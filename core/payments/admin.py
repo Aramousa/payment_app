@@ -16,7 +16,8 @@ class PaymentRecordAdmin(admin.ModelAdmin):
     search_fields = ('first_name', 'last_name', 'phone')
 
     def formatted_amount(self, obj):
-        return "{:,}".format(obj.amount)
+        return '{:,}'.format(obj.amount)
+
     formatted_amount.short_description = 'مبلغ'
 
 

@@ -26,6 +26,7 @@ def redirect_to_submit(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/', include('django.contrib.auth.urls')),
     path('', include('payments.urls')),
     path('', redirect_to_submit),
 ]

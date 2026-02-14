@@ -1,97 +1,118 @@
-{% load humanize %}
+﻿{% load humanize %}
 <!DOCTYPE html>
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
     <title>ثبت واریزی</title>
 
-    <!-- فونت و راست‌چین -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css" rel="stylesheet" type="text/css">
-
-    <!-- تقویم شمسی CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
 
-    <!-- Cleave.js -->
     <script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
-
-    <!-- jQuery و persian-date برای تقویم -->
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
 
     <style>
-        body {
-            font-family: Vazir, sans-serif;
-            direction: rtl;
-            background-color: #f7f7f7;
-            padding: 20px;
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        form {
-            max-width: 500px;
-            margin: auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        }
-        form button {
-            background-color: #007bff;
-            color: #fff;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        form button:hover {
-            background-color: #0056b3;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 8px;
-            margin: 5px 0 15px 0;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        /* جدول نمایش اطلاعات */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 40px;
-            background: #fff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        }
-        th, td {
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-            text-align: center;
-        }
-        th {
-            background-color: #007bff;
-            color: white;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
+        body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
+        h2 { text-align: center; margin-bottom: 20px; }
+        .top-bar { max-width: 500px; margin: 0 auto 16px auto; display: flex; justify-content: flex-start; }
+        .logout-form { max-width: none; margin: 0; background: transparent; padding: 0; border-radius: 0; box-shadow: none; }
+        .logout-form .logout-btn { background-color: #dc3545; color: #fff; border: none; border-radius: 5px; padding: 8px 14px; cursor: pointer; margin-top: 0; }
+        .logout-form .logout-btn:hover { background-color: #bb2d3b; }
+
+        #payment-form { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        #payment-form button { background-color: #007bff; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        #payment-form button:hover { background-color: #0056b3; }
+
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
+        th { background-color: #007bff; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+
+        .review-btn { background-color: #198754; color: #fff; border: none; border-radius: 5px; padding: 6px 10px; cursor: pointer; }
+        .review-btn:hover { background-color: #157347; }
+        .incomplete-btn { background-color: #fd7e14; color: #fff; border: none; border-radius: 5px; padding: 6px 10px; cursor: pointer; margin-top: 6px; }
+        .incomplete-btn:hover { background-color: #dc6d12; }
+        .edit-link { display: inline-block; background: #0d6efd; color: #fff; padding: 6px 10px; border-radius: 5px; text-decoration: none; }
+        .edit-link:hover { background: #0b5ed7; }
+
+        .filter-box { max-width: 1100px; margin: 20px auto 0; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
+        .filter-grid label { display: block; margin-bottom: 4px; font-size: 13px; }
+        .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .filter-actions button, .filter-actions a { border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; text-decoration: none; text-align: center; }
+        .apply-btn { background: #0d6efd; color: #fff; }
+        .clear-btn { background: #6c757d; color: #fff; }
     </style>
 </head>
 <body>
-    <h2>ثبت اطلاعات واریزی</h2>
+    <div class="top-bar">
+        <form class="logout-form" method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">خروج از حساب</button>
+        </form>
+    </div>
 
-    <!-- فرم ثبت -->
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">ثبت</button>
-    </form>
+    {% if not is_staff_user %}
+        <h2>ثبت اطلاعات واریزی</h2>
+        <form id="payment-form" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">ثبت</button>
+        </form>
+    {% else %}
+        <h2>بررسی اسناد ارسالی</h2>
+    {% endif %}
 
-    <!-- جدول نمایش گزارش‌ها -->
-    <h2>گزارش واریزی‌ها</h2>
+    <h2>گزارش واریزی ها</h2>
+
+    <div class="filter-box">
+        <form method="get" class="filter-grid">
+            {% if is_staff_user %}
+                <div>
+                    <label for="first_name">نام</label>
+                    <input id="first_name" type="text" name="first_name" value="{{ filters.first_name }}">
+                </div>
+                <div>
+                    <label for="last_name">نام خانوادگی</label>
+                    <input id="last_name" type="text" name="last_name" value="{{ filters.last_name }}">
+                </div>
+                <div>
+                    <label for="phone">شماره تلفن</label>
+                    <input id="phone" type="text" name="phone" value="{{ filters.phone }}">
+                </div>
+                <div>
+                    <label for="city">شهر</label>
+                    <input id="city" type="text" name="city" value="{{ filters.city }}">
+                </div>
+            {% endif %}
+            <div>
+                <label for="amount_filter">مبلغ</label>
+                <input id="amount_filter" type="text" name="amount" value="{{ filters.amount }}">
+            </div>
+            <div>
+                <label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label>
+                <input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}">
+            </div>
+            <div>
+                <label for="status">وضعیت</label>
+                <select id="status" name="status">
+                    <option value="">همه</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="apply-btn">اعمال فیلتر</button>
+                <a href="{% url 'submit' %}" class="clear-btn">حذف فیلتر</a>
+            </div>
+        </form>
+    </div>
+
     <table>
         <thead>
             <tr>
@@ -103,11 +124,14 @@
                 <th>مبلغ</th>
                 <th>تاریخ واریز</th>
                 <th>سند واریز</th>
+                <th>Tracking Code</th>
+                <th>Status</th>
+                <th>عملیات</th>
             </tr>
         </thead>
         <tbody>
             {% for payment in records %}
-             <tr>
+            <tr>
                 <td>{{ payment.first_name }}</td>
                 <td>{{ payment.last_name }}</td>
                 <td>{{ payment.organization }}</td>
@@ -116,39 +140,75 @@
                 <td>{{ payment.amount|intcomma }}</td>
                 <td>{{ payment.pay_date }}</td>
                 <td>
-                    {% if payment.receipt_image %}
-                        <a href="{{ payment.receipt_image.url }}" target="_blank">مشاهده</a>
+                    {% with receipts=payment.receipts.all %}
+                        {% if receipts %}
+                            {% for receipt in receipts %}
+                                <a href="{{ receipt.image.url }}" target="_blank">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %}<br>{% endif %}
+                            {% endfor %}
+                        {% elif payment.receipt_image %}
+                            <a href="{{ payment.receipt_image.url }}" target="_blank">مشاهده</a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    {% endwith %}
+                </td>
+                <td>{{ payment.tracking_code|default:"-" }}</td>
+                <td>{{ payment.get_status_display }}</td>
+                <td>
+                    {% if is_staff_user %}
+                        {% if payment.status == 'pending' or payment.status == 'reviewed' %}
+                            {% if payment.status == 'pending' %}
+                                <form method="post" action="{% url 'mark_reviewed' payment.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="review-btn">تغییر به بررسی شده</button>
+                                </form>
+                            {% endif %}
+                            <form method="post" action="{% url 'mark_incomplete' payment.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="incomplete-btn">اعلام نقص</button>
+                            </form>
+                        {% else %}
+                            -
+                        {% endif %}
                     {% else %}
-                        -
+                        {% if payment.status == 'rejected' %}
+                            <a class="edit-link" href="{% url 'edit_payment' payment.id %}">ویرایش</a>
+                        {% elif payment.status == 'pending' %}
+                            در حال بررسی
+                        {% else %}
+                            -
+                        {% endif %}
                     {% endif %}
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="8">اطلاعاتی موجود نیست</td></tr>
+            <tr><td colspan="11">اطلاعاتی موجود نیست</td></tr>
             {% endfor %}
         </tbody>
     </table>
 
     <script>
     $(document).ready(function(){
-        // تقویم شمسی
         $('.jalali-date').persianDatepicker({
             format: 'YYYY/MM/DD',
             observer: true,
             initialValue: false
         });
 
-        // جداکننده هزارگان
-       new Cleave('.amount-input', {
+        new Cleave('.amount-input', {
             numeral: true,
             numeralThousandsGroupStyle: 'thousand'
-            });
-        document.querySelector('form').addEventListener('submit', function () {
-            const amountInput = document.querySelector('.amount-input');
-            if (amountInput) {
-            amountInput.value = amountInput.value.replace(/,/g, '');
-            }
         });
+
+        const paymentForm = document.querySelector('#payment-form');
+        if (paymentForm) {
+            paymentForm.addEventListener('submit', function () {
+                const amountInput = document.querySelector('.amount-input');
+                if (amountInput) {
+                    amountInput.value = amountInput.value.replace(/,/g, '');
+                }
+            });
+        }
     });
     </script>
 </body>

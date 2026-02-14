@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>ویرایش فیش واریزی</title>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+    <style>
+        body {
+            font-family: Vazir, sans-serif;
+            direction: rtl;
+            background-color: #f7f7f7;
+            padding: 20px;
+        }
+        .box {
+            max-width: 520px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,.2);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button, a {
+            border: none;
+            border-radius: 6px;
+            padding: 10px 14px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .save-btn {
+            background: #0d6efd;
+            color: #fff;
+        }
+        .back-link {
+            background: #6c757d;
+            color: #fff;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>ویرایش فیش ناقص</h2>
+        {% if payment.receipts.all %}
+            <p>تصاویر فعلی:</p>
+            {% for receipt in payment.receipts.all %}
+                <a href="{{ receipt.image.url }}" target="_blank">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+            {% endfor %}
+            <hr>
+        {% endif %}
+        <form id="payment-form" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="save-btn">ثبت اصلاحات</button>
+            <a href="{% url 'submit' %}" class="back-link">بازگشت</a>
+        </form>
+    </div>
+    <script>
+    $(document).ready(function () {
+        $('.jalali-date').persianDatepicker({
+            format: 'YYYY/MM/DD',
+            observer: true,
+            initialValue: false
+        });
+        new Cleave('.amount-input', {
+            numeral: true,
+            numeralThousandsGroupStyle: 'thousand'
+        });
+        document.querySelector('#payment-form').addEventListener('submit', function () {
+            const amountInput = document.querySelector('.amount-input');
+            if (amountInput) {
+                amountInput.value = amountInput.value.replace(/,/g, '');
+            }
+        });
+    });
+    </script>
+</body>
+</html>

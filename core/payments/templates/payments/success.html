@@ -1,11 +1,54 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
     <title>ثبت موفق</title>
+    <style>
+        body {
+            font-family: Tahoma, sans-serif;
+            direction: rtl;
+            background: #f5f6f8;
+            padding: 24px;
+        }
+        .card {
+            max-width: 500px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.08);
+            padding: 24px;
+            text-align: center;
+        }
+        a, button {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        a {
+            background: #0d6efd;
+            color: #fff;
+        }
+        button {
+            background: #dc3545;
+            color: #fff;
+        }
+        .logout-form {
+            margin: 0;
+        }
+    </style>
 </head>
 <body>
-    <h2>ثبت اطلاعات با موفقیت انجام شد!</h2>
-    <a href="/submit/">ثبت واریزی جدید</a>
+    <div class="card">
+        <h2>ثبت اطلاعات با موفقیت انجام شد</h2>
+        <a href="/submit/">ثبت واریزی جدید</a>
+        <form class="logout-form" method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit">خروج از حساب</button>
+        </form>
+    </div>
 </body>
 </html>
