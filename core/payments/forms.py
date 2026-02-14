@@ -1,8 +1,10 @@
-﻿from django import forms
+﻿import hashlib
+
+from django import forms
 from django.core.exceptions import ValidationError
 from django_jalali.forms import jDateField, jDateInput
-import hashlib
-from .models import PaymentRecord
+
+from .models import Counterparty, PaymentRecord
 
 
 class MultiFileInput(forms.ClearableFileInput):
@@ -116,3 +118,30 @@ class PaymentRecordForm(forms.ModelForm):
 
     def receipt_payload(self):
         return self._receipt_payload
+
+
+class StaffStatusUpdateForm(forms.Form):
+    status = forms.ChoiceField(
+        choices=PaymentRecord.STATUS_CHOICES,
+        label='وضعیت جدید',
+    )
+    note = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+        label='توضیحات',
+    )
+    counterparty = forms.ModelChoiceField(
+        queryset=Counterparty.objects.all(),
+        required=False,
+        label='طرف حساب',
+    )
+
+
+class CounterpartyForm(forms.ModelForm):
+    class Meta:
+        model = Counterparty
+        fields = ['name', 'description']
+        labels = {
+            'name': 'طرف حساب',
+            'description': 'توضیحات',
+        }

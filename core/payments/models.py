@@ -1,18 +1,56 @@
+﻿from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
 from django_jalali.db import models as jmodels
 
 
+class Counterparty(models.Model):
+    name = models.CharField('طرف حساب', max_length=120, unique=True)
+    description = models.CharField('توضیحات', max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Counterparty records are permanent and cannot be deleted.')
+
+
 class PaymentRecord(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_COMMERCIAL_REVIEW = 'commercial_review'
+    STATUS_FINANCE_REVIEW = 'finance_review'
+    STATUS_APPROVED = 'approved'
+    STATUS_FINAL_APPROVED = 'final_approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_INCOMPLETE = 'incomplete'
+
     STATUS_CHOICES = [
-        ('pending', 'در حال بررسی'),
-        ('reviewed', 'بررسی شده'),
-        ('approved', 'تأیید شده'),
-        ('rejected', 'رد شده'),
-        ('archived', 'بایگانی شده'),
+        (STATUS_PENDING, 'در حال بررسی'),
+        (STATUS_COMMERCIAL_REVIEW, 'بررسی بازرگانی'),
+        (STATUS_FINANCE_REVIEW, 'بررسی مالی'),
+        (STATUS_APPROVED, 'تایید شده'),
+        (STATUS_FINAL_APPROVED, 'تایید نهایی'),
+        (STATUS_REJECTED, 'رد شده'),
+        (STATUS_INCOMPLETE, 'ناقص'),
     ]
 
+    CUSTOMER_VISIBLE_LABELS = {
+        STATUS_PENDING: 'در حال بررسی',
+        STATUS_COMMERCIAL_REVIEW: 'در حال بررسی',
+        STATUS_FINANCE_REVIEW: 'در حال بررسی',
+        STATUS_APPROVED: 'تایید شده',
+        STATUS_FINAL_APPROVED: 'تایید شده',
+        STATUS_REJECTED: 'رد شده',
+        STATUS_INCOMPLETE: 'ناقص',
+    }
+
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    counterparty = models.ForeignKey(Counterparty, on_delete=models.PROTECT, null=True, blank=True, related_name='payments')
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     organization = models.CharField(max_length=100)
@@ -20,18 +58,32 @@ class PaymentRecord(models.Model):
     phone = models.CharField(max_length=20)
     amount = models.BigIntegerField()
     pay_date = jmodels.jDateField(verbose_name='تاریخ واریز')
-    tracking_code = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-        verbose_name='کد پیگیری'
-    )
+    tracking_code = models.CharField(max_length=50, blank=True, null=True, verbose_name='کد پیگیری')
     receipt_image = models.ImageField(upload_to='receipts/', blank=True, null=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    last_staff_note = models.TextField('آخرین توضیح کارشناس', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} - {self.amount}"
+
+    @property
+    def customer_status_label(self):
+        return self.CUSTOMER_VISIBLE_LABELS.get(self.status, 'در حال بررسی')
+
+    @property
+    def status_flag_class(self):
+        return {
+            self.STATUS_COMMERCIAL_REVIEW: 'flag-blue',
+            self.STATUS_FINANCE_REVIEW: 'flag-purple',
+            self.STATUS_APPROVED: 'flag-green',
+            self.STATUS_FINAL_APPROVED: 'flag-green',
+            self.STATUS_REJECTED: 'flag-red',
+            self.STATUS_INCOMPLETE: 'flag-yellow',
+        }.get(self.status, 'flag-gray')
 
 
 class UserProfile(models.Model):
@@ -42,21 +94,11 @@ class UserProfile(models.Model):
         ('staff', 'کارمند'),
     )
 
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name='profile'
-    )
-
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     phone = models.CharField('شماره تلفن', max_length=20)
     organization = models.CharField('نام مجموعه', max_length=100, blank=True)
     city = models.CharField('شهر', max_length=50, blank=True)
-    role = models.CharField(
-        'نوع کاربر',
-        max_length=10,
-        choices=ROLE_CHOICES,
-        default='customer'
-    )
+    role = models.CharField('نوع کاربر', max_length=10, choices=ROLE_CHOICES, default='customer')
 
     def __str__(self):
         return self.user.username
@@ -72,3 +114,28 @@ class PaymentReceipt(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['payment', 'file_hash'], name='uniq_payment_receipt_hash'),
         ]
+
+
+class PaymentActivityLog(models.Model):
+    ACTION_CREATED = 'created'
+    ACTION_EDITED = 'edited'
+    ACTION_STATUS_CHANGED = 'status_changed'
+    ACTION_VIEWED = 'viewed'
+
+    ACTION_CHOICES = [
+        (ACTION_CREATED, 'ایجاد'),
+        (ACTION_EDITED, 'ویرایش'),
+        (ACTION_STATUS_CHANGED, 'تغییر وضعیت'),
+        (ACTION_VIEWED, 'رویت'),
+    ]
+
+    payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    from_status = models.CharField(max_length=20, blank=True)
+    to_status = models.CharField(max_length=20, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']

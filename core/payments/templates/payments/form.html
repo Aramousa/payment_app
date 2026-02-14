@@ -16,10 +16,30 @@
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
         h2 { text-align: center; margin-bottom: 20px; }
-        .top-bar { max-width: 500px; margin: 0 auto 16px auto; display: flex; justify-content: flex-start; }
-        .logout-form { max-width: none; margin: 0; background: transparent; padding: 0; border-radius: 0; box-shadow: none; }
-        .logout-form .logout-btn { background-color: #dc3545; color: #fff; border: none; border-radius: 5px; padding: 8px 14px; cursor: pointer; margin-top: 0; }
-        .logout-form .logout-btn:hover { background-color: #bb2d3b; }
+
+        .top-bar {
+            max-width: 1100px;
+            margin: 0 auto 16px auto;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .top-actions { display: flex; gap: 8px; }
+
+        .button-link, .logout-btn {
+            border: none;
+            border-radius: 5px;
+            padding: 8px 14px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #fff;
+            display: inline-block;
+        }
+        .logout-btn { background-color: #dc3545; }
+        .button-link { background: #0d6efd; }
+
+        .logout-form { margin: 0; }
 
         #payment-form { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
         #payment-form button { background-color: #007bff; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
@@ -28,28 +48,47 @@
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; vertical-align: top; }
         th { background-color: #007bff; color: white; }
-        tr:hover { background-color: #f1f1f1; }
 
-        .review-btn { background-color: #198754; color: #fff; border: none; border-radius: 5px; padding: 6px 10px; cursor: pointer; }
-        .review-btn:hover { background-color: #157347; }
-        .incomplete-btn { background-color: #fd7e14; color: #fff; border: none; border-radius: 5px; padding: 6px 10px; cursor: pointer; margin-top: 6px; }
-        .incomplete-btn:hover { background-color: #dc6d12; }
-        .edit-link { display: inline-block; background: #0d6efd; color: #fff; padding: 6px 10px; border-radius: 5px; text-decoration: none; }
-        .edit-link:hover { background: #0b5ed7; }
-
-        .filter-box { max-width: 1100px; margin: 20px auto 0; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+        .filter-box { max-width: 1200px; margin: 20px auto 0; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
         .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
         .filter-grid label { display: block; margin-bottom: 4px; font-size: 13px; }
         .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .filter-actions button, .filter-actions a { border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; text-decoration: none; text-align: center; }
         .apply-btn { background: #0d6efd; color: #fff; }
         .clear-btn { background: #6c757d; color: #fff; }
+
+        .status-pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 16px;
+            color: #fff;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .flag-blue { background: #1e88e5; }
+        .flag-purple { background: #7b1fa2; }
+        .flag-green { background: #2e7d32; }
+        .flag-red { background: #c62828; }
+        .flag-yellow { background: #f9a825; color: #111; }
+        .flag-gray { background: #546e7a; }
+
+        .staff-action textarea { min-height: 60px; }
+        .staff-action button { border: none; border-radius: 5px; padding: 6px 10px; background: #198754; color: #fff; cursor: pointer; width: 100%; }
+        .note-box { font-size: 12px; color: #333; background: #f8f9fa; border-radius: 6px; padding: 6px; margin-top: 6px; }
+
+        .timeline-link { margin-top: 6px; display: inline-block; color: #0d6efd; text-decoration: none; }
+        .edit-link { display: inline-block; background: #fd7e14; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; }
     </style>
 </head>
 <body>
     <div class="top-bar">
+        <div class="top-actions">
+            {% if is_staff_user %}
+                <a href="{% url 'counterparties_manage' %}" class="button-link">مدیریت طرف حساب</a>
+            {% endif %}
+        </div>
         <form class="logout-form" method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button type="submit" class="logout-btn">خروج از حساب</button>
@@ -88,7 +127,17 @@
                     <label for="city">شهر</label>
                     <input id="city" type="text" name="city" value="{{ filters.city }}">
                 </div>
+                <div>
+                    <label for="counterparty">طرف حساب</label>
+                    <select id="counterparty" name="counterparty">
+                        <option value="">همه</option>
+                        {% for cp in counterparties %}
+                            <option value="{{ cp.id }}" {% if filters.counterparty == cp.id|stringformat:"s" %}selected{% endif %}>{{ cp.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             {% endif %}
+
             <div>
                 <label for="amount_filter">مبلغ</label>
                 <input id="amount_filter" type="text" name="amount" value="{{ filters.amount }}">
@@ -123,9 +172,12 @@
                 <th>شماره تلفن</th>
                 <th>مبلغ</th>
                 <th>تاریخ واریز</th>
-                <th>سند واریز</th>
-                <th>Tracking Code</th>
-                <th>Status</th>
+                <th>سند</th>
+                {% if is_staff_user %}
+                    <th>طرف حساب</th>
+                {% endif %}
+                <th>وضعیت</th>
+                <th>توضیح کارشناس</th>
                 <th>عملیات</th>
             </tr>
         </thead>
@@ -152,37 +204,55 @@
                         {% endif %}
                     {% endwith %}
                 </td>
-                <td>{{ payment.tracking_code|default:"-" }}</td>
-                <td>{{ payment.get_status_display }}</td>
+                {% if is_staff_user %}
+                    <td>{{ payment.counterparty|default:'-' }}</td>
+                {% endif %}
                 <td>
                     {% if is_staff_user %}
-                        {% if payment.status == 'pending' or payment.status == 'reviewed' %}
-                            {% if payment.status == 'pending' %}
-                                <form method="post" action="{% url 'mark_reviewed' payment.id %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="review-btn">تغییر به بررسی شده</button>
-                                </form>
-                            {% endif %}
-                            <form method="post" action="{% url 'mark_incomplete' payment.id %}">
-                                {% csrf_token %}
-                                <button type="submit" class="incomplete-btn">اعلام نقص</button>
-                            </form>
-                        {% else %}
-                            -
-                        {% endif %}
+                        <span class="status-pill {{ payment.status_flag_class }}">{{ payment.get_status_display }}</span>
                     {% else %}
-                        {% if payment.status == 'rejected' %}
+                        <span class="status-pill {{ payment.status_flag_class }}">{{ payment.customer_status_label }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if payment.last_staff_note %}
+                        <div class="note-box">{{ payment.last_staff_note }}</div>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if is_staff_user %}
+                        <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
+                            {% csrf_token %}
+                            <select name="status" required>
+                                {% for value, label in staff_action_choices %}
+                                    <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <textarea name="note" placeholder="توضیح (برای مشتری نمایش داده می‌شود)"></textarea>
+                            <select name="counterparty">
+                                <option value="">بدون طرف حساب</option>
+                                {% for cp in counterparties %}
+                                    <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit">ثبت وضعیت</button>
+                        </form>
+                    {% else %}
+                        {% if payment.status == 'incomplete' %}
                             <a class="edit-link" href="{% url 'edit_payment' payment.id %}">ویرایش</a>
-                        {% elif payment.status == 'pending' %}
-                            در حال بررسی
                         {% else %}
                             -
                         {% endif %}
                     {% endif %}
+                    <a class="timeline-link" href="{% url 'payment_timeline' payment.id %}">تاریخچه</a>
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="11">اطلاعاتی موجود نیست</td></tr>
+            <tr>
+                <td colspan="{% if is_staff_user %}12{% else %}11{% endif %}">اطلاعاتی موجود نیست</td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
