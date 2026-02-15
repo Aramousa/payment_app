@@ -64,6 +64,7 @@ class PaymentRecord(models.Model):
     tracking_code = models.CharField(max_length=50, blank=True, null=True, verbose_name='کد پیگیری')
     receipt_image = models.ImageField(upload_to='receipts/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    locked_by_finance = models.BooleanField(default=False)
     last_staff_note = models.TextField('آخرین توضیح کارشناس', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

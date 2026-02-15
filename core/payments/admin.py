@@ -23,6 +23,7 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         'last_name',
         'formatted_amount',
         'status',
+        'locked_by_finance',
         'pay_date',
         'city',
         'counterparty',

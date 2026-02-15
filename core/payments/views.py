@@ -52,6 +52,14 @@ def _user_role(user):
         return 'staff' if user.is_staff else 'customer'
 
 
+def _staff_role_label(role):
+    return {
+        'commercial': 'بازرگانی',
+        'finance': 'مالی',
+        'staff': 'کارمندی',
+    }.get(role, '')
+
+
 def _is_staff_user(user):
     if not user.is_authenticated:
         return False
@@ -81,11 +89,15 @@ def _staff_status_choices_for_role(role):
     return PaymentRecord.STATUS_CHOICES
 
 
-def _can_staff_act_on_payment(role, payment):
+def _can_staff_act_on_payment(role, payment, is_system_admin=False):
+    if is_system_admin:
+        return True
+    if payment.locked_by_finance:
+        return False
     if role == 'commercial':
         return payment.status in {PaymentRecord.STATUS_PENDING, PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL}
     if role == 'finance':
-        return payment.status in {PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FINANCE_REVIEW}
+        return True
     return True
 
 
@@ -154,7 +166,7 @@ def _log_text(log):
     return f"{role} ({actor}) عملیاتی انجام داد."
 
 
-def _enrich_records(records, staff_role=''):
+def _enrich_records(records, staff_role='', is_system_admin=False):
     status_order = [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_FINANCE_REVIEW,
@@ -191,7 +203,11 @@ def _enrich_records(records, staff_role=''):
             }
             for log in payment.activity_logs.all()[:5]
         ]
-        payment.staff_can_act = _can_staff_act_on_payment(staff_role, payment) if staff_role else False
+        payment.staff_can_act = _can_staff_act_on_payment(
+            staff_role,
+            payment,
+            is_system_admin=is_system_admin,
+        ) if staff_role else False
         payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
     return records
 
@@ -286,6 +302,7 @@ def create_payment(request):
     initial_data = _account_initial_data(request.user, profile)
     is_staff_user = _is_staff_user(request.user)
     staff_role = _user_role(request.user) if is_staff_user else ''
+    is_system_admin = request.user.is_superuser
 
     if request.method == 'POST':
         if is_staff_user:
@@ -309,7 +326,8 @@ def create_payment(request):
 
     records = _records_for_user(request.user)
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
-    records = _enrich_records(records, staff_role=staff_role)
+    records = _enrich_records(records, staff_role=staff_role, is_system_admin=is_system_admin)
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
     return render(request, 'payments/form.html', {
         'form': form,
@@ -319,6 +337,10 @@ def create_payment(request):
         'status_choices': PaymentRecord.STATUS_CHOICES if is_staff_user else CUSTOMER_STATUSES,
         'counterparties': Counterparty.objects.all() if is_staff_user else [],
         'staff_user_role': staff_role,
+        'staff_role_label': _staff_role_label(staff_role),
+        'can_manage_counterparties': is_system_admin,
+        'is_system_admin': is_system_admin,
+        'user_display_name': user_display_name,
     })
 
 
@@ -336,7 +358,7 @@ def staff_update_status(request, payment_id):
 
     payment = get_object_or_404(PaymentRecord, id=payment_id)
     staff_role = _user_role(request.user)
-    if not _can_staff_act_on_payment(staff_role, payment):
+    if not _can_staff_act_on_payment(staff_role, payment, is_system_admin=request.user.is_superuser):
         return HttpResponseForbidden('You cannot modify this payment at its current stage.')
 
     form = StaffStatusUpdateForm(request.POST)
@@ -345,7 +367,7 @@ def staff_update_status(request, payment_id):
 
     target_status = form.cleaned_data['status']
     allowed_statuses = {value for value, _ in _staff_status_choices_for_role(staff_role)}
-    if target_status not in allowed_statuses:
+    if not request.user.is_superuser and target_status not in allowed_statuses:
         return HttpResponseForbidden('This status transition is not allowed for your role.')
 
     note = (form.cleaned_data['note'] or '').strip()
@@ -356,11 +378,21 @@ def staff_update_status(request, payment_id):
     payment.status = target_status
     payment.last_staff_note = note
 
+    # Finance can hard-lock records on terminal decisions.
+    if request.user.is_superuser:
+        payment.locked_by_finance = False
+    elif staff_role == 'finance' and target_status in {
+        PaymentRecord.STATUS_FINAL_APPROVED,
+        PaymentRecord.STATUS_REJECTED,
+        PaymentRecord.STATUS_INCOMPLETE,
+    }:
+        payment.locked_by_finance = True
+
     selected_counterparty = form.cleaned_data['counterparty']
     if selected_counterparty and staff_role in {'commercial', 'staff'}:
         payment.counterparty = selected_counterparty
 
-    payment.save(update_fields=['status', 'last_staff_note', 'counterparty'])
+    payment.save(update_fields=['status', 'last_staff_note', 'counterparty', 'locked_by_finance'])
 
     _log_activity(
         payment,
@@ -407,6 +439,7 @@ def edit_payment(request, payment_id):
             payment.phone = initial_data['phone']
             from_status = payment.status
             payment.status = PaymentRecord.STATUS_PENDING
+            payment.locked_by_finance = False
             payment.save()
             _save_receipts(payment, form)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_EDITED, from_status=from_status, to_status=payment.status)
@@ -431,7 +464,7 @@ def payment_timeline(request, payment_id):
 
 @login_required
 def counterparties_manage(request):
-    if not _is_staff_user(request.user):
+    if not request.user.is_superuser:
         return HttpResponseForbidden('You do not have permission to manage counterparties.')
 
     if request.method == 'POST':
@@ -448,7 +481,7 @@ def counterparties_manage(request):
 
 @login_required
 def counterparty_edit(request, counterparty_id):
-    if not _is_staff_user(request.user):
+    if not request.user.is_superuser:
         return HttpResponseForbidden('You do not have permission to manage counterparties.')
 
     counterparty = get_object_or_404(Counterparty, id=counterparty_id)
