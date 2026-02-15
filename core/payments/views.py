@@ -10,12 +10,46 @@ from .models import Counterparty, PaymentActivityLog, PaymentRecord, PaymentRece
 
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
+STATUS_FLAG_META = {
+    PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('رویت بازرگانی', 'flag-blue'),
+    PaymentRecord.STATUS_FINANCE_REVIEW: ('رویت مالی', 'flag-purple'),
+    PaymentRecord.STATUS_APPROVED: ('تایید شده', 'flag-green'),
+    PaymentRecord.STATUS_FINAL_APPROVED: ('تایید نهایی', 'flag-green'),
+    PaymentRecord.STATUS_REJECTED: ('رد شده', 'flag-red'),
+    PaymentRecord.STATUS_INCOMPLETE: ('ناقص', 'flag-yellow'),
+    PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: ('عودت به بازرگانی', 'flag-blue'),
+}
+STATUS_PROGRESS_FLOWS = {
+    PaymentRecord.STATUS_COMMERCIAL_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW],
+    PaymentRecord.STATUS_FINANCE_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FINANCE_REVIEW],
+    PaymentRecord.STATUS_APPROVED: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FINANCE_REVIEW, PaymentRecord.STATUS_APPROVED],
+    PaymentRecord.STATUS_FINAL_APPROVED: [
+        PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        PaymentRecord.STATUS_FINANCE_REVIEW,
+        PaymentRecord.STATUS_APPROVED,
+        PaymentRecord.STATUS_FINAL_APPROVED,
+    ],
+    PaymentRecord.STATUS_REJECTED: [PaymentRecord.STATUS_REJECTED],
+    PaymentRecord.STATUS_INCOMPLETE: [PaymentRecord.STATUS_INCOMPLETE],
+    PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL],
+}
 CUSTOMER_STATUSES = [
     (PaymentRecord.STATUS_PENDING, 'در حال بررسی'),
-    (PaymentRecord.STATUS_APPROVED, 'تایید شده'),
+    (PaymentRecord.STATUS_FINAL_APPROVED, 'تایید نهایی'),
     (PaymentRecord.STATUS_REJECTED, 'رد شده'),
     (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
 ]
+
+
+def _user_role(user):
+    if not user.is_authenticated:
+        return ''
+    if user.is_superuser:
+        return 'staff'
+    try:
+        return user.profile.role
+    except UserProfile.DoesNotExist:
+        return 'staff' if user.is_staff else 'customer'
 
 
 def _is_staff_user(user):
@@ -27,6 +61,32 @@ def _is_staff_user(user):
         return user.profile.role in STAFF_ROLES
     except UserProfile.DoesNotExist:
         return False
+
+
+def _staff_status_choices_for_role(role):
+    if role == 'commercial':
+        return [
+            (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'تایید بازرگانی'),
+            (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
+            (PaymentRecord.STATUS_REJECTED, 'رد شده'),
+        ]
+    if role == 'finance':
+        return [
+            (PaymentRecord.STATUS_FINANCE_REVIEW, 'تایید مالی'),
+            (PaymentRecord.STATUS_FINAL_APPROVED, 'تایید نهایی'),
+            (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
+            (PaymentRecord.STATUS_REJECTED, 'رد شده'),
+            (PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
+        ]
+    return PaymentRecord.STATUS_CHOICES
+
+
+def _can_staff_act_on_payment(role, payment):
+    if role == 'commercial':
+        return payment.status in {PaymentRecord.STATUS_PENDING, PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL}
+    if role == 'finance':
+        return payment.status in {PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FINANCE_REVIEW}
+    return True
 
 
 def _records_for_user(user):
@@ -54,6 +114,86 @@ def _log_activity(payment, actor, action, from_status='', to_status='', note='')
         to_status=to_status or '',
         note=note or '',
     )
+
+
+def _role_title(user):
+    if not user:
+        return 'کاربر'
+    try:
+        role = user.profile.role
+    except UserProfile.DoesNotExist:
+        role = ''
+    return {
+        'commercial': 'کاربر بازرگانی',
+        'finance': 'کاربر مالی',
+        'staff': 'کاربر کارمند',
+        'customer': 'مشتری',
+    }.get(role, 'کاربر')
+
+
+def _display_name(user):
+    if not user:
+        return 'سیستم'
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    return full_name or user.username
+
+
+def _log_text(log):
+    actor = _display_name(log.actor)
+    role = _role_title(log.actor)
+    if log.action == PaymentActivityLog.ACTION_VIEWED:
+        return f"{role} ({actor}) سند را مشاهده کرد."
+    if log.action == PaymentActivityLog.ACTION_CREATED:
+        return f"{role} ({actor}) سند را بارگذاری کرد."
+    if log.action == PaymentActivityLog.ACTION_EDITED:
+        return f"{role} ({actor}) سند را ویرایش کرد."
+    if log.action == PaymentActivityLog.ACTION_STATUS_CHANGED:
+        status_labels = dict(PaymentRecord.STATUS_CHOICES)
+        status_text = status_labels.get(log.to_status, log.to_status)
+        return f"{role} ({actor}) وضعیت سند را به «{status_text}» تغییر داد."
+    return f"{role} ({actor}) عملیاتی انجام داد."
+
+
+def _enrich_records(records, staff_role=''):
+    status_order = [
+        PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        PaymentRecord.STATUS_FINANCE_REVIEW,
+        PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        PaymentRecord.STATUS_APPROVED,
+        PaymentRecord.STATUS_FINAL_APPROVED,
+        PaymentRecord.STATUS_REJECTED,
+        PaymentRecord.STATUS_INCOMPLETE,
+    ]
+    records = list(records)
+    for payment in records:
+        reached = set()
+        for log in payment.activity_logs.all():
+            if log.to_status in STATUS_FLAG_META:
+                reached.add(log.to_status)
+        if payment.status in STATUS_FLAG_META:
+            reached.add(payment.status)
+            for step in STATUS_PROGRESS_FLOWS.get(payment.status, []):
+                reached.add(step)
+
+        payment.row_flags = [
+            {
+                'label': STATUS_FLAG_META[code][0],
+                'css': STATUS_FLAG_META[code][1],
+            }
+            for code in status_order
+            if code in reached
+        ]
+        payment.timeline_lines = [
+            {
+                'time': log.created_at,
+                'text': _log_text(log),
+                'note': log.note,
+            }
+            for log in payment.activity_logs.all()[:5]
+        ]
+        payment.staff_can_act = _can_staff_act_on_payment(staff_role, payment) if staff_role else False
+        payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
+    return records
 
 
 def _apply_record_filters(records, request, is_staff_user):
@@ -88,8 +228,26 @@ def _apply_record_filters(records, request, is_staff_user):
         records = records.filter(pay_date=parsed_date)
 
     valid_statuses = {choice[0] for choice in PaymentRecord.STATUS_CHOICES}
-    if filters['status'] in valid_statuses:
-        records = records.filter(status=filters['status'])
+    if is_staff_user:
+        if filters['status'] in valid_statuses:
+            records = records.filter(status=filters['status'])
+    else:
+        customer_status_map = {
+            PaymentRecord.STATUS_PENDING: [
+                PaymentRecord.STATUS_PENDING,
+                PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+                PaymentRecord.STATUS_FINANCE_REVIEW,
+                PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+            ],
+            PaymentRecord.STATUS_FINAL_APPROVED: [
+                PaymentRecord.STATUS_APPROVED,
+                PaymentRecord.STATUS_FINAL_APPROVED,
+            ],
+            PaymentRecord.STATUS_REJECTED: [PaymentRecord.STATUS_REJECTED],
+            PaymentRecord.STATUS_INCOMPLETE: [PaymentRecord.STATUS_INCOMPLETE],
+        }
+        if filters['status'] in customer_status_map:
+            records = records.filter(status__in=customer_status_map[filters['status']])
 
     return records, filters
 
@@ -127,6 +285,7 @@ def create_payment(request):
 
     initial_data = _account_initial_data(request.user, profile)
     is_staff_user = _is_staff_user(request.user)
+    staff_role = _user_role(request.user) if is_staff_user else ''
 
     if request.method == 'POST':
         if is_staff_user:
@@ -150,6 +309,7 @@ def create_payment(request):
 
     records = _records_for_user(request.user)
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
+    records = _enrich_records(records, staff_role=staff_role)
 
     return render(request, 'payments/form.html', {
         'form': form,
@@ -158,7 +318,7 @@ def create_payment(request):
         'filters': active_filters,
         'status_choices': PaymentRecord.STATUS_CHOICES if is_staff_user else CUSTOMER_STATUSES,
         'counterparties': Counterparty.objects.all() if is_staff_user else [],
-        'staff_action_choices': PaymentRecord.STATUS_CHOICES,
+        'staff_user_role': staff_role,
     })
 
 
@@ -175,16 +335,29 @@ def staff_update_status(request, payment_id):
         return HttpResponseForbidden('You do not have permission to review documents.')
 
     payment = get_object_or_404(PaymentRecord, id=payment_id)
+    staff_role = _user_role(request.user)
+    if not _can_staff_act_on_payment(staff_role, payment):
+        return HttpResponseForbidden('You cannot modify this payment at its current stage.')
+
     form = StaffStatusUpdateForm(request.POST)
     if not form.is_valid():
         return redirect(request.META.get('HTTP_REFERER') or 'submit')
 
+    target_status = form.cleaned_data['status']
+    allowed_statuses = {value for value, _ in _staff_status_choices_for_role(staff_role)}
+    if target_status not in allowed_statuses:
+        return HttpResponseForbidden('This status transition is not allowed for your role.')
+
+    note = (form.cleaned_data['note'] or '').strip()
+    if target_status in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE} and not note:
+        return HttpResponseForbidden('A note is required for rejected or incomplete statuses.')
+
     from_status = payment.status
-    payment.status = form.cleaned_data['status']
-    payment.last_staff_note = form.cleaned_data['note'] or ''
+    payment.status = target_status
+    payment.last_staff_note = note
 
     selected_counterparty = form.cleaned_data['counterparty']
-    if selected_counterparty:
+    if selected_counterparty and staff_role in {'commercial', 'staff'}:
         payment.counterparty = selected_counterparty
 
     payment.save(update_fields=['status', 'last_staff_note', 'counterparty'])

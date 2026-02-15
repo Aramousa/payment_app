@@ -16,40 +16,18 @@
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
         h2 { text-align: center; margin-bottom: 20px; }
-
-        .top-bar {
-            max-width: 1100px;
-            margin: 0 auto 16px auto;
-            display: flex;
-            justify-content: space-between;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
+        .top-bar { max-width: 1100px; margin: 0 auto 16px auto; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .top-actions { display: flex; gap: 8px; }
 
-        .button-link, .logout-btn {
-            border: none;
-            border-radius: 5px;
-            padding: 8px 14px;
-            cursor: pointer;
-            text-decoration: none;
-            color: #fff;
-            display: inline-block;
-        }
+        .button-link, .logout-btn { border: none; border-radius: 5px; padding: 8px 14px; cursor: pointer; text-decoration: none; color: #fff; display: inline-block; }
         .logout-btn { background-color: #dc3545; }
         .button-link { background: #0d6efd; }
-
         .logout-form { margin: 0; }
 
         #payment-form { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
         #payment-form button { background-color: #007bff; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
-        #payment-form button:hover { background-color: #0056b3; }
 
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; vertical-align: top; }
-        th { background-color: #007bff; color: white; }
 
         .filter-box { max-width: 1200px; margin: 20px auto 0; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
         .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
@@ -59,14 +37,17 @@
         .apply-btn { background: #0d6efd; color: #fff; }
         .clear-btn { background: #6c757d; color: #fff; }
 
-        .status-pill {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 16px;
-            color: #fff;
-            font-size: 12px;
-            line-height: 1.5;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; vertical-align: top; }
+        th { background-color: #007bff; color: white; }
+
+        tr.summary-row { cursor: pointer; }
+        tr.summary-row:hover { background: #f5f9ff; }
+        tr.detail-row { display: none; background: #fafafa; }
+        tr.detail-row.open { display: table-row; }
+
+        .status-pill { display: inline-block; padding: 4px 10px; border-radius: 16px; color: #fff; font-size: 12px; line-height: 1.5; }
+        .flag-chip { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; margin: 2px; color: #fff; }
         .flag-blue { background: #1e88e5; }
         .flag-purple { background: #7b1fa2; }
         .flag-green { background: #2e7d32; }
@@ -74,12 +55,21 @@
         .flag-yellow { background: #f9a825; color: #111; }
         .flag-gray { background: #546e7a; }
 
-        .staff-action textarea { min-height: 60px; }
-        .staff-action button { border: none; border-radius: 5px; padding: 6px 10px; background: #198754; color: #fff; cursor: pointer; width: 100%; }
-        .note-box { font-size: 12px; color: #333; background: #f8f9fa; border-radius: 6px; padding: 6px; margin-top: 6px; }
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; text-align: right; }
+        .detail-card { background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; padding: 10px; }
 
-        .timeline-link { margin-top: 6px; display: inline-block; color: #0d6efd; text-decoration: none; }
-        .edit-link { display: inline-block; background: #fd7e14; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; }
+        .staff-action textarea { min-height: 58px; }
+        .staff-action button { border: none; border-radius: 5px; padding: 8px 10px; background: #198754; color: #fff; cursor: pointer; width: 100%; }
+        .staff-quick { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+        .staff-quick select, .staff-quick input { width: auto; min-width: 140px; margin: 0; }
+        .staff-quick button { border: none; border-radius: 5px; padding: 6px 10px; background: #198754; color: #fff; cursor: pointer; }
+        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #0d6efd; color: #fff; cursor: pointer; margin-top: 6px; }
+        .timeline-list { margin: 0; padding-right: 18px; }
+        .timeline-list li { margin-bottom: 6px; }
+        .tiny { color: #666; font-size: 12px; }
+
+        .edit-link { display: inline-block; background: #fd7e14; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; margin-bottom: 6px; }
+        .track-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -111,22 +101,10 @@
     <div class="filter-box">
         <form method="get" class="filter-grid">
             {% if is_staff_user %}
-                <div>
-                    <label for="first_name">نام</label>
-                    <input id="first_name" type="text" name="first_name" value="{{ filters.first_name }}">
-                </div>
-                <div>
-                    <label for="last_name">نام خانوادگی</label>
-                    <input id="last_name" type="text" name="last_name" value="{{ filters.last_name }}">
-                </div>
-                <div>
-                    <label for="phone">شماره تلفن</label>
-                    <input id="phone" type="text" name="phone" value="{{ filters.phone }}">
-                </div>
-                <div>
-                    <label for="city">شهر</label>
-                    <input id="city" type="text" name="city" value="{{ filters.city }}">
-                </div>
+                <div><label for="first_name">نام</label><input id="first_name" type="text" name="first_name" value="{{ filters.first_name }}"></div>
+                <div><label for="last_name">نام خانوادگی</label><input id="last_name" type="text" name="last_name" value="{{ filters.last_name }}"></div>
+                <div><label for="phone">شماره تلفن</label><input id="phone" type="text" name="phone" value="{{ filters.phone }}"></div>
+                <div><label for="city">شهر</label><input id="city" type="text" name="city" value="{{ filters.city }}"></div>
                 <div>
                     <label for="counterparty">طرف حساب</label>
                     <select id="counterparty" name="counterparty">
@@ -137,15 +115,8 @@
                     </select>
                 </div>
             {% endif %}
-
-            <div>
-                <label for="amount_filter">مبلغ</label>
-                <input id="amount_filter" type="text" name="amount" value="{{ filters.amount }}">
-            </div>
-            <div>
-                <label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label>
-                <input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}">
-            </div>
+            <div><label for="amount_filter">مبلغ</label><input id="amount_filter" type="text" name="amount" value="{{ filters.amount }}"></div>
+            <div><label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
             <div>
                 <label for="status">وضعیت</label>
                 <select id="status" name="status">
@@ -165,94 +136,141 @@
     <table>
         <thead>
             <tr>
-                <th>نام</th>
-                <th>نام خانوادگی</th>
-                <th>مجموعه</th>
-                <th>شهر</th>
-                <th>شماره تلفن</th>
+                <th>نام مشتری</th>
                 <th>مبلغ</th>
-                <th>تاریخ واریز</th>
-                <th>سند</th>
-                {% if is_staff_user %}
-                    <th>طرف حساب</th>
-                {% endif %}
+                <th>تاریخ</th>
                 <th>وضعیت</th>
-                <th>توضیح کارشناس</th>
-                <th>عملیات</th>
+                <th>اقدام سریع</th>
             </tr>
         </thead>
         <tbody>
             {% for payment in records %}
-            <tr>
-                <td>{{ payment.first_name }}</td>
-                <td>{{ payment.last_name }}</td>
-                <td>{{ payment.organization }}</td>
-                <td>{{ payment.city }}</td>
-                <td>{{ payment.phone }}</td>
+            <tr class="summary-row" data-row="{{ payment.id }}">
+                <td>{{ payment.first_name }} {{ payment.last_name }}</td>
                 <td>{{ payment.amount|intcomma }}</td>
                 <td>{{ payment.pay_date }}</td>
                 <td>
-                    {% with receipts=payment.receipts.all %}
-                        {% if receipts %}
-                            {% for receipt in receipts %}
-                                <a href="{{ receipt.image.url }}" target="_blank">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %}<br>{% endif %}
-                            {% endfor %}
-                        {% elif payment.receipt_image %}
-                            <a href="{{ payment.receipt_image.url }}" target="_blank">مشاهده</a>
-                        {% else %}
-                            -
-                        {% endif %}
-                    {% endwith %}
-                </td>
-                {% if is_staff_user %}
-                    <td>{{ payment.counterparty|default:'-' }}</td>
-                {% endif %}
-                <td>
                     {% if is_staff_user %}
-                        <span class="status-pill {{ payment.status_flag_class }}">{{ payment.get_status_display }}</span>
+                        <span class="status-pill {{ payment.status_flag_class }}">&#9873; {{ payment.get_status_display }}</span>
                     {% else %}
-                        <span class="status-pill {{ payment.status_flag_class }}">{{ payment.customer_status_label }}</span>
+                        <span class="status-pill {{ payment.customer_flag_class }}">&#9873; {{ payment.customer_status_label }}</span>
                     {% endif %}
                 </td>
                 <td>
-                    {% if payment.last_staff_note %}
-                        <div class="note-box">{{ payment.last_staff_note }}</div>
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td>
-                    {% if is_staff_user %}
-                        <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
-                            {% csrf_token %}
-                            <select name="status" required>
-                                {% for value, label in staff_action_choices %}
-                                    <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                            <textarea name="note" placeholder="توضیح (برای مشتری نمایش داده می‌شود)"></textarea>
-                            <select name="counterparty">
-                                <option value="">بدون طرف حساب</option>
-                                {% for cp in counterparties %}
-                                    <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <button type="submit">ثبت وضعیت</button>
-                        </form>
-                    {% else %}
+                    {% if not is_staff_user %}
                         {% if payment.status == 'incomplete' %}
                             <a class="edit-link" href="{% url 'edit_payment' payment.id %}">ویرایش</a>
-                        {% else %}
-                            -
                         {% endif %}
+                        <a class="track-link" href="{% url 'payment_timeline' payment.id %}">پیگیری وضعیت</a>
+                    {% else %}
+                        {% if payment.staff_can_act %}
+                            <form class="staff-quick" method="post" action="{% url 'staff_update_status' payment.id %}">
+                                {% csrf_token %}
+                                <select name="status" required>
+                                    {% for value, label in payment.staff_allowed_choices %}
+                                        <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="note" placeholder="توضیح (برای رد/ناقص الزامی)">
+                                {% if staff_user_role == 'commercial' or staff_user_role == 'staff' %}
+                                    <select name="counterparty">
+                                        <option value="">بدون طرف حساب</option>
+                                        {% for cp in counterparties %}
+                                            <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% endif %}
+                                <button type="submit">ثبت</button>
+                            </form>
+                        {% else %}
+                            قفل
+                        {% endif %}
+                        <button type="button" class="expand-btn" data-row="{{ payment.id }}">نمایش جزئیات</button>
                     {% endif %}
-                    <a class="timeline-link" href="{% url 'payment_timeline' payment.id %}">تاریخچه</a>
+                </td>
+            </tr>
+            <tr class="detail-row" id="detail-{{ payment.id }}">
+                <td colspan="5">
+                    <div class="detail-grid">
+                        <div class="detail-card">
+                            <strong>اطلاعات رکورد</strong>
+                            <div>مجموعه: {{ payment.organization }}</div>
+                            <div>شهر: {{ payment.city }}</div>
+                            <div>شماره تلفن: {{ payment.phone }}</div>
+                            <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
+                            {% if is_staff_user %}<div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>{% endif %}
+                            {% if payment.status == 'rejected' or payment.status == 'incomplete' %}
+                                <div>توضیح کارشناس: {{ payment.last_staff_note|default:'-' }}</div>
+                            {% elif is_staff_user %}
+                                <div>آخرین توضیح: {{ payment.last_staff_note|default:'-' }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="detail-card">
+                            <strong>اسناد</strong>
+                            <div>
+                                {% with receipts=payment.receipts.all %}
+                                    {% if receipts %}
+                                        {% for receipt in receipts %}
+                                            <a href="{{ receipt.image.url }}" target="_blank">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                                        {% endfor %}
+                                    {% elif payment.receipt_image %}
+                                        <a href="{{ payment.receipt_image.url }}" target="_blank">مشاهده</a>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </div>
+
+                        <div class="detail-card">
+                            <strong>گراف تغییرات</strong>
+                            <ul class="timeline-list">
+                                {% for row in payment.timeline_lines %}
+                                    <li>
+                                        {{ row.text }}
+                                        <div class="tiny">{{ row.time }}</div>
+                                        {% if row.note %}<div class="tiny">توضیح: {{ row.note }}</div>{% endif %}
+                                    </li>
+                                {% empty %}
+                                    <li>تاریخچه‌ای ثبت نشده است.</li>
+                                {% endfor %}
+                            </ul>
+                            <a href="{% url 'payment_timeline' payment.id %}">نمایش کامل تاریخچه</a>
+                        </div>
+
+                        {% if is_staff_user %}
+                        <div class="detail-card">
+                            <strong>تغییر وضعیت و توضیح</strong>
+                            {% if payment.staff_can_act %}
+                                <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
+                                    {% csrf_token %}
+                                    <select name="status" required>
+                                        {% for value, label in payment.staff_allowed_choices %}
+                                            <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <textarea name="note" placeholder="توضیح برای مشتری (برای رد/ناقص الزامی)"></textarea>
+                                    {% if staff_user_role == 'commercial' or staff_user_role == 'staff' %}
+                                        <select name="counterparty">
+                                            <option value="">بدون طرف حساب</option>
+                                            {% for cp in counterparties %}
+                                                <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% endif %}
+                                    <button type="submit">ثبت تغییرات</button>
+                                </form>
+                            {% else %}
+                                <div class="tiny">در این مرحله امکان تغییر وضعیت برای نقش شما وجود ندارد.</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% empty %}
-            <tr>
-                <td colspan="{% if is_staff_user %}12{% else %}11{% endif %}">اطلاعاتی موجود نیست</td>
-            </tr>
+            <tr><td colspan="5">اطلاعاتی موجود نیست</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -265,10 +283,13 @@
             initialValue: false
         });
 
-        new Cleave('.amount-input', {
-            numeral: true,
-            numeralThousandsGroupStyle: 'thousand'
-        });
+        const amountEl = document.querySelector('.amount-input');
+        if (amountEl) {
+            new Cleave(amountEl, {
+                numeral: true,
+                numeralThousandsGroupStyle: 'thousand'
+            });
+        }
 
         const paymentForm = document.querySelector('#payment-form');
         if (paymentForm) {
@@ -279,6 +300,25 @@
                 }
             });
         }
+
+        function toggleDetail(id) {
+            const detail = document.getElementById('detail-' + id);
+            if (detail) detail.classList.toggle('open');
+        }
+
+        document.querySelectorAll('tr.summary-row').forEach(function (row) {
+            row.addEventListener('click', function (event) {
+                const interactive = event.target.closest('a, button, input, select, textarea, form');
+                if (interactive) return;
+                toggleDetail(row.getAttribute('data-row'));
+            });
+        });
+
+        document.querySelectorAll('.expand-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                toggleDetail(btn.getAttribute('data-row'));
+            });
+        });
     });
     </script>
 </body>

@@ -28,23 +28,26 @@ class PaymentRecord(models.Model):
     STATUS_FINAL_APPROVED = 'final_approved'
     STATUS_REJECTED = 'rejected'
     STATUS_INCOMPLETE = 'incomplete'
+    STATUS_RETURNED_TO_COMMERCIAL = 'returned_commercial'
 
     STATUS_CHOICES = [
         (STATUS_PENDING, 'در حال بررسی'),
         (STATUS_COMMERCIAL_REVIEW, 'بررسی بازرگانی'),
-        (STATUS_FINANCE_REVIEW, 'بررسی مالی'),
+        (STATUS_FINANCE_REVIEW, 'تایید مالی'),
         (STATUS_APPROVED, 'تایید شده'),
         (STATUS_FINAL_APPROVED, 'تایید نهایی'),
         (STATUS_REJECTED, 'رد شده'),
         (STATUS_INCOMPLETE, 'ناقص'),
+        (STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
     ]
 
     CUSTOMER_VISIBLE_LABELS = {
         STATUS_PENDING: 'در حال بررسی',
         STATUS_COMMERCIAL_REVIEW: 'در حال بررسی',
         STATUS_FINANCE_REVIEW: 'در حال بررسی',
-        STATUS_APPROVED: 'تایید شده',
-        STATUS_FINAL_APPROVED: 'تایید شده',
+        STATUS_RETURNED_TO_COMMERCIAL: 'در حال بررسی',
+        STATUS_APPROVED: 'تایید نهایی',
+        STATUS_FINAL_APPROVED: 'تایید نهایی',
         STATUS_REJECTED: 'رد شده',
         STATUS_INCOMPLETE: 'ناقص',
     }
@@ -83,7 +86,22 @@ class PaymentRecord(models.Model):
             self.STATUS_FINAL_APPROVED: 'flag-green',
             self.STATUS_REJECTED: 'flag-red',
             self.STATUS_INCOMPLETE: 'flag-yellow',
+            self.STATUS_RETURNED_TO_COMMERCIAL: 'flag-blue',
         }.get(self.status, 'flag-gray')
+
+    @property
+    def customer_flag_class(self):
+        if self.status == self.STATUS_FINANCE_REVIEW:
+            return 'flag-purple'
+        if self.status in {self.STATUS_PENDING, self.STATUS_COMMERCIAL_REVIEW, self.STATUS_RETURNED_TO_COMMERCIAL}:
+            return 'flag-blue'
+        if self.status in {self.STATUS_APPROVED, self.STATUS_FINAL_APPROVED}:
+            return 'flag-green'
+        if self.status == self.STATUS_REJECTED:
+            return 'flag-red'
+        if self.status == self.STATUS_INCOMPLETE:
+            return 'flag-yellow'
+        return 'flag-gray'
 
 
 class UserProfile(models.Model):

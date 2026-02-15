@@ -6,42 +6,31 @@
     <style>
         body { font-family: Tahoma, sans-serif; direction: rtl; background: #f6f7f9; padding: 20px; }
         .box { max-width: 920px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border-bottom: 1px solid #ddd; padding: 10px; text-align: right; }
-        th { background: #0d6efd; color: #fff; }
-        a { text-decoration: none; }
+        ul { padding-right: 20px; }
+        li { margin-bottom: 10px; }
+        .tiny { color: #666; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="box">
         <h3>تاریخچه عملیات رکورد {{ payment.id }}</h3>
         <p>وضعیت فعلی: {{ payment.get_status_display }}</p>
-        <table>
-            <thead>
-                <tr>
-                    <th>زمان</th>
-                    <th>کاربر</th>
-                    <th>عملیات</th>
-                    <th>از وضعیت</th>
-                    <th>به وضعیت</th>
-                    <th>توضیح</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for log in logs %}
-                <tr>
-                    <td>{{ log.created_at }}</td>
-                    <td>{{ log.actor.username|default:'سیستم' }}</td>
-                    <td>{{ log.get_action_display }}</td>
-                    <td>{{ log.from_status|default:'-' }}</td>
-                    <td>{{ log.to_status|default:'-' }}</td>
-                    <td>{{ log.note|default:'-' }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6">تاریخچه‌ای ثبت نشده است.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <ul>
+            {% for log in logs %}
+                <li>
+                    {% if log.actor %}
+                        {{ log.get_action_display }} توسط {{ log.actor.get_full_name|default:log.actor.username }}
+                    {% else %}
+                        {{ log.get_action_display }} توسط سیستم
+                    {% endif %}
+                    {% if log.to_status %} | وضعیت جدید: {{ log.to_status }}{% endif %}
+                    {% if log.note %}<div>توضیح: {{ log.note }}</div>{% endif %}
+                    <div class="tiny">{{ log.created_at }}</div>
+                </li>
+            {% empty %}
+                <li>تاریخچه‌ای ثبت نشده است.</li>
+            {% endfor %}
+        </ul>
         <p><a href="{% url 'submit' %}">بازگشت</a></p>
     </div>
 </body>
