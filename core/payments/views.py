@@ -1,6 +1,7 @@
 ﻿import jdatetime
+from openpyxl import Workbook
 
-from django.http import HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -339,6 +340,7 @@ def create_payment(request):
         'staff_user_role': staff_role,
         'staff_role_label': _staff_role_label(staff_role),
         'can_manage_counterparties': is_system_admin,
+        'can_export_records': is_system_admin or staff_role in {'finance', 'commercial'},
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
     })
@@ -495,3 +497,57 @@ def counterparty_edit(request, counterparty_id):
         form = CounterpartyForm(instance=counterparty)
 
     return render(request, 'payments/counterparty_edit.html', {'form': form, 'counterparty': counterparty})
+
+
+
+
+@login_required
+def export_records(request):
+    if not _is_staff_user(request.user):
+        return HttpResponseForbidden('You do not have permission to export records.')
+
+    role = _user_role(request.user)
+    if not request.user.is_superuser and role not in {'finance', 'commercial'}:
+        return HttpResponseForbidden('Export is only available for finance and commercial users.')
+
+    records = _records_for_user(request.user)
+    records, _ = _apply_record_filters(records, request, is_staff_user=True)
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="payment_records.xlsx"'
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Payments'
+
+    ws.append([
+        'ID',
+        'نام',
+        'نام خانوادگی',
+        'مبلغ',
+        'تاریخ واریز',
+        'وضعیت',
+        'توضیح',
+        'طرف حساب',
+        'شهر',
+        'شماره تلفن',
+    ])
+
+    for payment in records:
+        ws.append([
+            payment.id,
+            payment.first_name,
+            payment.last_name,
+            payment.amount,
+            str(payment.pay_date),
+            payment.get_status_display(),
+            payment.last_staff_note or '',
+            payment.counterparty.name if payment.counterparty else '',
+            payment.city,
+            payment.phone,
+        ])
+
+    wb.save(response)
+    return response
