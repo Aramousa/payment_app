@@ -25,8 +25,8 @@ SECRET_KEY = 'django-insecure-1ibqjl6sezccnzq&&@%oj7q76(2w@6=8m#gpgg&3*bim-upid9
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# ALLOWED_HOSTS = []
-ALLOWED_HOSTS = ['192.168.1.23', 'app.rabasa.ir', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = []
+
 
 # Application definition
 
@@ -118,16 +118,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://192.168.1.23:8080",
-    "http://app.rabasa.ir"
-]
-
-
 
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/submit/'
