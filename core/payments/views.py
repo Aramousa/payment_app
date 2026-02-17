@@ -219,6 +219,12 @@ def _apply_record_filters(records, request, is_staff_user):
         'last_name': (request.GET.get('last_name') or '').strip(),
         'phone': (request.GET.get('phone') or '').strip(),
         'city': (request.GET.get('city') or '').strip(),
+        'tracking_code': (request.GET.get('tracking_code') or '').strip(),
+        'payer_account_number': (request.GET.get('payer_account_number') or '').strip(),
+        'payer_first_name': (request.GET.get('payer_first_name') or '').strip(),
+        'payer_last_name': (request.GET.get('payer_last_name') or '').strip(),
+        'payer_bank_name': (request.GET.get('payer_bank_name') or '').strip(),
+        'payer_bank_branch': (request.GET.get('payer_bank_branch') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
         'pay_date': (request.GET.get('pay_date') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
@@ -234,6 +240,18 @@ def _apply_record_filters(records, request, is_staff_user):
             records = records.filter(phone__icontains=filters['phone'])
         if filters['city']:
             records = records.filter(city__icontains=filters['city'])
+        if filters['tracking_code']:
+            records = records.filter(tracking_code__icontains=filters['tracking_code'])
+        if filters['payer_account_number']:
+            records = records.filter(payer_account_number__icontains=filters['payer_account_number'])
+        if filters['payer_first_name']:
+            records = records.filter(payer_first_name__icontains=filters['payer_first_name'])
+        if filters['payer_last_name']:
+            records = records.filter(payer_last_name__icontains=filters['payer_last_name'])
+        if filters['payer_bank_name']:
+            records = records.filter(payer_bank_name__icontains=filters['payer_bank_name'])
+        if filters['payer_bank_branch']:
+            records = records.filter(payer_bank_branch__icontains=filters['payer_bank_branch'])
         if filters['counterparty'].isdigit():
             records = records.filter(counterparty_id=int(filters['counterparty']))
 
@@ -292,6 +310,18 @@ def _save_receipts(payment, form):
     PaymentReceipt.objects.bulk_create(receipts)
 
 
+def _apply_placeholder_defaults(payment):
+    for field_name in (
+        'payer_account_number',
+        'payer_first_name',
+        'payer_last_name',
+        'payer_bank_name',
+        'payer_bank_branch',
+    ):
+        value = (getattr(payment, field_name, '') or '').strip()
+        setattr(payment, field_name, value or 'Z')
+
+
 @login_required
 def create_payment(request):
     profile = None
@@ -318,6 +348,7 @@ def create_payment(request):
             payment.city = initial_data['city']
             payment.phone = initial_data['phone']
             payment.status = PaymentRecord.STATUS_PENDING
+            _apply_placeholder_defaults(payment)
             payment.save()
             _save_receipts(payment, form)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_CREATED, to_status=payment.status)
@@ -442,6 +473,7 @@ def edit_payment(request, payment_id):
             from_status = payment.status
             payment.status = PaymentRecord.STATUS_PENDING
             payment.locked_by_finance = False
+            _apply_placeholder_defaults(payment)
             payment.save()
             _save_receipts(payment, form)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_EDITED, from_status=from_status, to_status=payment.status)
@@ -524,29 +556,45 @@ def export_records(request):
 
     ws.append([
         'ID',
+        'کاربر',
+        'نام کاربر',
         'نام',
         'نام خانوادگی',
-        'مبلغ',
-        'تاریخ واریز',
-        'وضعیت',
-        'توضیح',
-        'طرف حساب',
+        'نام واریز کننده',
+        'نام خانوادگی واریز کننده',
+        'شماره حساب واریز کننده',
+        'نام بانک',
+        'شعبه',
+        'مجموعه',
         'شهر',
         'شماره تلفن',
+        'مبلغ',
+        'تاریخ واریز',
+        'کد پیگیری',
+        'طرف حساب',
+        'تاریخ ثبت',
     ])
 
     for payment in records:
         ws.append([
             payment.id,
+            payment.user.get_full_name() if payment.user else '',
+            payment.user.username if payment.user else '',
             payment.first_name,
             payment.last_name,
-            payment.amount,
-            str(payment.pay_date),
-            payment.get_status_display(),
-            payment.last_staff_note or '',
-            payment.counterparty.name if payment.counterparty else '',
+            payment.payer_first_name,
+            payment.payer_last_name,
+            payment.payer_account_number,
+            payment.payer_bank_name,
+            payment.payer_bank_branch,
+            payment.organization,
             payment.city,
             payment.phone,
+            payment.amount,
+            str(payment.pay_date),
+            payment.tracking_code or '',
+            payment.counterparty.name if payment.counterparty else '',
+            payment.created_at.strftime('%Y-%m-%d %H:%M:%S') if payment.created_at else '',
         ])
 
     wb.save(response)

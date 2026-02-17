@@ -3,6 +3,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django_jalali.forms import jDateField, jDateInput
+from django.utils.safestring import mark_safe
 
 from .models import Counterparty, PaymentRecord
 
@@ -33,6 +34,13 @@ class MultiFileField(forms.FileField):
 
 class PaymentRecordForm(forms.ModelForm):
     ACCOUNT_FIELDS = ('first_name', 'last_name', 'organization', 'city', 'phone')
+    OPTIONAL_PAYER_FIELDS = (
+        'payer_account_number',
+        'payer_first_name',
+        'payer_last_name',
+        'payer_bank_name',
+        'payer_bank_branch',
+    )
     receipt_images = MultiFileField(
         required=False,
         widget=MultiFileInput(attrs={'multiple': True}),
@@ -40,6 +48,7 @@ class PaymentRecordForm(forms.ModelForm):
     )
 
     pay_date = jDateField(
+        label='تاریخ',
         input_formats=['%Y/%m/%d'],
         widget=jDateInput(format='%Y/%m/%d')
     )
@@ -47,11 +56,25 @@ class PaymentRecordForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._receipt_payload = []
+        self.fields['tracking_code'].required = True
+
         for field_name in self.ACCOUNT_FIELDS:
             field = self.fields[field_name]
             field.disabled = True
             css_class = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = (css_class + ' readonly-field').strip()
+
+        # Do not show placeholder Z in editable form fields.
+        for name in self.OPTIONAL_PAYER_FIELDS:
+            if self.initial.get(name) == 'Z':
+                self.initial[name] = ''
+            if self.instance and getattr(self.instance, name, '') == 'Z' and not self.is_bound:
+                self.initial[name] = ''
+
+        # Show required marker for mandatory fields in UI.
+        for name, field in self.fields.items():
+            if field.required and not field.disabled and name != 'receipt_images':
+                field.label = mark_safe(f'{field.label} <span style=\"color:#d00;\">*</span>')
 
     class Meta:
         model = PaymentRecord
@@ -61,6 +84,11 @@ class PaymentRecordForm(forms.ModelForm):
             'organization',
             'city',
             'phone',
+            'payer_account_number',
+            'payer_first_name',
+            'payer_last_name',
+            'payer_bank_name',
+            'payer_bank_branch',
             'amount',
             'tracking_code',
             'pay_date',
@@ -71,6 +99,11 @@ class PaymentRecordForm(forms.ModelForm):
             'organization': forms.TextInput(),
             'city': forms.TextInput(),
             'phone': forms.TextInput(),
+            'payer_account_number': forms.TextInput(),
+            'payer_first_name': forms.TextInput(),
+            'payer_last_name': forms.TextInput(),
+            'payer_bank_name': forms.TextInput(),
+            'payer_bank_branch': forms.TextInput(),
             'amount': forms.TextInput(attrs={'class': 'amount-input'}),
             'pay_date': jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date'}),
         }
@@ -81,9 +114,14 @@ class PaymentRecordForm(forms.ModelForm):
             'organization': 'مجموعه',
             'city': 'شهر',
             'phone': 'شماره تلفن',
+            'payer_account_number': 'شماره حساب واریز کننده',
+            'payer_first_name': 'نام واریز کننده',
+            'payer_last_name': 'نام خانوادگی واریز کننده',
+            'payer_bank_name': 'نام بانک',
+            'payer_bank_branch': 'شعبه',
             'amount': 'مبلغ',
             'tracking_code': 'کد پیگیری',
-            'pay_date': 'تاریخ واریز',
+            'pay_date': 'تاریخ',
             'receipt_images': 'تصاویر فیش',
         }
 

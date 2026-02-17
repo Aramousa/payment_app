@@ -122,6 +122,12 @@
                 <div><label for="last_name">نام خانوادگی</label><input id="last_name" type="text" name="last_name" value="{{ filters.last_name }}"></div>
                 <div><label for="phone">شماره تلفن</label><input id="phone" type="text" name="phone" value="{{ filters.phone }}"></div>
                 <div><label for="city">شهر</label><input id="city" type="text" name="city" value="{{ filters.city }}"></div>
+                <div><label for="tracking_code">کد پیگیری</label><input id="tracking_code" type="text" name="tracking_code" value="{{ filters.tracking_code }}"></div>
+                <div><label for="payer_first_name">نام واریز کننده</label><input id="payer_first_name" type="text" name="payer_first_name" value="{{ filters.payer_first_name }}"></div>
+                <div><label for="payer_last_name">نام خانوادگی واریز کننده</label><input id="payer_last_name" type="text" name="payer_last_name" value="{{ filters.payer_last_name }}"></div>
+                <div><label for="payer_account_number">شماره حساب واریز کننده</label><input id="payer_account_number" type="text" name="payer_account_number" value="{{ filters.payer_account_number }}"></div>
+                <div><label for="payer_bank_name">نام بانک</label><input id="payer_bank_name" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}"></div>
+                <div><label for="payer_bank_branch">شعبه</label><input id="payer_bank_branch" type="text" name="payer_bank_branch" value="{{ filters.payer_bank_branch }}"></div>
                 <div>
                     <label for="counterparty">طرف حساب</label>
                     <select id="counterparty" name="counterparty">
@@ -214,6 +220,11 @@
                             <div>مجموعه: {{ payment.organization }}</div>
                             <div>شهر: {{ payment.city }}</div>
                             <div>شماره تلفن: {{ payment.phone }}</div>
+                            <div>نام واریز کننده: {% if payment.payer_first_name and payment.payer_first_name != 'Z' %}{{ payment.payer_first_name }}{% else %}-{% endif %}</div>
+                            <div>نام خانوادگی واریز کننده: {% if payment.payer_last_name and payment.payer_last_name != 'Z' %}{{ payment.payer_last_name }}{% else %}-{% endif %}</div>
+                            <div>شماره حساب واریز کننده: {% if payment.payer_account_number and payment.payer_account_number != 'Z' %}{{ payment.payer_account_number }}{% else %}-{% endif %}</div>
+                            <div>نام بانک: {% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</div>
+                            <div>شعبه: {% if payment.payer_bank_branch and payment.payer_bank_branch != 'Z' %}{{ payment.payer_bank_branch }}{% else %}-{% endif %}</div>
                             <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
                             {% if is_staff_user %}<div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>{% endif %}
                             {% if payment.status == 'rejected' or payment.status == 'incomplete' %}

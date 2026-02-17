@@ -124,7 +124,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 CSRF_TRUSTED_ORIGINS = [
     "http://192.168.1.23:8080",
-    "http://app.rabasa.ir"
+    "http://app.rabasa.ir:8080"
+    "http://127.0.0.1:8080"
 ]
 
 

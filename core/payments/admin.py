@@ -21,6 +21,11 @@ class PaymentRecordAdmin(admin.ModelAdmin):
     list_display = (
         'first_name',
         'last_name',
+        'payer_first_name',
+        'payer_last_name',
+        'payer_account_number',
+        'payer_bank_name',
+        'payer_bank_branch',
         'formatted_amount',
         'status',
         'locked_by_finance',
@@ -29,7 +34,17 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         'counterparty',
     )
     list_filter = ('status', 'city', 'counterparty')
-    search_fields = ('first_name', 'last_name', 'phone', 'tracking_code')
+    search_fields = (
+        'first_name',
+        'last_name',
+        'payer_first_name',
+        'payer_last_name',
+        'payer_account_number',
+        'payer_bank_name',
+        'payer_bank_branch',
+        'phone',
+        'tracking_code',
+    )
     inlines = [PaymentReceiptInline, PaymentActivityInline]
 
     def formatted_amount(self, obj):
