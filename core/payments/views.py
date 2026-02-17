@@ -322,6 +322,49 @@ def _apply_placeholder_defaults(payment):
         setattr(payment, field_name, value or 'Z')
 
 
+def _payer_profiles_for_user(user):
+    if not user or not user.is_authenticated:
+        return []
+    records = (
+        PaymentRecord.objects
+        .filter(user=user)
+        .values(
+            'payer_account_number',
+            'payer_first_name',
+            'payer_last_name',
+            'payer_bank_name',
+            'payer_bank_branch',
+        )
+        .order_by('-id')
+    )
+    seen = set()
+    profiles = []
+    for row in records:
+        values = {
+            'payer_account_number': (row.get('payer_account_number') or '').strip(),
+            'payer_first_name': (row.get('payer_first_name') or '').strip(),
+            'payer_last_name': (row.get('payer_last_name') or '').strip(),
+            'payer_bank_name': (row.get('payer_bank_name') or '').strip(),
+            'payer_bank_branch': (row.get('payer_bank_branch') or '').strip(),
+        }
+        if not all(values.values()):
+            continue
+        if 'Z' in values.values():
+            continue
+        key = tuple(values[field] for field in (
+            'payer_account_number',
+            'payer_first_name',
+            'payer_last_name',
+            'payer_bank_name',
+            'payer_bank_branch',
+        ))
+        if key in seen:
+            continue
+        seen.add(key)
+        profiles.append(values)
+    return profiles
+
+
 @login_required
 def create_payment(request):
     profile = None
@@ -374,6 +417,7 @@ def create_payment(request):
         'can_export_records': is_system_admin or staff_role in {'finance', 'commercial'},
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
+        'payer_profiles': _payer_profiles_for_user(request.user) if not is_staff_user else [],
     })
 
 
@@ -481,7 +525,11 @@ def edit_payment(request, payment_id):
     else:
         form = PaymentRecordForm(instance=payment, initial=initial_data)
 
-    return render(request, 'payments/edit_payment.html', {'form': form, 'payment': payment})
+    return render(request, 'payments/edit_payment.html', {
+        'form': form,
+        'payment': payment,
+        'payer_profiles': _payer_profiles_for_user(request.user),
+    })
 
 
 @login_required

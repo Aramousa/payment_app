@@ -42,9 +42,23 @@
         <form id="payment-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
             {{ form.as_p }}
+            {% if payer_profiles %}
+                <p>
+                    <label for="payer_profile_picker">استفاده از اطلاعات قبلی</label>
+                    <select id="payer_profile_picker">
+                        <option value="">انتخاب کنید</option>
+                        {% for profile in payer_profiles %}
+                            <option value="{{ forloop.counter0 }}">
+                                {{ profile.payer_bank_name }} | {{ profile.payer_bank_branch }} | {{ profile.payer_account_number }} | {{ profile.payer_first_name }} {{ profile.payer_last_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </p>
+            {% endif %}
             <button type="submit" class="save-btn">ثبت اصلاحات</button>
             <a href="{% url 'submit' %}" class="back-link">بازگشت</a>
         </form>
+        {{ payer_profiles|json_script:"payer-profiles-data" }}
     </div>
 
     <script>
@@ -64,6 +78,28 @@
                 amountInput.value = amountInput.value.replace(/,/g, '');
             }
         });
+
+        const profilePicker = document.getElementById('payer_profile_picker');
+        const profileDataEl = document.getElementById('payer-profiles-data');
+        if (profilePicker && profileDataEl) {
+            const profiles = JSON.parse(profileDataEl.textContent || '[]');
+            profilePicker.addEventListener('change', function () {
+                const idx = parseInt(profilePicker.value, 10);
+                if (Number.isNaN(idx) || !profiles[idx]) return;
+                const selected = profiles[idx];
+                const fieldMap = {
+                    payer_account_number: selected.payer_account_number || '',
+                    payer_first_name: selected.payer_first_name || '',
+                    payer_last_name: selected.payer_last_name || '',
+                    payer_bank_name: selected.payer_bank_name || '',
+                    payer_bank_branch: selected.payer_bank_branch || ''
+                };
+                Object.keys(fieldMap).forEach(function (name) {
+                    const input = document.querySelector('[name="' + name + '"]');
+                    if (input) input.value = fieldMap[name];
+                });
+            });
+        }
     });
     </script>
 </body>
