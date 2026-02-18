@@ -20,6 +20,43 @@ class Counterparty(models.Model):
         raise ValidationError('Counterparty records are permanent and cannot be deleted.')
 
 
+class LoginAdvertisement(models.Model):
+    SLOT_1 = 1
+    SLOT_2 = 2
+    SLOT_3 = 3
+    SLOT_4 = 4
+    SLOT_CHOICES = (
+        (SLOT_1, 'کادر 1'),
+        (SLOT_2, 'کادر 2'),
+        (SLOT_3, 'کادر 3'),
+        (SLOT_4, 'کادر 4'),
+    )
+
+    slot = models.PositiveSmallIntegerField('جایگاه', choices=SLOT_CHOICES, unique=True)
+    title = models.CharField('عنوان آگهی', max_length=120)
+    description = models.TextField('متن آگهی', blank=True)
+    image = models.ImageField('تصویر بنر', upload_to='login_ads/', blank=True, null=True)
+    link_url = models.URLField('لینک مقصد', blank=True)
+    start_date = models.DateField('تاریخ شروع')
+    end_date = models.DateField('تاریخ خاتمه')
+    is_visible = models.BooleanField('نمایش', default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['slot']
+        verbose_name = 'آگهی صفحه ورود'
+        verbose_name_plural = 'آگهی های صفحه ورود'
+
+    def __str__(self):
+        return f"کادر {self.slot} - {self.title}"
+
+    def clean(self):
+        super().clean()
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError({'end_date': 'تاریخ خاتمه باید بعد از تاریخ شروع باشد.'})
+
+
 class PaymentRecord(models.Model):
     STATUS_PENDING = 'pending'
     STATUS_COMMERCIAL_REVIEW = 'commercial_review'

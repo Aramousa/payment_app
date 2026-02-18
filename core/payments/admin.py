@@ -1,6 +1,6 @@
 ﻿from django.contrib import admin
 
-from .models import Counterparty, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
+from .models import Counterparty, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
 
 
 class PaymentReceiptInline(admin.TabularInline):
@@ -51,6 +51,29 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         return '{:,}'.format(obj.amount)
 
     formatted_amount.short_description = 'مبلغ'
+
+
+@admin.register(LoginAdvertisement)
+class LoginAdvertisementAdmin(admin.ModelAdmin):
+    list_display = ('slot', 'title', 'start_date', 'end_date', 'is_visible', 'updated_at')
+    list_filter = ('is_visible', 'start_date', 'end_date')
+    search_fields = ('title', 'description', 'link_url')
+    ordering = ('slot',)
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
 
 
 @admin.register(UserProfile)

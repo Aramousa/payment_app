@@ -388,6 +388,10 @@
                 detail.classList.toggle('open');
                 return;
             }
+            if (detail.classList.contains('open')) {
+                detail.classList.remove('open');
+                return;
+            }
             openExclusive(id);
         }
 

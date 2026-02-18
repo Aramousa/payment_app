@@ -11,13 +11,21 @@
             margin: 0;
             padding: 24px;
         }
+        .page {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
         .card {
-            max-width: 420px;
-            margin: 48px auto;
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 8px 24px rgba(0,0,0,.08);
             padding: 24px;
+            position: sticky;
+            top: 20px;
         }
         h2 {
             margin: 0 0 16px;
@@ -49,16 +57,89 @@
             margin: 8px 0;
             padding-right: 18px;
         }
+        .ads-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(240px, 1fr));
+            gap: 14px;
+        }
+        .ad-box {
+            min-height: 180px;
+            background: #fff;
+            border: 1px solid #e7e7e7;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,.05);
+        }
+        .ad-content {
+            padding: 12px;
+        }
+        .ad-title {
+            margin: 0 0 8px;
+            font-size: 16px;
+        }
+        .ad-desc {
+            margin: 0;
+            color: #444;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+        .ad-image {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            display: block;
+            background: #eef2f7;
+        }
+        .ad-link {
+            display: inline-block;
+            margin-top: 10px;
+            text-decoration: none;
+            color: #0d6efd;
+            font-size: 13px;
+        }
+        .ad-hidden {
+            display: none;
+        }
+        @media (max-width: 940px) {
+            .page {
+                grid-template-columns: 1fr;
+            }
+            .card {
+                position: static;
+            }
+            .ads-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>ورود به سامانه</h2>
-        <form method="post">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit">ورود</button>
-        </form>
+    <div class="page">
+        <div class="card">
+            <h2>ورود به سامانه</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit">ورود</button>
+            </form>
+        </div>
+
+        <div class="ads-grid">
+            {% for item in login_slot_ads %}
+                <div class="ad-box {% if not item.ad %}ad-hidden{% endif %}">
+                    {% if item.ad %}
+                        {% if item.ad.link_url %}<a href="{{ item.ad.link_url }}" target="_blank" rel="noopener">{% endif %}
+                        {% if item.ad.image %}<img class="ad-image" src="{{ item.ad.image.url }}" alt="{{ item.ad.title }}">{% endif %}
+                        {% if item.ad.link_url %}</a>{% endif %}
+                        <div class="ad-content">
+                            <h3 class="ad-title">{{ item.ad.title }}</h3>
+                            {% if item.ad.description %}<p class="ad-desc">{{ item.ad.description }}</p>{% endif %}
+                            {% if item.ad.link_url %}<a class="ad-link" href="{{ item.ad.link_url }}" target="_blank" rel="noopener">مشاهده بیشتر</a>{% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
     </div>
 </body>
 </html>
