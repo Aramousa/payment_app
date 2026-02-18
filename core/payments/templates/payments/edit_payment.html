@@ -32,7 +32,7 @@
         {% endif %}
 
         {% if payment.receipts.all %}
-            <p>تصاویر فعلی:</p>
+            <p>فایل های فعلی:</p>
             {% for receipt in payment.receipts.all %}
                 <a href="{{ receipt.image.url }}" target="_blank">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
             {% endfor %}

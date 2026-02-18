@@ -1,4 +1,5 @@
-﻿import hashlib
+import hashlib
+import os
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -33,6 +34,10 @@ class MultiFileField(forms.FileField):
 
 
 class PaymentRecordForm(forms.ModelForm):
+    MAX_UPLOAD_SIZE = 1 * 1024 * 1024  # 1 MB
+    ALLOWED_EXTENSIONS = {
+        '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf',
+    }
     ACCOUNT_FIELDS = ('first_name', 'last_name', 'organization', 'city', 'phone')
     OPTIONAL_PAYER_FIELDS = (
         'payer_account_number',
@@ -43,8 +48,12 @@ class PaymentRecordForm(forms.ModelForm):
     )
     receipt_images = MultiFileField(
         required=False,
-        widget=MultiFileInput(attrs={'multiple': True}),
-        label='تصاویر فیش',
+        widget=MultiFileInput(attrs={
+            'multiple': True,
+            'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
+        }),
+        label='فایل های فیش',
+        help_text='فقط فایل های تصویر استاندارد و PDF مجاز است. حداکثر حجم هر فایل: 1 مگابایت.',
     )
 
     pay_date = jDateField(
@@ -74,7 +83,7 @@ class PaymentRecordForm(forms.ModelForm):
         # Show required marker for mandatory fields in UI.
         for name, field in self.fields.items():
             if field.required and not field.disabled and name != 'receipt_images':
-                field.label = mark_safe(f'{field.label} <span style=\"color:#d00;\">*</span>')
+                field.label = mark_safe(f'{field.label} <span style="color:#d00;">*</span>')
 
     class Meta:
         model = PaymentRecord
@@ -122,14 +131,14 @@ class PaymentRecordForm(forms.ModelForm):
             'amount': 'مبلغ',
             'tracking_code': 'کد پیگیری',
             'pay_date': 'تاریخ',
-            'receipt_images': 'تصاویر فیش',
+            'receipt_images': 'فایل های فیش',
         }
 
     def clean_receipt_images(self):
         files = self.files.getlist('receipt_images')
 
         if not self.instance.pk and not files:
-            raise ValidationError('حداقل یک تصویر فیش لازم است.')
+            raise ValidationError('حداقل یک فایل فیش لازم است.')
 
         existing_hashes = set()
         if self.instance.pk:
@@ -139,6 +148,13 @@ class PaymentRecordForm(forms.ModelForm):
         seen_hashes = set()
 
         for uploaded in files:
+            ext = os.path.splitext(uploaded.name or '')[1].lower()
+            if ext not in self.ALLOWED_EXTENSIONS:
+                raise ValidationError('فرمت فایل مجاز نیست. فقط تصویرهای استاندارد و PDF پذیرفته می شود.')
+
+            if uploaded.size and uploaded.size > self.MAX_UPLOAD_SIZE:
+                raise ValidationError('حجم هر فایل باید حداکثر 1 مگابایت باشد.')
+
             digest = hashlib.sha256()
             for chunk in uploaded.chunks():
                 digest.update(chunk)
@@ -146,7 +162,7 @@ class PaymentRecordForm(forms.ModelForm):
             uploaded.seek(0)
 
             if file_hash in seen_hashes or file_hash in existing_hashes:
-                raise ValidationError('تصاویر تکراری برای این رکورد مجاز نیست.')
+                raise ValidationError('فایل تکراری برای این رکورد مجاز نیست.')
 
             seen_hashes.add(file_hash)
             payload.append((uploaded, file_hash))

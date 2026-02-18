@@ -12,10 +12,10 @@
             padding: 24px;
         }
         .page {
-            max-width: 1100px;
+            max-width: 1280px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: 380px 1fr;
+            grid-template-columns: 1fr 380px 1fr;
             gap: 20px;
             align-items: start;
         }
@@ -57,9 +57,9 @@
             margin: 8px 0;
             padding-right: 18px;
         }
-        .ads-grid {
+        .ads-column {
             display: grid;
-            grid-template-columns: repeat(2, minmax(240px, 1fr));
+            grid-template-columns: 1fr;
             gap: 14px;
         }
         .ad-box {
@@ -107,25 +107,14 @@
             .card {
                 position: static;
             }
-            .ads-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
 <body>
     <div class="page">
-        <div class="card">
-            <h2>ورود به سامانه</h2>
-            <form method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit">ورود</button>
-            </form>
-        </div>
-
-        <div class="ads-grid">
+        <div class="ads-column">
             {% for item in login_slot_ads %}
+                {% if item.slot == 1 or item.slot == 2 %}
                 <div class="ad-box {% if not item.ad %}ad-hidden{% endif %}">
                     {% if item.ad %}
                         {% if item.ad.link_url %}<a href="{{ item.ad.link_url }}" target="_blank" rel="noopener">{% endif %}
@@ -138,6 +127,35 @@
                         </div>
                     {% endif %}
                 </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <h2>ورود به سامانه</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit">ورود</button>
+            </form>
+        </div>
+
+        <div class="ads-column">
+            {% for item in login_slot_ads %}
+                {% if item.slot == 3 or item.slot == 4 %}
+                <div class="ad-box {% if not item.ad %}ad-hidden{% endif %}">
+                    {% if item.ad %}
+                        {% if item.ad.link_url %}<a href="{{ item.ad.link_url }}" target="_blank" rel="noopener">{% endif %}
+                        {% if item.ad.image %}<img class="ad-image" src="{{ item.ad.image.url }}" alt="{{ item.ad.title }}">{% endif %}
+                        {% if item.ad.link_url %}</a>{% endif %}
+                        <div class="ad-content">
+                            <h3 class="ad-title">{{ item.ad.title }}</h3>
+                            {% if item.ad.description %}<p class="ad-desc">{{ item.ad.description }}</p>{% endif %}
+                            {% if item.ad.link_url %}<a class="ad-link" href="{{ item.ad.link_url }}" target="_blank" rel="noopener">مشاهده بیشتر</a>{% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+                {% endif %}
             {% endfor %}
         </div>
     </div>

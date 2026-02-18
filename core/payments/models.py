@@ -167,7 +167,7 @@ class UserProfile(models.Model):
 
 class PaymentReceipt(models.Model):
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='receipts')
-    image = models.ImageField(upload_to='receipts/')
+    image = models.FileField(upload_to='receipts/')
     file_hash = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -1,6 +1,7 @@
 ﻿import jdatetime
 from openpyxl import Workbook
 
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
@@ -225,6 +226,7 @@ def _apply_record_filters(records, request, is_staff_user):
         'payer_last_name': (request.GET.get('payer_last_name') or '').strip(),
         'payer_bank_name': (request.GET.get('payer_bank_name') or '').strip(),
         'payer_bank_branch': (request.GET.get('payer_bank_branch') or '').strip(),
+        'payer_name': (request.GET.get('payer_name') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
         'pay_date': (request.GET.get('pay_date') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
@@ -254,6 +256,18 @@ def _apply_record_filters(records, request, is_staff_user):
             records = records.filter(payer_bank_branch__icontains=filters['payer_bank_branch'])
         if filters['counterparty'].isdigit():
             records = records.filter(counterparty_id=int(filters['counterparty']))
+    else:
+        if filters['payer_name']:
+            records = records.filter(
+                Q(payer_first_name__icontains=filters['payer_name']) |
+                Q(payer_last_name__icontains=filters['payer_name'])
+            )
+        if filters['payer_account_number']:
+            records = records.filter(payer_account_number__icontains=filters['payer_account_number'])
+        if filters['payer_bank_name']:
+            records = records.filter(payer_bank_name__icontains=filters['payer_bank_name'])
+        if filters['payer_bank_branch']:
+            records = records.filter(payer_bank_branch__icontains=filters['payer_bank_branch'])
 
     if filters['amount'].isdigit():
         records = records.filter(amount=int(filters['amount']))
