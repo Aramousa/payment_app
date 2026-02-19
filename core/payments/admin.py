@@ -21,11 +21,9 @@ class PaymentRecordAdmin(admin.ModelAdmin):
     list_display = (
         'first_name',
         'last_name',
-        'payer_first_name',
-        'payer_last_name',
+        'payer_full_name',
         'payer_account_number',
         'payer_bank_name',
-        'payer_bank_branch',
         'formatted_amount',
         'status',
         'locked_by_finance',
@@ -37,11 +35,9 @@ class PaymentRecordAdmin(admin.ModelAdmin):
     search_fields = (
         'first_name',
         'last_name',
-        'payer_first_name',
-        'payer_last_name',
+        'payer_full_name',
         'payer_account_number',
         'payer_bank_name',
-        'payer_bank_branch',
         'phone',
         'tracking_code',
     )
@@ -50,7 +46,7 @@ class PaymentRecordAdmin(admin.ModelAdmin):
     def formatted_amount(self, obj):
         return '{:,}'.format(obj.amount)
 
-    formatted_amount.short_description = 'مبلغ'
+    formatted_amount.short_description = 'مبلغ (ریال)'
 
 
 @admin.register(LoginAdvertisement)

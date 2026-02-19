@@ -115,7 +115,7 @@
                         <option value="">انتخاب کنید</option>
                         {% for profile in payer_profiles %}
                             <option value="{{ forloop.counter0 }}">
-                                {{ profile.payer_bank_name }} | {{ profile.payer_bank_branch }} | {{ profile.payer_account_number }} | {{ profile.payer_first_name }} {{ profile.payer_last_name }}
+                                {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }}
                             </option>
                         {% endfor %}
                     </select>
@@ -138,11 +138,9 @@
                 <div><label for="phone">شماره تلفن</label><input id="phone" type="text" name="phone" value="{{ filters.phone }}"></div>
                 <div><label for="city">شهر</label><input id="city" type="text" name="city" value="{{ filters.city }}"></div>
                 <div><label for="tracking_code">کد پیگیری</label><input id="tracking_code" type="text" name="tracking_code" value="{{ filters.tracking_code }}"></div>
-                <div><label for="payer_first_name">نام واریز کننده</label><input id="payer_first_name" type="text" name="payer_first_name" value="{{ filters.payer_first_name }}"></div>
-                <div><label for="payer_last_name">نام خانوادگی واریز کننده</label><input id="payer_last_name" type="text" name="payer_last_name" value="{{ filters.payer_last_name }}"></div>
+                <div><label for="payer_full_name">نام و نام خانوادگی واریز کننده</label><input id="payer_full_name" type="text" name="payer_full_name" value="{{ filters.payer_full_name }}"></div>
                 <div><label for="payer_account_number">شماره حساب واریز کننده</label><input id="payer_account_number" type="text" name="payer_account_number" value="{{ filters.payer_account_number }}"></div>
                 <div><label for="payer_bank_name">نام بانک</label><input id="payer_bank_name" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}"></div>
-                <div><label for="payer_bank_branch">شعبه</label><input id="payer_bank_branch" type="text" name="payer_bank_branch" value="{{ filters.payer_bank_branch }}"></div>
                 <div>
                     <label for="counterparty">طرف حساب</label>
                     <select id="counterparty" name="counterparty">
@@ -154,10 +152,9 @@
                 </div>
             {% endif %}
             {% if not is_staff_user %}
-                <div><label for="payer_name_filter">واریز کننده</label><input id="payer_name_filter" type="text" name="payer_name" value="{{ filters.payer_name }}"></div>
+                <div><label for="payer_full_name_filter">واریز کننده</label><input id="payer_full_name_filter" type="text" name="payer_full_name" value="{{ filters.payer_full_name }}"></div>
                 <div><label for="payer_account_number_filter">شماره حساب واریز کننده</label><input id="payer_account_number_filter" type="text" name="payer_account_number" value="{{ filters.payer_account_number }}"></div>
                 <div><label for="payer_bank_name_filter">نام بانک</label><input id="payer_bank_name_filter" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}"></div>
-                <div><label for="payer_bank_branch_filter">شعبه</label><input id="payer_bank_branch_filter" type="text" name="payer_bank_branch" value="{{ filters.payer_bank_branch }}"></div>
             {% endif %}
             <div><label for="amount_filter">مبلغ (ریال)</label><input id="amount_filter" type="text" name="amount" value="{{ filters.amount }}"></div>
             <div><label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
@@ -180,9 +177,11 @@
     <table>
         <thead>
             <tr>
-                <th>نام مشتری</th>
-                <th>مبلغ</th>
+                <th>نام واریز کننده</th>
                 <th>تاریخ</th>
+                <th>شماره پیگیری</th>
+                <th>مبلغ (ریال)</th>
+                <th>نام بانک</th>
                 <th>وضعیت</th>
                 <th>اقدام سریع</th>
             </tr>
@@ -190,9 +189,11 @@
         <tbody>
             {% for payment in records %}
             <tr class="summary-row" data-row="{{ payment.id }}">
-                <td>{{ payment.first_name }} {{ payment.last_name }}</td>
-                <td>{{ payment.amount|intcomma }}</td>
+                <td>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</td>
                 <td>{{ payment.pay_date }}</td>
+                <td>{{ payment.tracking_code|default:'-' }}</td>
+                <td>{{ payment.amount|intcomma }}</td>
+                <td>{% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</td>
                 <td>
                     {% if is_staff_user %}
                         <span class="status-pill {{ payment.status_flag_class }}">&#9873; {{ payment.get_status_display }}</span>
@@ -234,18 +235,16 @@
                 </td>
             </tr>
             <tr class="detail-row" id="detail-{{ payment.id }}">
-                <td colspan="5">
+                <td colspan="7">
                     <div class="detail-grid">
                         <div class="detail-card">
                             <strong>اطلاعات رکورد</strong>
                             <div>مجموعه: {{ payment.organization }}</div>
                             <div>شهر: {{ payment.city }}</div>
                             <div>شماره تلفن: {{ payment.phone }}</div>
-                            <div>نام واریز کننده: {% if payment.payer_first_name and payment.payer_first_name != 'Z' %}{{ payment.payer_first_name }}{% else %}-{% endif %}</div>
-                            <div>نام خانوادگی واریز کننده: {% if payment.payer_last_name and payment.payer_last_name != 'Z' %}{{ payment.payer_last_name }}{% else %}-{% endif %}</div>
+                            <div>نام و نام خانوادگی واریز کننده: {% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</div>
                             <div>شماره حساب واریز کننده: {% if payment.payer_account_number and payment.payer_account_number != 'Z' %}{{ payment.payer_account_number }}{% else %}-{% endif %}</div>
                             <div>نام بانک: {% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</div>
-                            <div>شعبه: {% if payment.payer_bank_branch and payment.payer_bank_branch != 'Z' %}{{ payment.payer_bank_branch }}{% else %}-{% endif %}</div>
                             <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
                             {% if is_staff_user %}<div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>{% endif %}
                             {% if payment.status == 'rejected' or payment.status == 'incomplete' %}
@@ -319,7 +318,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5">اطلاعاتی موجود نیست</td></tr>
+            <tr><td colspan="7">اطلاعاتی موجود نیست</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -360,10 +359,8 @@
                 const selected = profiles[idx];
                 const fieldMap = {
                     payer_account_number: selected.payer_account_number || '',
-                    payer_first_name: selected.payer_first_name || '',
-                    payer_last_name: selected.payer_last_name || '',
-                    payer_bank_name: selected.payer_bank_name || '',
-                    payer_bank_branch: selected.payer_bank_branch || ''
+                    payer_full_name: selected.payer_full_name || '',
+                    payer_bank_name: selected.payer_bank_name || ''
                 };
                 Object.keys(fieldMap).forEach(function (name) {
                     const input = document.querySelector('[name="' + name + '"]');

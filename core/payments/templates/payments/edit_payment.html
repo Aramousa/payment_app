@@ -49,7 +49,7 @@
                         <option value="">انتخاب کنید</option>
                         {% for profile in payer_profiles %}
                             <option value="{{ forloop.counter0 }}">
-                                {{ profile.payer_bank_name }} | {{ profile.payer_bank_branch }} | {{ profile.payer_account_number }} | {{ profile.payer_first_name }} {{ profile.payer_last_name }}
+                                {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }}
                             </option>
                         {% endfor %}
                     </select>
@@ -89,10 +89,8 @@
                 const selected = profiles[idx];
                 const fieldMap = {
                     payer_account_number: selected.payer_account_number || '',
-                    payer_first_name: selected.payer_first_name || '',
-                    payer_last_name: selected.payer_last_name || '',
-                    payer_bank_name: selected.payer_bank_name || '',
-                    payer_bank_branch: selected.payer_bank_branch || ''
+                    payer_full_name: selected.payer_full_name || '',
+                    payer_bank_name: selected.payer_bank_name || ''
                 };
                 Object.keys(fieldMap).forEach(function (name) {
                     const input = document.querySelector('[name="' + name + '"]');

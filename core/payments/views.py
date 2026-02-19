@@ -1,7 +1,6 @@
 ﻿import jdatetime
 from openpyxl import Workbook
 
-from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
@@ -222,11 +221,8 @@ def _apply_record_filters(records, request, is_staff_user):
         'city': (request.GET.get('city') or '').strip(),
         'tracking_code': (request.GET.get('tracking_code') or '').strip(),
         'payer_account_number': (request.GET.get('payer_account_number') or '').strip(),
-        'payer_first_name': (request.GET.get('payer_first_name') or '').strip(),
-        'payer_last_name': (request.GET.get('payer_last_name') or '').strip(),
+        'payer_full_name': (request.GET.get('payer_full_name') or '').strip(),
         'payer_bank_name': (request.GET.get('payer_bank_name') or '').strip(),
-        'payer_bank_branch': (request.GET.get('payer_bank_branch') or '').strip(),
-        'payer_name': (request.GET.get('payer_name') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
         'pay_date': (request.GET.get('pay_date') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
@@ -246,28 +242,19 @@ def _apply_record_filters(records, request, is_staff_user):
             records = records.filter(tracking_code__icontains=filters['tracking_code'])
         if filters['payer_account_number']:
             records = records.filter(payer_account_number__icontains=filters['payer_account_number'])
-        if filters['payer_first_name']:
-            records = records.filter(payer_first_name__icontains=filters['payer_first_name'])
-        if filters['payer_last_name']:
-            records = records.filter(payer_last_name__icontains=filters['payer_last_name'])
+        if filters['payer_full_name']:
+            records = records.filter(payer_full_name__icontains=filters['payer_full_name'])
         if filters['payer_bank_name']:
             records = records.filter(payer_bank_name__icontains=filters['payer_bank_name'])
-        if filters['payer_bank_branch']:
-            records = records.filter(payer_bank_branch__icontains=filters['payer_bank_branch'])
         if filters['counterparty'].isdigit():
             records = records.filter(counterparty_id=int(filters['counterparty']))
     else:
-        if filters['payer_name']:
-            records = records.filter(
-                Q(payer_first_name__icontains=filters['payer_name']) |
-                Q(payer_last_name__icontains=filters['payer_name'])
-            )
+        if filters['payer_full_name']:
+            records = records.filter(payer_full_name__icontains=filters['payer_full_name'])
         if filters['payer_account_number']:
             records = records.filter(payer_account_number__icontains=filters['payer_account_number'])
         if filters['payer_bank_name']:
             records = records.filter(payer_bank_name__icontains=filters['payer_bank_name'])
-        if filters['payer_bank_branch']:
-            records = records.filter(payer_bank_branch__icontains=filters['payer_bank_branch'])
 
     if filters['amount'].isdigit():
         records = records.filter(amount=int(filters['amount']))
@@ -324,18 +311,6 @@ def _save_receipts(payment, form):
     PaymentReceipt.objects.bulk_create(receipts)
 
 
-def _apply_placeholder_defaults(payment):
-    for field_name in (
-        'payer_account_number',
-        'payer_first_name',
-        'payer_last_name',
-        'payer_bank_name',
-        'payer_bank_branch',
-    ):
-        value = (getattr(payment, field_name, '') or '').strip()
-        setattr(payment, field_name, value or 'Z')
-
-
 def _payer_profiles_for_user(user):
     if not user or not user.is_authenticated:
         return []
@@ -344,10 +319,8 @@ def _payer_profiles_for_user(user):
         .filter(user=user)
         .values(
             'payer_account_number',
-            'payer_first_name',
-            'payer_last_name',
+            'payer_full_name',
             'payer_bank_name',
-            'payer_bank_branch',
         )
         .order_by('-id')
     )
@@ -356,10 +329,8 @@ def _payer_profiles_for_user(user):
     for row in records:
         values = {
             'payer_account_number': (row.get('payer_account_number') or '').strip(),
-            'payer_first_name': (row.get('payer_first_name') or '').strip(),
-            'payer_last_name': (row.get('payer_last_name') or '').strip(),
+            'payer_full_name': (row.get('payer_full_name') or '').strip(),
             'payer_bank_name': (row.get('payer_bank_name') or '').strip(),
-            'payer_bank_branch': (row.get('payer_bank_branch') or '').strip(),
         }
         if not all(values.values()):
             continue
@@ -367,10 +338,8 @@ def _payer_profiles_for_user(user):
             continue
         key = tuple(values[field] for field in (
             'payer_account_number',
-            'payer_first_name',
-            'payer_last_name',
+            'payer_full_name',
             'payer_bank_name',
-            'payer_bank_branch',
         ))
         if key in seen:
             continue
@@ -405,7 +374,6 @@ def create_payment(request):
             payment.city = initial_data['city']
             payment.phone = initial_data['phone']
             payment.status = PaymentRecord.STATUS_PENDING
-            _apply_placeholder_defaults(payment)
             payment.save()
             _save_receipts(payment, form)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_CREATED, to_status=payment.status)
@@ -531,7 +499,6 @@ def edit_payment(request, payment_id):
             from_status = payment.status
             payment.status = PaymentRecord.STATUS_PENDING
             payment.locked_by_finance = False
-            _apply_placeholder_defaults(payment)
             payment.save()
             _save_receipts(payment, form)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_EDITED, from_status=from_status, to_status=payment.status)
@@ -622,15 +589,13 @@ def export_records(request):
         'نام کاربر',
         'نام',
         'نام خانوادگی',
-        'نام واریز کننده',
-        'نام خانوادگی واریز کننده',
+        'نام و نام خانوادگی واریز کننده',
         'شماره حساب واریز کننده',
         'نام بانک',
-        'شعبه',
         'مجموعه',
         'شهر',
         'شماره تلفن',
-        'مبلغ',
+        'مبلغ (ریال)',
         'تاریخ واریز',
         'کد پیگیری',
         'طرف حساب',
@@ -644,11 +609,9 @@ def export_records(request):
             payment.user.username if payment.user else '',
             payment.first_name,
             payment.last_name,
-            payment.payer_first_name,
-            payment.payer_last_name,
+            payment.payer_full_name,
             payment.payer_account_number,
             payment.payer_bank_name,
-            payment.payer_bank_branch,
             payment.organization,
             payment.city,
             payment.phone,

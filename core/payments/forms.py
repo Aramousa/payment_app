@@ -3,8 +3,8 @@ import os
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django_jalali.forms import jDateField, jDateInput
 from django.utils.safestring import mark_safe
+from django_jalali.forms import jDateField, jDateInput
 
 from .models import Counterparty, PaymentRecord
 
@@ -39,13 +39,15 @@ class PaymentRecordForm(forms.ModelForm):
         '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf',
     }
     ACCOUNT_FIELDS = ('first_name', 'last_name', 'organization', 'city', 'phone')
-    OPTIONAL_PAYER_FIELDS = (
+    REQUIRED_CUSTOMER_FIELDS = (
         'payer_account_number',
-        'payer_first_name',
-        'payer_last_name',
+        'payer_full_name',
         'payer_bank_name',
-        'payer_bank_branch',
+        'amount',
+        'tracking_code',
+        'pay_date',
     )
+
     receipt_images = MultiFileField(
         required=False,
         widget=MultiFileInput(attrs={
@@ -65,7 +67,13 @@ class PaymentRecordForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._receipt_payload = []
-        self.fields['tracking_code'].required = True
+
+        for name in self.REQUIRED_CUSTOMER_FIELDS:
+            self.fields[name].required = True
+
+        # Upload is mandatory on new records; on edit it is mandatory only if no file exists yet.
+        has_existing_files = bool(self.instance and self.instance.pk and self.instance.receipts.exists())
+        self.fields['receipt_images'].required = not has_existing_files
 
         for field_name in self.ACCOUNT_FIELDS:
             field = self.fields[field_name]
@@ -73,16 +81,15 @@ class PaymentRecordForm(forms.ModelForm):
             css_class = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = (css_class + ' readonly-field').strip()
 
-        # Do not show placeholder Z in editable form fields.
-        for name in self.OPTIONAL_PAYER_FIELDS:
+        # Do not show legacy placeholder Z in form inputs.
+        for name in ('payer_account_number', 'payer_full_name', 'payer_bank_name'):
             if self.initial.get(name) == 'Z':
                 self.initial[name] = ''
             if self.instance and getattr(self.instance, name, '') == 'Z' and not self.is_bound:
                 self.initial[name] = ''
 
-        # Show required marker for mandatory fields in UI.
         for name, field in self.fields.items():
-            if field.required and not field.disabled and name != 'receipt_images':
+            if field.required and not field.disabled:
                 field.label = mark_safe(f'{field.label} <span style="color:#d00;">*</span>')
 
     class Meta:
@@ -94,10 +101,8 @@ class PaymentRecordForm(forms.ModelForm):
             'city',
             'phone',
             'payer_account_number',
-            'payer_first_name',
-            'payer_last_name',
+            'payer_full_name',
             'payer_bank_name',
-            'payer_bank_branch',
             'amount',
             'tracking_code',
             'pay_date',
@@ -109,14 +114,11 @@ class PaymentRecordForm(forms.ModelForm):
             'city': forms.TextInput(),
             'phone': forms.TextInput(),
             'payer_account_number': forms.TextInput(),
-            'payer_first_name': forms.TextInput(),
-            'payer_last_name': forms.TextInput(),
+            'payer_full_name': forms.TextInput(),
             'payer_bank_name': forms.TextInput(),
-            'payer_bank_branch': forms.TextInput(),
             'amount': forms.TextInput(attrs={'class': 'amount-input'}),
             'pay_date': jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date'}),
         }
-
         labels = {
             'first_name': 'نام',
             'last_name': 'نام خانوادگی',
@@ -124,10 +126,8 @@ class PaymentRecordForm(forms.ModelForm):
             'city': 'شهر',
             'phone': 'شماره تلفن',
             'payer_account_number': 'شماره حساب واریز کننده',
-            'payer_first_name': 'نام واریز کننده',
-            'payer_last_name': 'نام خانوادگی واریز کننده',
+            'payer_full_name': 'نام و نام خانوادگی واریز کننده',
             'payer_bank_name': 'نام بانک',
-            'payer_bank_branch': 'شعبه',
             'amount': 'مبلغ (ریال)',
             'tracking_code': 'کد پیگیری',
             'pay_date': 'تاریخ',
@@ -142,8 +142,8 @@ class PaymentRecordForm(forms.ModelForm):
 
     def clean_receipt_images(self):
         files = self.files.getlist('receipt_images')
-
-        if not self.instance.pk and not files:
+        has_existing_files = bool(self.instance.pk and self.instance.receipts.exists())
+        if not files and not has_existing_files:
             raise ValidationError('حداقل یک فایل فیش لازم است.')
 
         existing_hashes = set()
@@ -152,12 +152,10 @@ class PaymentRecordForm(forms.ModelForm):
 
         payload = []
         seen_hashes = set()
-
         for uploaded in files:
             ext = os.path.splitext(uploaded.name or '')[1].lower()
             if ext not in self.ALLOWED_EXTENSIONS:
                 raise ValidationError('فرمت فایل مجاز نیست. فقط تصویرهای استاندارد و PDF پذیرفته می شود.')
-
             if uploaded.size and uploaded.size > self.MAX_UPLOAD_SIZE:
                 raise ValidationError('حجم هر فایل باید حداکثر 1 مگابایت باشد.')
 
