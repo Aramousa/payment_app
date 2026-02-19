@@ -128,11 +128,17 @@ class PaymentRecordForm(forms.ModelForm):
             'payer_last_name': 'نام خانوادگی واریز کننده',
             'payer_bank_name': 'نام بانک',
             'payer_bank_branch': 'شعبه',
-            'amount': 'مبلغ',
+            'amount': 'مبلغ (ریال)',
             'tracking_code': 'کد پیگیری',
             'pay_date': 'تاریخ',
             'receipt_images': 'فایل های فیش',
         }
+
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if amount is None or amount <= 0:
+            raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
+        return amount
 
     def clean_receipt_images(self):
         files = self.files.getlist('receipt_images')
