@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 
@@ -393,7 +394,7 @@ def create_payment(request):
 
     if request.method == 'POST':
         if is_staff_user:
-            return HttpResponseForbidden('Staff users cannot create payment records from this form.')
+            return HttpResponseForbidden('کاربران واحدها امکان ثبت سند از این فرم را ندارند.')
         form = PaymentRecordForm(request.POST, request.FILES, initial=initial_data)
         if form.is_valid():
             payment = form.save(commit=False)
@@ -446,26 +447,33 @@ def success(request):
 @login_required
 @require_POST
 def staff_update_status(request, payment_id):
+    redirect_target = request.META.get('HTTP_REFERER') or 'submit'
+
     if not _is_staff_user(request.user):
-        return HttpResponseForbidden('You do not have permission to review documents.')
+        messages.error(request, 'شما دسترسی بررسی اسناد را ندارید.')
+        return redirect(redirect_target)
 
     payment = get_object_or_404(PaymentRecord, id=payment_id)
     staff_role = _user_role(request.user)
     if not _can_staff_act_on_payment(staff_role, payment, is_system_admin=request.user.is_superuser):
-        return HttpResponseForbidden('You cannot modify this payment at its current stage.')
+        messages.error(request, 'در وضعیت فعلی، امکان تغییر این سند برای شما وجود ندارد.')
+        return redirect(redirect_target)
 
     form = StaffStatusUpdateForm(request.POST)
     if not form.is_valid():
-        return redirect(request.META.get('HTTP_REFERER') or 'submit')
+        messages.error(request, 'اطلاعات ارسالی معتبر نیست.')
+        return redirect(redirect_target)
 
     target_status = form.cleaned_data['status']
     allowed_statuses = {value for value, _ in _staff_status_choices_for_role(staff_role)}
     if not request.user.is_superuser and target_status not in allowed_statuses:
-        return HttpResponseForbidden('This status transition is not allowed for your role.')
+        messages.error(request, 'این تغییر وضعیت برای نقش شما مجاز نیست.')
+        return redirect(redirect_target)
 
     note = (form.cleaned_data['note'] or '').strip()
     if target_status in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE} and not note:
-        return HttpResponseForbidden('A note is required for rejected or incomplete statuses.')
+        messages.error(request, 'برای وضعیت «رد شده» یا «ناقص»، ثبت توضیح الزامی است.')
+        return redirect(redirect_target)
 
     from_status = payment.status
     payment.status = target_status
@@ -496,7 +504,8 @@ def staff_update_status(request, payment_id):
         note=payment.last_staff_note,
     )
 
-    return redirect(request.META.get('HTTP_REFERER') or 'submit')
+    messages.success(request, 'وضعیت سند با موفقیت ثبت شد.')
+    return redirect(redirect_target)
 
 
 @login_required
@@ -504,13 +513,13 @@ def edit_payment(request, payment_id):
     payment = get_object_or_404(PaymentRecord, id=payment_id)
 
     if _is_staff_user(request.user):
-        return HttpResponseForbidden('Staff users cannot edit customer payment records.')
+        return HttpResponseForbidden('کاربران واحدها امکان ویرایش سند مشتری را ندارند.')
 
     if payment.user_id != request.user.id:
-        return HttpResponseForbidden('You can only edit your own payment records.')
+        return HttpResponseForbidden('فقط امکان ویرایش اسناد ثبت شده توسط خودتان وجود دارد.')
 
     if payment.status != PaymentRecord.STATUS_INCOMPLETE:
-        return HttpResponseForbidden('Only incomplete records can be edited.')
+        return HttpResponseForbidden('فقط اسناد با وضعیت «ناقص» قابل ویرایش هستند.')
 
     profile = None
     try:
@@ -551,7 +560,7 @@ def edit_payment(request, payment_id):
 def payment_timeline(request, payment_id):
     payment = get_object_or_404(PaymentRecord.objects.select_related('user', 'counterparty'), id=payment_id)
     if not _is_staff_user(request.user) and payment.user_id != request.user.id:
-        return HttpResponseForbidden('You can only view your own payment record timeline.')
+        return HttpResponseForbidden('فقط امکان مشاهده تاریخچه اسناد خودتان وجود دارد.')
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده تاریخچه')
     logs = payment.activity_logs.select_related('actor').all()
@@ -562,7 +571,7 @@ def payment_timeline(request, payment_id):
 @login_required
 def counterparties_manage(request):
     if not request.user.is_superuser:
-        return HttpResponseForbidden('You do not have permission to manage counterparties.')
+        return HttpResponseForbidden('شما دسترسی مدیریت طرف حساب را ندارید.')
 
     if request.method == 'POST':
         form = CounterpartyForm(request.POST)
@@ -579,7 +588,7 @@ def counterparties_manage(request):
 @login_required
 def counterparty_edit(request, counterparty_id):
     if not request.user.is_superuser:
-        return HttpResponseForbidden('You do not have permission to manage counterparties.')
+        return HttpResponseForbidden('شما دسترسی مدیریت طرف حساب را ندارید.')
 
     counterparty = get_object_or_404(Counterparty, id=counterparty_id)
 
@@ -599,11 +608,11 @@ def counterparty_edit(request, counterparty_id):
 @login_required
 def export_records(request):
     if not _is_staff_user(request.user):
-        return HttpResponseForbidden('You do not have permission to export records.')
+        return HttpResponseForbidden('شما دسترسی خروجی گرفتن از رکوردها را ندارید.')
 
     role = _user_role(request.user)
     if not request.user.is_superuser and role not in {'finance', 'commercial'}:
-        return HttpResponseForbidden('Export is only available for finance and commercial users.')
+        return HttpResponseForbidden('خروجی فقط برای کاربران مالی و بازرگانی فعال است.')
 
     records = _records_for_user(request.user)
     records, _ = _apply_record_filters(records, request, is_staff_user=True)

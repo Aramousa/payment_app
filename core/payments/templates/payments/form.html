@@ -89,6 +89,10 @@
         .preview-frame { width: 100%; height: 78vh; border: 0; }
         .preview-image { max-width: 100%; max-height: 78vh; display: block; margin: 0 auto; }
         .preview-hint { font-size: 12px; color: #666; text-align: center; margin-top: 8px; }
+        .flash-title { margin: 0 0 10px; font-size: 16px; }
+        .flash-list { margin: 0; padding-right: 18px; text-align: right; }
+        .flash-error { color: #c62828; }
+        .flash-success { color: #1b5e20; }
     </style>
 </head>
 <body>
@@ -136,6 +140,19 @@
     {% endif %}
 
     <h2>گزارش واریزی ها{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
+    {% if messages %}
+        <div id="flashOverlay" class="preview-overlay open" tabindex="-1">
+            <div class="preview-box">
+                <h3 class="flash-title">پیام سیستم</h3>
+                <ul class="flash-list">
+                    {% for message in messages %}
+                        <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+                <div class="preview-hint">برای بستن پیام، روی صفحه کلیک کنید یا کلید Enter را بزنید.</div>
+            </div>
+        </div>
+    {% endif %}
 
     <div class="filter-box">
         <form method="get" class="filter-grid">
@@ -465,6 +482,7 @@
         const previewBox = document.getElementById('previewBox');
         const previewImage = document.getElementById('previewImage');
         const previewFrame = document.getElementById('previewFrame');
+        const flashOverlay = document.getElementById('flashOverlay');
 
         function closePreview() {
             overlay.classList.remove('open');
@@ -512,11 +530,22 @@
         });
 
         document.addEventListener('keydown', function (event) {
+            if (flashOverlay && flashOverlay.classList.contains('open') && (event.key === 'Enter' || event.key === 'Escape')) {
+                flashOverlay.classList.remove('open');
+                return;
+            }
             if (!overlay.classList.contains('open')) return;
             if (event.key === 'Enter' || event.key === 'Escape') {
                 closePreview();
             }
         });
+
+        if (flashOverlay) {
+            flashOverlay.focus();
+            flashOverlay.addEventListener('click', function () {
+                flashOverlay.classList.remove('open');
+            });
+        }
     });
     </script>
 </body>
