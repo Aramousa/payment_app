@@ -43,6 +43,7 @@ class PaymentRecordForm(forms.ModelForm):
         'payer_account_number',
         'payer_full_name',
         'payer_bank_name',
+        'beneficiary_bank_name',
         'beneficiary_account_number',
         'beneficiary_account_owner',
         'amount',
@@ -84,7 +85,7 @@ class PaymentRecordForm(forms.ModelForm):
             field.widget.attrs['class'] = (css_class + ' readonly-field').strip()
 
         # Do not show legacy placeholder Z in form inputs.
-        for name in ('payer_account_number', 'payer_full_name', 'payer_bank_name'):
+        for name in ('payer_account_number', 'payer_full_name', 'payer_bank_name', 'beneficiary_bank_name'):
             if self.initial.get(name) == 'Z':
                 self.initial[name] = ''
             if self.instance and getattr(self.instance, name, '') == 'Z' and not self.is_bound:
@@ -105,6 +106,7 @@ class PaymentRecordForm(forms.ModelForm):
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
+            'beneficiary_bank_name',
             'beneficiary_account_number',
             'beneficiary_account_owner',
             'amount',
@@ -120,6 +122,7 @@ class PaymentRecordForm(forms.ModelForm):
             'payer_account_number': forms.TextInput(),
             'payer_full_name': forms.TextInput(),
             'payer_bank_name': forms.TextInput(),
+            'beneficiary_bank_name': forms.TextInput(),
             'beneficiary_account_number': forms.TextInput(),
             'beneficiary_account_owner': forms.TextInput(),
             'amount': forms.TextInput(attrs={'class': 'amount-input'}),
@@ -133,7 +136,8 @@ class PaymentRecordForm(forms.ModelForm):
             'phone': 'شماره تلفن',
             'payer_account_number': 'شماره حساب واریز کننده',
             'payer_full_name': 'نام و نام خانوادگی واریز کننده',
-            'payer_bank_name': 'نام بانک',
+            'payer_bank_name': 'بانک مبدا',
+            'beneficiary_bank_name': 'بانک مقصد',
             'beneficiary_account_number': 'شماره حساب مقصد',
             'beneficiary_account_owner': 'نام صاحب حساب مقصد',
             'amount': 'مبلغ (ریال)',

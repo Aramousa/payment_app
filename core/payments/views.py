@@ -352,6 +352,7 @@ def _payer_profiles_for_user(user):
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
+            'beneficiary_bank_name',
             'beneficiary_account_number',
             'beneficiary_account_owner',
         )
@@ -364,6 +365,7 @@ def _payer_profiles_for_user(user):
             'payer_account_number': (row.get('payer_account_number') or '').strip(),
             'payer_full_name': (row.get('payer_full_name') or '').strip(),
             'payer_bank_name': (row.get('payer_bank_name') or '').strip(),
+            'beneficiary_bank_name': (row.get('beneficiary_bank_name') or '').strip(),
             'beneficiary_account_number': (row.get('beneficiary_account_number') or '').strip(),
             'beneficiary_account_owner': (row.get('beneficiary_account_owner') or '').strip(),
         }
@@ -375,6 +377,7 @@ def _payer_profiles_for_user(user):
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
+            'beneficiary_bank_name',
             'beneficiary_account_number',
             'beneficiary_account_owner',
         ))
@@ -641,6 +644,7 @@ def export_records(request):
         'نام و نام خانوادگی واریز کننده',
         'شماره حساب واریز کننده',
         'نام بانک',
+        'نام بانک مقصد',
         'شماره حساب مقصد',
         'نام صاحب حساب مقصد',
         'مجموعه',
@@ -663,6 +667,7 @@ def export_records(request):
             payment.payer_full_name,
             payment.payer_account_number,
             payment.payer_bank_name,
+            payment.beneficiary_bank_name,
             payment.beneficiary_account_number,
             payment.beneficiary_account_owner,
             payment.organization,
