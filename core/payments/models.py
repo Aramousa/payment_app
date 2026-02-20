@@ -102,6 +102,8 @@ class PaymentRecord(models.Model):
     payer_account_number = models.CharField(max_length=64, blank=True, default='')
     payer_full_name = models.CharField(max_length=128, blank=True, default='')
     payer_bank_name = models.CharField(max_length=64, blank=True, default='')
+    beneficiary_account_number = models.CharField(max_length=64, blank=True, default='')
+    beneficiary_account_owner = models.CharField(max_length=128, blank=True, default='')
     receipt_image = models.ImageField(upload_to='receipts/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     locked_by_finance = models.BooleanField(default=False)

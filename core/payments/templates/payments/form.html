@@ -126,7 +126,7 @@
                         <option value="">انتخاب کنید</option>
                         {% for profile in payer_profiles %}
                             <option value="{{ forloop.counter0 }}">
-                                {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }}
+                                {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }} | {{ profile.beneficiary_account_number }} - {{ profile.beneficiary_account_owner }}
                             </option>
                         {% endfor %}
                     </select>
@@ -205,6 +205,7 @@
                 <th>نام مشتری</th>
                 <th>مجموعه</th>
                 <th>شهر</th>
+                <th>حساب مقصد</th>
                 {% endif %}
                 <th>
                     <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_full_name&dir={% if current_sort == 'payer_full_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
@@ -246,6 +247,13 @@
                 <td>{{ payment.first_name }} {{ payment.last_name }}</td>
                 <td>{{ payment.organization|default:'-' }}</td>
                 <td>{{ payment.city|default:'-' }}</td>
+                <td>
+                    {% if payment.beneficiary_account_number and payment.beneficiary_account_owner and payment.beneficiary_account_number != 'Z' and payment.beneficiary_account_owner != 'Z' %}
+                        {{ payment.beneficiary_account_number }} - {{ payment.beneficiary_account_owner }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
                 {% endif %}
                 <td>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</td>
                 <td>{{ payment.pay_date }}</td>
@@ -293,7 +301,7 @@
                 </td>
             </tr>
             <tr class="detail-row" id="detail-{{ payment.id }}">
-                <td colspan="{% if is_staff_user %}10{% else %}7{% endif %}">
+                <td colspan="{% if is_staff_user %}11{% else %}7{% endif %}">
                     <div class="detail-grid">
                         <div class="detail-card">
                             <strong>اطلاعات رکورد</strong>
@@ -303,6 +311,8 @@
                             <div>نام و نام خانوادگی واریز کننده: {% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</div>
                             <div>شماره حساب واریز کننده: {% if payment.payer_account_number and payment.payer_account_number != 'Z' %}{{ payment.payer_account_number }}{% else %}-{% endif %}</div>
                             <div>نام بانک: {% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</div>
+                            <div>شماره حساب مقصد: {% if payment.beneficiary_account_number and payment.beneficiary_account_number != 'Z' %}{{ payment.beneficiary_account_number }}{% else %}-{% endif %}</div>
+                            <div>نام صاحب حساب مقصد: {% if payment.beneficiary_account_owner and payment.beneficiary_account_owner != 'Z' %}{{ payment.beneficiary_account_owner }}{% else %}-{% endif %}</div>
                             <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
                             {% if is_staff_user %}<div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>{% endif %}
                             {% if payment.status == 'rejected' or payment.status == 'incomplete' %}
@@ -376,7 +386,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="{% if is_staff_user %}10{% else %}7{% endif %}">اطلاعاتی موجود نیست</td></tr>
+            <tr><td colspan="{% if is_staff_user %}11{% else %}7{% endif %}">اطلاعاتی موجود نیست</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -425,7 +435,9 @@
                 const fieldMap = {
                     payer_account_number: selected.payer_account_number || '',
                     payer_full_name: selected.payer_full_name || '',
-                    payer_bank_name: selected.payer_bank_name || ''
+                    payer_bank_name: selected.payer_bank_name || '',
+                    beneficiary_account_number: selected.beneficiary_account_number || '',
+                    beneficiary_account_owner: selected.beneficiary_account_owner || ''
                 };
                 Object.keys(fieldMap).forEach(function (name) {
                     const input = document.querySelector('[name="' + name + '"]');

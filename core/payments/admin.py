@@ -24,6 +24,8 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         'payer_full_name',
         'payer_account_number',
         'payer_bank_name',
+        'beneficiary_account_number',
+        'beneficiary_account_owner',
         'formatted_amount',
         'status',
         'locked_by_finance',
@@ -38,6 +40,8 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         'payer_full_name',
         'payer_account_number',
         'payer_bank_name',
+        'beneficiary_account_number',
+        'beneficiary_account_owner',
         'phone',
         'tracking_code',
     )
