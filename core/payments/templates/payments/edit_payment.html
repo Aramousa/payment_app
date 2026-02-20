@@ -18,6 +18,12 @@
         .save-btn { background: #0d6efd; color: #fff; }
         .back-link { background: #6c757d; color: #fff; margin-right: 8px; }
         .note-box { background: #fff3cd; border-radius: 6px; padding: 10px; margin-bottom: 12px; }
+        .preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+        .preview-overlay.open { display: flex; }
+        .preview-box { background: #fff; border-radius: 10px; max-width: 92vw; max-height: 92vh; width: 980px; padding: 10px; position: relative; }
+        .preview-frame { width: 100%; height: 78vh; border: 0; }
+        .preview-image { max-width: 100%; max-height: 78vh; display: block; margin: 0 auto; }
+        .preview-hint { font-size: 12px; color: #666; text-align: center; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -34,7 +40,7 @@
         {% if payment.receipts.all %}
             <p>فایل های فعلی:</p>
             {% for receipt in payment.receipts.all %}
-                <a href="{{ receipt.image.url }}" target="_blank">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                <a href="{{ receipt.image.url }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
             {% endfor %}
             <hr>
         {% endif %}
@@ -59,6 +65,13 @@
             <a href="{% url 'submit' %}" class="back-link">بازگشت</a>
         </form>
         {{ payer_profiles|json_script:"payer-profiles-data" }}
+    </div>
+    <div id="previewOverlay" class="preview-overlay" tabindex="-1">
+        <div class="preview-box" id="previewBox">
+            <img id="previewImage" class="preview-image" alt="پیش نمایش سند" style="display:none;">
+            <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
+            <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید Enter را بزنید.</div>
+        </div>
     </div>
 
     <script>
@@ -98,6 +111,63 @@
                 });
             });
         }
+
+        const overlay = document.getElementById('previewOverlay');
+        const previewBox = document.getElementById('previewBox');
+        const previewImage = document.getElementById('previewImage');
+        const previewFrame = document.getElementById('previewFrame');
+
+        function closePreview() {
+            overlay.classList.remove('open');
+            previewImage.style.display = 'none';
+            previewImage.src = '';
+            previewFrame.style.display = 'none';
+            previewFrame.src = '';
+        }
+
+        function openPreview(url) {
+            const lowerUrl = (url || '').toLowerCase();
+            const isPdf = lowerUrl.endsWith('.pdf');
+            if (isPdf) {
+                previewFrame.src = url;
+                previewFrame.style.display = 'block';
+                previewImage.style.display = 'none';
+                previewImage.src = '';
+            } else {
+                previewImage.src = url;
+                previewImage.style.display = 'block';
+                previewFrame.style.display = 'none';
+                previewFrame.src = '';
+            }
+            overlay.classList.add('open');
+            overlay.focus();
+        }
+
+        document.querySelectorAll('.receipt-preview-link').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                openPreview(link.getAttribute('href'));
+            });
+        });
+
+        overlay.addEventListener('click', function (event) {
+            if (event.target === overlay || event.target === previewImage) {
+                closePreview();
+            }
+        });
+
+        previewBox.addEventListener('click', function (event) {
+            if (event.target === previewBox) {
+                closePreview();
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (!overlay.classList.contains('open')) return;
+            if (event.key === 'Enter' || event.key === 'Escape') {
+                closePreview();
+            }
+        });
     });
     </script>
 </body>
