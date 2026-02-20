@@ -11,13 +11,20 @@
     <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
-        .box { max-width: 560px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+        .box { max-width: 980px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
         h2 { text-align: center; margin-bottom: 16px; }
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
         button, a { border: none; border-radius: 6px; padding: 10px 14px; text-decoration: none; cursor: pointer; }
         .save-btn { background: #0d6efd; color: #fff; }
         .back-link { background: #6c757d; color: #fff; margin-right: 8px; }
         .note-box { background: #fff3cd; border-radius: 6px; padding: 10px; margin-bottom: 12px; }
+        #payment-form { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 10px 14px; }
+        #payment-form > p { margin: 0; }
+        #payment-form .full-row { grid-column: 1 / -1; }
+        #payment-form .save-btn, #payment-form .back-link { grid-column: span 1; margin-top: 4px; }
+        @media (max-width: 860px) {
+            #payment-form { grid-template-columns: 1fr; }
+        }
         .preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
         .preview-overlay.open { display: flex; }
         .preview-box { background: #fff; border-radius: 10px; max-width: 92vw; max-height: 92vh; width: 980px; padding: 10px; position: relative; }
@@ -28,6 +35,9 @@
         .flash-list { margin: 0; padding-right: 18px; text-align: right; }
         .flash-error { color: #c62828; }
         .flash-success { color: #1b5e20; }
+        .customer-info { background: #fff; border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+        .customer-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
+        .customer-info-item { font-size: 13px; color: #333; }
     </style>
 </head>
 <body>
@@ -46,6 +56,15 @@
     {% endif %}
     <div class="box">
         <h2>ویرایش فیش ناقص</h2>
+        <div class="customer-info">
+            <div class="customer-info-grid">
+                <div class="customer-info-item"><strong>نام:</strong> {{ customer_info.first_name|default:'-' }}</div>
+                <div class="customer-info-item"><strong>نام خانوادگی:</strong> {{ customer_info.last_name|default:'-' }}</div>
+                <div class="customer-info-item"><strong>مجموعه:</strong> {{ customer_info.organization|default:'-' }}</div>
+                <div class="customer-info-item"><strong>شهر:</strong> {{ customer_info.city|default:'-' }}</div>
+                <div class="customer-info-item"><strong>شماره تلفن:</strong> {{ customer_info.phone|default:'-' }}</div>
+            </div>
+        </div>
 
         {% if payment.last_staff_note %}
             <div class="note-box">
@@ -66,7 +85,7 @@
             {% csrf_token %}
             {{ form.as_p }}
             {% if payer_profiles %}
-                <p>
+                <p class="full-row">
                     <label for="payer_profile_picker">استفاده از اطلاعات قبلی</label>
                     <select id="payer_profile_picker">
                         <option value="">انتخاب کنید</option>
@@ -137,6 +156,7 @@
         const previewImage = document.getElementById('previewImage');
         const previewFrame = document.getElementById('previewFrame');
         const flashOverlay = document.getElementById('flashOverlay');
+        let pdfBlobUrl = '';
 
         function closePreview() {
             overlay.classList.remove('open');
@@ -144,13 +164,31 @@
             previewImage.src = '';
             previewFrame.style.display = 'none';
             previewFrame.src = '';
+            if (pdfBlobUrl) {
+                URL.revokeObjectURL(pdfBlobUrl);
+                pdfBlobUrl = '';
+            }
         }
 
-        function openPreview(url) {
-            const lowerUrl = (url || '').toLowerCase();
-            const isPdf = lowerUrl.endsWith('.pdf');
+        async function openPreview(url) {
+            let isPdf = false;
+            try {
+                const parsed = new URL(url, window.location.origin);
+                isPdf = /\.pdf$/i.test(parsed.pathname || '');
+            } catch (e) {
+                isPdf = /\.pdf(\?|#|$)/i.test((url || '').toLowerCase());
+            }
             if (isPdf) {
-                previewFrame.src = url;
+                try {
+                    const res = await fetch(url, { credentials: 'same-origin' });
+                    if (!res.ok) throw new Error('pdf_fetch_failed');
+                    const blob = await res.blob();
+                    pdfBlobUrl = URL.createObjectURL(blob);
+                    previewFrame.src = pdfBlobUrl;
+                } catch (e) {
+                    window.open(url, '_blank', 'noopener');
+                    return;
+                }
                 previewFrame.style.display = 'block';
                 previewImage.style.display = 'none';
                 previewImage.src = '';
@@ -165,9 +203,9 @@
         }
 
         document.querySelectorAll('.receipt-preview-link').forEach(function (link) {
-            link.addEventListener('click', function (event) {
+            link.addEventListener('click', async function (event) {
                 event.preventDefault();
-                openPreview(link.getAttribute('href'));
+                await openPreview(link.getAttribute('href'));
             });
         });
 

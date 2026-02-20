@@ -38,7 +38,7 @@ class PaymentRecordForm(forms.ModelForm):
     ALLOWED_EXTENSIONS = {
         '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf',
     }
-    ACCOUNT_FIELDS = ('first_name', 'last_name', 'organization', 'city', 'phone')
+    ACCOUNT_FIELDS = ()
     REQUIRED_CUSTOMER_FIELDS = (
         'payer_account_number',
         'payer_full_name',
@@ -98,11 +98,6 @@ class PaymentRecordForm(forms.ModelForm):
     class Meta:
         model = PaymentRecord
         fields = [
-            'first_name',
-            'last_name',
-            'organization',
-            'city',
-            'phone',
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
@@ -114,11 +109,6 @@ class PaymentRecordForm(forms.ModelForm):
             'pay_date',
         ]
         widgets = {
-            'first_name': forms.TextInput(),
-            'last_name': forms.TextInput(),
-            'organization': forms.TextInput(),
-            'city': forms.TextInput(),
-            'phone': forms.TextInput(),
             'payer_account_number': forms.TextInput(),
             'payer_full_name': forms.TextInput(),
             'payer_bank_name': forms.TextInput(),
@@ -129,11 +119,6 @@ class PaymentRecordForm(forms.ModelForm):
             'pay_date': jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date'}),
         }
         labels = {
-            'first_name': 'نام',
-            'last_name': 'نام خانوادگی',
-            'organization': 'مجموعه',
-            'city': 'شهر',
-            'phone': 'شماره تلفن',
             'payer_account_number': 'شماره حساب واریز کننده',
             'payer_full_name': 'نام و نام خانوادگی واریز کننده',
             'payer_bank_name': 'بانک مبدا',

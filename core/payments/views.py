@@ -444,6 +444,7 @@ def create_payment(request):
         'current_sort': current_sort,
         'current_sort_dir': current_sort_dir,
         'sort_base_query': sort_base_query,
+        'customer_info': initial_data,
     })
 
 
@@ -562,6 +563,7 @@ def edit_payment(request, payment_id):
         'form': form,
         'payment': payment,
         'payer_profiles': _payer_profiles_for_user(request.user),
+        'customer_info': initial_data,
     })
 
 

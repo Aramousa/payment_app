@@ -134,3 +134,6 @@ CSRF_TRUSTED_ORIGINS = [
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/submit/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+# Allow rendering same-origin documents (e.g., PDF receipts) inside in-page iframe preview.
+X_FRAME_OPTIONS = 'SAMEORIGIN'
