@@ -52,6 +52,7 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
         th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; vertical-align: top; }
         th { background-color: #007bff; color: white; }
+        .sort-link { color: #fff; text-decoration: none; }
 
         tr.summary-row { cursor: pointer; }
         tr.summary-row:hover { background: #f5f9ff; }
@@ -177,12 +178,36 @@
     <table>
         <thead>
             <tr>
-                <th>نام واریز کننده</th>
-                <th>تاریخ</th>
-                <th>شماره پیگیری</th>
-                <th>مبلغ (ریال)</th>
-                <th>نام بانک</th>
-                <th>وضعیت</th>
+                <th>
+                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_full_name&dir={% if current_sort == 'payer_full_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                        نام واریز کننده{% if current_sort == 'payer_full_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=pay_date&dir={% if current_sort == 'pay_date' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                        تاریخ{% if current_sort == 'pay_date' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=tracking_code&dir={% if current_sort == 'tracking_code' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                        شماره پیگیری{% if current_sort == 'tracking_code' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=amount&dir={% if current_sort == 'amount' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                        مبلغ (ریال){% if current_sort == 'amount' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_bank_name&dir={% if current_sort == 'payer_bank_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                        نام بانک{% if current_sort == 'payer_bank_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=status&dir={% if current_sort == 'status' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                        وضعیت{% if current_sort == 'status' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                    </a>
+                </th>
                 <th>اقدام سریع</th>
             </tr>
         </thead>

@@ -1,5 +1,6 @@
 ﻿import jdatetime
 from openpyxl import Workbook
+from urllib.parse import urlencode
 
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -287,6 +288,35 @@ def _apply_record_filters(records, request, is_staff_user):
 
     return records, filters
 
+def _apply_record_sort(records, request):
+    sortable_fields = {
+        'payer_full_name': 'payer_full_name',
+        'pay_date': 'pay_date',
+        'tracking_code': 'tracking_code',
+        'amount': 'amount',
+        'payer_bank_name': 'payer_bank_name',
+        'status': 'status',
+    }
+    current_sort = (request.GET.get('sort') or '').strip()
+    current_dir = (request.GET.get('dir') or 'desc').strip().lower()
+    if current_dir not in {'asc', 'desc'}:
+        current_dir = 'desc'
+
+    sort_field = sortable_fields.get(current_sort)
+    if sort_field:
+        prefix = '' if current_dir == 'asc' else '-'
+        records = records.order_by(f'{prefix}{sort_field}', '-id')
+    else:
+        records = records.order_by('-id')
+        current_sort = ''
+        current_dir = 'desc'
+
+    query_params = request.GET.copy()
+    query_params.pop('sort', None)
+    query_params.pop('dir', None)
+    base_query = urlencode(query_params, doseq=True)
+
+    return records, current_sort, current_dir, base_query
 
 def _account_initial_data(user, profile, payment=None):
     payment = payment or PaymentRecord()
@@ -383,6 +413,7 @@ def create_payment(request):
 
     records = _records_for_user(request.user)
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
+    records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
     records = _enrich_records(records, staff_role=staff_role, is_system_admin=is_system_admin)
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
@@ -400,6 +431,9 @@ def create_payment(request):
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
         'payer_profiles': _payer_profiles_for_user(request.user) if not is_staff_user else [],
+        'current_sort': current_sort,
+        'current_sort_dir': current_sort_dir,
+        'sort_base_query': sort_base_query,
     })
 
 
@@ -624,3 +658,8 @@ def export_records(request):
 
     wb.save(response)
     return response
+
+
+
+
+
