@@ -184,6 +184,11 @@
     <table>
         <thead>
             <tr>
+                {% if is_staff_user %}
+                <th>نام مشتری</th>
+                <th>مجموعه</th>
+                <th>شهر</th>
+                {% endif %}
                 <th>
                     <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_full_name&dir={% if current_sort == 'payer_full_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         نام واریز کننده{% if current_sort == 'payer_full_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
@@ -220,6 +225,11 @@
         <tbody>
             {% for payment in records %}
             <tr class="summary-row" data-row="{{ payment.id }}">
+                {% if is_staff_user %}
+                <td>{{ payment.first_name }} {{ payment.last_name }}</td>
+                <td>{{ payment.organization|default:'-' }}</td>
+                <td>{{ payment.city|default:'-' }}</td>
+                {% endif %}
                 <td>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</td>
                 <td>{{ payment.pay_date }}</td>
                 <td>{{ payment.tracking_code|default:'-' }}</td>
@@ -266,7 +276,7 @@
                 </td>
             </tr>
             <tr class="detail-row" id="detail-{{ payment.id }}">
-                <td colspan="7">
+                <td colspan="{% if is_staff_user %}10{% else %}7{% endif %}">
                     <div class="detail-grid">
                         <div class="detail-card">
                             <strong>اطلاعات رکورد</strong>
@@ -349,7 +359,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="7">اطلاعاتی موجود نیست</td></tr>
+            <tr><td colspan="{% if is_staff_user %}10{% else %}7{% endif %}">اطلاعاتی موجود نیست</td></tr>
             {% endfor %}
         </tbody>
     </table>
