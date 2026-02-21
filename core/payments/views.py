@@ -352,8 +352,6 @@ def _source_profiles_for_user(user):
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
-            'tracking_code',
-            'amount',
         )
         .order_by('-id')
     )
@@ -364,8 +362,6 @@ def _source_profiles_for_user(user):
             'payer_account_number': (row.get('payer_account_number') or '').strip(),
             'payer_full_name': (row.get('payer_full_name') or '').strip(),
             'payer_bank_name': (row.get('payer_bank_name') or '').strip(),
-            'tracking_code': (row.get('tracking_code') or '').strip(),
-            'amount': row.get('amount') or '',
         }
         if not all(values.values()):
             continue
@@ -471,7 +467,7 @@ def create_payment(request):
         'staff_user_role': staff_role,
         'staff_role_label': _staff_role_label(staff_role),
         'can_manage_counterparties': is_system_admin,
-        'can_export_records': is_system_admin or staff_role in {'finance', 'commercial'},
+        'can_export_records': (not is_staff_user) or is_system_admin or staff_role in {'finance', 'commercial'},
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
         'source_profiles': _source_profiles_for_user(request.user) if not is_staff_user else [],
@@ -654,15 +650,13 @@ def counterparty_edit(request, counterparty_id):
 
 @login_required
 def export_records(request):
-    if not _is_staff_user(request.user):
-        return HttpResponseForbidden('شما دسترسی خروجی گرفتن از رکوردها را ندارید.')
-
+    is_staff_user = _is_staff_user(request.user)
     role = _user_role(request.user)
-    if not request.user.is_superuser and role not in {'finance', 'commercial'}:
-        return HttpResponseForbidden('خروجی فقط برای کاربران مالی و بازرگانی فعال است.')
+    if is_staff_user and not request.user.is_superuser and role not in {'finance', 'commercial'}:
+        return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
 
     records = _records_for_user(request.user)
-    records, _ = _apply_record_filters(records, request, is_staff_user=True)
+    records, _ = _apply_record_filters(records, request, is_staff_user=is_staff_user)
 
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

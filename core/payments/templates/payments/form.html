@@ -142,7 +142,7 @@
                     <option value="">انتخاب کنید</option>
                     {% for profile in source_profiles %}
                         <option value="{{ forloop.counter0 }}">
-                            {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }} | پیگیری: {{ profile.tracking_code }} | مبلغ: {{ profile.amount|intcomma }}
+                            {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }}
                         </option>
                     {% empty %}
                         <option value="" disabled>اطلاعات مبدا قبلی موجود نیست</option>
@@ -467,9 +467,7 @@
                 const fieldMap = {
                     payer_account_number: selected.payer_account_number || '',
                     payer_full_name: selected.payer_full_name || '',
-                    payer_bank_name: selected.payer_bank_name || '',
-                    tracking_code: selected.tracking_code || '',
-                    amount: selected.amount || ''
+                    payer_bank_name: selected.payer_bank_name || ''
                 };
                 Object.keys(fieldMap).forEach(function (name) {
                     const input = document.querySelector('[name="' + name + '"]');
