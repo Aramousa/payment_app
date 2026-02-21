@@ -342,7 +342,7 @@ def _save_receipts(payment, form):
     PaymentReceipt.objects.bulk_create(receipts)
 
 
-def _payer_profiles_for_user(user):
+def _source_profiles_for_user(user):
     if not user or not user.is_authenticated:
         return []
     records = (
@@ -352,9 +352,8 @@ def _payer_profiles_for_user(user):
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
-            'beneficiary_bank_name',
-            'beneficiary_account_number',
-            'beneficiary_account_owner',
+            'tracking_code',
+            'amount',
         )
         .order_by('-id')
     )
@@ -365,9 +364,8 @@ def _payer_profiles_for_user(user):
             'payer_account_number': (row.get('payer_account_number') or '').strip(),
             'payer_full_name': (row.get('payer_full_name') or '').strip(),
             'payer_bank_name': (row.get('payer_bank_name') or '').strip(),
-            'beneficiary_bank_name': (row.get('beneficiary_bank_name') or '').strip(),
-            'beneficiary_account_number': (row.get('beneficiary_account_number') or '').strip(),
-            'beneficiary_account_owner': (row.get('beneficiary_account_owner') or '').strip(),
+            'tracking_code': (row.get('tracking_code') or '').strip(),
+            'amount': row.get('amount') or '',
         }
         if not all(values.values()):
             continue
@@ -377,6 +375,42 @@ def _payer_profiles_for_user(user):
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
+            'tracking_code',
+            'amount',
+        ))
+        if key in seen:
+            continue
+        seen.add(key)
+        profiles.append(values)
+    return profiles
+
+
+def _destination_profiles_for_user(user):
+    if not user or not user.is_authenticated:
+        return []
+    records = (
+        PaymentRecord.objects
+        .filter(user=user)
+        .values(
+            'beneficiary_bank_name',
+            'beneficiary_account_number',
+            'beneficiary_account_owner',
+        )
+        .order_by('-id')
+    )
+    seen = set()
+    profiles = []
+    for row in records:
+        values = {
+            'beneficiary_bank_name': (row.get('beneficiary_bank_name') or '').strip(),
+            'beneficiary_account_number': (row.get('beneficiary_account_number') or '').strip(),
+            'beneficiary_account_owner': (row.get('beneficiary_account_owner') or '').strip(),
+        }
+        if not all(values.values()):
+            continue
+        if 'Z' in values.values():
+            continue
+        key = tuple(values[field] for field in (
             'beneficiary_bank_name',
             'beneficiary_account_number',
             'beneficiary_account_owner',
@@ -440,7 +474,8 @@ def create_payment(request):
         'can_export_records': is_system_admin or staff_role in {'finance', 'commercial'},
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
-        'payer_profiles': _payer_profiles_for_user(request.user) if not is_staff_user else [],
+        'source_profiles': _source_profiles_for_user(request.user) if not is_staff_user else [],
+        'destination_profiles': _destination_profiles_for_user(request.user) if not is_staff_user else [],
         'current_sort': current_sort,
         'current_sort_dir': current_sort_dir,
         'sort_base_query': sort_base_query,
@@ -562,7 +597,8 @@ def edit_payment(request, payment_id):
     return render(request, 'payments/edit_payment.html', {
         'form': form,
         'payment': payment,
-        'payer_profiles': _payer_profiles_for_user(request.user),
+        'source_profiles': _source_profiles_for_user(request.user),
+        'destination_profiles': _destination_profiles_for_user(request.user),
         'customer_info': initial_data,
     })
 

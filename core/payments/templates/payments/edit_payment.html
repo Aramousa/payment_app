@@ -84,23 +84,37 @@
         <form id="payment-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
             {{ form.as_p }}
-            {% if payer_profiles %}
-                <p class="full-row">
-                    <label for="payer_profile_picker">استفاده از اطلاعات قبلی</label>
-                    <select id="payer_profile_picker">
-                        <option value="">انتخاب کنید</option>
-                        {% for profile in payer_profiles %}
-                            <option value="{{ forloop.counter0 }}">
-                                {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }} | {{ profile.beneficiary_bank_name }} | {{ profile.beneficiary_account_number }} - {{ profile.beneficiary_account_owner }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </p>
-            {% endif %}
+            <p class="full-row">
+                <label for="source_profile_picker">استفاده از اطلاعات مبدا قبلی</label>
+                <select id="source_profile_picker">
+                    <option value="">انتخاب کنید</option>
+                    {% for profile in source_profiles %}
+                        <option value="{{ forloop.counter0 }}">
+                            {{ profile.payer_bank_name }} | {{ profile.payer_account_number }} | {{ profile.payer_full_name }} | پیگیری: {{ profile.tracking_code }} | مبلغ: {{ profile.amount|intcomma }}
+                        </option>
+                    {% empty %}
+                        <option value="" disabled>اطلاعات مبدا قبلی موجود نیست</option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p class="full-row">
+                <label for="destination_profile_picker">استفاده از اطلاعات مقصد قبلی</label>
+                <select id="destination_profile_picker">
+                    <option value="">انتخاب کنید</option>
+                    {% for profile in destination_profiles %}
+                        <option value="{{ forloop.counter0 }}">
+                            {{ profile.beneficiary_bank_name }} | {{ profile.beneficiary_account_number }} - {{ profile.beneficiary_account_owner }}
+                        </option>
+                    {% empty %}
+                        <option value="" disabled>اطلاعات مقصد قبلی موجود نیست</option>
+                    {% endfor %}
+                </select>
+            </p>
             <button type="submit" class="save-btn">ثبت اصلاحات</button>
             <a href="{% url 'submit' %}" class="back-link">بازگشت</a>
         </form>
-        {{ payer_profiles|json_script:"payer-profiles-data" }}
+        {{ source_profiles|json_script:"source-profiles-data" }}
+        {{ destination_profiles|json_script:"destination-profiles-data" }}
     </div>
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
         <div class="preview-box" id="previewBox">
@@ -128,18 +142,37 @@
             }
         });
 
-        const profilePicker = document.getElementById('payer_profile_picker');
-        const profileDataEl = document.getElementById('payer-profiles-data');
-        if (profilePicker && profileDataEl) {
-            const profiles = JSON.parse(profileDataEl.textContent || '[]');
-            profilePicker.addEventListener('change', function () {
-                const idx = parseInt(profilePicker.value, 10);
+        const sourcePicker = document.getElementById('source_profile_picker');
+        const sourceDataEl = document.getElementById('source-profiles-data');
+        if (sourcePicker && sourceDataEl) {
+            const profiles = JSON.parse(sourceDataEl.textContent || '[]');
+            sourcePicker.addEventListener('change', function () {
+                const idx = parseInt(sourcePicker.value, 10);
                 if (Number.isNaN(idx) || !profiles[idx]) return;
                 const selected = profiles[idx];
                 const fieldMap = {
                     payer_account_number: selected.payer_account_number || '',
                     payer_full_name: selected.payer_full_name || '',
                     payer_bank_name: selected.payer_bank_name || '',
+                    tracking_code: selected.tracking_code || '',
+                    amount: selected.amount || ''
+                };
+                Object.keys(fieldMap).forEach(function (name) {
+                    const input = document.querySelector('[name="' + name + '"]');
+                    if (input) input.value = fieldMap[name];
+                });
+            });
+        }
+
+        const destinationPicker = document.getElementById('destination_profile_picker');
+        const destinationDataEl = document.getElementById('destination-profiles-data');
+        if (destinationPicker && destinationDataEl) {
+            const profiles = JSON.parse(destinationDataEl.textContent || '[]');
+            destinationPicker.addEventListener('change', function () {
+                const idx = parseInt(destinationPicker.value, 10);
+                if (Number.isNaN(idx) || !profiles[idx]) return;
+                const selected = profiles[idx];
+                const fieldMap = {
                     beneficiary_bank_name: selected.beneficiary_bank_name || '',
                     beneficiary_account_number: selected.beneficiary_account_number || '',
                     beneficiary_account_owner: selected.beneficiary_account_owner || ''
