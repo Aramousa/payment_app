@@ -106,6 +106,7 @@
 <body>
     <div class="top-bar">
         <div class="top-actions">
+            <a href="{% url 'profile_password_change' %}" class="button-link">پروفایل / تغییر رمز</a>
             {% if can_manage_counterparties %}
                 <a href="{% url 'counterparties_manage' %}" class="button-link">مدیریت طرف حساب</a>
             {% endif %}

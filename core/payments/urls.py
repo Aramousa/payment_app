@@ -5,6 +5,7 @@ from .views import (
     create_payment,
     edit_payment,
     export_records,
+    profile_password_change,
     payment_timeline,
     staff_update_status,
     success,
@@ -19,4 +20,5 @@ urlpatterns = [
     path('counterparties/', counterparties_manage, name='counterparties_manage'),
     path('counterparties/<int:counterparty_id>/edit/', counterparty_edit, name='counterparty_edit'),
     path('export-records/', export_records, name='export_records'),
+    path('profile/password/', profile_password_change, name='profile_password_change'),
 ]

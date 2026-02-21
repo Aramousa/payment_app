@@ -80,8 +80,8 @@ class LoginAdvertisementAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'phone', 'organization', 'city', 'role')
-    list_filter = ('role', 'city')
+    list_display = ('user', 'phone', 'organization', 'city', 'role', 'force_password_change')
+    list_filter = ('role', 'city', 'force_password_change')
     search_fields = ('user__username', 'phone')
 
 

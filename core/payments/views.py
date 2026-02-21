@@ -5,6 +5,9 @@ from urllib.parse import urlencode
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth import logout as auth_logout
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 
@@ -371,8 +374,6 @@ def _source_profiles_for_user(user):
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
-            'tracking_code',
-            'amount',
         ))
         if key in seen:
             continue
@@ -483,6 +484,38 @@ def create_payment(request):
 def success(request):
     records = _records_for_user(request.user)
     return render(request, 'payments/success.html', {'records': records})
+
+
+@login_required
+def profile_password_change(request):
+    profile = getattr(request.user, 'profile', None)
+    is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
+
+    if request.method == 'POST':
+        if request.POST.get('action') == 'cancel':
+            if is_force_change:
+                auth_logout(request)
+                return redirect('login')
+            return redirect('submit')
+
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)
+            if profile and profile.role == 'customer' and profile.force_password_change:
+                profile.force_password_change = False
+                profile.save(update_fields=['force_password_change'])
+            messages.success(request, 'رمز عبور با موفقیت تغییر کرد.')
+            return redirect('submit')
+        messages.error(request, 'تغییر رمز انجام نشد. لطفا خطاها را بررسی کنید.')
+    else:
+        form = PasswordChangeForm(request.user)
+
+    return render(request, 'payments/profile_password_change.html', {
+        'form': form,
+        'is_force_change': is_force_change,
+        'username': request.user.username,
+    })
 
 
 @login_required
