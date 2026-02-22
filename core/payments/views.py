@@ -492,12 +492,6 @@ def profile_password_change(request):
     is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
 
     if request.method == 'POST':
-        if request.POST.get('action') == 'cancel':
-            if is_force_change:
-                auth_logout(request)
-                return redirect('login')
-            return redirect('submit')
-
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             user = form.save()
@@ -516,6 +510,16 @@ def profile_password_change(request):
         'is_force_change': is_force_change,
         'username': request.user.username,
     })
+
+
+@login_required
+def profile_password_cancel(request):
+    profile = getattr(request.user, 'profile', None)
+    is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
+    if is_force_change:
+        auth_logout(request)
+        return redirect('login')
+    return redirect('submit')
 
 
 @login_required
