@@ -162,6 +162,7 @@ class UserProfile(models.Model):
     city = models.CharField('شهر', max_length=50, blank=True)
     role = models.CharField('نوع کاربر', max_length=10, choices=ROLE_CHOICES, default='customer')
     force_password_change = models.BooleanField('الزام تعویض رمز', default=True)
+    force_password_change = models.BooleanField('الزام تعویض رمز', default=True)
 
     def __str__(self):
         return self.user.username
