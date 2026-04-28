@@ -1,0 +1,127 @@
+{% load humanize %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>جزئیات فاکتور</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f6fa; padding: 20px; }
+        .box { max-width: 980px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 22px; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
+        .actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+        .button-link { background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; display: inline-block; }
+        .download-link { background: #198754; }
+        .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .card { border: 1px solid #e4e8ef; border-radius: 8px; padding: 12px; background: #fbfcfe; }
+        .label { color: #5f6b7a; font-size: 12px; margin-bottom: 6px; }
+        .value { color: #222; }
+        .note-box { background: #fff8e1; border: 1px solid #f2d389; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; color: #6a4d00; }
+        textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 10px; font-family: inherit; }
+        .submit-btn { border: none; border-radius: 6px; background: #198754; color: #fff; padding: 10px 16px; cursor: pointer; font-family: inherit; }
+        .flash-list { margin: 0 0 16px; padding-right: 18px; }
+        .flash-success { color: #1b5e20; }
+        .flash-error { color: #c62828; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="actions">
+            <a class="button-link" href="{% url 'invoices_dashboard' %}">بازگشت به فاکتورها</a>
+            <a class="button-link download-link" href="{{ invoice.attachment.url }}" download>دانلود فایل فاکتور</a>
+        </div>
+
+        {% if messages %}
+            <ul class="flash-list">
+                {% for message in messages %}
+                    <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {% if just_marked_seen %}
+            <div class="note-box">این فاکتور با ورود شما به این صفحه به عنوان «دیده شده» ثبت شد.</div>
+        {% endif %}
+
+        <h2>جزئیات فاکتور</h2>
+        <div class="meta-grid">
+            <div class="card">
+                <div class="label">مشتری</div>
+                <div class="value">{{ invoice.customer.get_full_name|default:invoice.customer.username }}</div>
+            </div>
+            <div class="card">
+                <div class="label">نام کاربری</div>
+                <div class="value">{{ invoice.customer.username }}</div>
+            </div>
+            <div class="card">
+                <div class="label">مجموعه</div>
+                <div class="value">{{ customer_profile.organization|default:'-' }}</div>
+            </div>
+            <div class="card">
+                <div class="label">تاریخ فاکتور</div>
+                <div class="value">{{ invoice.invoice_date }}</div>
+            </div>
+            <div class="card">
+                <div class="label">مبلغ</div>
+                <div class="value">{{ invoice.amount|intcomma }} ریال</div>
+            </div>
+            <div class="card">
+                <div class="label">شماره حواله</div>
+                <div class="value">{{ invoice.reference_number }}</div>
+            </div>
+            <div class="card">
+                <div class="label">بارگذاری کننده</div>
+                <div class="value">{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</div>
+            </div>
+            <div class="card">
+                <div class="label">وضعیت مشاهده</div>
+                <div class="value">{% if invoice.is_seen_by_customer %}دیده شده{% else %}دیده نشده{% endif %}</div>
+            </div>
+            <div class="card">
+                <div class="label">تاریخ ثبت</div>
+                <div class="value">{{ invoice.created_at|date:"Y/m/d" }}</div>
+            </div>
+            <div class="card">
+                <div class="label">ساعت بارگذاری</div>
+                <div class="value">{{ invoice.created_at|date:"H:i" }}</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 18px;">
+            <div class="label">نمایش فایل</div>
+            {% if '.pdf' in invoice.attachment.url|lower %}
+                <iframe src="{{ invoice.attachment.url }}" style="width:100%;height:70vh;border:0;"></iframe>
+            {% else %}
+                <img src="{{ invoice.attachment.url }}" alt="فاکتور" style="max-width:100%;height:auto;display:block;margin:0 auto;">
+            {% endif %}
+        </div>
+
+        {% if invoice.customer_visible_note %}
+            <div class="card" style="margin-bottom: 18px;">
+                <div class="label">توضیحات کارشناس بازرگانی</div>
+                <div class="value">{{ invoice.customer_visible_note|linebreaksbr }}</div>
+            </div>
+        {% endif %}
+
+        {% if is_staff_user %}
+            <div class="card" style="margin-bottom: 18px;">
+                <div class="label">توضیحات داخلی</div>
+                <div class="value">{{ invoice.internal_note|default:'-'|linebreaksbr }}</div>
+            </div>
+        {% endif %}
+
+        {% if not is_staff_user %}
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="submit-btn">ذخیره یادداشت</button>
+            </form>
+        {% else %}
+            <div class="card">
+                <div class="label">یادداشت مشتری</div>
+                <div class="value">{{ invoice.customer_note|default:'-' }}</div>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

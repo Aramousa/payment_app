@@ -1,17 +1,18 @@
 ﻿{% load humanize %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
     <title>ثبت واریزی</title>
 
-    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css" rel="stylesheet" type="text/css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
 
-    <script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+    <script src="{% static 'js/cleave.min.js' %}"></script>
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/persian-date.min.js' %}"></script>
+    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
 
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
@@ -106,6 +107,10 @@
 <body>
     <div class="top-bar">
         <div class="top-actions">
+            <a href="{% url 'invoices_dashboard' %}" class="button-link">بخش فاکتورها</a>
+            {% if request.user.is_superuser %}
+                <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
+            {% endif %}
             <a href="{% url 'profile_password_change' %}" class="button-link">پروفایل / تغییر رمز</a>
             {% if can_manage_counterparties %}
                 <a href="{% url 'counterparties_manage' %}" class="button-link">مدیریت طرف حساب</a>
@@ -438,7 +443,6 @@
             observer: true,
             initialValue: false
         });
-
         const amountEl = document.querySelector('.amount-input');
         if (amountEl) {
             new Cleave(amountEl, {

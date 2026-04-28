@@ -158,10 +158,14 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     phone = models.CharField('شماره تلفن', max_length=20)
+    mobile = models.CharField('شماره همراه', max_length=20, blank=True)
     organization = models.CharField('نام مجموعه', max_length=100, blank=True)
     city = models.CharField('شهر', max_length=50, blank=True)
+    province = models.CharField('استان', max_length=50, blank=True)
+    address = models.TextField('آدرس', blank=True)
     role = models.CharField('نوع کاربر', max_length=10, choices=ROLE_CHOICES, default='customer')
-    force_password_change = models.BooleanField('الزام تعویض رمز', default=True)
+    active_from = jmodels.jDateField('تاریخ آغاز فعالیت', null=True, blank=True)
+    valid_until = jmodels.jDateField('تاریخ اعتبار', null=True, blank=True)
     force_password_change = models.BooleanField('الزام تعویض رمز', default=True)
 
     def __str__(self):
@@ -203,3 +207,37 @@ class PaymentActivityLog(models.Model):
 
     class Meta:
         ordering = ['-created_at', '-id']
+
+
+class InvoiceRecord(models.Model):
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='invoice_records')
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_invoice_records',
+    )
+    amount = models.BigIntegerField('مبلغ')
+    invoice_date = jmodels.jDateField('تاریخ فاکتور')
+    reference_number = models.CharField('شماره حواله', max_length=80)
+    attachment = models.FileField('فایل فاکتور', upload_to='invoices/')
+    customer_visible_note = models.TextField('توضیحات قابل مشاهده برای مشتری', blank=True)
+    internal_note = models.TextField('توضیحات داخلی', blank=True)
+    customer_note = models.TextField('یادداشت مشتری', blank=True)
+    customer_note_updated_at = models.DateTimeField('آخرین بروزرسانی یادداشت', null=True, blank=True)
+    customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'فاکتور مشتری'
+        verbose_name_plural = 'فاکتورهای مشتری'
+
+    def __str__(self):
+        return f"فاکتور {self.reference_number} - {self.customer.username}"
+
+    @property
+    def is_seen_by_customer(self):
+        return bool(self.customer_seen_at)

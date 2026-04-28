@@ -1,6 +1,6 @@
 ﻿from django.contrib import admin
 
-from .models import Counterparty, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
+from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
 
 
 class PaymentReceiptInline(admin.TabularInline):
@@ -80,9 +80,9 @@ class LoginAdvertisementAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'phone', 'organization', 'city', 'role', 'force_password_change')
-    list_filter = ('role', 'city', 'force_password_change')
-    search_fields = ('user__username', 'phone')
+    list_display = ('user', 'phone', 'mobile', 'organization', 'city', 'province', 'role', 'active_from', 'valid_until', 'force_password_change')
+    list_filter = ('role', 'city', 'province', 'force_password_change')
+    search_fields = ('user__username', 'phone', 'mobile', 'organization')
 
 
 @admin.register(Counterparty)
@@ -105,3 +105,10 @@ class PaymentActivityLogAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(InvoiceRecord)
+class InvoiceRecordAdmin(admin.ModelAdmin):
+    list_display = ('reference_number', 'customer', 'amount', 'invoice_date', 'uploaded_by', 'customer_seen_at', 'created_at')
+    list_filter = ('invoice_date', 'created_at', 'customer_seen_at')
+    search_fields = ('reference_number', 'customer__username', 'customer__first_name', 'customer__last_name', 'customer__profile__organization')

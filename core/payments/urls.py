@@ -5,11 +5,15 @@ from .views import (
     create_payment,
     edit_payment,
     export_records,
+    invoice_detail,
+    invoices_dashboard,
     profile_password_cancel,
     profile_password_change,
     payment_timeline,
     staff_update_status,
     success,
+    user_edit,
+    users_manage,
 )
 
 urlpatterns = [
@@ -18,6 +22,10 @@ urlpatterns = [
     path('payments/<int:payment_id>/status/', staff_update_status, name='staff_update_status'),
     path('payments/<int:payment_id>/edit/', edit_payment, name='edit_payment'),
     path('payments/<int:payment_id>/timeline/', payment_timeline, name='payment_timeline'),
+    path('invoices/', invoices_dashboard, name='invoices_dashboard'),
+    path('invoices/<int:invoice_id>/', invoice_detail, name='invoice_detail'),
+    path('users/', users_manage, name='users_manage'),
+    path('users/<int:user_id>/edit/', user_edit, name='user_edit'),
     path('counterparties/', counterparties_manage, name='counterparties_manage'),
     path('counterparties/<int:counterparty_id>/edit/', counterparty_edit, name='counterparty_edit'),
     path('export-records/', export_records, name='export_records'),

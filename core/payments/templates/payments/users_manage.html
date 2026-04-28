@@ -1,0 +1,150 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>مدیریت کاربران</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/persian-date.min.js' %}"></script>
+    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f6f7fb; padding: 20px; }
+        .top-bar { max-width: 1180px; margin: 0 auto 18px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .button-link, .logout-btn, .submit-btn { border: none; border-radius: 6px; padding: 8px 14px; text-decoration: none; color: #fff; display: inline-block; cursor: pointer; font-family: inherit; }
+        .button-link { background: #0d6efd; }
+        .logout-btn { background: #dc3545; }
+        .submit-btn { background: #198754; }
+        .section { max-width: 1180px; margin: 0 auto 18px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .form-grid { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 12px; }
+        .full-row { grid-column: 1 / -1; }
+        .field-box { display: flex; flex-direction: column; gap: 4px; }
+        input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 8px 10px; margin: 0; font-family: inherit; font-size: 13px; }
+        label { font-size: 12px; color: #243447; }
+        .hint-box { background: #eef6ff; border: 1px solid #cfe2ff; color: #124b91; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+        .field-error { color: #c62828; font-size: 11px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; border-bottom: 1px solid #e7ebf0; text-align: center; vertical-align: top; }
+        th { background: #0d6efd; color: #fff; }
+        .edit-link { background: #fd7e14; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; }
+        .cancel-link { background: #6c757d; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; }
+        .flash-list { margin: 0; padding-right: 18px; }
+        .flash-success { color: #1b5e20; }
+        .flash-error { color: #c62828; }
+        @media (max-width: 980px) {
+            .form-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+        }
+        @media (max-width: 760px) {
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <div class="top-actions">
+            <a href="{% url 'submit' %}" class="button-link">بخش فیش ها</a>
+            <a href="{% url 'invoices_dashboard' %}" class="button-link">بخش فاکتورها</a>
+        </div>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">خروج از حساب</button>
+        </form>
+    </div>
+
+    {% if messages %}
+        <div class="section">
+            <ul class="flash-list">
+                {% for message in messages %}
+                    <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <div class="section">
+        <h2>{% if editing_user %}ویرایش کاربر{% else %}ایجاد کاربر جدید{% endif %}</h2>
+        <div class="hint-box">رمز پیشنهادی 5 رقمی: <strong id="suggested-password">{{ password_suggestion }}</strong></div>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="field-box {% if field.name == 'address' %}full-row{% endif %}">
+                        <label for="{{ field.id_for_label }}">{{ field.label|safe }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:14px;">
+                <button type="button" class="button-link" id="use-suggested-password">استفاده از رمز پیشنهادی</button>
+                {% if editing_user %}
+                    <a href="{% url 'users_manage' %}" class="cancel-link">لغو ویرایش</a>
+                {% endif %}
+                <button type="submit" class="submit-btn">{% if editing_user %}ذخیره تغییرات{% else %}ایجاد کاربر{% endif %}</button>
+            </div>
+            {% for error in form.non_field_errors %}<div class="field-error" style="margin-top:10px;">{{ error }}</div>{% endfor %}
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>فهرست کاربران</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>نام کاربر</th>
+                    <th>نام و نام خانوادگی</th>
+                    <th>نقش</th>
+                    <th>شماره تماس</th>
+                    <th>شماره همراه</th>
+                    <th>مجموعه</th>
+                    <th>شهر / استان</th>
+                    <th>تاریخ آغاز</th>
+                    <th>تاریخ اعتبار</th>
+                    <th>وضعیت</th>
+                    <th>اقدام</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in users %}
+                    <tr>
+                        <td>{{ item.username }}</td>
+                        <td>{{ item.first_name }} {{ item.last_name }}</td>
+                        <td>{{ item.profile.get_role_display }}</td>
+                        <td>{{ item.profile.phone|default:'-' }}</td>
+                        <td>{{ item.profile.mobile|default:'-' }}</td>
+                        <td>{{ item.profile.organization|default:'-' }}</td>
+                        <td>{{ item.profile.city|default:'-' }} / {{ item.profile.province|default:'-' }}</td>
+                        <td>{{ item.profile.active_from|default:'-' }}</td>
+                        <td>{{ item.profile.valid_until|default:'-' }}</td>
+                        <td>{% if item.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
+                        <td><a href="{% url 'user_edit' item.id %}" class="edit-link">ویرایش</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="11">کاربری ثبت نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            $('.jalali-date').persianDatepicker({
+                format: 'YYYY/MM/DD',
+                observer: true,
+                initialValue: false
+            });
+
+            const useSuggestedButton = document.getElementById('use-suggested-password');
+            const suggestedPassword = document.getElementById('suggested-password');
+            const passwordInput = document.getElementById('id_password');
+            if (useSuggestedButton && suggestedPassword && passwordInput) {
+                useSuggestedButton.addEventListener('click', function () {
+                    passwordInput.value = suggestedPassword.textContent.trim();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

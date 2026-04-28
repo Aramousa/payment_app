@@ -1,0 +1,430 @@
+{% load humanize %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>فاکتورهای مشتریان</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
+    <script src="{% static 'js/cleave.min.js' %}"></script>
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/persian-date.min.js' %}"></script>
+    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f6f7fb; padding: 20px; }
+        .top-bar { max-width: 1180px; margin: 0 auto 18px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .button-link, .logout-btn { border: none; border-radius: 6px; padding: 8px 14px; text-decoration: none; color: #fff; display: inline-block; cursor: pointer; }
+        .button-link { background: #0d6efd; }
+        .button-link.alt { background: #198754; }
+        .logout-btn { background: #dc3545; }
+        .user-chip { background: #fff; border: 1px solid #d8dce3; border-radius: 6px; padding: 7px 12px; font-size: 13px; text-align: center; }
+        .logout-form { margin: 0; }
+        .logout-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+        .section { max-width: 1180px; margin: 0 auto 18px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        h2, h3 { margin-top: 0; }
+        input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 8px 10px; margin: 0; font-family: inherit; font-size: 13px; }
+        label { display: block; font-size: 12px; color: #243447; margin-bottom: 4px; }
+
+        .warning-box { background: #fff8e1; color: #7a5600; border: 1px solid #f0d58a; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+        .invoice-form-shell { border: 1px solid #e7edf5; border-radius: 10px; background: #fcfdff; padding: 14px; }
+        .subsection { margin-bottom: 14px; }
+        .subsection:last-child { margin-bottom: 0; }
+        .subsection-title { font-size: 13px; font-weight: 700; color: #1f2d3d; margin-bottom: 10px; }
+        .field-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 12px; align-items: start; }
+        .field-box { display: flex; flex-direction: column; gap: 4px; }
+        .field-box.full-row { grid-column: 1 / -1; }
+        .field-help { color: #657180; font-size: 11px; line-height: 1.7; }
+        .field-error { color: #c62828; font-size: 11px; line-height: 1.7; }
+        .compact-input input, .compact-input select { min-height: 38px; }
+        .actions-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding-top: 6px; }
+        .submit-btn { border: none; border-radius: 6px; background: #198754; color: #fff; padding: 9px 18px; cursor: pointer; font-family: inherit; font-size: 13px; }
+
+        .customer-picker-grid { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr); gap: 12px; }
+        .customer-card { border: 1px solid #e2e7ef; border-radius: 8px; background: #f9fbff; padding: 12px; min-height: 108px; }
+        .customer-card .meta { color: #4b5563; font-size: 12px; margin-bottom: 5px; }
+        .hint { color: #5f6b7a; font-size: 11px; line-height: 1.7; }
+        .confirm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+        .confirm-row input[type="checkbox"] { width: auto; margin: 0; }
+        .confirm-row label { margin: 0; font-size: 13px; }
+
+        .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
+        .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .filter-actions button, .filter-actions a { border: none; border-radius: 6px; padding: 8px 12px; text-decoration: none; cursor: pointer; }
+        .apply-btn { background: #0d6efd; color: #fff; }
+        .clear-btn { background: #6c757d; color: #fff; }
+
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th, td { padding: 10px; border-bottom: 1px solid #e7ebf0; text-align: center; vertical-align: top; }
+        th { background: #0d6efd; color: #fff; }
+        tr.summary-row { cursor: pointer; }
+        tr.summary-row:hover { background: #f5f9ff; }
+        tr.detail-row { display: none; background: #fafbfd; }
+        tr.detail-row.open { display: table-row; }
+        tr.unseen-row { background: #fff7db; }
+        .status-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+        .status-seen { background: #dff3e4; color: #155724; }
+        .status-unseen { background: #fff3cd; color: #7a5300; }
+        .detail-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; }
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; text-align: right; }
+        .detail-card { background: #fff; border: 1px solid #e5eaf1; border-radius: 8px; padding: 12px; }
+        .flash-list { margin: 0; padding-right: 18px; }
+        .flash-success { color: #1b5e20; }
+        .flash-error { color: #c62828; }
+
+        @media (max-width: 980px) {
+            .field-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+        }
+        @media (max-width: 860px) {
+            .field-grid, .customer-picker-grid { grid-template-columns: 1fr; }
+            .actions-row { justify-content: stretch; }
+            .actions-row .submit-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <div class="top-actions">
+            <a href="{% url 'submit' %}" class="button-link">بخش فیش ها</a>
+            <a href="{% url 'invoices_dashboard' %}" class="button-link alt">بخش فاکتورها</a>
+            {% if request.user.is_superuser %}
+                <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
+            {% endif %}
+            <a href="{% url 'profile_password_change' %}" class="button-link">پروفایل / تغییر رمز</a>
+        </div>
+        <div class="logout-wrap">
+            <div class="user-chip">{{ user_display_name }}</div>
+            <form class="logout-form" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn">خروج از حساب</button>
+            </form>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="section">
+            <ul class="flash-list">
+                {% for message in messages %}
+                    <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if can_manage_invoices %}
+        <div class="section">
+            <h2>بارگذاری فاکتور مشتری</h2>
+            <div class="warning-box">پیش از ثبت، مشتری انتخاب شده را با نام، نام کاربری، مجموعه و شماره تماس کنترل کنید تا فاکتور برای مشتری اشتباه بارگذاری نشود.</div>
+            <form id="invoice-upload-form" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="invoice-form-shell">
+                    <div class="subsection">
+                        <div class="subsection-title">انتخاب مشتری</div>
+                        <div class="customer-picker-grid">
+                            <div class="field-box">
+                                <label for="customer-search">جستجوی مشتری</label>
+                                <input id="customer-search" type="text" placeholder="نام، نام کاربری، مجموعه یا شماره تماس">
+                                <div class="hint">جستجو فقط روی لیست مشتریان همین سامانه انجام می شود.</div>
+                            </div>
+                            <div class="customer-card" id="customer-preview">
+                                <strong>مشتری انتخاب نشده است</strong>
+                                <div class="meta">بعد از انتخاب مشتری، مشخصات او اینجا نمایش داده می شود.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <div class="subsection-title">اطلاعات فاکتور</div>
+                        <div class="field-grid">
+                            <div class="field-box full-row compact-input">
+                                <label for="{{ form.customer.id_for_label }}">{{ form.customer.label|safe }}</label>
+                                {{ form.customer }}
+                                {% if form.customer.help_text %}<div class="field-help">{{ form.customer.help_text }}</div>{% endif %}
+                                {% for error in form.customer.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="field-box compact-input">
+                                <label for="{{ form.invoice_date.id_for_label }}">{{ form.invoice_date.label|safe }}</label>
+                                {{ form.invoice_date }}
+                                {% for error in form.invoice_date.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="field-box compact-input">
+                                <label for="{{ form.amount.id_for_label }}">{{ form.amount.label|safe }}</label>
+                                {{ form.amount }}
+                                {% for error in form.amount.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="field-box compact-input">
+                                <label for="{{ form.reference_number.id_for_label }}">{{ form.reference_number.label|safe }}</label>
+                                {{ form.reference_number }}
+                                {% for error in form.reference_number.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="field-box compact-input">
+                                <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label|safe }}</label>
+                                {{ form.attachment }}
+                                {% if form.attachment.help_text %}<div class="field-help">{{ form.attachment.help_text }}</div>{% endif %}
+                                {% for error in form.attachment.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="field-box full-row">
+                                <label for="{{ form.customer_visible_note.id_for_label }}">{{ form.customer_visible_note.label|safe }}</label>
+                                {{ form.customer_visible_note }}
+                                <div class="field-help">این متن برای مشتری نمایش داده می شود و توسط مشتری قابل تغییر نیست.</div>
+                                {% for error in form.customer_visible_note.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="field-box full-row">
+                                <label for="{{ form.internal_note.id_for_label }}">{{ form.internal_note.label|safe }}</label>
+                                {{ form.internal_note }}
+                                <div class="field-help">این متن فقط برای کاربران داخلی قابل مشاهده است و به مشتری نمایش داده نمی شود.</div>
+                                {% for error in form.internal_note.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <div class="confirm-row">
+                            {{ form.confirm_assignment }}
+                            <label for="{{ form.confirm_assignment.id_for_label }}" id="confirm-assignment-label">
+                                انتساب فاکتور به مشتری <strong>انتخاب نشده</strong> را تایید می کنم.
+                            </label>
+                        </div>
+                        {% for error in form.confirm_assignment.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                        {% for error in form.non_field_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                    </div>
+
+                    <div class="actions-row">
+                        <button type="submit" class="submit-btn">ثبت فاکتور</button>
+                    </div>
+                </div>
+            </form>
+            {{ customer_rows|json_script:"invoice-customer-rows" }}
+        </div>
+    {% endif %}
+
+    <div class="section">
+        <h2>{% if is_staff_user %}فهرست فاکتورهای مشتریان{% else %}فاکتورهای من{% endif %}</h2>
+        <form method="get" class="filters">
+            {% if is_staff_user %}
+                <div>
+                    <label for="customer-filter">مشتری</label>
+                    <input id="customer-filter" type="text" name="customer" value="{{ filters.customer }}">
+                </div>
+            {% endif %}
+            <div>
+                <label for="reference-filter">شماره حواله</label>
+                <input id="reference-filter" type="text" name="reference_number" value="{{ filters.reference_number }}">
+            </div>
+            <div>
+                <label for="amount-filter">مبلغ (ریال)</label>
+                <input id="amount-filter" type="text" name="amount" value="{{ filters.amount }}">
+            </div>
+            <div>
+                <label for="invoice-date-filter">تاریخ فاکتور</label>
+                <input id="invoice-date-filter" class="jalali-date" type="text" name="invoice_date" value="{{ filters.invoice_date }}">
+            </div>
+            <div>
+                <label for="seen-filter">وضعیت مشاهده</label>
+                <select id="seen-filter" name="seen">
+                    <option value="">همه</option>
+                    <option value="unseen" {% if filters.seen == 'unseen' %}selected{% endif %}>دیده نشده</option>
+                    <option value="seen" {% if filters.seen == 'seen' %}selected{% endif %}>دیده شده</option>
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="apply-btn">اعمال فیلتر</button>
+                <a href="{% url 'invoices_dashboard' %}" class="clear-btn">حذف فیلتر</a>
+            </div>
+        </form>
+
+        <table>
+            <thead>
+                <tr>
+                    {% if is_staff_user %}
+                        <th>مشتری</th>
+                        <th>مجموعه</th>
+                    {% endif %}
+                    <th>تاریخ فاکتور</th>
+                    <th>مبلغ</th>
+                    <th>شماره حواله</th>
+                    <th>بارگذاری کننده</th>
+                    <th>وضعیت مشاهده</th>
+                    <th>اقدام</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invoice in records %}
+                    <tr class="summary-row {% if not invoice.is_seen_by_customer %}unseen-row{% endif %}" data-row="{{ invoice.id }}">
+                        {% if is_staff_user %}
+                            <td>{{ invoice.customer.get_full_name|default:invoice.customer.username }}</td>
+                            <td>{{ invoice.customer.profile.organization|default:'-' }}</td>
+                        {% endif %}
+                        <td>{{ invoice.invoice_date }}</td>
+                        <td>{{ invoice.amount|intcomma }}</td>
+                        <td>{{ invoice.reference_number }}</td>
+                        <td>{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</td>
+                        <td>
+                            {% if invoice.is_seen_by_customer %}
+                                <span class="status-badge status-seen">دیده شده</span>
+                            {% else %}
+                                <span class="status-badge status-unseen">دیده نشده</span>
+                            {% endif %}
+                        </td>
+                        <td><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}">جزئیات</a></td>
+                    </tr>
+                    <tr class="detail-row" id="detail-{{ invoice.id }}">
+                        <td colspan="{% if is_staff_user %}8{% else %}6{% endif %}">
+                            <div class="detail-grid">
+                                <div class="detail-card">
+                                    <div class="label">اطلاعات فاکتور</div>
+                                    <div class="value">تاریخ فاکتور: {{ invoice.invoice_date }}</div>
+                                    <div class="value">مبلغ: {{ invoice.amount|intcomma }} ریال</div>
+                                    <div class="value">شماره حواله: {{ invoice.reference_number }}</div>
+                                    <div class="value">بارگذاری کننده: {{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</div>
+                                    <div class="value">تاریخ ثبت: {{ invoice.created_at|date:"Y/m/d" }}</div>
+                                    <div class="value">ساعت بارگذاری: {{ invoice.created_at|date:"H:i" }}</div>
+                                </div>
+                                <div class="detail-card">
+                                    <div class="label">وضعیت و فایل</div>
+                                    <div class="value">وضعیت مشاهده: {% if invoice.is_seen_by_customer %}دیده شده{% else %}دیده نشده{% endif %}</div>
+                                    <div class="value"><a class="detail-link" href="{{ invoice.attachment.url }}" download>دانلود فایل</a></div>
+                                    <div class="value" style="margin-top:8px;"><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}">مشاهده صفحه کامل</a></div>
+                                </div>
+                                {% if invoice.customer_visible_note %}
+                                    <div class="detail-card">
+                                        <div class="label">توضیحات قابل مشاهده برای مشتری</div>
+                                        <div class="value">{{ invoice.customer_visible_note|linebreaksbr }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if is_staff_user %}
+                                    <div class="detail-card">
+                                        <div class="label">توضیحات داخلی</div>
+                                        <div class="value">{{ invoice.internal_note|default:'-'|linebreaksbr }}</div>
+                                    </div>
+                                    <div class="detail-card">
+                                        <div class="label">یادداشت مشتری</div>
+                                        <div class="value">{{ invoice.customer_note|default:'-'|linebreaksbr }}</div>
+                                    </div>
+                                {% elif invoice.customer_note %}
+                                    <div class="detail-card">
+                                        <div class="label">یادداشت شخصی شما</div>
+                                        <div class="value">{{ invoice.customer_note|linebreaksbr }}</div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{% if is_staff_user %}8{% else %}6{% endif %}">فاکتوری ثبت نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            $('.jalali-date').persianDatepicker({
+                format: 'YYYY/MM/DD',
+                observer: true,
+                initialValue: false
+            });
+
+            const amountEl = document.querySelector('.amount-input');
+            if (amountEl) {
+                new Cleave(amountEl, {
+                    numeral: true,
+                    numeralThousandsGroupStyle: 'thousand'
+                });
+            }
+
+            const form = document.getElementById('invoice-upload-form');
+            if (form) {
+                form.addEventListener('submit', function () {
+                    const amountInput = document.querySelector('.amount-input');
+                    if (amountInput) {
+                        amountInput.value = amountInput.value.replace(/,/g, '');
+                    }
+                });
+            }
+
+            const searchInput = document.getElementById('customer-search');
+            const selectEl = document.getElementById('id_customer');
+            const previewEl = document.getElementById('customer-preview');
+            const confirmLabelEl = document.getElementById('confirm-assignment-label');
+            const dataEl = document.getElementById('invoice-customer-rows');
+            const rows = dataEl ? JSON.parse(dataEl.textContent || '[]') : [];
+
+            function renderPreview(selectedProfileId) {
+                if (!previewEl) return;
+                const selected = rows.find(function (row) { return String(row.profile_id) === String(selectedProfileId); });
+                if (!selected) {
+                    previewEl.innerHTML = '<strong>مشتری انتخاب نشده است</strong><div class="meta">بعد از انتخاب مشتری، مشخصات او اینجا نمایش داده می شود.</div>';
+                    if (confirmLabelEl) {
+                        confirmLabelEl.innerHTML = 'انتساب فاکتور به مشتری <strong>انتخاب نشده</strong> را تایید می کنم.';
+                    }
+                    return;
+                }
+                previewEl.innerHTML =
+                    '<strong>' + selected.full_name + '</strong>' +
+                    '<div class="meta">نام کاربری: ' + selected.username + '</div>' +
+                    '<div class="meta">مجموعه: ' + selected.organization + '</div>' +
+                    '<div class="meta">شهر: ' + selected.city + '</div>' +
+                    '<div class="meta">شماره تماس: ' + selected.phone + '</div>';
+                if (confirmLabelEl) {
+                    confirmLabelEl.innerHTML = 'انتساب فاکتور به مشتری <strong>' + selected.full_name + '</strong> را تایید می کنم.';
+                }
+            }
+
+            if (searchInput && selectEl) {
+                searchInput.addEventListener('input', function () {
+                    const keyword = searchInput.value.trim().toLowerCase();
+                    Array.from(selectEl.options).forEach(function (option) {
+                        if (!option.value) return;
+                        const row = rows.find(function (item) { return String(item.profile_id) === option.value; });
+                        option.hidden = keyword && row ? row.search_blob.indexOf(keyword) === -1 : false;
+                    });
+                });
+                selectEl.addEventListener('change', function () {
+                    renderPreview(selectEl.value);
+                });
+                renderPreview(selectEl.value);
+            }
+
+            function closeAllDetails(exceptId) {
+                document.querySelectorAll('tr.detail-row.open').forEach(function (row) {
+                    if (!exceptId || row.id !== ('detail-' + exceptId)) {
+                        row.classList.remove('open');
+                    }
+                });
+            }
+
+            function toggleDetail(id, multiMode) {
+                const detail = document.getElementById('detail-' + id);
+                if (!detail) return;
+                if (multiMode) {
+                    detail.classList.toggle('open');
+                    return;
+                }
+                if (detail.classList.contains('open')) {
+                    detail.classList.remove('open');
+                    return;
+                }
+                closeAllDetails(id);
+                detail.classList.add('open');
+            }
+
+            document.querySelectorAll('tr.summary-row').forEach(function (row) {
+                row.addEventListener('click', function (event) {
+                    const interactive = event.target.closest('a, button, input, select, textarea, form');
+                    if (interactive) return;
+                    toggleDetail(row.getAttribute('data-row'), event.ctrlKey || event.metaKey);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

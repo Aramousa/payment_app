@@ -1,6 +1,7 @@
 Offline dependency bundle
 
 This project includes vendored Python packages for offline installs.
+Frontend static dependencies are also bundled in the repository under `static/css`, `static/js`, and `static/fonts`. The app does not need CDNs or online font downloads at runtime.
 
 Folders
 - `vendor/wheels`: Windows / local development bundle
@@ -23,6 +24,12 @@ Use the compatibility dependency set:
 python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements-py310.txt
 ```
 
+Collect local static files before starting the app:
+
+```bash
+python3.10 manage.py collectstatic --noinput
+```
+
 Windows offline install
 
 ```powershell
@@ -32,6 +39,8 @@ python -m pip install --no-index --find-links=vendor/wheels -r requirements.txt
 Important
 - `requirements.txt` is the current main stack and uses `Django 6`, which needs `Python >= 3.12`.
 - `requirements-py310.txt` is the compatibility stack for Ubuntu 22.04 default Python `3.10`.
+- The Persian font and frontend vendor assets are stored in the repository and served locally after `collectstatic`.
+- `db.sqlite3`, `media/`, and generated `staticfiles/` are runtime artifacts and should not be deployed as source replacements.
 - The Linux bundles assume:
   - OS/arch: `x86_64`
   - glibc-compatible manylinux environment

@@ -1,18 +1,22 @@
 ﻿import jdatetime
+import random
 from openpyxl import Workbook
 from urllib.parse import urlencode
 
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth import logout as auth_logout
+from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import CounterpartyForm, PaymentRecordForm, StaffStatusUpdateForm
-from .models import Counterparty, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
+from .forms import CounterpartyForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .models import Counterparty, InvoiceRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
@@ -75,6 +79,19 @@ def _is_staff_user(user):
         return user.profile.role in STAFF_ROLES
     except UserProfile.DoesNotExist:
         return False
+
+
+def _can_manage_invoices(user):
+    role = _user_role(user)
+    return user.is_superuser or role in {'commercial', 'staff'}
+
+
+def _can_manage_users(user):
+    return bool(user and user.is_authenticated and user.is_superuser)
+
+
+def _suggest_five_digit_password():
+    return str(random.randint(10000, 99999))
 
 
 def _staff_status_choices_for_role(role):
@@ -419,6 +436,74 @@ def _destination_profiles_for_user(user):
     return profiles
 
 
+def _invoice_records_for_user(user):
+    qs = InvoiceRecord.objects.select_related('customer', 'customer__profile', 'uploaded_by')
+    if _is_staff_user(user):
+        return qs.order_by('-created_at', '-id')
+    return qs.filter(customer=user).order_by('-created_at', '-id')
+
+
+def _invoice_customer_rows():
+    rows = []
+    profiles = UserProfile.objects.filter(role='customer').select_related('user').order_by(
+        'user__first_name', 'user__last_name', 'user__username'
+    )
+    for profile in profiles:
+        full_name = profile.user.get_full_name().strip() or profile.user.username
+        rows.append({
+            'profile_id': profile.id,
+            'user_id': profile.user_id,
+            'full_name': full_name,
+            'username': profile.user.username,
+            'organization': profile.organization or '-',
+            'city': profile.city or '-',
+            'phone': profile.phone or '-',
+            'search_blob': ' '.join(
+                filter(None, [full_name, profile.user.username, profile.organization, profile.city, profile.phone])
+            ).lower(),
+        })
+    return rows
+
+
+def _managed_users():
+    return User.objects.select_related('profile').order_by('username')
+
+
+def _apply_invoice_filters(records, request, is_staff_user):
+    filters = {
+        'customer': (request.GET.get('customer') or '').strip(),
+        'reference_number': (request.GET.get('reference_number') or '').strip(),
+        'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
+        'invoice_date': (request.GET.get('invoice_date') or '').strip(),
+        'seen': (request.GET.get('seen') or '').strip(),
+    }
+
+    if is_staff_user and filters['customer']:
+        records = records.filter(
+            Q(customer__first_name__icontains=filters['customer']) |
+            Q(customer__last_name__icontains=filters['customer']) |
+            Q(customer__username__icontains=filters['customer']) |
+            Q(customer__profile__organization__icontains=filters['customer'])
+        )
+
+    if filters['reference_number']:
+        records = records.filter(reference_number__icontains=filters['reference_number'])
+
+    if filters['amount'].isdigit():
+        records = records.filter(amount=int(filters['amount']))
+
+    parsed_date = _parse_jalali_date(filters['invoice_date'])
+    if parsed_date:
+        records = records.filter(invoice_date=parsed_date)
+
+    if filters['seen'] == 'seen':
+        records = records.filter(customer_seen_at__isnull=False)
+    elif filters['seen'] == 'unseen':
+        records = records.filter(customer_seen_at__isnull=True)
+
+    return records, filters
+
+
 @login_required
 def create_payment(request):
     profile = None
@@ -681,6 +766,132 @@ def counterparty_edit(request, counterparty_id):
         form = CounterpartyForm(instance=counterparty)
 
     return render(request, 'payments/counterparty_edit.html', {'form': form, 'counterparty': counterparty})
+
+
+@login_required
+def users_manage(request):
+    if not _can_manage_users(request.user):
+        return HttpResponseForbidden('شما دسترسی مدیریت کاربران را ندارید.')
+
+    password_suggestion = _suggest_five_digit_password()
+    if request.method == 'POST':
+        form = UserAccountManagementForm(request.POST, password_suggestion=password_suggestion)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'کاربر جدید با موفقیت ایجاد شد.')
+            return redirect('users_manage')
+    else:
+        form = UserAccountManagementForm(
+            initial={'password': password_suggestion, 'force_password_change': True, 'is_active': True},
+            password_suggestion=password_suggestion,
+        )
+
+    return render(request, 'payments/users_manage.html', {
+        'form': form,
+        'users': _managed_users(),
+        'password_suggestion': password_suggestion,
+        'editing_user': None,
+    })
+
+
+@login_required
+def user_edit(request, user_id):
+    if not _can_manage_users(request.user):
+        return HttpResponseForbidden('شما دسترسی مدیریت کاربران را ندارید.')
+
+    managed_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
+    password_suggestion = _suggest_five_digit_password()
+
+    if request.method == 'POST':
+        form = UserAccountManagementForm(
+            request.POST,
+            instance=managed_user,
+            password_suggestion=password_suggestion,
+        )
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'اطلاعات کاربر با موفقیت بروزرسانی شد.')
+            return redirect('users_manage')
+    else:
+        form = UserAccountManagementForm(instance=managed_user, password_suggestion=password_suggestion)
+
+    return render(request, 'payments/users_manage.html', {
+        'form': form,
+        'users': _managed_users(),
+        'password_suggestion': password_suggestion,
+        'editing_user': managed_user,
+    })
+
+
+@login_required
+def invoices_dashboard(request):
+    is_staff_user = _is_staff_user(request.user)
+    can_manage = _can_manage_invoices(request.user)
+
+    if request.method == 'POST':
+        if not can_manage:
+            return HttpResponseForbidden('شما دسترسی بارگذاری فاکتور مشتری را ندارید.')
+        form = InvoiceUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            invoice = form.save(commit=False)
+            invoice.uploaded_by = request.user
+            invoice.save()
+            messages.success(request, 'فاکتور با موفقیت برای مشتری ثبت شد.')
+            return redirect('invoices_dashboard')
+    else:
+        form = InvoiceUploadForm()
+
+    records = _invoice_records_for_user(request.user)
+    records, filters = _apply_invoice_filters(records, request, is_staff_user=is_staff_user)
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+    return render(request, 'payments/invoices.html', {
+        'form': form,
+        'records': records,
+        'filters': filters,
+        'is_staff_user': is_staff_user,
+        'can_manage_invoices': can_manage,
+        'user_display_name': user_display_name,
+        'customer_rows': _invoice_customer_rows() if can_manage else [],
+    })
+
+
+@login_required
+def invoice_detail(request, invoice_id):
+    invoice = get_object_or_404(
+        InvoiceRecord.objects.select_related('customer', 'customer__profile', 'uploaded_by'),
+        id=invoice_id,
+    )
+    is_staff_user = _is_staff_user(request.user)
+    just_marked_seen = False
+
+    if not is_staff_user and invoice.customer_id != request.user.id:
+        return HttpResponseForbidden('فقط امکان مشاهده فاکتورهای خودتان وجود دارد.')
+
+    if not is_staff_user and invoice.customer_seen_at is None:
+        invoice.customer_seen_at = timezone.now()
+        invoice.save(update_fields=['customer_seen_at'])
+        just_marked_seen = True
+
+    if request.method == 'POST':
+        if is_staff_user:
+            return HttpResponseForbidden('ثبت یادداشت فقط برای مشتری فعال است.')
+        form = InvoiceCustomerNoteForm(request.POST, instance=invoice)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'یادداشت شما ذخیره شد.')
+            return redirect('invoice_detail', invoice_id=invoice.id)
+    else:
+        form = InvoiceCustomerNoteForm(instance=invoice)
+
+    customer_profile = getattr(invoice.customer, 'profile', None)
+    return render(request, 'payments/invoice_detail.html', {
+        'invoice': invoice,
+        'form': form,
+        'is_staff_user': is_staff_user,
+        'customer_profile': customer_profile,
+        'just_marked_seen': just_marked_seen,
+    })
 
 
 
