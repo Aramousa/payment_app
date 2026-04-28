@@ -103,6 +103,13 @@ DATABASES = {
     }
 }
 
+# Authentication backends
+# Custom backend for date-based access control
+AUTHENTICATION_BACKENDS = [
+    'payments.auth_backend.DateRestrictedBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

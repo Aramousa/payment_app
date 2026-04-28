@@ -321,8 +321,8 @@ class UserAccountManagementForm(forms.Form):
     )
 
     username = forms.CharField(label='نام کاربر', max_length=150)
-    first_name = forms.CharField(label='نام', max_length=150, required=False)
-    last_name = forms.CharField(label='نام خانوادگی', max_length=150, required=False)
+    first_name = forms.CharField(label='نام', max_length=50, required=False)
+    last_name = forms.CharField(label='نام خانوادگی', max_length=50, required=False)
     phone = forms.CharField(label='شماره تماس', max_length=20, required=False)
     mobile = forms.CharField(label='شماره همراه', max_length=20, required=False)
     province = forms.CharField(label='استان', max_length=50, required=False)
@@ -344,6 +344,7 @@ class UserAccountManagementForm(forms.Form):
         widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/12/29'}),
     )
     force_password_change = forms.BooleanField(label='الزام تغییر رمز در ورود بعدی', required=False)
+    suspended = forms.BooleanField(label='معلق', required=False, initial=False)
     is_active = forms.BooleanField(label='فعال', required=False, initial=True)
 
     def __init__(self, *args, **kwargs):
@@ -368,6 +369,7 @@ class UserAccountManagementForm(forms.Form):
                 'active_from': getattr(profile, 'active_from', None),
                 'valid_until': getattr(profile, 'valid_until', None),
                 'force_password_change': getattr(profile, 'force_password_change', False),
+                'suspended': getattr(profile, 'suspended', False),
             })
 
         for name, field in self.fields.items():
@@ -386,6 +388,32 @@ class UserAccountManagementForm(forms.Form):
         if qs.exists():
             raise ValidationError('این نام کاربری قبلا ثبت شده است.')
         return username
+
+    def clean(self):
+        cleaned_data = super().clean()
+        role = cleaned_data.get('role')
+        mobile = (cleaned_data.get('mobile') or '').strip()
+        phone = (cleaned_data.get('phone') or '').strip()
+
+        # For customers, check for duplicate mobile/phone
+        if role == 'customer' and (mobile or phone):
+            # Check for existing customer with same mobile
+            if mobile:
+                existing_by_mobile = UserProfile.objects.filter(mobile=mobile, role='customer')
+                if self.instance:
+                    existing_by_mobile = existing_by_mobile.exclude(user=self.instance)
+                if existing_by_mobile.exists():
+                    raise ValidationError('مشتری دیگری با این شماره همراه ثبت شده است.')
+
+            # Check for existing customer with same phone
+            if phone:
+                existing_by_phone = UserProfile.objects.filter(phone=phone, role='customer')
+                if self.instance:
+                    existing_by_phone = existing_by_phone.exclude(user=self.instance)
+                if existing_by_phone.exists():
+                    raise ValidationError('مشتری دیگری با این شماره تماس ثبت شده است.')
+
+        return cleaned_data
 
     def clean_password(self):
         password = (self.cleaned_data.get('password') or '').strip()
@@ -407,6 +435,8 @@ class UserAccountManagementForm(forms.Form):
         instance.save()
 
         profile = instance.profile
+        profile.first_name = (self.cleaned_data.get('first_name') or '').strip()
+        profile.last_name = (self.cleaned_data.get('last_name') or '').strip()
         profile.phone = (self.cleaned_data.get('phone') or '').strip()
         profile.mobile = (self.cleaned_data.get('mobile') or '').strip()
         profile.province = (self.cleaned_data.get('province') or '').strip()
@@ -417,5 +447,6 @@ class UserAccountManagementForm(forms.Form):
         profile.active_from = self.cleaned_data.get('active_from')
         profile.valid_until = self.cleaned_data.get('valid_until')
         profile.force_password_change = self.cleaned_data.get('force_password_change', False)
+        profile.suspended = self.cleaned_data.get('suspended', False)
         profile.save()
         return instance

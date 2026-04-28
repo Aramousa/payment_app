@@ -157,6 +157,8 @@ class UserProfile(models.Model):
     )
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    first_name = models.CharField('نام', max_length=50, blank=True)
+    last_name = models.CharField('نام خانوادگی', max_length=50, blank=True)
     phone = models.CharField('شماره تلفن', max_length=20)
     mobile = models.CharField('شماره همراه', max_length=20, blank=True)
     organization = models.CharField('نام مجموعه', max_length=100, blank=True)
@@ -167,6 +169,7 @@ class UserProfile(models.Model):
     active_from = jmodels.jDateField('تاریخ آغاز فعالیت', null=True, blank=True)
     valid_until = jmodels.jDateField('تاریخ اعتبار', null=True, blank=True)
     force_password_change = models.BooleanField('الزام تعویض رمز', default=True)
+    suspended = models.BooleanField('معلق', default=False)
 
     def __str__(self):
         return self.user.username
