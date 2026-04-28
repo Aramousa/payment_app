@@ -1,0 +1,123 @@
+{% load humanize %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>لیست مشتریان</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
+        h2 { text-align: center; margin-bottom: 20px; }
+        .top-bar { max-width: 1200px; margin: 0 auto 16px auto; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .back-link { background: #6c757d; color: #fff; border-radius: 5px; padding: 8px 14px; text-decoration: none; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
+        th { background-color: #007bff; color: white; }
+        
+        tr:hover { background: #f5f9ff; }
+        
+        .customer-link {
+            display: inline-block;
+            background: #0d6efd;
+            color: #fff;
+            border-radius: 5px;
+            padding: 6px 12px;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .customer-link:hover { background: #0a58ca; }
+        
+        .status-badge { display: inline-block; padding: 4px 10px; border-radius: 16px; font-size: 12px; }
+        .status-active { background: #2e7d32; color: #fff; }
+        .status-suspended { background: #c62828; color: #fff; }
+        
+        .empty-message { max-width: 1200px; margin: 20px auto; background: #fff; padding: 40px; border-radius: 10px; text-align: center; color: #666; }
+        
+        .search-box { max-width: 1200px; margin: 0 auto 20px auto; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+        .search-box input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>لیست مشتریان</h2>
+        <a href="{% url 'submit' %}" class="back-link">بازگشت به صفحه اصلی</a>
+    </div>
+    
+    <div class="search-box">
+        <input type="text" id="customerSearch" placeholder="جستجو در نام، نام خانوادگی، نام کاربری، مجموعه، شهر یا شماره تماس..." onkeyup="filterCustomers()">
+    </div>
+    
+    {% if customer_data %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ردیف</th>
+                    <th>نام کاربری</th>
+                    <th>نام و نام خانوادگی</th>
+                    <th>نام مجموعه</th>
+                    <th>شهر</th>
+                    <th>شماره تماس</th>
+                    <th>تعداد فیش‌ها</th>
+                    <th>تعداد فاکتورها</th>
+                    <th>مجموع مبالغ (ریال)</th>
+                    <th>آخرین سند</th>
+                    <th>وضعیت</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody id="customerTableBody">
+                {% for customer in customer_data %}
+                    <tr class="customer-row" data-search="{{ customer.user.username }} {{ customer.profile.first_name|default:'' }} {{ customer.profile.last_name|default:'' }} {{ customer.profile.organization|default:'' }} {{ customer.profile.city|default:'' }} {{ customer.profile.phone|default:'' }} {{ customer.profile.mobile|default:'' }}">
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ customer.user.username }}</td>
+                        <td>{{ customer.profile.first_name|default:'-' }} {{ customer.profile.last_name|default:'' }}</td>
+                        <td>{{ customer.profile.organization|default:'-' }}</td>
+                        <td>{{ customer.profile.city|default:'-' }}</td>
+                        <td>{{ customer.profile.phone|default:'-' }}</td>
+                        <td>{{ customer.payment_count }}</td>
+                        <td>{{ customer.invoice_count }}</td>
+                        <td>{{ customer.total_amount|intcomma }}</td>
+                        <td>
+                            {% if customer.latest_payment_date %}
+                                {{ customer.latest_payment_date|date:"Y/m/d" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if customer.profile.suspended %}
+                                <span class="status-badge status-suspended">معلق</span>
+                            {% else %}
+                                <span class="status-badge status-active">فعال</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'customer_detail' customer.user.id %}" class="customer-link">مشاهده جزئیات</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-message">هیچ مشتری ثبت نشده است.</div>
+    {% endif %}
+    
+    <script>
+        function filterCustomers() {
+            var searchText = document.getElementById('customerSearch').value.toLowerCase();
+            var rows = document.getElementsByClassName('customer-row');
+            
+            for (var i = 0; i < rows.length; i++) {
+                var searchData = rows[i].getAttribute('data-search').toLowerCase();
+                if (searchData.indexOf(searchText) > -1) {
+                    rows[i].style.display = '';
+                } else {
+                    rows[i].style.display = 'none';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

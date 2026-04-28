@@ -1,0 +1,261 @@
+{% load humanize %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>اطلاعات مشتری - {{ customer_user.username }}</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
+        h2 { text-align: center; margin-bottom: 20px; }
+        .top-bar { max-width: 1200px; margin: 0 auto 16px auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .back-link { background: #6c757d; color: #fff; border-radius: 5px; padding: 8px 14px; text-decoration: none; }
+        
+        .customer-header { max-width: 1200px; margin: 0 auto 20px auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+        .customer-header-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .customer-header-item { font-size: 14px; }
+        .customer-header-item strong { color: #0d6efd; display: block; margin-bottom: 4px; }
+        
+        .summary-cards { max-width: 1200px; margin: 0 auto 20px auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .summary-card { background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); text-align: center; }
+        .summary-card h3 { margin: 0 0 8px 0; font-size: 14px; color: #666; }
+        .summary-card .value { font-size: 24px; font-weight: bold; color: #0d6efd; }
+        
+        .section-title { max-width: 1200px; margin: 30px auto 16px auto; font-size: 18px; color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 8px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; vertical-align: top; }
+        th { background-color: #007bff; color: white; }
+        
+        .status-pill { display: inline-block; padding: 4px 10px; border-radius: 16px; color: #fff; font-size: 12px; }
+        .flag-blue { background: #1e88e5; }
+        .flag-purple { background: #7b1fa2; }
+        .flag-green { background: #2e7d32; }
+        .flag-red { background: #c62828; }
+        .flag-yellow { background: #f9a825; color: #111; }
+        .flag-gray { background: #546e7a; }
+        
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; text-align: right; }
+        .detail-card { background: #fafafa; border: 1px solid #e6e6e6; border-radius: 8px; padding: 10px; font-size: 13px; }
+        
+        .timeline-list { margin: 0; padding-right: 18px; }
+        .timeline-list li { margin-bottom: 6px; font-size: 12px; color: #666; }
+        
+        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #0d6efd; color: #fff; cursor: pointer; margin-top: 6px; }
+        tr.detail-row { display: none; background: #fafafa; }
+        tr.detail-row.open { display: table-row; }
+        
+        .empty-message { max-width: 1200px; margin: 20px auto; background: #fff; padding: 40px; border-radius: 10px; text-align: center; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>اطلاعات مشتری: {{ customer_user.username }}</h2>
+        <a href="{% url 'submit' %}" class="back-link">بازگشت به صفحه اصلی</a>
+    </div>
+    
+    <!-- Customer Info Header -->
+    <div class="customer-header">
+        <div class="customer-header-grid">
+            <div class="customer-header-item">
+                <strong>نام کاربری:</strong>
+                {{ customer_user.username }}
+            </div>
+            <div class="customer-header-item">
+                <strong>نام:</strong>
+                {{ customer_profile.first_name|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>نام خانوادگی:</strong>
+                {{ customer_profile.last_name|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>نام مجموعه:</strong>
+                {{ customer_profile.organization|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>شماره تماس:</strong>
+                {{ customer_profile.phone|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>شماره همراه:</strong>
+                {{ customer_profile.mobile|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>استان:</strong>
+                {{ customer_profile.province|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>شهر:</strong>
+                {{ customer_profile.city|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>آدرس:</strong>
+                {{ customer_profile.address|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>تاریخ آغاز فعالیت:</strong>
+                {{ customer_profile.active_from|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>تاریخ اعتبار:</strong>
+                {{ customer_profile.valid_until|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>وضعیت:</strong>
+                {% if customer_profile.suspended %}
+                    <span style="color: #c62828;">معلق</span>
+                {% else %}
+                    <span style="color: #2e7d32;">فعال</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <h3>تعداد فیش‌های پرداخت</h3>
+            <div class="value">{{ total_payments }}</div>
+        </div>
+        <div class="summary-card">
+            <h3>تعداد فاکتورها</h3>
+            <div class="value">{{ total_invoices }}</div>
+        </div>
+        <div class="summary-card">
+            <h3>مجموع مبالغ (ریال)</h3>
+            <div class="value">{{ total_amount|intcomma }}</div>
+        </div>
+    </div>
+    
+    <!-- Payments Section -->
+    <h3 class="section-title">فیش‌های پرداخت</h3>
+    {% if payments %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ردیف</th>
+                    <th>مبلغ (ریال)</th>
+                    <th>تاریخ واریز</th>
+                    <th>کد پیگیری</th>
+                    <th>بانک مقصد</th>
+                    <th>شماره حساب مقصد</th>
+                    <th>وضعیت</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                    <tr class="summary-row" onclick="toggleDetail('payment-{{ payment.id }}')">
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ payment.amount|intcomma }}</td>
+                        <td>{{ payment.pay_date }}</td>
+                        <td>{{ payment.tracking_code|default:'-' }}</td>
+                        <td>{{ payment.beneficiary_bank_name|default:'-' }}</td>
+                        <td>{{ payment.beneficiary_account_number|default:'-' }}</td>
+                        <td>
+                            <span class="status-pill {{ payment.status_flag_class }}">
+                                {{ payment.customer_status_label }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="expand-btn" type="button">مشاهده جزئیات</button>
+                        </td>
+                    </tr>
+                    <tr class="detail-row" id="payment-{{ payment.id }}">
+                        <td colspan="8">
+                            <div class="detail-grid">
+                                <div class="detail-card">
+                                    <strong>نام و نام خانوادگی واریز کننده:</strong><br>
+                                    {{ payment.payer_full_name|default:'-' }}
+                                </div>
+                                <div class="detail-card">
+                                    <strong>شماره حساب واریز کننده:</strong><br>
+                                    {{ payment.payer_account_number|default:'-' }}
+                                </div>
+                                <div class="detail-card">
+                                    <strong>بانک مبدا:</strong><br>
+                                    {{ payment.payer_bank_name|default:'-' }}
+                                </div>
+                                <div class="detail-card">
+                                    <strong>نام صاحب حساب مقصد:</strong><br>
+                                    {{ payment.beneficiary_account_owner|default:'-' }}
+                                </div>
+                                <div class="detail-card">
+                                    <strong>تاریخ ثبت:</strong><br>
+                                    {{ payment.created_at|date:"Y/m/d H:i" }}
+                                </div>
+                                {% if payment.last_staff_note %}
+                                <div class="detail-card">
+                                    <strong>آخرین توضیح کارشناس:</strong><br>
+                                    {{ payment.last_staff_note }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if payment.row_flags %}
+                            <div style="margin-top: 10px;">
+                                <strong>تاریخچه وضعیت:</strong>
+                                {% for flag in payment.row_flags %}
+                                    <span class="status-pill {{ flag.css }}" style="margin: 2px;">{{ flag.label }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-message">هیچ فیش پرداختی برای این مشتری ثبت نشده است.</div>
+    {% endif %}
+    
+    <!-- Invoices Section -->
+    <h3 class="section-title">فاکتورها</h3>
+    {% if invoices %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ردیف</th>
+                    <th>شماره حواله</th>
+                    <th>مبلغ (ریال)</th>
+                    <th>تاریخ فاکتور</th>
+                    <th>ثبت شده توسط</th>
+                    <th>تاریخ ثبت</th>
+                    <th>مشاهده شده توسط مشتری</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invoice in invoices %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ invoice.reference_number }}</td>
+                        <td>{{ invoice.amount|intcomma }}</td>
+                        <td>{{ invoice.invoice_date }}</td>
+                        <td>{{ invoice.uploaded_by|default:'-' }}</td>
+                        <td>{{ invoice.created_at|date:"Y/m/d H:i" }}</td>
+                        <td>
+                            {% if invoice.customer_seen_at %}
+                                <span style="color: #2e7d32;">✓ بله</span>
+                            {% else %}
+                                <span style="color: #c62828;">✗ خیر</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-message">هیچ فاکتوری برای این مشتری ثبت نشده است.</div>
+    {% endif %}
+    
+    <script>
+        function toggleDetail(id) {
+            var row = document.getElementById(id);
+            if (row) {
+                row.classList.toggle('open');
+            }
+        }
+    </script>
+</body>
+</html>

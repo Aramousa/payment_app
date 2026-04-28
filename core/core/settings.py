@@ -85,6 +85,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'payments.context_processors.login_ads',
+                'payments.context_processors.unread_notifications',
             ],
         },
     },

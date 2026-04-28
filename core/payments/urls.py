@@ -3,6 +3,8 @@ from .views import (
     counterparty_edit,
     counterparties_manage,
     create_payment,
+    customer_detail,
+    customers_list,
     edit_payment,
     export_records,
     invoice_detail,
@@ -19,6 +21,8 @@ from .views import (
 urlpatterns = [
     path('submit/', create_payment, name='submit'),
     path('success/', success, name='success'),
+    path('customer/<int:user_id>/', customer_detail, name='customer_detail'),
+    path('customers/', customers_list, name='customers_list'),
     path('payments/<int:payment_id>/status/', staff_update_status, name='staff_update_status'),
     path('payments/<int:payment_id>/edit/', edit_payment, name='edit_payment'),
     path('payments/<int:payment_id>/timeline/', payment_timeline, name='payment_timeline'),

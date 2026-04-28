@@ -110,6 +110,7 @@ class PaymentRecord(models.Model):
     locked_by_finance = models.BooleanField(default=False)
     last_staff_note = models.TextField('آخرین توضیح کارشناس', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
 
     class Meta:
         ordering = ['-id']
@@ -146,6 +147,10 @@ class PaymentRecord(models.Model):
         if self.status == self.STATUS_INCOMPLETE:
             return 'flag-yellow'
         return 'flag-gray'
+
+    @property
+    def is_seen_by_customer(self):
+        return bool(self.customer_seen_at)
 
 
 class UserProfile(models.Model):

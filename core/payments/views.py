@@ -964,6 +964,96 @@ def export_records(request):
     return response
 
 
+@login_required
+def customer_detail(request, user_id):
+    """
+    Dedicated view for staff to see all documents (payments and invoices) for a specific customer.
+    """
+    is_staff_user = _is_staff_user(request.user)
+    if not is_staff_user:
+        return HttpResponseForbidden('این بخش فقط برای کاربران واحدها قابل دسترسی است.')
+
+    # Get the customer user
+    customer_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
+    customer_profile = getattr(customer_user, 'profile', None)
+
+    # Get all payments for this customer
+    payments = PaymentRecord.objects.filter(user=customer_user).order_by('-created_at')
+    payments = _enrich_records(payments, staff_role=_user_role(request.user), is_system_admin=request.user.is_superuser)
+
+    # Get all invoices for this customer
+    invoices = InvoiceRecord.objects.filter(customer=customer_user).order_by('-created_at')
+
+    # Calculate summary
+    total_payments = payments.count()
+    total_invoices = invoices.count()
+    total_amount = sum(p.amount for p in payments)
+
+    # Status breakdown for payments
+    status_counts = {}
+    for payment in payments:
+        status = payment.get_status_display()
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+    return render(request, 'payments/customer_detail.html', {
+        'customer_user': customer_user,
+        'customer_profile': customer_profile,
+        'payments': payments,
+        'invoices': invoices,
+        'total_payments': total_payments,
+        'total_invoices': total_invoices,
+        'total_amount': total_amount,
+        'status_counts': status_counts,
+        'is_staff_user': is_staff_user,
+        'staff_user_role': _user_role(request.user),
+        'user_display_name': user_display_name,
+    })
+
+
+@login_required
+def customers_list(request):
+    """
+    List all customers with their document counts for staff users.
+    """
+    is_staff_user = _is_staff_user(request.user)
+    if not is_staff_user:
+        return HttpResponseForbidden('این بخش فقط برای کاربران واحدها قابل دسترسی است.')
+
+    # Get all customer profiles
+    customers = UserProfile.objects.filter(role='customer').select_related('user').order_by('user__username')
+
+    # Calculate counts for each customer
+    customer_data = []
+    for profile in customers:
+        payment_count = PaymentRecord.objects.filter(user=profile.user).count()
+        invoice_count = InvoiceRecord.objects.filter(customer=profile.user).count()
+        total_amount = PaymentRecord.objects.filter(user=profile.user).aggregate(
+            total=models.Sum('amount')
+        )['total'] or 0
+
+        # Get latest payment
+        latest_payment = PaymentRecord.objects.filter(user=profile.user).order_by('-created_at').first()
+
+        customer_data.append({
+            'profile': profile,
+            'user': profile.user,
+            'payment_count': payment_count,
+            'invoice_count': invoice_count,
+            'total_amount': total_amount,
+            'latest_payment_date': latest_payment.created_at if latest_payment else None,
+        })
+
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+    return render(request, 'payments/customers_list.html', {
+        'customer_data': customer_data,
+        'is_staff_user': is_staff_user,
+        'user_display_name': user_display_name,
+    })
+
+
 
 
 
