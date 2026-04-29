@@ -321,25 +321,25 @@ class UserAccountManagementForm(forms.Form):
     )
 
     username = forms.CharField(label='نام کاربر', max_length=150)
-    first_name = forms.CharField(label='نام', max_length=50, required=False)
-    last_name = forms.CharField(label='نام خانوادگی', max_length=50, required=False)
+    first_name = forms.CharField(label='نام', max_length=50, required=True)
+    last_name = forms.CharField(label='نام خانوادگی', max_length=50, required=True)
     phone = forms.CharField(label='شماره تماس', max_length=20, required=False)
-    mobile = forms.CharField(label='شماره همراه', max_length=20, required=False)
-    province = forms.CharField(label='استان', max_length=50, required=False)
-    city = forms.CharField(label='شهر', max_length=50, required=False)
+    mobile = forms.CharField(label='شماره همراه', max_length=20, required=True)
+    province = forms.CharField(label='استان', max_length=50, required=True)
+    city = forms.CharField(label='شهر', max_length=50, required=True)
     address = forms.CharField(label='آدرس', required=False, widget=forms.Textarea(attrs={'rows': 2}))
-    organization = forms.CharField(label='نام مجموعه', max_length=100, required=False)
-    password = forms.CharField(label='کلمه عبور', required=False, widget=forms.TextInput(attrs={'dir': 'ltr', 'inputmode': 'numeric'}))
+    organization = forms.CharField(label='نام مجموعه', max_length=100, required=True)
+    password = forms.CharField(label='کلمه عبور', required=True, widget=forms.TextInput(attrs={'dir': 'ltr', 'inputmode': 'numeric'}))
     role = forms.ChoiceField(label='نقش', choices=ROLE_CHOICES)
     active_from = jDateField(
         label='تاریخ آغاز فعالیت',
-        required=False,
+        required=True,
         input_formats=['%Y/%m/%d'],
         widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31'}),
     )
     valid_until = jDateField(
         label='تاریخ اعتبار',
-        required=False,
+        required=True,
         input_formats=['%Y/%m/%d'],
         widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/12/29'}),
     )
@@ -395,6 +395,43 @@ class UserAccountManagementForm(forms.Form):
         mobile = (cleaned_data.get('mobile') or '').strip()
         phone = (cleaned_data.get('phone') or '').strip()
 
+        # Check required fields
+        first_name = (cleaned_data.get('first_name') or '').strip()
+        last_name = (cleaned_data.get('last_name') or '').strip()
+        organization = (cleaned_data.get('organization') or '').strip()
+        province = (cleaned_data.get('province') or '').strip()
+        city = (cleaned_data.get('city') or '').strip()
+        active_from = cleaned_data.get('active_from')
+        valid_until = cleaned_data.get('valid_until')
+        password = (cleaned_data.get('password') or '').strip()
+
+        if not first_name:
+            self.add_error('first_name', 'نام الزامی است.')
+
+        if not last_name:
+            self.add_error('last_name', 'نام خانوادگی الزامی است.')
+
+        if not mobile:
+            self.add_error('mobile', 'شماره همراه الزامی است.')
+
+        if not organization:
+            self.add_error('organization', 'نام مجموعه الزامی است.')
+
+        if not province:
+            self.add_error('province', 'استان الزامی است.')
+
+        if not city:
+            self.add_error('city', 'شهر الزامی است.')
+
+        if not active_from:
+            self.add_error('active_from', 'تاریخ آغاز فعالیت الزامی است.')
+
+        if not valid_until:
+            self.add_error('valid_until', 'تاریخ اعتبار الزامی است.')
+
+        if not password and not self.instance:
+            self.add_error('password', 'کلمه عبور الزامی است.')
+
         # For customers, check for duplicate mobile/phone
         if role == 'customer' and (mobile or phone):
             # Check for existing customer with same mobile
@@ -418,7 +455,7 @@ class UserAccountManagementForm(forms.Form):
     def clean_password(self):
         password = (self.cleaned_data.get('password') or '').strip()
         if not password and not self.instance:
-            raise ValidationError('کلمه عبور برای کاربر جدید الزامی است.')
+            raise ValidationError('کلمه عبور الزامی است.')
         if password and (not password.isdigit() or len(password) != 5):
             raise ValidationError('کلمه عبور باید یک عدد 5 رقمی باشد.')
         return password
