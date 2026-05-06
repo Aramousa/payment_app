@@ -1,0 +1,336 @@
+:root {
+    --app-bg: #f3f6f9;
+    --app-surface: #ffffff;
+    --app-surface-soft: #f8fafc;
+    --app-border: #dbe3ec;
+    --app-border-strong: #c5d1dd;
+    --app-text: #1f2933;
+    --app-muted: #66788a;
+    --app-primary: #1769aa;
+    --app-primary-dark: #0f4f84;
+    --app-success: #237a57;
+    --app-warning: #a86405;
+    --app-danger: #b42318;
+    --app-radius: 8px;
+    --app-shadow: 0 10px 28px rgba(31, 41, 51, 0.08);
+    --app-shadow-soft: 0 4px 14px rgba(31, 41, 51, 0.06);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    background: var(--app-bg);
+}
+
+body {
+    color: var(--app-text);
+    background:
+        linear-gradient(180deg, #eef4f8 0, var(--app-bg) 260px) !important;
+    line-height: 1.75;
+}
+
+a {
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+h1,
+h2,
+h3 {
+    color: #17212f;
+    letter-spacing: 0;
+}
+
+.top-bar {
+    align-items: center !important;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(219, 227, 236, 0.9);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow-soft);
+    padding: 12px 14px;
+}
+
+.top-bar h2 {
+    margin: 0;
+    text-align: right;
+}
+
+.top-actions,
+.filter-actions,
+.invoice-filter-actions {
+    align-items: center;
+}
+
+.button-link,
+.back-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn,
+.submit-btn,
+.staff-quick button,
+.staff-action button,
+button[type="submit"] {
+    border: 1px solid transparent !important;
+    border-radius: var(--app-radius) !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+    font-family: Vazir, sans-serif;
+    font-weight: 600;
+    min-height: 36px;
+}
+
+.button-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn {
+    background: var(--app-primary) !important;
+    color: #fff !important;
+}
+
+.button-link:hover,
+.customer-link:hover,
+.detail-link:hover,
+.track-link:hover,
+.expand-btn:hover,
+.apply-btn:hover {
+    background: var(--app-primary-dark) !important;
+    box-shadow: 0 8px 18px rgba(23, 105, 170, 0.18);
+}
+
+.button-link.alt,
+.submit-btn,
+.staff-quick button,
+.staff-action button {
+    background: var(--app-success) !important;
+}
+
+.back-link,
+.clear-btn {
+    background: #52606d !important;
+    color: #fff !important;
+}
+
+.logout-btn {
+    background: var(--app-danger) !important;
+}
+
+.user-chip {
+    background: #f8fafc !important;
+    border-color: var(--app-border) !important;
+    color: #243447 !important;
+    min-width: 130px;
+}
+
+.section,
+.box,
+.filter-box,
+.search-box,
+.customer-header,
+.summary-card,
+.empty-message,
+.customer-info,
+.invoice-filter-box,
+.card,
+#payment-form {
+    background: var(--app-surface) !important;
+    border: 1px solid var(--app-border) !important;
+    border-radius: var(--app-radius) !important;
+    box-shadow: var(--app-shadow-soft) !important;
+}
+
+.section,
+.filter-box,
+.search-box,
+.customer-header,
+.customer-info,
+#payment-form {
+    padding: 18px !important;
+}
+
+.summary-card {
+    border-top: 3px solid var(--app-primary) !important;
+}
+
+.summary-card .value {
+    color: var(--app-primary) !important;
+}
+
+label {
+    color: #324456;
+    font-weight: 600;
+}
+
+input,
+select,
+textarea {
+    border: 1px solid var(--app-border-strong) !important;
+    border-radius: var(--app-radius) !important;
+    color: var(--app-text);
+    font-family: Vazir, sans-serif;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    background: #fff;
+    border-color: var(--app-primary) !important;
+    box-shadow: 0 0 0 3px rgba(23, 105, 170, 0.16);
+    outline: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #8a99a8;
+}
+
+table {
+    border: 1px solid var(--app-border) !important;
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow-soft) !important;
+    overflow: hidden;
+}
+
+th {
+    background: #22384f !important;
+    color: #fff !important;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+td,
+th {
+    border-bottom-color: #e7edf3 !important;
+}
+
+tbody tr:nth-child(even):not(.detail-row) {
+    background: #fbfdff;
+}
+
+tbody tr:hover:not(.detail-row) {
+    background: #eef6fd !important;
+}
+
+.detail-row,
+tr.detail-row {
+    background: #f8fafc !important;
+}
+
+.detail-card,
+.customer-card {
+    background: var(--app-surface-soft) !important;
+    border: 1px solid var(--app-border) !important;
+    border-radius: var(--app-radius) !important;
+}
+
+.status-pill,
+.status-badge,
+.flag-chip {
+    border-radius: 999px !important;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.flag-blue {
+    background: #1769aa !important;
+}
+
+.flag-purple {
+    background: #6f4aa8 !important;
+}
+
+.flag-green,
+.status-active,
+.status-seen {
+    background: #237a57 !important;
+    color: #fff !important;
+}
+
+.flag-red,
+.status-suspended {
+    background: #b42318 !important;
+}
+
+.flag-yellow,
+.status-unseen {
+    background: #f5d36f !important;
+    color: #2b2111 !important;
+}
+
+.warning-box {
+    background: #fff8e6 !important;
+    border-color: #f0d083 !important;
+    color: #704b00 !important;
+}
+
+.system-popup-box {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius) !important;
+    box-shadow: var(--app-shadow);
+}
+
+.system-popup-item,
+.system-message,
+.field-error,
+.errorlist {
+    color: var(--app-danger) !important;
+}
+
+.helptext,
+.field-help,
+.hint,
+.tiny,
+.preview-hint,
+.ad-desc {
+    color: var(--app-muted) !important;
+}
+
+.empty-message {
+    color: var(--app-muted) !important;
+}
+
+@media (max-width: 760px) {
+    body {
+        padding: 12px !important;
+    }
+
+    .top-bar,
+    .top-actions,
+    .logout-wrap,
+    .filter-actions,
+    .invoice-filter-actions {
+        align-items: stretch !important;
+        width: 100%;
+    }
+
+    .top-actions,
+    .filter-actions,
+    .invoice-filter-actions {
+        display: grid !important;
+        grid-template-columns: 1fr;
+    }
+
+    .button-link,
+    .back-link,
+    .logout-btn,
+    .customer-link,
+    .detail-link,
+    .track-link,
+    .expand-btn,
+    .submit-btn {
+        text-align: center;
+        width: 100%;
+    }
+
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+}

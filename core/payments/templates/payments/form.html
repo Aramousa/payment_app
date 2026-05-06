@@ -1,5 +1,6 @@
 ﻿{% load humanize %}
 {% load static %}
+{% load payment_dates %}
 <!DOCTYPE html>
 <html lang="fa">
 <head>
@@ -7,6 +8,7 @@
     <title>ثبت واریزی</title>
 
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
 
     <script src="{% static 'js/cleave.min.js' %}"></script>
@@ -273,7 +275,7 @@
                 <div><label for="payer_account_number_filter">شماره حساب واریز کننده</label><input id="payer_account_number_filter" type="text" name="payer_account_number" value="{{ filters.payer_account_number }}"></div>
                 <div><label for="payer_bank_name_filter">نام بانک</label><input id="payer_bank_name_filter" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}"></div>
             {% endif %}
-            <div><label for="amount_filter">مبلغ (ریال)</label><input id="amount_filter" type="text" name="amount" value="{{ filters.amount }}"></div>
+            <div><label for="amount_filter">مبلغ (ریال)</label><input id="amount_filter" class="amount-input" type="text" inputmode="numeric" dir="ltr" name="amount" value="{{ filters.amount }}"></div>
             <div><label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
             <div>
                 <label for="status">وضعیت</label>
@@ -351,7 +353,7 @@
                 <td>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</td>
                 <td>{{ payment.pay_date }}</td>
                 <td>{{ payment.tracking_code|default:'-' }}</td>
-                <td>{{ payment.amount|intcomma }}</td>
+                <td>{{ payment.amount|thousand_sep }}</td>
                 <td>{% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</td>
                 <td>
                     {% if is_staff_user %}
@@ -499,21 +501,20 @@
             observer: true,
             initialValue: false
         });
-        const amountEl = document.querySelector('.amount-input');
-        if (amountEl) {
+        const amountEls = document.querySelectorAll('.amount-input');
+        amountEls.forEach(function (amountEl) {
             new Cleave(amountEl, {
                 numeral: true,
                 numeralThousandsGroupStyle: 'thousand'
             });
-        }
+        });
 
         const paymentForm = document.querySelector('#payment-form');
         if (paymentForm) {
             paymentForm.addEventListener('submit', function () {
-                const amountInput = document.querySelector('.amount-input');
-                if (amountInput) {
+                document.querySelectorAll('.amount-input').forEach(function (amountInput) {
                     amountInput.value = amountInput.value.replace(/,/g, '');
-                }
+                });
             });
         }
 

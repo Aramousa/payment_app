@@ -4,7 +4,7 @@ import random
 from openpyxl import Workbook
 from urllib.parse import urlencode
 
-from django.db.models import Q, Sum
+from django.db.models import Count, Max, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
@@ -343,7 +343,9 @@ def _apply_record_filters(records, request, is_staff_user):
             records = records.filter(payer_bank_name__icontains=filters['payer_bank_name'])
 
     if filters['amount'].isdigit():
-        records = records.filter(amount=int(filters['amount']))
+        parsed_amount = int(filters['amount'])
+        records = records.filter(amount=parsed_amount)
+        filters['amount'] = _format_thousand_separator(parsed_amount)
 
     parsed_date = _parse_jalali_date(filters['pay_date'])
     if parsed_date:
@@ -372,6 +374,13 @@ def _apply_record_filters(records, request, is_staff_user):
             records = records.filter(status__in=customer_status_map[filters['status']])
 
     return records, filters
+
+def _format_thousand_separator(value):
+    try:
+        return '{:,}'.format(int(str(value).replace(',', '').strip()))
+    except (ValueError, TypeError):
+        return value
+
 
 def _apply_record_sort(records, request):
     sortable_fields = {
@@ -562,7 +571,9 @@ def _apply_invoice_filters(records, request, is_staff_user):
         records = records.filter(reference_number__icontains=filters['reference_number'])
 
     if filters['amount'].isdigit():
-        records = records.filter(amount=int(filters['amount']))
+        parsed_amount = int(filters['amount'])
+        records = records.filter(amount=parsed_amount)
+        filters['amount'] = _format_thousand_separator(parsed_amount)
 
     parsed_date = _parse_jalali_date(filters['invoice_date'])
     if parsed_date:
@@ -1143,11 +1154,22 @@ def customer_detail(request, user_id):
     customer_profile = getattr(customer_user, 'profile', None)
 
     # Get all payments for this customer
-    payments = PaymentRecord.objects.filter(user=customer_user).order_by('-created_at')
+    payments = (
+        PaymentRecord.objects
+        .filter(user=customer_user)
+        .select_related('counterparty', 'user')
+        .prefetch_related('receipts', 'activity_logs', 'activity_logs__actor')
+        .order_by('-created_at')
+    )
     payments = _enrich_records(payments, staff_role=_user_role(request.user), is_system_admin=request.user.is_superuser)
 
     # Get all invoices for this customer
-    invoices = InvoiceRecord.objects.filter(customer=customer_user).order_by('-created_at')
+    invoices = (
+        InvoiceRecord.objects
+        .filter(customer=customer_user)
+        .select_related('customer', 'customer__profile', 'uploaded_by')
+        .order_by('-created_at')
+    )
     can_view_invoices = _can_view_invoices(request.user)
     if not can_view_invoices:
         invoices = InvoiceRecord.objects.none()
@@ -1202,25 +1224,41 @@ def customers_list(request):
     # Get all customer profiles
     customers = UserProfile.objects.filter(role='customer').select_related('user').order_by('user__username')
 
+    payment_stats = {
+        row['user']: row
+        for row in (
+            PaymentRecord.objects
+            .filter(user__profile__role='customer')
+            .values('user')
+            .annotate(
+                payment_count=Count('id'),
+                total_amount=Sum('amount'),
+                latest_payment_date=Max('created_at'),
+            )
+        )
+    }
+    invoice_counts = {
+        row['customer']: row['invoice_count']
+        for row in (
+            InvoiceRecord.objects
+            .filter(customer__profile__role='customer')
+            .values('customer')
+            .annotate(invoice_count=Count('id'))
+        )
+    }
+
     # Calculate counts for each customer
     customer_data = []
     for profile in customers:
-        payment_count = PaymentRecord.objects.filter(user=profile.user).count()
-        invoice_count = InvoiceRecord.objects.filter(customer=profile.user).count()
-        total_amount = PaymentRecord.objects.filter(user=profile.user).aggregate(
-            total=Sum('amount')
-        )['total'] or 0
-
-        # Get latest payment
-        latest_payment = PaymentRecord.objects.filter(user=profile.user).order_by('-created_at').first()
+        stats = payment_stats.get(profile.user_id, {})
 
         customer_data.append({
             'profile': profile,
             'user': profile.user,
-            'payment_count': payment_count,
-            'invoice_count': invoice_count,
-            'total_amount': total_amount,
-            'latest_payment_date': latest_payment.created_at if latest_payment else None,
+            'payment_count': stats.get('payment_count') or 0,
+            'invoice_count': invoice_counts.get(profile.user_id, 0),
+            'total_amount': stats.get('total_amount') or 0,
+            'latest_payment_date': stats.get('latest_payment_date'),
         })
 
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username

@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <title>فاکتورهای مشتریان</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
     <script src="{% static 'js/cleave.min.js' %}"></script>
     <script src="{% static 'js/jquery.min.js' %}"></script>
@@ -244,7 +245,7 @@
             </div>
             <div>
                 <label for="amount-filter">مبلغ (ریال)</label>
-                <input id="amount-filter" type="text" name="amount" value="{{ filters.amount }}">
+                <input id="amount-filter" class="amount-input" type="text" inputmode="numeric" dir="ltr" name="amount" value="{{ filters.amount }}">
             </div>
             <div>
                 <label for="invoice-date-filter">تاریخ فاکتور</label>
@@ -289,7 +290,7 @@
                         {% endif %}
                         <td>{{ invoice.invoice_number }}</td>
                         <td>{{ invoice.invoice_date }}</td>
-                        <td>{{ invoice.amount|intcomma }}</td>
+                        <td>{{ invoice.amount|thousand_sep }}</td>
                         <td>{{ invoice.reference_number }}</td>
                         <td>{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</td>
                         <td>
@@ -307,7 +308,7 @@
                                 <div class="detail-card">
                                     <div class="label">اطلاعات فاکتور</div>
                                     <div class="value">تاریخ فاکتور: {{ invoice.invoice_date }}</div>
-                                    <div class="value">مبلغ: {{ invoice.amount|intcomma }} ریال</div>
+                                    <div class="value">مبلغ: {{ invoice.amount|thousand_sep }} ریال</div>
                                     <div class="value">شماره حواله: {{ invoice.reference_number }}</div>
                                     <div class="value">بارگذاری کننده: {{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</div>
                                     <div class="value">تاریخ ثبت: {{ invoice.created_at|jalali_date }}</div>
@@ -358,21 +359,20 @@
                 initialValue: false
             });
 
-            const amountEl = document.querySelector('.amount-input');
-            if (amountEl) {
+            const amountEls = document.querySelectorAll('.amount-input');
+            amountEls.forEach(function (amountEl) {
                 new Cleave(amountEl, {
                     numeral: true,
                     numeralThousandsGroupStyle: 'thousand'
                 });
-            }
+            });
 
             const form = document.getElementById('invoice-upload-form');
             if (form) {
                 form.addEventListener('submit', function () {
-                    const amountInput = document.querySelector('.amount-input');
-                    if (amountInput) {
+                    document.querySelectorAll('.amount-input').forEach(function (amountInput) {
                         amountInput.value = amountInput.value.replace(/,/g, '');
-                    }
+                    });
                 });
             }
 

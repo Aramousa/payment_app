@@ -116,6 +116,14 @@ class PaymentRecordForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self._receipt_payload = []
 
+        if not self.is_bound:
+            amount_initial = self.initial.get('amount')
+            if amount_initial is not None:
+                try:
+                    self.initial['amount'] = '{:,}'.format(int(str(amount_initial).replace(',', '').strip()))
+                except (ValueError, TypeError):
+                    pass
+
         for name in self.REQUIRED_CUSTOMER_FIELDS:
             self.fields[name].required = True
 
@@ -294,6 +302,14 @@ class InvoiceUploadForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.is_bound:
+            amount_initial = self.initial.get('amount')
+            if amount_initial is not None:
+                try:
+                    self.initial['amount'] = '{:,}'.format(int(str(amount_initial).replace(',', '').strip()))
+                except (ValueError, TypeError):
+                    pass
+
         self.fields['customer'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
             'user__first_name', 'user__last_name', 'user__username'
         )

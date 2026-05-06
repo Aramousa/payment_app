@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <title>اطلاعات مشتری - {{ customer_user.username }}</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
         h2 { text-align: center; margin-bottom: 20px; }
@@ -139,11 +140,11 @@
         </div>
         <div class="summary-card">
             <h3>جمع مبالغ فاکتورها (ریال)</h3>
-            <div class="value">{{ invoice_total_amount|intcomma }}</div>
+            <div class="value">{{ invoice_total_amount|thousand_sep }}</div>
         </div>
         <div class="summary-card">
             <h3>جمع مبالغ واریزی (ریال)</h3>
-            <div class="value">{{ total_amount|intcomma }}</div>
+            <div class="value">{{ total_amount|thousand_sep }}</div>
         </div>
     </div>
     
@@ -167,7 +168,7 @@
                 {% for payment in payments %}
                     <tr class="summary-row" onclick="toggleDetail('payment-{{ payment.id }}')">
                         <td>{{ forloop.counter }}</td>
-                        <td>{{ payment.amount|intcomma }}</td>
+                        <td>{{ payment.amount|thousand_sep }}</td>
                         <td>{{ payment.pay_date }}</td>
                         <td>{{ payment.tracking_code|default:'-' }}</td>
                         <td>{{ payment.beneficiary_bank_name|default:'-' }}</td>
@@ -268,7 +269,7 @@
                         <td>{{ forloop.counter }}</td>
                         <td>{{ invoice.invoice_number }}</td>
                         <td>{{ invoice.reference_number }}</td>
-                        <td>{{ invoice.amount|intcomma }}</td>
+                        <td>{{ invoice.amount|thousand_sep }}</td>
                         <td>{{ invoice.invoice_date }}</td>
                         <td>{{ invoice.uploaded_by|default:'-' }}</td>
                         <td>{{ invoice.created_at|jalali_datetime }}</td>

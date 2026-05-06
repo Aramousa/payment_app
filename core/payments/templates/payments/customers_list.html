@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <title>لیست مشتریان</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
         h2 { text-align: center; margin-bottom: 20px; }
@@ -81,7 +82,7 @@
                         <td>{{ customer.profile.phone|default:'-' }}</td>
                         <td>{{ customer.payment_count }}</td>
                         <td>{{ customer.invoice_count }}</td>
-                        <td>{{ customer.total_amount|intcomma }}</td>
+                        <td>{{ customer.total_amount|thousand_sep }}</td>
                         <td>
                             {% if customer.latest_payment_date %}
                                 {{ customer.latest_payment_date|jalali_date }}

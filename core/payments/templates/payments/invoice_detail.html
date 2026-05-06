@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <title>جزئیات فاکتور</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f6fa; padding: 20px; }
         .box { max-width: 980px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 22px; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
@@ -81,7 +82,7 @@
             </div>
             <div class="card">
                 <div class="label">مبلغ</div>
-                <div class="value">{{ invoice.amount|intcomma }} ریال</div>
+                <div class="value">{{ invoice.amount|thousand_sep }} ریال</div>
             </div>
             <div class="card">
                 <div class="label">شماره حواله</div>

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>ویرایش فیش ناقص</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
     <script src="{% static 'js/cleave.min.js' %}"></script>
     <script src="{% static 'js/jquery.min.js' %}"></script>
@@ -136,10 +137,9 @@
             numeralThousandsGroupStyle: 'thousand'
         });
         document.querySelector('#payment-form').addEventListener('submit', function () {
-            const amountInput = document.querySelector('.amount-input');
-            if (amountInput) {
+            document.querySelectorAll('.amount-input').forEach(function (amountInput) {
                 amountInput.value = amountInput.value.replace(/,/g, '');
-            }
+            });
         });
 
         const sourcePicker = document.getElementById('source_profile_picker');

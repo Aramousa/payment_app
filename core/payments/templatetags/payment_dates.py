@@ -7,6 +7,15 @@ from django.utils import timezone
 register = template.Library()
 
 
+@register.filter
+def thousand_sep(value):
+    try:
+        amount = int(str(value).replace(',', '').strip())
+    except (ValueError, TypeError):
+        return value
+    return '{:,}'.format(amount)
+
+
 def _to_jalali(value):
     if not value:
         return None
