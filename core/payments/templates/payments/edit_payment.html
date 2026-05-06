@@ -50,7 +50,7 @@
                     <li class="system-message">{{ message }}</li>
                 {% endfor %}
             </ul>
-            <div class="preview-hint">برای بستن پیام، روی صفحه کلیک کنید یا کلید Enter را بزنید.</div>
+            <div class="preview-hint">برای بستن پیام، روی صفحه کلیک کنید یا کلید ورود را بزنید.</div>
         </div>
     </div>
     {% endif %}
@@ -76,7 +76,7 @@
         {% if payment.receipts.all %}
             <p>فایل های فعلی:</p>
             {% for receipt in payment.receipts.all %}
-                <a href="{{ receipt.image.url }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
             {% endfor %}
             <hr>
         {% endif %}
@@ -120,7 +120,7 @@
         <div class="preview-box" id="previewBox">
             <img id="previewImage" class="preview-image" alt="پیش نمایش سند" style="display:none;">
             <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
-            <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید Enter را بزنید.</div>
+            <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید ورود را بزنید.</div>
         </div>
     </div>
 
@@ -201,13 +201,13 @@
             }
         }
 
-        async function openPreview(url) {
+        async function openPreview(url, fileName) {
             let isPdf = false;
             try {
-                const parsed = new URL(url, window.location.origin);
+                const parsed = new URL(fileName || url, window.location.origin);
                 isPdf = /\.pdf$/i.test(parsed.pathname || '');
             } catch (e) {
-                isPdf = /\.pdf(\?|#|$)/i.test((url || '').toLowerCase());
+                isPdf = /\.pdf(\?|#|$)/i.test((fileName || url || '').toLowerCase());
             }
             if (isPdf) {
                 try {
@@ -236,7 +236,7 @@
         document.querySelectorAll('.receipt-preview-link').forEach(function (link) {
             link.addEventListener('click', async function (event) {
                 event.preventDefault();
-                await openPreview(link.getAttribute('href'));
+                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'));
             });
         });
 

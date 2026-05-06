@@ -17,7 +17,7 @@ class Counterparty(models.Model):
         return self.name
 
     def delete(self, *args, **kwargs):
-        raise ValidationError('Counterparty records are permanent and cannot be deleted.')
+        raise ValidationError('رکوردهای طرف حساب دائمی هستند و امکان حذف آن‌ها وجود ندارد.')
 
 
 class LoginAdvertisement(models.Model):
@@ -199,14 +199,12 @@ class PaymentActivityLog(models.Model):
     ACTION_EDITED = 'edited'
     ACTION_STATUS_CHANGED = 'status_changed'
     ACTION_VIEWED = 'viewed'
-    ACTION_PASSWORD_VIEWED = 'password_viewed'
 
     ACTION_CHOICES = [
         (ACTION_CREATED, 'ایجاد'),
         (ACTION_EDITED, 'ویرایش'),
         (ACTION_STATUS_CHANGED, 'تغییر وضعیت'),
         (ACTION_VIEWED, 'رویت'),
-        (ACTION_PASSWORD_VIEWED, 'مشاهده رمز عبور'),
     ]
 
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')
@@ -219,6 +217,33 @@ class PaymentActivityLog(models.Model):
 
     class Meta:
         ordering = ['-created_at', '-id']
+
+
+class SystemActivityLog(models.Model):
+    ACTION_USER_CREATED = 'user_created'
+    ACTION_USER_UPDATED = 'user_updated'
+    ACTION_PASSWORD_RESET = 'password_reset'
+
+    ACTION_CHOICES = [
+        (ACTION_USER_CREATED, 'ایجاد کاربر'),
+        (ACTION_USER_UPDATED, 'ویرایش کاربر'),
+        (ACTION_PASSWORD_RESET, 'ریست رمز عبور'),
+    ]
+
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='performed_system_logs')
+    target_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='targeted_system_logs')
+    action = models.CharField('عملیات', max_length=40, choices=ACTION_CHOICES)
+    description = models.TextField('توضیحات', blank=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'لاگ عملیات سیستم'
+        verbose_name_plural = 'لاگ‌های عملیات سیستم'
+
+    def __str__(self):
+        target = self.target_user.username if self.target_user else '-'
+        return f"{self.get_action_display()} - {target}"
 
 
 class InvoiceRecord(models.Model):

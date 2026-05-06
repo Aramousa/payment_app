@@ -46,6 +46,7 @@ class EnforceCustomerPasswordChangeMiddleware:
                     return self.get_response(request)
                 profile = getattr(request.user, 'profile', None)
                 if profile and profile.role == 'customer' and profile.force_password_change:
+                    request.session['show_initial_password_change_note'] = True
                     messages.warning(request, 'برای ادامه، ابتدا باید رمز عبور خود را تغییر دهید.')
                     return redirect('profile_password_change')
 

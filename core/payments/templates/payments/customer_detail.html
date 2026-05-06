@@ -1,5 +1,6 @@
 {% load humanize %}
 {% load static %}
+{% load payment_dates %}
 <!DOCTYPE html>
 <html lang="fa">
 <head>
@@ -62,7 +63,10 @@
 <body>
     <div class="top-bar">
         <h2>اطلاعات مشتری: {{ customer_user.username }}</h2>
-        <a href="{% url 'submit' %}" class="back-link">بازگشت به صفحه اصلی</a>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <a href="{% url 'customers_list' %}" class="back-link">بازگشت به لیست مشتریان</a>
+            <a href="{% url 'submit' %}" class="back-link">بازگشت به صفحه اصلی</a>
+        </div>
     </div>
     
     <!-- Customer Info Header -->
@@ -198,7 +202,7 @@
                                 </div>
                                 <div class="detail-card">
                                     <strong>تاریخ ثبت:</strong><br>
-                                    {{ payment.created_at|date:"Y/m/d H:i" }}
+                                    {{ payment.created_at|jalali_datetime }}
                                 </div>
                                 {% if payment.last_staff_note %}
                                 <div class="detail-card">
@@ -242,7 +246,7 @@
     {% endif %}
     {% if not can_view_invoices %}
         <div class="empty-message" style="background: #fff8e1; border: 1px solid #f0d58a; color: #7a5600; padding: 12px; border-radius: 8px;">
-            شما دسترسی مشاهده فاکتورها را ندارید. برای مشاهده جزئیات فاکتورها باید دسترسی مربوطه در پروفایل شما فعال شود.
+            شما دسترسی مشاهده فاکتورها را ندارید. برای مشاهده جزئیات فاکتورها باید دسترسی مربوطه در حساب کاربری شما فعال شود.
         </div>
     {% elif invoices %}
         <table>
@@ -267,7 +271,7 @@
                         <td>{{ invoice.amount|intcomma }}</td>
                         <td>{{ invoice.invoice_date }}</td>
                         <td>{{ invoice.uploaded_by|default:'-' }}</td>
-                        <td>{{ invoice.created_at|date:"Y/m/d H:i" }}</td>
+                        <td>{{ invoice.created_at|jalali_datetime }}</td>
                         <td>
                             {% if invoice.customer_seen_at %}
                                 <span style="color: #2e7d32;">✓ بله</span>

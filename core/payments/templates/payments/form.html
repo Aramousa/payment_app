@@ -167,7 +167,7 @@
             {% if request.user.is_superuser %}
                 <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
             {% endif %}
-            <a href="{% url 'profile_password_change' %}" class="button-link">پروفایل / تغییر رمز</a>
+            <a href="{% url 'profile_password_change' %}" class="button-link">حساب کاربری / تغییر رمز</a>
             {% if can_manage_counterparties %}
                 <a href="{% url 'counterparties_manage' %}" class="button-link">مدیریت طرف حساب</a>
             {% endif %}
@@ -242,7 +242,7 @@
                         <li class="system-message">{{ message }}</li>
                     {% endfor %}
                 </ul>
-                <div class="preview-hint">برای بستن پیام، روی صفحه کلیک کنید یا کلید Enter را بزنید.</div>
+                <div class="preview-hint">برای بستن پیام، روی صفحه کلیک کنید یا کلید ورود را بزنید.</div>
             </div>
         </div>
     {% endif %}
@@ -422,10 +422,10 @@
                                 {% with receipts=payment.receipts.all %}
                                     {% if receipts %}
                                         {% for receipt in receipts %}
-                                            <a href="{{ receipt.image.url }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                                            <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
                                         {% endfor %}
                                     {% elif payment.receipt_image %}
-                                        <a href="{{ payment.receipt_image.url }}" class="receipt-preview-link">مشاهده</a>
+                                        <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" class="receipt-preview-link">مشاهده</a>
                                     {% else %}
                                         -
                                     {% endif %}
@@ -434,7 +434,7 @@
                         </div>
 
                         <div class="detail-card">
-                            <strong>گراف تغییرات</strong>
+                            <strong>روند تغییرات</strong>
                             <ul class="timeline-list">
                                 {% for row in payment.timeline_lines %}
                                     <li>
@@ -488,7 +488,7 @@
         <div class="preview-box" id="previewBox">
             <img id="previewImage" class="preview-image" alt="پیش نمایش سند" style="display:none;">
             <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
-            <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید Enter را بزنید.</div>
+            <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید ورود را بزنید.</div>
         </div>
     </div>
 
@@ -620,13 +620,13 @@
             }
         }
 
-        async function openPreview(url) {
+        async function openPreview(url, fileName) {
             let isPdf = false;
             try {
-                const parsed = new URL(url, window.location.origin);
+                const parsed = new URL(fileName || url, window.location.origin);
                 isPdf = /\.pdf$/i.test(parsed.pathname || '');
             } catch (e) {
-                isPdf = /\.pdf(\?|#|$)/i.test((url || '').toLowerCase());
+                isPdf = /\.pdf(\?|#|$)/i.test((fileName || url || '').toLowerCase());
             }
             if (isPdf) {
                 try {
@@ -655,7 +655,7 @@
         document.querySelectorAll('.receipt-preview-link').forEach(function (link) {
             link.addEventListener('click', async function (event) {
                 event.preventDefault();
-                await openPreview(link.getAttribute('href'));
+                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'));
             });
         });
 

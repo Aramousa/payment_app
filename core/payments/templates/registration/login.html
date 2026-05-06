@@ -120,7 +120,7 @@
                 <div class="ad-box {% if not item.ad %}ad-hidden{% endif %}">
                     {% if item.ad %}
                         {% if item.ad.link_url %}<a href="{{ item.ad.link_url }}" target="_blank" rel="noopener">{% endif %}
-                        {% if item.ad.image %}<img class="ad-image" src="{{ item.ad.image.url }}" alt="{{ item.ad.title }}">{% endif %}
+                        {% if item.ad.image %}<img class="ad-image" src="{% url 'login_ad_image' item.ad.id %}" alt="{{ item.ad.title }}">{% endif %}
                         {% if item.ad.link_url %}</a>{% endif %}
                         <div class="ad-content">
                             <h3 class="ad-title">{{ item.ad.title }}</h3>
@@ -148,7 +148,7 @@
                 <div class="ad-box {% if not item.ad %}ad-hidden{% endif %}">
                     {% if item.ad %}
                         {% if item.ad.link_url %}<a href="{{ item.ad.link_url }}" target="_blank" rel="noopener">{% endif %}
-                        {% if item.ad.image %}<img class="ad-image" src="{{ item.ad.image.url }}" alt="{{ item.ad.title }}">{% endif %}
+                        {% if item.ad.image %}<img class="ad-image" src="{% url 'login_ad_image' item.ad.id %}" alt="{{ item.ad.title }}">{% endif %}
                         {% if item.ad.link_url %}</a>{% endif %}
                         <div class="ad-content">
                             <h3 class="ad-title">{{ item.ad.title }}</h3>

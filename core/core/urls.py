@@ -17,8 +17,6 @@ Including another URLconf
 from django.urls import include
 from django.contrib import admin
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
 from django.shortcuts import redirect
 
 def redirect_to_submit(request):
@@ -30,4 +28,3 @@ urlpatterns = [
     path('', include('payments.urls')),
     path('', redirect_to_submit),
 ]
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

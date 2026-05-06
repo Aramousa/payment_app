@@ -1,19 +1,39 @@
 from django.contrib import admin
+import jdatetime
+from django.utils import timezone
 
-from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
+from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
+
+
+def format_jalali_datetime(value):
+    if not value:
+        return '-'
+    if timezone.is_aware(value):
+        value = timezone.localtime(value)
+    return jdatetime.datetime.fromgregorian(datetime=value).strftime('%Y/%m/%d %H:%M')
 
 
 class PaymentReceiptInline(admin.TabularInline):
     model = PaymentReceipt
     extra = 0
-    readonly_fields = ('file_hash', 'created_at')
+    readonly_fields = ('file_hash', 'jalali_created_at')
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    jalali_created_at.short_description = 'تاریخ ثبت'
 
 
 class PaymentActivityInline(admin.TabularInline):
     model = PaymentActivityLog
     extra = 0
-    readonly_fields = ('actor', 'action', 'from_status', 'to_status', 'note', 'created_at')
+    readonly_fields = ('actor', 'action', 'from_status', 'to_status', 'note', 'jalali_created_at')
     can_delete = False
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    jalali_created_at.short_description = 'تاریخ ثبت'
 
 
 @admin.register(PaymentRecord)
@@ -49,6 +69,15 @@ class PaymentRecordAdmin(admin.ModelAdmin):
     )
     inlines = [PaymentReceiptInline, PaymentActivityInline]
 
+    def get_inline_instances(self, request, obj=None):
+        if not request.user.is_superuser:
+            return [
+                inline
+                for inline in super().get_inline_instances(request, obj)
+                if not isinstance(inline, PaymentActivityInline)
+            ]
+        return super().get_inline_instances(request, obj)
+
     def formatted_amount(self, obj):
         return '{:,}'.format(obj.amount)
 
@@ -57,13 +86,18 @@ class PaymentRecordAdmin(admin.ModelAdmin):
 
 @admin.register(LoginAdvertisement)
 class LoginAdvertisementAdmin(admin.ModelAdmin):
-    list_display = ('slot', 'title', 'start_date', 'end_date', 'is_visible', 'updated_at')
+    list_display = ('slot', 'title', 'start_date', 'end_date', 'is_visible', 'jalali_updated_at')
     list_filter = ('is_visible', 'start_date', 'end_date')
     search_fields = ('title', 'description', 'link_url')
     ordering = ('slot',)
 
     def has_module_permission(self, request):
         return request.user.is_superuser
+
+    def jalali_updated_at(self, obj):
+        return format_jalali_datetime(obj.updated_at)
+
+    jalali_updated_at.short_description = 'آخرین بروزرسانی'
 
     def has_view_permission(self, request, obj=None):
         return request.user.is_superuser
@@ -138,8 +172,17 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Counterparty)
 class CounterpartyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'created_at', 'updated_at')
+    list_display = ('name', 'description', 'jalali_created_at', 'jalali_updated_at')
     search_fields = ('name',)
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    def jalali_updated_at(self, obj):
+        return format_jalali_datetime(obj.updated_at)
+
+    jalali_created_at.short_description = 'تاریخ ثبت'
+    jalali_updated_at.short_description = 'آخرین بروزرسانی'
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -147,9 +190,14 @@ class CounterpartyAdmin(admin.ModelAdmin):
 
 @admin.register(PaymentActivityLog)
 class PaymentActivityLogAdmin(admin.ModelAdmin):
-    list_display = ('payment', 'actor', 'action', 'from_status', 'to_status', 'created_at')
+    list_display = ('payment', 'actor', 'action', 'from_status', 'to_status', 'jalali_created_at')
     list_filter = ('action', 'to_status', 'created_at')
     search_fields = ('payment__first_name', 'payment__last_name', 'note', 'actor__username')
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    jalali_created_at.short_description = 'تاریخ ثبت'
 
     def has_add_permission(self, request):
         return False
@@ -157,9 +205,52 @@ class PaymentActivityLogAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
 
 @admin.register(InvoiceRecord)
 class InvoiceRecordAdmin(admin.ModelAdmin):
-    list_display = ('reference_number', 'customer', 'amount', 'invoice_date', 'uploaded_by', 'customer_seen_at', 'created_at')
+    list_display = ('reference_number', 'customer', 'amount', 'invoice_date', 'uploaded_by', 'jalali_customer_seen_at', 'jalali_created_at')
     list_filter = ('invoice_date', 'created_at', 'customer_seen_at')
     search_fields = ('reference_number', 'customer__username', 'customer__first_name', 'customer__last_name', 'customer__profile__organization')
+
+    def jalali_customer_seen_at(self, obj):
+        return format_jalali_datetime(obj.customer_seen_at)
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    jalali_customer_seen_at.short_description = 'زمان مشاهده مشتری'
+    jalali_created_at.short_description = 'زمان ثبت'
+
+
+@admin.register(SystemActivityLog)
+class SystemActivityLogAdmin(admin.ModelAdmin):
+    list_display = ('jalali_created_at', 'actor', 'target_user', 'action', 'description')
+    list_filter = ('action', 'created_at')
+    search_fields = ('actor__username', 'target_user__username', 'description')
+    readonly_fields = ('actor', 'target_user', 'action', 'description', 'jalali_created_at')
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    jalali_created_at.short_description = 'زمان ثبت'
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser

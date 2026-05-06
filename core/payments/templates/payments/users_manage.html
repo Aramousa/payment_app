@@ -144,10 +144,9 @@
         </table>
     </div>
 
-    <!-- Password View Modal -->
     <div id="password-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
         <div style="background:#fff; border-radius:10px; padding:20px; max-width:400px; width:90%;">
-            <h3 style="margin-top:0;">رمز عبور کاربر</h3>
+            <h3 style="margin-top:0;">رمز عبور جدید</h3>
             <p id="password-modal-message"></p>
             <div style="display:flex; gap:8px; justify-content:flex-end;">
                 <button type="button" onclick="document.getElementById('password-modal').style.display='none'" style="background:#6c757d; color:#fff; border:none; border-radius:5px; padding:8px 16px; cursor:pointer;">بستن</button>
@@ -172,7 +171,6 @@
                 });
             }
 
-            // Password view button handler
             function getCookie(name) {
                 let cookieValue = null;
                 if (document.cookie && document.cookie !== '') {

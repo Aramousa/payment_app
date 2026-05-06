@@ -1,5 +1,6 @@
 {% load humanize %}
 {% load static %}
+{% load payment_dates %}
 <!DOCTYPE html>
 <html lang="fa">
 <head>
@@ -43,7 +44,6 @@
     <div class="top-bar">
         <h2>لیست مشتریان</h2>
         <div style="display: flex; gap: 8px; align-items: center;">
-            <a href="{% url 'users_manage' %}" class="back-link">بازگشت به لیست کاربران</a>
             <a href="{% url 'submit' %}" class="back-link">بازگشت به صفحه اصلی</a>
         </div>
     </div>
@@ -84,7 +84,7 @@
                         <td>{{ customer.total_amount|intcomma }}</td>
                         <td>
                             {% if customer.latest_payment_date %}
-                                {{ customer.latest_payment_date|date:"Y/m/d" }}
+                                {{ customer.latest_payment_date|jalali_date }}
                             {% else %}
                                 -
                             {% endif %}

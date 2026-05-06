@@ -1,23 +1,25 @@
 import jdatetime
+import mimetypes
 import random
 from openpyxl import Workbook
 from urllib.parse import urlencode
 
 from django.db.models import Q, Sum
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.conf import settings
 from django.contrib.sessions.models import Session
-from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
-from .models import Counterparty, InvoiceRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
+from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
@@ -104,6 +106,32 @@ def _can_manage_users(user):
     return bool(user and user.is_authenticated and user.is_superuser)
 
 
+def _can_access_payment(user, payment):
+    return _is_staff_user(user) or payment.user_id == user.id
+
+
+def _can_access_invoice(user, invoice):
+    if _is_staff_user(user):
+        return _can_view_invoices(user)
+    return invoice.customer_id == user.id
+
+
+def _file_response(field_file, as_attachment=False):
+    if not field_file:
+        raise Http404
+    try:
+        field_file.open('rb')
+    except FileNotFoundError as exc:
+        raise Http404 from exc
+    content_type, _ = mimetypes.guess_type(field_file.name)
+    return FileResponse(
+        field_file,
+        as_attachment=as_attachment,
+        filename=field_file.name.rsplit('/', 1)[-1],
+        content_type=content_type or 'application/octet-stream',
+    )
+
+
 def _suggest_five_digit_password():
     lower = 'abcdefghijklmnopqrstuvwxyz'
     upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -166,6 +194,14 @@ def _parse_jalali_date(date_text):
         return jdatetime.datetime.strptime(date_text, '%Y/%m/%d').date()
     except ValueError:
         return None
+
+
+def _format_jalali_datetime(value, date_format='%Y/%m/%d %H:%M'):
+    if not value:
+        return ''
+    if timezone.is_aware(value):
+        value = timezone.localtime(value)
+    return jdatetime.datetime.fromgregorian(datetime=value).strftime(date_format)
 
 
 def _log_activity(payment, actor, action, from_status='', to_status='', note=''):
@@ -248,7 +284,7 @@ def _enrich_records(records, staff_role='', is_system_admin=False):
         ]
         payment.timeline_lines = [
             {
-                'time': jdatetime.datetime.fromgregorian(datetime=log.created_at).strftime('%Y/%m/%d %H:%M') if log.created_at else '',
+                'time': _format_jalali_datetime(log.created_at),
                 'text': _log_text(log),
                 'note': log.note,
             }
@@ -611,6 +647,38 @@ def success(request):
 def profile_password_change(request):
     profile = getattr(request.user, 'profile', None)
     is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
+    show_initial_password_change_note = bool(
+        is_force_change and request.session.get('show_initial_password_change_note')
+    )
+
+
+def _log_system_activity(actor, target_user, action, description=''):
+    SystemActivityLog.objects.create(
+        actor=actor if actor and actor.is_authenticated else None,
+        target_user=target_user,
+        action=action,
+        description=description,
+    )
+
+
+def _send_temporary_password_email(user, temp_password):
+    if not user.email:
+        return False, 'برای این کاربر ایمیل ثبت نشده است.'
+
+    subject = 'رمز عبور جدید سامانه'
+    message = (
+        f'{user.get_full_name() or user.username} عزیز،\n\n'
+        f'رمز عبور جدید شما در سامانه: {temp_password}\n\n'
+        'پس از ورود، لازم است رمز عبور خود را تغییر دهید.'
+    )
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
+    return True, ''
 
     if request.method == 'POST':
         form = CustomPasswordChangeForm(request.user, request.POST)
@@ -620,15 +688,17 @@ def profile_password_change(request):
             if profile and profile.role == 'customer' and profile.force_password_change:
                 profile.force_password_change = False
                 profile.save(update_fields=['force_password_change'])
+            request.session.pop('show_initial_password_change_note', None)
             messages.success(request, 'رمز عبور با موفقیت تغییر کرد.')
             return redirect('submit')
         messages.error(request, 'تغییر رمز انجام نشد. لطفا خطاها را بررسی کنید.')
     else:
-        form = PasswordChangeForm(request.user)
+        form = CustomPasswordChangeForm(request.user)
 
     return render(request, 'payments/profile_password_change.html', {
         'form': form,
         'is_force_change': is_force_change,
+        'show_initial_password_change_note': show_initial_password_change_note,
         'username': request.user.username,
     })
 
@@ -637,6 +707,7 @@ def profile_password_change(request):
 def profile_password_cancel(request):
     profile = getattr(request.user, 'profile', None)
     is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
+    request.session.pop('show_initial_password_change_note', None)
     if is_force_change:
         auth_logout(request)
         return redirect('login')
@@ -768,7 +839,7 @@ def payment_timeline(request, payment_id):
     logs = [
         {
             'log': log,
-            'jalali_time': jdatetime.datetime.fromgregorian(datetime=log.created_at).strftime('%Y/%m/%d %H:%M') if log.created_at else '',
+            'jalali_time': _format_jalali_datetime(log.created_at),
         }
         for log in raw_logs
     ]
@@ -820,7 +891,13 @@ def users_manage(request):
     if request.method == 'POST':
         form = UserAccountManagementForm(request.POST, password_suggestion=password_suggestion)
         if form.is_valid():
-            form.save()
+            created_user = form.save()
+            _log_system_activity(
+                request.user,
+                created_user,
+                SystemActivityLog.ACTION_USER_CREATED,
+                'کاربر جدید ایجاد شد.',
+            )
             messages.success(request, 'کاربر جدید با موفقیت ایجاد شد.')
             return redirect('users_manage')
     else:
@@ -853,6 +930,12 @@ def user_edit(request, user_id):
         )
         if form.is_valid():
             form.save()
+            _log_system_activity(
+                request.user,
+                managed_user,
+                SystemActivityLog.ACTION_USER_UPDATED,
+                'اطلاعات کاربر ویرایش شد.',
+            )
             messages.success(request, 'اطلاعات کاربر با موفقیت بروزرسانی شد.')
             return redirect('users_manage')
     else:
@@ -944,6 +1027,38 @@ def invoice_detail(request, invoice_id):
     })
 
 
+@login_required
+def invoice_file(request, invoice_id):
+    invoice = get_object_or_404(InvoiceRecord, id=invoice_id)
+    if not _can_access_invoice(request.user, invoice):
+        return HttpResponseForbidden('فقط امکان مشاهده فایل فاکتورهای خودتان وجود دارد.')
+    return _file_response(invoice.attachment, as_attachment=request.GET.get('download') == '1')
+
+
+@login_required
+def receipt_file(request, receipt_id):
+    receipt = get_object_or_404(PaymentReceipt.objects.select_related('payment'), id=receipt_id)
+    if not _can_access_payment(request.user, receipt.payment):
+        return HttpResponseForbidden('فقط امکان مشاهده فایل فیش‌های خودتان وجود دارد.')
+    return _file_response(receipt.image)
+
+
+@login_required
+def legacy_payment_receipt_file(request, payment_id):
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    if not _can_access_payment(request.user, payment):
+        return HttpResponseForbidden('فقط امکان مشاهده فایل فیش‌های خودتان وجود دارد.')
+    return _file_response(payment.receipt_image)
+
+
+def login_ad_image(request, ad_id):
+    ad = get_object_or_404(LoginAdvertisement, id=ad_id, is_visible=True)
+    today = timezone.localdate()
+    if ad.start_date > today or ad.end_date < today:
+        raise Http404
+    return _file_response(ad.image)
+
+
 
 
 @login_required
@@ -1007,7 +1122,7 @@ def export_records(request):
             str(payment.pay_date),
             payment.tracking_code or '',
             payment.counterparty.name if payment.counterparty else '',
-            payment.created_at.strftime('%Y-%m-%d %H:%M:%S') if payment.created_at else '',
+            _format_jalali_datetime(payment.created_at),
         ])
 
     wb.save(response)
@@ -1113,6 +1228,7 @@ def customers_list(request):
     return render(request, 'payments/customers_list.html', {
         'customer_data': customer_data,
         'is_staff_user': is_staff_user,
+        'can_manage_users': _can_manage_users(request.user),
         'user_display_name': user_display_name,
     })
 
@@ -1129,6 +1245,21 @@ def reset_user_password(request, user_id):
 
     target_user = get_object_or_404(User, id=user_id)
     temp_password = _suggest_five_digit_password()
+
+    from django.http import JsonResponse
+
+    email_sent = False
+    email_note = 'برای این کاربر ایمیل ثبت نشده است؛ رمز جدید فقط به مدیر سیستم نمایش داده شد.'
+    if target_user.email:
+        try:
+            email_sent, email_error = _send_temporary_password_email(target_user, temp_password)
+            if email_sent:
+                email_note = f'رمز جدید به ایمیل {target_user.email} ارسال شد.'
+            else:
+                email_note = email_error
+        except Exception:
+            email_note = 'ارسال ایمیل انجام نشد؛ رمز جدید فقط به مدیر سیستم نمایش داده شد.'
+
     target_user.set_password(temp_password)
     target_user.save()
 
@@ -1143,23 +1274,25 @@ def reset_user_password(request, user_id):
         profile.force_password_change = True
         profile.save(update_fields=['force_password_change'])
 
-    from django.contrib.admin.models import LogEntry, CHANGE
-    from django.contrib.contenttypes.models import ContentType
-    from django.http import JsonResponse
-
-    LogEntry.objects.create(
-        user_id=request.user.id,
-        content_type=ContentType.objects.get_for_model(target_user),
-        object_id=target_user.id,
-        object_repr=str(target_user),
-        action_flag=CHANGE,
-        change_message=f'ریست رمز عبور برای کاربر {target_user.username} به رمز موقت {temp_password}',
+    _log_system_activity(
+        request.user,
+        target_user,
+        SystemActivityLog.ACTION_PASSWORD_RESET,
+        f'رمز عبور کاربر ریست شد. {email_note} کاربر ملزم به تغییر رمز در ورود بعدی شد.',
     )
+
+    message = 'رمز عبور کاربر با موفقیت ریست شد. این رمز فقط همین لحظه نمایش داده می‌شود.'
+    if email_sent:
+        message = 'رمز عبور کاربر با موفقیت ریست شد و به ایمیل کاربر ارسال شد. این رمز فقط همین لحظه نمایش داده می‌شود.'
+    elif not target_user.email:
+        message = 'رمز عبور کاربر با موفقیت ریست شد. برای این کاربر ایمیل ثبت نشده است؛ رمز را همین حالا به کاربر اطلاع دهید.'
+    else:
+        message = 'رمز عبور کاربر با موفقیت ریست شد. ارسال ایمیل انجام نشد؛ رمز را همین حالا به کاربر اطلاع دهید.'
 
     return JsonResponse({
         'success': True,
         'temp_password': temp_password,
-        'message': 'رمز عبور کاربر با موفقیت ریست شد. لطفا رمز موقت را به کاربر اطلاع دهید.',
+        'message': message,
     })
 
 

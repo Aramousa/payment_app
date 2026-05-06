@@ -17,16 +17,41 @@ STAFF_ROLES = {'staff', 'finance', 'commercial'}
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):
+    error_messages = {
+        **PasswordChangeForm.error_messages,
+        'password_incorrect': 'رمز عبور فعلی اشتباه وارد شده است. لطفاً دوباره وارد کنید.',
+        'password_mismatch': 'رمز عبور جدید و تکرار آن یکسان نیستند.',
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['old_password'].label = 'رمز عبور فعلی'
+        self.fields['new_password1'].label = 'رمز عبور جدید'
+        self.fields['new_password2'].label = 'تکرار رمز عبور جدید'
+        self.fields['new_password1'].help_text = mark_safe(
+            'رمز عبور باید حداقل ۵ کاراکتر باشد، فقط شامل حروف انگلیسی و عدد باشد، '
+            'و از حداقل دو نوع کاراکتر شامل حرف کوچک، حرف بزرگ یا عدد تشکیل شود.'
+            '<br>نمونه صحیح: Ab123، ali12، Test5'
+            '<br>نمونه غلط: 1234، abcde، رمز۱۲۳، ab@12'
+        )
+        self.fields['new_password2'].help_text = 'برای اطمینان، رمز عبور جدید را دوباره وارد کنید.'
+        for field in self.fields.values():
+            field.error_messages['required'] = 'تکمیل این فیلد الزامی است.'
+
     def clean_new_password1(self):
-        password = super().clean_new_password1()
+        password = self.cleaned_data.get('new_password1') or ''
         if len(password) < 5:
-            raise ValidationError('کلمه عبور باید حداقل 5 کاراکتر باشد.')
+            raise ValidationError('رمز عبور باید حداقل ۵ کاراکتر باشد.')
         if not re.match(r'^[A-Za-z0-9]+$', password):
-            raise ValidationError('کلمه عبور باید فقط شامل حروف انگلیسی و اعداد باشد.')
+            raise ValidationError('رمز عبور باید فقط شامل حروف انگلیسی و اعداد باشد.')
         categories = sum(bool(re.search(pattern, password)) for pattern in [r'[a-z]', r'[A-Z]', r'[0-9]'])
         if categories < 2:
-            raise ValidationError('کلمه عبور باید ترکیبی از حداقل دو حالت از حروف کوچک، حروف بزرگ و اعداد باشد.')
+            raise ValidationError('رمز عبور باید ترکیبی از حداقل دو حالت از حروف کوچک، حروف بزرگ و اعداد باشد.')
         return password
+
+    def clean(self):
+        self.validate_passwords('new_password1', 'new_password2')
+        return forms.Form.clean(self)
 
 
 class MultiFileInput(forms.ClearableFileInput):
@@ -78,7 +103,7 @@ class PaymentRecordForm(forms.ModelForm):
             'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
         }),
         label='فایل های فیش',
-        help_text='فقط فایل های تصویر استاندارد و PDF مجاز است. حداکثر حجم هر فایل: 1 مگابایت.',
+        help_text='فقط فایل های تصویر استاندارد و PDF مجاز است. حداکثر حجم هر فایل: ۱ مگابایت.',
     )
 
     pay_date = jDateField(
@@ -172,7 +197,7 @@ class PaymentRecordForm(forms.ModelForm):
             if ext not in self.ALLOWED_EXTENSIONS:
                 raise ValidationError('فرمت فایل مجاز نیست. فقط تصویرهای استاندارد و PDF پذیرفته می شود.')
             if uploaded.size and uploaded.size > self.MAX_UPLOAD_SIZE:
-                raise ValidationError('حجم هر فایل باید حداکثر 1 مگابایت باشد.')
+                raise ValidationError('حجم هر فایل باید حداکثر ۱ مگابایت باشد.')
 
             digest = hashlib.sha256()
             for chunk in uploaded.chunks():
@@ -322,7 +347,7 @@ class InvoiceUploadForm(forms.ModelForm):
         if ext not in self.ALLOWED_EXTENSIONS:
             raise ValidationError('فقط فایل های تصویری استاندارد و PDF مجاز است.')
         if uploaded.size and uploaded.size > self.MAX_UPLOAD_SIZE:
-            raise ValidationError('حجم فایل باید حداکثر 5 مگابایت باشد.')
+            raise ValidationError('حجم فایل باید حداکثر ۵ مگابایت باشد.')
         return uploaded
 
 
@@ -360,6 +385,7 @@ class UserAccountManagementForm(forms.Form):
     city = forms.CharField(label='شهر', max_length=50, required=True)
     address = forms.CharField(label='آدرس', required=False, widget=forms.Textarea(attrs={'rows': 2}))
     organization = forms.CharField(label='نام مجموعه', max_length=100, required=True)
+    email = forms.EmailField(label='ایمیل', required=False)
     password = forms.CharField(label='کلمه عبور', required=True, widget=forms.TextInput(attrs={'dir': 'ltr', 'inputmode': 'latin'}))
     role = forms.ChoiceField(label='نقش', choices=ROLE_CHOICES)
     active_from = jDateField(
@@ -396,6 +422,7 @@ class UserAccountManagementForm(forms.Form):
                 'city': getattr(profile, 'city', ''),
                 'address': getattr(profile, 'address', ''),
                 'organization': getattr(profile, 'organization', ''),
+                'email': self.instance.email,
                 'role': getattr(profile, 'role', 'customer'),
                 'active_from': getattr(profile, 'active_from', None),
                 'valid_until': getattr(profile, 'valid_until', None),
@@ -482,7 +509,7 @@ class UserAccountManagementForm(forms.Form):
             raise ValidationError('کلمه عبور الزامی است.')
         if password:
             if len(password) < 5:
-                raise ValidationError('کلمه عبور باید حداقل 5 کاراکتر باشد.')
+                raise ValidationError('کلمه عبور باید حداقل ۵ کاراکتر باشد.')
             if not re.match(r'^[A-Za-z0-9]+$', password):
                 raise ValidationError('کلمه عبور باید فقط شامل حروف انگلیسی و اعداد باشد.')
             categories = sum(bool(re.search(pattern, password)) for pattern in [r'[a-z]', r'[A-Z]', r'[0-9]'])
@@ -495,6 +522,7 @@ class UserAccountManagementForm(forms.Form):
         # username باید برابر mobile باشد
         mobile = (self.cleaned_data.get('mobile') or '').strip()
         instance.username = mobile
+        instance.email = self.cleaned_data.get('email', '').strip()
         instance.first_name = self.cleaned_data.get('first_name', '').strip()
         instance.last_name = self.cleaned_data.get('last_name', '').strip()
         instance.is_active = self.cleaned_data.get('is_active', False)
