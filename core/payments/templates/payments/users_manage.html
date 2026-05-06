@@ -30,9 +30,15 @@
         th { background: #0d6efd; color: #fff; }
         .edit-link { background: #fd7e14; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; }
         .cancel-link { background: #6c757d; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; }
-        .flash-list { margin: 0; padding-right: 18px; }
-        .flash-success { color: #1b5e20; }
-        .flash-error { color: #c62828; }
+        .system-message-list { margin: 0; padding-right: 18px; }
+        .system-message { color: #c62828; }
+        .system-popup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+        .system-popup-overlay.open { display: flex; }
+        .system-popup-box { background: #fff; border-radius: 10px; max-width: 560px; width: 100%; max-height: 90vh; overflow: auto; padding: 18px; box-shadow: 0 20px 45px rgba(0,0,0,.25); }
+        .system-popup-box h3 { margin-top: 0; font-size: 18px; }
+        .system-popup-list { margin: 0; padding-right: 18px; list-style: none; }
+        .system-popup-item { color: #c62828; font-weight: 700; margin-bottom: 10px; }
+        .system-popup-help { color: #5f6b7a; font-size: 12px; margin-top: 10px; }
         @media (max-width: 980px) {
             .form-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
         }
@@ -54,13 +60,18 @@
     </div>
 
     {% if messages %}
-        <div class="section">
-            <ul class="flash-list">
-                {% for message in messages %}
-                    <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
-                {% endfor %}
-            </ul>
+        <div id="systemPopup" class="system-popup-overlay open" tabindex="-1" onclick="this.classList.remove('open')">
+            <div class="system-popup-box" onclick="event.stopPropagation()">
+                <h3>پیام سیستم</h3>
+                <ul class="system-popup-list">
+                    {% for message in messages %}
+                        <li class="system-popup-item">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+                <div class="system-popup-help">برای بستن پیام، روی پشت‌زمینه کلیک کنید یا Esc بزنید.</div>
+            </div>
         </div>
+        <script>document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ var el=document.getElementById('systemPopup'); if(el){ el.classList.remove('open'); } }});</script>
     {% endif %}
 
     <div class="section">
@@ -119,13 +130,29 @@
                         <td>{{ item.profile.active_from|default:'-' }}</td>
                         <td>{{ item.profile.valid_until|default:'-' }}</td>
                         <td>{% if item.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
-                        <td><a href="{% url 'user_edit' item.id %}" class="edit-link">ویرایش</a></td>
+                        <td>
+                            <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:center;">
+                                <button type="button" class="reset-password-btn" data-user-id="{{ item.id }}" data-username="{{ item.username }}" style="background:#198754; color:#fff; border:none; border-radius:4px; padding:4px 8px; cursor:pointer; font-size:11px;">🔄</button>
+                                <a href="{% url 'user_edit' item.id %}" class="edit-link">ویرایش</a>
+                            </div>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="11">کاربری ثبت نشده است.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+
+    <!-- Password View Modal -->
+    <div id="password-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:10px; padding:20px; max-width:400px; width:90%;">
+            <h3 style="margin-top:0;">رمز عبور کاربر</h3>
+            <p id="password-modal-message"></p>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button type="button" onclick="document.getElementById('password-modal').style.display='none'" style="background:#6c757d; color:#fff; border:none; border-radius:5px; padding:8px 16px; cursor:pointer;">بستن</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -144,6 +171,57 @@
                     passwordInput.value = suggestedPassword.textContent.trim();
                 });
             }
+
+            // Password view button handler
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            const csrfToken = getCookie('csrftoken') || '{{ csrf_token }}';
+            $.ajaxSetup({
+                beforeSend: function(xhr, settings) {
+                    if (!/^https?:\/\//.test(settings.url)) {
+                        xhr.setRequestHeader('X-CSRFToken', csrfToken);
+                    }
+                }
+            });
+
+            $('.reset-password-btn').on('click', function() {
+                const userId = $(this).data('user-id');
+                const username = $(this).data('username');
+
+                if (confirm('آیا مطمئن هستید که می‌خواهید رمز عبور کاربر «' + username + '» ریست شود؟ کاربر پس از ورود باید رمز را تغییر دهد.')) {
+                    $.ajax({
+                        url: '/users/reset-password/' + userId + '/',
+                        method: 'POST',
+                        dataType: 'json',
+                        success: function(response) {
+                            document.getElementById('password-modal-message').textContent = response.message + '\nرمز موقت: ' + response.temp_password;
+                            document.getElementById('password-modal').style.display = 'flex';
+                        },
+                        error: function(xhr) {
+                            let errMsg = 'خطا در ثبت درخواست. لطفا مجدد تلاش کنید.';
+                            if (xhr.responseJSON && xhr.responseJSON.detail) {
+                                errMsg = xhr.responseJSON.detail;
+                            } else if (xhr.responseText) {
+                                errMsg += '\n' + xhr.responseText;
+                            }
+                            alert(errMsg);
+                        }
+                    });
+                }
+            });
         });
     </script>
 </body>

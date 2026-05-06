@@ -1,7 +1,10 @@
 import hashlib
 import os
+import random
+import re
 
 from django import forms
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -9,6 +12,21 @@ from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 
 from .models import Counterparty, InvoiceRecord, PaymentRecord, UserProfile
+
+STAFF_ROLES = {'staff', 'finance', 'commercial'}
+
+
+class CustomPasswordChangeForm(PasswordChangeForm):
+    def clean_new_password1(self):
+        password = super().clean_new_password1()
+        if len(password) < 5:
+            raise ValidationError('کلمه عبور باید حداقل 5 کاراکتر باشد.')
+        if not re.match(r'^[A-Za-z0-9]+$', password):
+            raise ValidationError('کلمه عبور باید فقط شامل حروف انگلیسی و اعداد باشد.')
+        categories = sum(bool(re.search(pattern, password)) for pattern in [r'[a-z]', r'[A-Z]', r'[0-9]'])
+        if categories < 2:
+            raise ValidationError('کلمه عبور باید ترکیبی از حداقل دو حالت از حروف کوچک، حروف بزرگ و اعداد باشد.')
+        return password
 
 
 class MultiFileInput(forms.ClearableFileInput):
@@ -229,9 +247,10 @@ class InvoiceUploadForm(forms.ModelForm):
 
     class Meta:
         model = InvoiceRecord
-        fields = ['customer', 'invoice_date', 'amount', 'reference_number', 'attachment', 'customer_visible_note', 'internal_note']
+        fields = ['customer', 'invoice_date', 'invoice_number', 'amount', 'reference_number', 'attachment', 'customer_visible_note', 'internal_note']
         widgets = {
-            'reference_number': forms.TextInput(attrs={'dir': 'ltr'}),
+            'invoice_number': forms.TextInput(attrs={'dir': 'ltr', 'placeholder': 'شماره فاکتور از سیستم حسابداری'}),
+            'reference_number': forms.TextInput(attrs={'dir': 'ltr', 'placeholder': 'اختیاری'}),
             'attachment': forms.ClearableFileInput(attrs={
                 'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
             }),
@@ -240,6 +259,7 @@ class InvoiceUploadForm(forms.ModelForm):
         }
         labels = {
             'invoice_date': 'تاریخ فاکتور',
+            'invoice_number': 'شماره فاکتور',
             'amount': 'مبلغ (ریال)',
             'reference_number': 'شماره حواله',
             'attachment': 'تصویر یا فایل PDF',
@@ -253,6 +273,8 @@ class InvoiceUploadForm(forms.ModelForm):
             'user__first_name', 'user__last_name', 'user__username'
         )
         self.fields['customer'].label_from_instance = self._customer_label
+        self.fields['invoice_number'].required = True
+        self.fields['reference_number'].required = False
         for name, field in self.fields.items():
             if field.required:
                 field.label = mark_safe(f'{field.label} <span style="color:#d00;">*</span>')
@@ -281,6 +303,16 @@ class InvoiceUploadForm(forms.ModelForm):
         if amount <= 0:
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت باشد.')
         return amount
+
+    def clean_invoice_number(self):
+        invoice_number = (self.cleaned_data.get('invoice_number') or '').strip()
+        if not invoice_number:
+            raise ValidationError('شماره فاکتور الزامی است.')
+        return invoice_number
+
+    def clean_reference_number(self):
+        # Reference number is optional, return empty string if not provided
+        return (self.cleaned_data.get('reference_number') or '').strip()
 
     def clean_attachment(self):
         uploaded = self.cleaned_data.get('attachment')
@@ -320,7 +352,6 @@ class UserAccountManagementForm(forms.Form):
         ('finance', 'مالی'),
     )
 
-    username = forms.CharField(label='نام کاربر', max_length=150)
     first_name = forms.CharField(label='نام', max_length=50, required=True)
     last_name = forms.CharField(label='نام خانوادگی', max_length=50, required=True)
     phone = forms.CharField(label='شماره تماس', max_length=20, required=False)
@@ -329,7 +360,7 @@ class UserAccountManagementForm(forms.Form):
     city = forms.CharField(label='شهر', max_length=50, required=True)
     address = forms.CharField(label='آدرس', required=False, widget=forms.Textarea(attrs={'rows': 2}))
     organization = forms.CharField(label='نام مجموعه', max_length=100, required=True)
-    password = forms.CharField(label='کلمه عبور', required=True, widget=forms.TextInput(attrs={'dir': 'ltr', 'inputmode': 'numeric'}))
+    password = forms.CharField(label='کلمه عبور', required=True, widget=forms.TextInput(attrs={'dir': 'ltr', 'inputmode': 'latin'}))
     role = forms.ChoiceField(label='نقش', choices=ROLE_CHOICES)
     active_from = jDateField(
         label='تاریخ آغاز فعالیت',
@@ -345,6 +376,8 @@ class UserAccountManagementForm(forms.Form):
     )
     force_password_change = forms.BooleanField(label='الزام تغییر رمز در ورود بعدی', required=False)
     suspended = forms.BooleanField(label='معلق', required=False, initial=False)
+    can_view_invoices = forms.BooleanField(label='دسترسی مشاهده فاکتورها', required=False)
+    can_upload_invoices = forms.BooleanField(label='دسترسی بارگذاری فاکتورها', required=False)
     is_active = forms.BooleanField(label='فعال', required=False, initial=True)
 
     def __init__(self, *args, **kwargs):
@@ -355,10 +388,8 @@ class UserAccountManagementForm(forms.Form):
         if self.instance and not self.is_bound:
             profile = getattr(self.instance, 'profile', None)
             self.initial.update({
-                'username': self.instance.username,
                 'first_name': self.instance.first_name,
                 'last_name': self.instance.last_name,
-                'is_active': self.instance.is_active,
                 'phone': getattr(profile, 'phone', ''),
                 'mobile': getattr(profile, 'mobile', ''),
                 'province': getattr(profile, 'province', ''),
@@ -370,6 +401,8 @@ class UserAccountManagementForm(forms.Form):
                 'valid_until': getattr(profile, 'valid_until', None),
                 'force_password_change': getattr(profile, 'force_password_change', False),
                 'suspended': getattr(profile, 'suspended', False),
+                'can_view_invoices': getattr(profile, 'can_view_invoices', False),
+                'can_upload_invoices': getattr(profile, 'can_upload_invoices', False),
             })
 
         for name, field in self.fields.items():
@@ -377,17 +410,6 @@ class UserAccountManagementForm(forms.Form):
                 continue
             if field.required:
                 field.label = mark_safe(f'{field.label} <span style="color:#d00;">*</span>')
-
-    def clean_username(self):
-        username = (self.cleaned_data.get('username') or '').strip()
-        if not username:
-            raise ValidationError('نام کاربر الزامی است.')
-        qs = User.objects.filter(username=username)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise ValidationError('این نام کاربری قبلا ثبت شده است.')
-        return username
 
     def clean(self):
         cleaned_data = super().clean()
@@ -432,23 +454,25 @@ class UserAccountManagementForm(forms.Form):
         if not password and not self.instance:
             self.add_error('password', 'کلمه عبور الزامی است.')
 
-        # For customers, check for duplicate mobile/phone
-        if role == 'customer' and (mobile or phone):
-            # Check for existing customer with same mobile
-            if mobile:
-                existing_by_mobile = UserProfile.objects.filter(mobile=mobile, role='customer')
-                if self.instance:
-                    existing_by_mobile = existing_by_mobile.exclude(user=self.instance)
-                if existing_by_mobile.exists():
-                    raise ValidationError('مشتری دیگری با این شماره همراه ثبت شده است.')
+        # username باید برابر mobile باشد
+        cleaned_data['username'] = mobile
 
-            # Check for existing customer with same phone
-            if phone:
-                existing_by_phone = UserProfile.objects.filter(phone=phone, role='customer')
-                if self.instance:
-                    existing_by_phone = existing_by_phone.exclude(user=self.instance)
-                if existing_by_phone.exists():
-                    raise ValidationError('مشتری دیگری با این شماره تماس ثبت شده است.')
+        # Check if mobile is unique across all users
+        if mobile:
+            existing_by_mobile = User.objects.filter(username=mobile)
+            if self.instance:
+                existing_by_mobile = existing_by_mobile.exclude(pk=self.instance.pk)
+            if existing_by_mobile.exists():
+                raise ValidationError('این شماره موبایل قبلاً برای کاربری دیگر ثبت شده است.')
+
+        # For customers, check for duplicate phone
+        if role == 'customer' and phone:
+
+            existing_by_phone = UserProfile.objects.filter(phone=phone, role='customer')
+            if self.instance:
+                existing_by_phone = existing_by_phone.exclude(user=self.instance)
+            if existing_by_phone.exists():
+                raise ValidationError('مشتری دیگری با این شماره تماس ثبت شده است.')
 
         return cleaned_data
 
@@ -456,16 +480,26 @@ class UserAccountManagementForm(forms.Form):
         password = (self.cleaned_data.get('password') or '').strip()
         if not password and not self.instance:
             raise ValidationError('کلمه عبور الزامی است.')
-        if password and (not password.isdigit() or len(password) != 5):
-            raise ValidationError('کلمه عبور باید یک عدد 5 رقمی باشد.')
+        if password:
+            if len(password) < 5:
+                raise ValidationError('کلمه عبور باید حداقل 5 کاراکتر باشد.')
+            if not re.match(r'^[A-Za-z0-9]+$', password):
+                raise ValidationError('کلمه عبور باید فقط شامل حروف انگلیسی و اعداد باشد.')
+            categories = sum(bool(re.search(pattern, password)) for pattern in [r'[a-z]', r'[A-Z]', r'[0-9]'])
+            if categories < 2:
+                raise ValidationError('کلمه عبور باید ترکیبی از حداقل دو حالت از حروف کوچک، حروف بزرگ و اعداد باشد.')
         return password
 
     def save(self):
         instance = self.instance or User()
-        instance.username = self.cleaned_data['username']
+        # username باید برابر mobile باشد
+        mobile = (self.cleaned_data.get('mobile') or '').strip()
+        instance.username = mobile
         instance.first_name = self.cleaned_data.get('first_name', '').strip()
         instance.last_name = self.cleaned_data.get('last_name', '').strip()
         instance.is_active = self.cleaned_data.get('is_active', False)
+        role = self.cleaned_data.get('role')
+        instance.is_staff = instance.is_superuser or role in STAFF_ROLES
         password = self.cleaned_data.get('password', '').strip()
         if password:
             instance.set_password(password)
@@ -485,5 +519,7 @@ class UserAccountManagementForm(forms.Form):
         profile.valid_until = self.cleaned_data.get('valid_until')
         profile.force_password_change = self.cleaned_data.get('force_password_change', False)
         profile.suspended = self.cleaned_data.get('suspended', False)
+        profile.can_view_invoices = self.cleaned_data.get('can_view_invoices', False)
+        profile.can_upload_invoices = self.cleaned_data.get('can_upload_invoices', False)
         profile.save()
         return instance

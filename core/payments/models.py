@@ -1,4 +1,4 @@
-﻿from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
 from django_jalali.db import models as jmodels
@@ -175,6 +175,8 @@ class UserProfile(models.Model):
     valid_until = jmodels.jDateField('تاریخ اعتبار', null=True, blank=True)
     force_password_change = models.BooleanField('الزام تعویض رمز', default=True)
     suspended = models.BooleanField('معلق', default=False)
+    can_view_invoices = models.BooleanField('دسترسی مشاهده فاکتورها', default=False)
+    can_upload_invoices = models.BooleanField('دسترسی بارگذاری فاکتورها', default=False)
 
     def __str__(self):
         return self.user.username
@@ -197,12 +199,14 @@ class PaymentActivityLog(models.Model):
     ACTION_EDITED = 'edited'
     ACTION_STATUS_CHANGED = 'status_changed'
     ACTION_VIEWED = 'viewed'
+    ACTION_PASSWORD_VIEWED = 'password_viewed'
 
     ACTION_CHOICES = [
         (ACTION_CREATED, 'ایجاد'),
         (ACTION_EDITED, 'ویرایش'),
         (ACTION_STATUS_CHANGED, 'تغییر وضعیت'),
         (ACTION_VIEWED, 'رویت'),
+        (ACTION_PASSWORD_VIEWED, 'مشاهده رمز عبور'),
     ]
 
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')
@@ -228,7 +232,8 @@ class InvoiceRecord(models.Model):
     )
     amount = models.BigIntegerField('مبلغ')
     invoice_date = jmodels.jDateField('تاریخ فاکتور')
-    reference_number = models.CharField('شماره حواله', max_length=80)
+    invoice_number = models.CharField('شماره فاکتور', max_length=80, blank=False)
+    reference_number = models.CharField('شماره حواله', max_length=80, blank=True)
     attachment = models.FileField('فایل فاکتور', upload_to='invoices/')
     customer_visible_note = models.TextField('توضیحات قابل مشاهده برای مشتری', blank=True)
     internal_note = models.TextField('توضیحات داخلی', blank=True)
@@ -244,7 +249,7 @@ class InvoiceRecord(models.Model):
         verbose_name_plural = 'فاکتورهای مشتری'
 
     def __str__(self):
-        return f"فاکتور {self.reference_number} - {self.customer.username}"
+        return f"فاکتور {self.invoice_number} - {self.customer.username}"
 
     @property
     def is_seen_by_customer(self):

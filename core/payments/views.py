@@ -1,21 +1,22 @@
-﻿import jdatetime
+import jdatetime
 import random
 from openpyxl import Workbook
 from urllib.parse import urlencode
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.models import User
+from django.contrib.sessions.models import Session
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import CounterpartyForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .forms import CounterpartyForm, CustomPasswordChangeForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .models import Counterparty, InvoiceRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
 
 
@@ -81,9 +82,22 @@ def _is_staff_user(user):
         return False
 
 
-def _can_manage_invoices(user):
-    role = _user_role(user)
-    return user.is_superuser or role in {'commercial', 'staff'}
+def _can_upload_invoices(user):
+    if user.is_superuser:
+        return True
+    try:
+        return user.profile.can_upload_invoices
+    except UserProfile.DoesNotExist:
+        return False
+
+
+def _can_view_invoices(user):
+    if user.is_superuser:
+        return True
+    try:
+        return user.profile.can_view_invoices
+    except UserProfile.DoesNotExist:
+        return False
 
 
 def _can_manage_users(user):
@@ -91,7 +105,21 @@ def _can_manage_users(user):
 
 
 def _suggest_five_digit_password():
-    return str(random.randint(10000, 99999))
+    lower = 'abcdefghijklmnopqrstuvwxyz'
+    upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    digits = '0123456789'
+    all_chars = lower + upper + digits
+
+    categories = [lower, upper, digits]
+    selected = []
+    # ensure at least two categories are represented
+    chosen_categories = random.sample(categories, 2)
+    for category in chosen_categories:
+        selected.append(random.choice(category))
+    while len(selected) < 5:
+        selected.append(random.choice(all_chars))
+    random.shuffle(selected)
+    return ''.join(selected)
 
 
 def _staff_status_choices_for_role(role):
@@ -220,7 +248,7 @@ def _enrich_records(records, staff_role='', is_system_admin=False):
         ]
         payment.timeline_lines = [
             {
-                'time': log.created_at,
+                'time': jdatetime.datetime.fromgregorian(datetime=log.created_at).strftime('%Y/%m/%d %H:%M') if log.created_at else '',
                 'text': _log_text(log),
                 'note': log.note,
             }
@@ -439,7 +467,11 @@ def _destination_profiles_for_user(user):
 def _invoice_records_for_user(user):
     qs = InvoiceRecord.objects.select_related('customer', 'customer__profile', 'uploaded_by')
     if _is_staff_user(user):
+        # Staff can see all invoices only if they have permission
+        if not _can_view_invoices(user):
+            return InvoiceRecord.objects.none()
         return qs.order_by('-created_at', '-id')
+    # Customers can always see their own invoices
     return qs.filter(customer=user).order_by('-created_at', '-id')
 
 
@@ -472,6 +504,7 @@ def _managed_users():
 def _apply_invoice_filters(records, request, is_staff_user):
     filters = {
         'customer': (request.GET.get('customer') or '').strip(),
+        'invoice_number': (request.GET.get('invoice_number') or '').strip(),
         'reference_number': (request.GET.get('reference_number') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
         'invoice_date': (request.GET.get('invoice_date') or '').strip(),
@@ -485,6 +518,9 @@ def _apply_invoice_filters(records, request, is_staff_user):
             Q(customer__username__icontains=filters['customer']) |
             Q(customer__profile__organization__icontains=filters['customer'])
         )
+
+    if filters['invoice_number']:
+        records = records.filter(invoice_number__icontains=filters['invoice_number'])
 
     if filters['reference_number']:
         records = records.filter(reference_number__icontains=filters['reference_number'])
@@ -577,7 +613,7 @@ def profile_password_change(request):
     is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
 
     if request.method == 'POST':
-        form = PasswordChangeForm(request.user, request.POST)
+        form = CustomPasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             user = form.save()
             update_session_auth_hash(request, user)
@@ -728,7 +764,14 @@ def payment_timeline(request, payment_id):
         return HttpResponseForbidden('فقط امکان مشاهده تاریخچه اسناد خودتان وجود دارد.')
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده تاریخچه')
-    logs = payment.activity_logs.select_related('actor').all()
+    raw_logs = payment.activity_logs.select_related('actor').all()
+    logs = [
+        {
+            'log': log,
+            'jalali_time': jdatetime.datetime.fromgregorian(datetime=log.created_at).strftime('%Y/%m/%d %H:%M') if log.created_at else '',
+        }
+        for log in raw_logs
+    ]
 
     return render(request, 'payments/timeline.html', {'payment': payment, 'logs': logs, 'is_staff_user': _is_staff_user(request.user)})
 
@@ -826,10 +869,10 @@ def user_edit(request, user_id):
 @login_required
 def invoices_dashboard(request):
     is_staff_user = _is_staff_user(request.user)
-    can_manage = _can_manage_invoices(request.user)
+    can_upload_invoices = _can_upload_invoices(request.user)
 
     if request.method == 'POST':
-        if not can_manage:
+        if not can_upload_invoices:
             return HttpResponseForbidden('شما دسترسی بارگذاری فاکتور مشتری را ندارید.')
         form = InvoiceUploadForm(request.POST, request.FILES)
         if form.is_valid():
@@ -841,6 +884,7 @@ def invoices_dashboard(request):
     else:
         form = InvoiceUploadForm()
 
+    can_view_invoices = _can_view_invoices(request.user)
     records = _invoice_records_for_user(request.user)
     records, filters = _apply_invoice_filters(records, request, is_staff_user=is_staff_user)
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
@@ -850,9 +894,10 @@ def invoices_dashboard(request):
         'records': records,
         'filters': filters,
         'is_staff_user': is_staff_user,
-        'can_manage_invoices': can_manage,
+        'can_upload_invoices': can_upload_invoices,
+        'can_view_invoices': can_view_invoices,
         'user_display_name': user_display_name,
-        'customer_rows': _invoice_customer_rows() if can_manage else [],
+        'customer_rows': _invoice_customer_rows() if can_upload_invoices else [],
     })
 
 
@@ -865,6 +910,11 @@ def invoice_detail(request, invoice_id):
     is_staff_user = _is_staff_user(request.user)
     just_marked_seen = False
 
+    # Staff needs permission to view invoices
+    if is_staff_user and not _can_view_invoices(request.user):
+        return HttpResponseForbidden('شما دسترسی مشاهده فاکتور را ندارید.')
+
+    # Customers can only see their own invoices
     if not is_staff_user and invoice.customer_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده فاکتورهای خودتان وجود دارد.')
 
@@ -983,11 +1033,19 @@ def customer_detail(request, user_id):
 
     # Get all invoices for this customer
     invoices = InvoiceRecord.objects.filter(customer=customer_user).order_by('-created_at')
+    can_view_invoices = _can_view_invoices(request.user)
+    if not can_view_invoices:
+        invoices = InvoiceRecord.objects.none()
+
+    invoice_number_filter = (request.GET.get('invoice_number') or '').strip()
+    if invoice_number_filter and can_view_invoices:
+        invoices = invoices.filter(invoice_number__icontains=invoice_number_filter)
 
     # Calculate summary
-    total_payments = payments.count()
+    total_payments = len(payments)
     total_invoices = invoices.count()
     total_amount = sum(p.amount for p in payments)
+    invoice_total_amount = invoices.aggregate(total=Sum('amount'))['total'] or 0
 
     # Status breakdown for payments
     status_counts = {}
@@ -1005,9 +1063,14 @@ def customer_detail(request, user_id):
         'total_payments': total_payments,
         'total_invoices': total_invoices,
         'total_amount': total_amount,
+        'invoice_total_amount': invoice_total_amount,
         'status_counts': status_counts,
         'is_staff_user': is_staff_user,
         'staff_user_role': _user_role(request.user),
+        'can_view_invoices': can_view_invoices,
+        'filters': {
+            'invoice_number': invoice_number_filter,
+        },
         'user_display_name': user_display_name,
     })
 
@@ -1030,7 +1093,7 @@ def customers_list(request):
         payment_count = PaymentRecord.objects.filter(user=profile.user).count()
         invoice_count = InvoiceRecord.objects.filter(customer=profile.user).count()
         total_amount = PaymentRecord.objects.filter(user=profile.user).aggregate(
-            total=models.Sum('amount')
+            total=Sum('amount')
         )['total'] or 0
 
         # Get latest payment
@@ -1053,6 +1116,51 @@ def customers_list(request):
         'user_display_name': user_display_name,
     })
 
+
+@login_required
+@require_POST
+def reset_user_password(request, user_id):
+    """
+    Reset a user's password to a temporary numeric password and force them to change it.
+    Only accessible to users with management permissions.
+    """
+    if not _can_manage_users(request.user):
+        return HttpResponseForbidden('شما دسترسی ریست رمز عبور را ندارید.')
+
+    target_user = get_object_or_404(User, id=user_id)
+    temp_password = _suggest_five_digit_password()
+    target_user.set_password(temp_password)
+    target_user.save()
+
+    # Invalidate all sessions for the target user
+    for session in Session.objects.all():
+        session_data = session.get_decoded()
+        if session_data.get('_auth_user_id') == str(target_user.id):
+            session.delete()
+
+    profile = getattr(target_user, 'profile', None)
+    if profile:
+        profile.force_password_change = True
+        profile.save(update_fields=['force_password_change'])
+
+    from django.contrib.admin.models import LogEntry, CHANGE
+    from django.contrib.contenttypes.models import ContentType
+    from django.http import JsonResponse
+
+    LogEntry.objects.create(
+        user_id=request.user.id,
+        content_type=ContentType.objects.get_for_model(target_user),
+        object_id=target_user.id,
+        object_repr=str(target_user),
+        action_flag=CHANGE,
+        change_message=f'ریست رمز عبور برای کاربر {target_user.username} به رمز موقت {temp_password}',
+    )
+
+    return JsonResponse({
+        'success': True,
+        'temp_password': temp_password,
+        'message': 'رمز عبور کاربر با موفقیت ریست شد. لطفا رمز موقت را به کاربر اطلاع دهید.',
+    })
 
 
 

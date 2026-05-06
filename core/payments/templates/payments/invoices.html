@@ -49,6 +49,7 @@
         .confirm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
         .confirm-row input[type="checkbox"] { width: auto; margin: 0; }
         .confirm-row label { margin: 0; font-size: 13px; }
+        .assigned-customer-name { color: #c62828; font-weight: 800; font-size: 1.1em; }
 
         .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
         .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -70,9 +71,8 @@
         .detail-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; }
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; text-align: right; }
         .detail-card { background: #fff; border: 1px solid #e5eaf1; border-radius: 8px; padding: 12px; }
-        .flash-list { margin: 0; padding-right: 18px; }
-        .flash-success { color: #1b5e20; }
-        .flash-error { color: #c62828; }
+        .system-message-list { margin: 0; padding-right: 18px; }
+        .system-message { color: #c62828; }
 
         @media (max-width: 980px) {
             .field-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
@@ -104,16 +104,28 @@
     </div>
 
     {% if messages %}
-        <div class="section">
-            <ul class="flash-list">
-                {% for message in messages %}
-                    <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
-                {% endfor %}
-            </ul>
+        <div id="systemPopup" class="system-popup-overlay open" tabindex="-1" onclick="this.classList.remove('open')">
+            <div class="system-popup-box" onclick="event.stopPropagation()">
+                <h3>پیام سیستم</h3>
+                <ul class="system-popup-list">
+                    {% for message in messages %}
+                        <li class="system-popup-item">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+                <div class="system-popup-help">برای بستن پیام، روی پشت‌زمینه کلیک کنید یا Esc بزنید.</div>
+            </div>
+        </div>
+        <script>document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ var el=document.getElementById('systemPopup'); if(el){ el.classList.remove('open'); } }});</script>
+    {% endif %}
+
+    {% if is_staff_user and not can_view_invoices %}
+        <div class="section warning-box">
+            <strong>شما در حال حاضر دسترسی مشاهده فاکتورها را ندارید.</strong>
+            <div>برای مشاهده لیست فاکتورها باید مجوز مربوطه در پروفایل کاربری‌تان فعال باشد.</div>
         </div>
     {% endif %}
 
-    {% if can_manage_invoices %}
+    {% if can_upload_invoices %}
         <div class="section">
             <h2>بارگذاری فاکتور مشتری</h2>
             <div class="warning-box">پیش از ثبت، مشتری انتخاب شده را با نام، نام کاربری، مجموعه و شماره تماس کنترل کنید تا فاکتور برای مشتری اشتباه بارگذاری نشود.</div>
@@ -149,6 +161,12 @@
                                 <label for="{{ form.invoice_date.id_for_label }}">{{ form.invoice_date.label|safe }}</label>
                                 {{ form.invoice_date }}
                                 {% for error in form.invoice_date.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="field-box compact-input">
+                                <label for="{{ form.invoice_number.id_for_label }}">{{ form.invoice_number.label|safe }}</label>
+                                {{ form.invoice_number }}
+                                {% for error in form.invoice_number.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
                             </div>
 
                             <div class="field-box compact-input">
@@ -190,7 +208,7 @@
                         <div class="confirm-row">
                             {{ form.confirm_assignment }}
                             <label for="{{ form.confirm_assignment.id_for_label }}" id="confirm-assignment-label">
-                                انتساب فاکتور به مشتری <strong>انتخاب نشده</strong> را تایید می کنم.
+                                انتساب فاکتور به مشتری <strong class="assigned-customer-name">انتخاب نشده</strong> را تایید می کنم.
                             </label>
                         </div>
                         {% for error in form.confirm_assignment.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
@@ -215,6 +233,10 @@
                     <input id="customer-filter" type="text" name="customer" value="{{ filters.customer }}">
                 </div>
             {% endif %}
+            <div>
+                <label for="invoice-number-filter">شماره فاکتور</label>
+                <input id="invoice-number-filter" type="text" name="invoice_number" value="{{ filters.invoice_number }}">
+            </div>
             <div>
                 <label for="reference-filter">شماره حواله</label>
                 <input id="reference-filter" type="text" name="reference_number" value="{{ filters.reference_number }}">
@@ -248,6 +270,7 @@
                         <th>مشتری</th>
                         <th>مجموعه</th>
                     {% endif %}
+                    <th>شماره فاکتور</th>
                     <th>تاریخ فاکتور</th>
                     <th>مبلغ</th>
                     <th>شماره حواله</th>
@@ -263,6 +286,7 @@
                             <td>{{ invoice.customer.get_full_name|default:invoice.customer.username }}</td>
                             <td>{{ invoice.customer.profile.organization|default:'-' }}</td>
                         {% endif %}
+                        <td>{{ invoice.invoice_number }}</td>
                         <td>{{ invoice.invoice_date }}</td>
                         <td>{{ invoice.amount|intcomma }}</td>
                         <td>{{ invoice.reference_number }}</td>
@@ -277,7 +301,7 @@
                         <td><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}">جزئیات</a></td>
                     </tr>
                     <tr class="detail-row" id="detail-{{ invoice.id }}">
-                        <td colspan="{% if is_staff_user %}8{% else %}6{% endif %}">
+                        <td colspan="{% if is_staff_user %}9{% else %}7{% endif %}">
                             <div class="detail-grid">
                                 <div class="detail-card">
                                     <div class="label">اطلاعات فاکتور</div>
@@ -375,7 +399,7 @@
                     '<div class="meta">شهر: ' + selected.city + '</div>' +
                     '<div class="meta">شماره تماس: ' + selected.phone + '</div>';
                 if (confirmLabelEl) {
-                    confirmLabelEl.innerHTML = 'انتساب فاکتور به مشتری <strong>' + selected.full_name + '</strong> را تایید می کنم.';
+                    confirmLabelEl.innerHTML = 'انتساب فاکتور به مشتری <strong class="assigned-customer-name">' + selected.full_name + '</strong> را تایید می کنم.';
                 }
             }
 

@@ -33,9 +33,8 @@
         .preview-image { max-width: 100%; max-height: 78vh; display: block; margin: 0 auto; }
         .preview-hint { font-size: 12px; color: #666; text-align: center; margin-top: 8px; }
         .flash-title { margin: 0 0 10px; font-size: 16px; }
-        .flash-list { margin: 0; padding-right: 18px; text-align: right; }
-        .flash-error { color: #c62828; }
-        .flash-success { color: #1b5e20; }
+        .system-message-list { margin: 0; padding-right: 18px; text-align: right; }
+        .system-message { color: #c62828; }
         .customer-info { background: #fff; border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
         .customer-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
         .customer-info-item { font-size: 13px; color: #333; }
@@ -46,9 +45,9 @@
     <div id="flashOverlay" class="preview-overlay open" tabindex="-1">
         <div class="preview-box">
             <h3 class="flash-title">پیام سیستم</h3>
-            <ul class="flash-list">
+            <ul class="system-message-list">
                 {% for message in messages %}
-                    <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
+                    <li class="system-message">{{ message }}</li>
                 {% endfor %}
             </ul>
             <div class="preview-hint">برای بستن پیام، روی صفحه کلیک کنید یا کلید Enter را بزنید.</div>

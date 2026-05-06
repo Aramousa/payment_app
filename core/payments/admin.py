@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 
 from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, UserProfile
 

@@ -20,14 +20,14 @@
         <ul>
             {% for log in logs %}
                 <li>
-                    {% if log.actor %}
-                        {{ log.get_action_display }} توسط {{ log.actor.get_full_name|default:log.actor.username }}
+                    {% if log.log.actor %}
+                        {{ log.log.get_action_display }} توسط {{ log.log.actor.get_full_name|default:log.log.actor.username }}
                     {% else %}
-                        {{ log.get_action_display }} توسط سیستم
+                        {{ log.log.get_action_display }} توسط سیستم
                     {% endif %}
-                    {% if log.to_status %} | وضعیت جدید: {{ log.to_status }}{% endif %}
-                    {% if log.note %}<div>توضیح: {{ log.note }}</div>{% endif %}
-                    <div class="tiny">{{ log.created_at }}</div>
+                    {% if log.log.to_status %} | وضعیت جدید: {{ log.log.to_status }}{% endif %}
+                    {% if log.log.note %}<div>توضیح: {{ log.log.note }}</div>{% endif %}
+                    <div class="tiny">{{ log.jalali_time }}</div>
                 </li>
             {% empty %}
                 <li>تاریخچه‌ای ثبت نشده است.</li>

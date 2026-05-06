@@ -83,6 +83,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
+                'django.template.context_processors.csrf',
                 'django.contrib.messages.context_processors.messages',
                 'payments.context_processors.login_ads',
                 'payments.context_processors.unread_notifications',

@@ -19,9 +19,15 @@
         .note-box { background: #fff8e1; border: 1px solid #f2d389; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; color: #6a4d00; }
         textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 10px; font-family: inherit; }
         .submit-btn { border: none; border-radius: 6px; background: #198754; color: #fff; padding: 10px 16px; cursor: pointer; font-family: inherit; }
-        .flash-list { margin: 0 0 16px; padding-right: 18px; }
-        .flash-success { color: #1b5e20; }
-        .flash-error { color: #c62828; }
+        .system-message-list { margin: 0 0 16px; padding-right: 18px; }
+        .system-message { color: #c62828; }
+        .system-popup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+        .system-popup-overlay.open { display: flex; }
+        .system-popup-box { background: #fff; border-radius: 10px; max-width: 560px; width: 100%; max-height: 90vh; overflow: auto; padding: 18px; box-shadow: 0 20px 45px rgba(0,0,0,.25); }
+        .system-popup-box h3 { margin-top: 0; font-size: 18px; }
+        .system-popup-list { margin: 0; padding-right: 18px; list-style: none; }
+        .system-popup-item { color: #c62828; font-weight: 700; margin-bottom: 10px; }
+        .system-popup-help { color: #5f6b7a; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -32,11 +38,18 @@
         </div>
 
         {% if messages %}
-            <ul class="flash-list">
-                {% for message in messages %}
-                    <li class="{% if 'success' in message.tags %}flash-success{% else %}flash-error{% endif %}">{{ message }}</li>
-                {% endfor %}
-            </ul>
+            <div id="systemPopup" class="system-popup-overlay open" tabindex="-1" onclick="this.classList.remove('open')">
+                <div class="system-popup-box" onclick="event.stopPropagation()">
+                    <h3>پیام سیستم</h3>
+                    <ul class="system-popup-list">
+                        {% for message in messages %}
+                            <li class="system-popup-item">{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                    <div class="system-popup-help">برای بستن پیام، روی پشت‌زمینه کلیک کنید یا Esc بزنید.</div>
+                </div>
+            </div>
+            <script>document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ var el=document.getElementById('systemPopup'); if(el){ el.classList.remove('open'); } }});</script>
         {% endif %}
 
         {% if just_marked_seen %}
@@ -56,6 +69,10 @@
             <div class="card">
                 <div class="label">مجموعه</div>
                 <div class="value">{{ customer_profile.organization|default:'-' }}</div>
+            </div>
+            <div class="card">
+                <div class="label">شماره فاکتور</div>
+                <div class="value">{{ invoice.invoice_number }}</div>
             </div>
             <div class="card">
                 <div class="label">تاریخ فاکتور</div>
