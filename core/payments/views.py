@@ -4,6 +4,7 @@ import random
 from openpyxl import Workbook
 from urllib.parse import urlencode
 
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Max, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -18,7 +19,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import CounterpartyForm, CustomPasswordChangeForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
 
 
@@ -202,6 +203,23 @@ def _format_jalali_datetime(value, date_format='%Y/%m/%d %H:%M'):
     if timezone.is_aware(value):
         value = timezone.localtime(value)
     return jdatetime.datetime.fromgregorian(datetime=value).strftime(date_format)
+
+
+def _build_query_string(request, remove_keys=None):
+    query_params = request.GET.copy()
+    for key in remove_keys or []:
+        query_params.pop(key, None)
+    return query_params.urlencode()
+
+
+def _paginate_queryset(request, queryset, per_page=15, page_param='page'):
+    paginator = Paginator(queryset, per_page)
+    page_number = request.GET.get(page_param) or 1
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+    return page_obj
 
 
 def _log_activity(payment, actor, action, from_status='', to_status='', note=''):
@@ -624,11 +642,15 @@ def create_payment(request):
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
     records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
     records = _enrich_records(records, staff_role=staff_role, is_system_admin=is_system_admin)
+    page_obj = _paginate_queryset(request, records, per_page=15, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
     return render(request, 'payments/form.html', {
         'form': form,
-        'records': records,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
         'is_staff_user': is_staff_user,
         'filters': active_filters,
         'status_choices': PaymentRecord.STATUS_CHOICES if is_staff_user else CUSTOMER_STATUSES,
@@ -662,35 +684,6 @@ def profile_password_change(request):
         is_force_change and request.session.get('show_initial_password_change_note')
     )
 
-
-def _log_system_activity(actor, target_user, action, description=''):
-    SystemActivityLog.objects.create(
-        actor=actor if actor and actor.is_authenticated else None,
-        target_user=target_user,
-        action=action,
-        description=description,
-    )
-
-
-def _send_temporary_password_email(user, temp_password):
-    if not user.email:
-        return False, 'برای این کاربر ایمیل ثبت نشده است.'
-
-    subject = 'رمز عبور جدید سامانه'
-    message = (
-        f'{user.get_full_name() or user.username} عزیز،\n\n'
-        f'رمز عبور جدید شما در سامانه: {temp_password}\n\n'
-        'پس از ورود، لازم است رمز عبور خود را تغییر دهید.'
-    )
-    send_mail(
-        subject,
-        message,
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-        fail_silently=False,
-    )
-    return True, ''
-
     if request.method == 'POST':
         form = CustomPasswordChangeForm(request.user, request.POST)
         if form.is_valid():
@@ -712,6 +705,67 @@ def _send_temporary_password_email(user, temp_password):
         'show_initial_password_change_note': show_initial_password_change_note,
         'username': request.user.username,
     })
+
+
+def _log_system_activity(actor, target_user, action, description=''):
+    SystemActivityLog.objects.create(
+        actor=actor if actor and actor.is_authenticated else None,
+        target_user=target_user,
+        action=action,
+        description=description,
+    )
+
+
+@login_required
+def profile_edit(request):
+    profile = get_object_or_404(UserProfile, user=request.user)
+
+    if request.method == 'POST':
+        form = CustomerProfileUpdateForm(request.POST, instance=profile, user=request.user)
+        if form.is_valid():
+            changes = form.changed_profile_fields()
+            form.save()
+            if changes:
+                change_text = '؛ '.join(
+                    f"{item['field']}: از «{item['old']}» به «{item['new']}»"
+                    for item in changes
+                )
+                _log_system_activity(
+                    request.user,
+                    request.user,
+                    SystemActivityLog.ACTION_PROFILE_UPDATED,
+                    f'مشخصات کاربر توسط خودش ویرایش شد. {change_text}',
+                )
+            messages.success(request, 'مشخصات شما با موفقیت ذخیره شد.')
+            return redirect('profile_edit')
+        messages.error(request, 'ذخیره مشخصات انجام نشد. لطفا خطاها را بررسی کنید.')
+    else:
+        form = CustomerProfileUpdateForm(instance=profile, user=request.user)
+
+    return render(request, 'payments/profile_edit.html', {
+        'form': form,
+        'username': request.user.username,
+    })
+
+
+def _send_temporary_password_email(user, temp_password):
+    if not user.email:
+        return False, 'برای این کاربر ایمیل ثبت نشده است.'
+
+    subject = 'رمز عبور جدید سامانه'
+    message = (
+        f'{user.get_full_name() or user.username} عزیز،\n\n'
+        f'رمز عبور جدید شما در سامانه: {temp_password}\n\n'
+        'پس از ورود، لازم است رمز عبور خود را تغییر دهید.'
+    )
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
+    return True, ''
 
 
 @login_required
@@ -872,7 +926,14 @@ def counterparties_manage(request):
         form = CounterpartyForm()
 
     counterparties = Counterparty.objects.all()
-    return render(request, 'payments/counterparties.html', {'form': form, 'counterparties': counterparties})
+    page_obj = _paginate_queryset(request, counterparties, per_page=15, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    return render(request, 'payments/counterparties.html', {
+        'form': form,
+        'counterparties': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+    })
 
 
 @login_required
@@ -917,9 +978,13 @@ def users_manage(request):
             password_suggestion=password_suggestion,
         )
 
+    users_page = _paginate_queryset(request, _managed_users(), per_page=15, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
     return render(request, 'payments/users_manage.html', {
         'form': form,
-        'users': _managed_users(),
+        'users': users_page,
+        'page_obj': users_page,
+        'page_base_query': page_base_query,
         'password_suggestion': password_suggestion,
         'editing_user': None,
     })
@@ -952,9 +1017,13 @@ def user_edit(request, user_id):
     else:
         form = UserAccountManagementForm(instance=managed_user, password_suggestion=password_suggestion)
 
+    users_page = _paginate_queryset(request, _managed_users(), per_page=15, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
     return render(request, 'payments/users_manage.html', {
         'form': form,
-        'users': _managed_users(),
+        'users': users_page,
+        'page_obj': users_page,
+        'page_base_query': page_base_query,
         'password_suggestion': password_suggestion,
         'editing_user': managed_user,
     })
@@ -972,6 +1041,8 @@ def invoices_dashboard(request):
         if form.is_valid():
             invoice = form.save(commit=False)
             invoice.uploaded_by = request.user
+            # مقدار amount را تنظیم کنیم
+            invoice.amount = form.cleaned_data.get('amount')
             invoice.save()
             messages.success(request, 'فاکتور با موفقیت برای مشتری ثبت شد.')
             return redirect('invoices_dashboard')
@@ -981,11 +1052,15 @@ def invoices_dashboard(request):
     can_view_invoices = _can_view_invoices(request.user)
     records = _invoice_records_for_user(request.user)
     records, filters = _apply_invoice_filters(records, request, is_staff_user=is_staff_user)
+    page_obj = _paginate_queryset(request, records, per_page=15, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
     return render(request, 'payments/invoices.html', {
         'form': form,
-        'records': records,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
         'filters': filters,
         'is_staff_user': is_staff_user,
         'can_upload_invoices': can_upload_invoices,
@@ -1184,6 +1259,11 @@ def customer_detail(request, user_id):
     total_amount = sum(p.amount for p in payments)
     invoice_total_amount = invoices.aggregate(total=Sum('amount'))['total'] or 0
 
+    payments_page_obj = _paginate_queryset(request, payments, per_page=15, page_param='payments_page')
+    invoices_page_obj = _paginate_queryset(request, invoices, per_page=15, page_param='invoice_page')
+    payments_page_base_query = _build_query_string(request, remove_keys=['payments_page'])
+    invoices_page_base_query = _build_query_string(request, remove_keys=['invoice_page'])
+
     # Status breakdown for payments
     status_counts = {}
     for payment in payments:
@@ -1195,8 +1275,12 @@ def customer_detail(request, user_id):
     return render(request, 'payments/customer_detail.html', {
         'customer_user': customer_user,
         'customer_profile': customer_profile,
-        'payments': payments,
-        'invoices': invoices,
+        'payments': payments_page_obj,
+        'invoices': invoices_page_obj,
+        'payments_page_obj': payments_page_obj,
+        'invoices_page_obj': invoices_page_obj,
+        'payments_page_base_query': payments_page_base_query,
+        'invoices_page_base_query': invoices_page_base_query,
         'total_payments': total_payments,
         'total_invoices': total_invoices,
         'total_amount': total_amount,
@@ -1262,9 +1346,13 @@ def customers_list(request):
         })
 
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+    page_obj = _paginate_queryset(request, customer_data, per_page=15, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
 
     return render(request, 'payments/customers_list.html', {
-        'customer_data': customer_data,
+        'customer_data': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
         'is_staff_user': is_staff_user,
         'can_manage_users': _can_manage_users(request.user),
         'user_display_name': user_display_name,

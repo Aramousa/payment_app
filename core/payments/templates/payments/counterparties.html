@@ -43,6 +43,18 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if page_obj.has_other_pages %}
+            <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
+                {% if page_obj.has_previous %}
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
+                {% endif %}
+                <span style="font-size:13px; color:#333;">صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
 </body>
 </html>

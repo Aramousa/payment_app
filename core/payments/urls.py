@@ -12,6 +12,7 @@ from .views import (
     invoices_dashboard,
     legacy_payment_receipt_file,
     login_ad_image,
+    profile_edit,
     profile_password_cancel,
     profile_password_change,
     payment_timeline,
@@ -43,6 +44,7 @@ urlpatterns = [
     path('counterparties/', counterparties_manage, name='counterparties_manage'),
     path('counterparties/<int:counterparty_id>/edit/', counterparty_edit, name='counterparty_edit'),
     path('export-records/', export_records, name='export_records'),
+    path('profile/', profile_edit, name='profile_edit'),
     path('profile/password/', profile_password_change, name='profile_password_change'),
     path('profile/password/cancel/', profile_password_cancel, name='profile_password_cancel'),
 ]

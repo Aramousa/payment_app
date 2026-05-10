@@ -94,7 +94,8 @@
             {% if request.user.is_superuser %}
                 <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
             {% endif %}
-            <a href="{% url 'profile_password_change' %}" class="button-link">حساب کاربری / تغییر رمز</a>
+            <a href="{% url 'profile_edit' %}" class="button-link">ویرایش مشخصات</a>
+            <a href="{% url 'profile_password_change' %}" class="button-link">تغییر رمز عبور</a>
         </div>
         <div class="logout-wrap">
             <div class="user-chip">{{ user_display_name }}</div>
@@ -251,6 +252,7 @@
                 <label for="invoice-date-filter">تاریخ فاکتور</label>
                 <input id="invoice-date-filter" class="jalali-date" type="text" name="invoice_date" value="{{ filters.invoice_date }}">
             </div>
+            <input type="hidden" name="page" value="{{ page_obj.number }}">
             <div>
                 <label for="seen-filter">وضعیت مشاهده</label>
                 <select id="seen-filter" name="seen">
@@ -349,6 +351,18 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if page_obj.has_other_pages %}
+            <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
+                {% if page_obj.has_previous %}
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="button-link" style="display:inline-block;">قبلی</a>
+                {% endif %}
+                <span style="font-size:13px; color:#333;">صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="button-link" style="display:inline-block;">بعدی</a>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
 
     <script>

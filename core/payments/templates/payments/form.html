@@ -169,7 +169,8 @@
             {% if request.user.is_superuser %}
                 <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
             {% endif %}
-            <a href="{% url 'profile_password_change' %}" class="button-link">حساب کاربری / تغییر رمز</a>
+            <a href="{% url 'profile_edit' %}" class="button-link">ویرایش مشخصات</a>
+            <a href="{% url 'profile_password_change' %}" class="button-link">تغییر رمز عبور</a>
             {% if can_manage_counterparties %}
                 <a href="{% url 'counterparties_manage' %}" class="button-link">مدیریت طرف حساب</a>
             {% endif %}
@@ -277,6 +278,7 @@
             {% endif %}
             <div><label for="amount_filter">مبلغ (ریال)</label><input id="amount_filter" class="amount-input" type="text" inputmode="numeric" dir="ltr" name="amount" value="{{ filters.amount }}"></div>
             <div><label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
+            <input type="hidden" name="page" value="{{ page_obj.number }}">
             <div>
                 <label for="status">وضعیت</label>
                 <select id="status" name="status">
@@ -486,6 +488,19 @@
             {% endfor %}
         </tbody>
     </table>
+
+    {% if page_obj.has_other_pages %}
+        <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
+            {% if page_obj.has_previous %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="button-link" style="display:inline-block;">قبلی</a>
+            {% endif %}
+            <span style="font-size:13px; color:#333;">صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="button-link" style="display:inline-block;">بعدی</a>
+            {% endif %}
+        </div>
+    {% endif %}
+
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
         <div class="preview-box" id="previewBox">
             <img id="previewImage" class="preview-image" alt="پیش نمایش سند" style="display:none;">

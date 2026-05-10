@@ -114,16 +114,16 @@ class LoginAdvertisementAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'first_name', 'last_name', 'phone', 'mobile', 'organization', 'city', 'province', 'role', 'active_from', 'valid_until', 'force_password_change', 'suspended')
+    list_display = ('user', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'organization', 'city', 'province', 'role', 'active_from', 'valid_until', 'force_password_change', 'suspended')
     list_filter = ('role', 'city', 'province', 'force_password_change', 'suspended')
-    search_fields = ('user__username', 'phone', 'mobile', 'organization', 'first_name', 'last_name')
+    search_fields = ('user__username', 'user__email', 'phone', 'mobile', 'second_mobile', 'organization', 'first_name', 'last_name')
     readonly_fields = ('user',)
     fieldsets = (
         ('اطلاعات کاربر', {
-            'fields': ('user', 'first_name', 'last_name', 'phone', 'mobile', 'organization')
+            'fields': ('user', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'organization')
         }),
         ('اطلاعات تماس', {
-            'fields': ('city', 'province', 'address')
+            'fields': ('city', 'province', 'address', 'second_address')
         }),
         ('اطلاعات حساب', {
             'fields': ('role', 'active_from', 'valid_until', 'force_password_change', 'suspended')
@@ -214,7 +214,7 @@ class PaymentActivityLogAdmin(admin.ModelAdmin):
 
 @admin.register(InvoiceRecord)
 class InvoiceRecordAdmin(admin.ModelAdmin):
-    list_display = ('reference_number', 'customer', 'amount', 'invoice_date', 'uploaded_by', 'jalali_customer_seen_at', 'jalali_created_at')
+    list_display = ('reference_number', 'customer', 'formatted_amount', 'invoice_date', 'uploaded_by', 'jalali_customer_seen_at', 'jalali_created_at')
     list_filter = ('invoice_date', 'created_at', 'customer_seen_at')
     search_fields = ('reference_number', 'customer__username', 'customer__first_name', 'customer__last_name', 'customer__profile__organization')
 
@@ -224,8 +224,14 @@ class InvoiceRecordAdmin(admin.ModelAdmin):
     def jalali_created_at(self, obj):
         return format_jalali_datetime(obj.created_at)
 
+    def formatted_amount(self, obj):
+        if obj.amount is None:
+            return '-'
+        return '{:,}'.format(obj.amount)
+
     jalali_customer_seen_at.short_description = 'زمان مشاهده مشتری'
     jalali_created_at.short_description = 'زمان ثبت'
+    formatted_amount.short_description = 'مبلغ (ریال)'
 
 
 @admin.register(SystemActivityLog)

@@ -54,6 +54,72 @@ class CustomPasswordChangeForm(PasswordChangeForm):
         return forms.Form.clean(self)
 
 
+class CustomerProfileUpdateForm(forms.ModelForm):
+    email = forms.EmailField(label='ایمیل', required=False)
+
+    class Meta:
+        model = UserProfile
+        fields = ['phone', 'mobile', 'second_mobile', 'address', 'second_address']
+        widgets = {
+            'phone': forms.TextInput(attrs={'inputmode': 'tel'}),
+            'mobile': forms.TextInput(attrs={'inputmode': 'tel'}),
+            'second_mobile': forms.TextInput(attrs={'inputmode': 'tel'}),
+            'address': forms.Textarea(attrs={'rows': 3}),
+            'second_address': forms.Textarea(attrs={'rows': 3}),
+        }
+        labels = {
+            'phone': 'شماره تلفن',
+            'mobile': 'شماره همراه',
+            'second_mobile': 'شماره همراه دوم',
+            'address': 'آدرس',
+            'second_address': 'آدرس دوم',
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user')
+        super().__init__(*args, **kwargs)
+        if not self.is_bound:
+            self.initial['email'] = self.user.email
+        for field in self.fields.values():
+            field.required = False
+
+    def clean_email(self):
+        return (self.cleaned_data.get('email') or '').strip()
+
+    def changed_profile_fields(self):
+        labels = {
+            'email': 'ایمیل',
+            'phone': 'شماره تلفن',
+            'mobile': 'شماره همراه',
+            'second_mobile': 'شماره همراه دوم',
+            'address': 'آدرس',
+            'second_address': 'آدرس دوم',
+        }
+        changes = []
+        for field_name in self.changed_data:
+            if field_name not in labels:
+                continue
+            if field_name == 'email':
+                old_value = self.user.email or ''
+            else:
+                old_value = getattr(self.instance, field_name, '') or ''
+            new_value = self.cleaned_data.get(field_name) or ''
+            changes.append({
+                'field': labels[field_name],
+                'old': old_value or '-',
+                'new': new_value or '-',
+            })
+        return changes
+
+    def save(self, commit=True):
+        profile = super().save(commit=False)
+        self.user.email = self.cleaned_data.get('email', '').strip()
+        if commit:
+            self.user.save(update_fields=['email'])
+            profile.save(update_fields=['phone', 'mobile', 'second_mobile', 'address', 'second_address'])
+        return profile
+
+
 class MultiFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
@@ -263,6 +329,7 @@ class InvoiceUploadForm(forms.ModelForm):
         queryset=UserProfile.objects.none(),
         label='مشتری',
         empty_label='انتخاب مشتری',
+        required=True,
     )
     confirm_assignment = forms.BooleanField(
         required=True,
@@ -272,15 +339,18 @@ class InvoiceUploadForm(forms.ModelForm):
         label='تاریخ فاکتور',
         input_formats=['%Y/%m/%d'],
         widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31'}),
+        required=False,
     )
     amount = forms.CharField(
         label='مبلغ (ریال)',
         widget=forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
+        required=False,
     )
 
     class Meta:
         model = InvoiceRecord
-        fields = ['customer', 'invoice_date', 'invoice_number', 'amount', 'reference_number', 'attachment', 'customer_visible_note', 'internal_note']
+        fields = ['customer', 'invoice_date', 'invoice_number', 'reference_number', 'attachment', 'customer_visible_note', 'internal_note']
+        exclude = ['amount']
         widgets = {
             'invoice_number': forms.TextInput(attrs={'dir': 'ltr', 'placeholder': 'شماره فاکتور از سیستم حسابداری'}),
             'reference_number': forms.TextInput(attrs={'dir': 'ltr', 'placeholder': 'اختیاری'}),
@@ -314,8 +384,19 @@ class InvoiceUploadForm(forms.ModelForm):
             'user__first_name', 'user__last_name', 'user__username'
         )
         self.fields['customer'].label_from_instance = self._customer_label
-        self.fields['invoice_number'].required = True
+        
+        # فیلدهای ضروری
+        self.fields['customer'].required = True
+        self.fields['attachment'].required = True
+        
+        # سایر فیلدها اختیاری
+        self.fields['invoice_date'].required = False
+        self.fields['invoice_number'].required = False
+        self.fields['amount'].required = False
         self.fields['reference_number'].required = False
+        self.fields['customer_visible_note'].required = False
+        self.fields['internal_note'].required = False
+        
         for name, field in self.fields.items():
             if field.required:
                 field.label = mark_safe(f'{field.label} <span style="color:#d00;">*</span>')
@@ -338,6 +419,8 @@ class InvoiceUploadForm(forms.ModelForm):
 
     def clean_amount(self):
         raw_amount = str(self.cleaned_data.get('amount') or '').replace(',', '').strip()
+        if not raw_amount:
+            return None  # مبلغ اختیاری است
         if not raw_amount.isdigit():
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت باشد.')
         amount = int(raw_amount)
@@ -347,8 +430,7 @@ class InvoiceUploadForm(forms.ModelForm):
 
     def clean_invoice_number(self):
         invoice_number = (self.cleaned_data.get('invoice_number') or '').strip()
-        if not invoice_number:
-            raise ValidationError('شماره فاکتور الزامی است.')
+        # شماره فاکتور اختیاری است
         return invoice_number
 
     def clean_reference_number(self):

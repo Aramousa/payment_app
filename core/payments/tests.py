@@ -214,6 +214,67 @@ class InvoiceFlowTests(TestCase):
         response = self.client.get(invoice.attachment.url)
         self.assertEqual(response.status_code, 404)
 
+    def test_customer_can_edit_optional_profile_fields_and_change_is_logged(self):
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.post(
+            reverse('profile_edit'),
+            {
+                'email': 'customer1@example.com',
+                'phone': '02122222222',
+                'mobile': '09123333333',
+                'second_mobile': '09124444444',
+                'address': 'آدرس اصلی مشتری',
+                'second_address': 'آدرس دوم مشتری',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.customer_user.refresh_from_db()
+        self.customer_profile.refresh_from_db()
+        self.assertEqual(self.customer_user.email, 'customer1@example.com')
+        self.assertEqual(self.customer_profile.phone, '02122222222')
+        self.assertEqual(self.customer_profile.second_mobile, '09124444444')
+        self.assertEqual(self.customer_profile.second_address, 'آدرس دوم مشتری')
+
+        log = SystemActivityLog.objects.get(action=SystemActivityLog.ACTION_PROFILE_UPDATED)
+        self.assertEqual(log.actor, self.customer_user)
+        self.assertEqual(log.target_user, self.customer_user)
+        self.assertIn('شماره همراه دوم', log.description)
+        self.assertIn('آدرس دوم', log.description)
+
+    def test_customer_profile_optional_fields_can_be_empty(self):
+        self.customer_user.email = 'old@example.com'
+        self.customer_user.save(update_fields=['email'])
+        self.customer_profile.phone = '02122222222'
+        self.customer_profile.mobile = '09123333333'
+        self.customer_profile.second_mobile = '09124444444'
+        self.customer_profile.address = 'آدرس اصلی'
+        self.customer_profile.second_address = 'آدرس دوم'
+        self.customer_profile.save()
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.post(
+            reverse('profile_edit'),
+            {
+                'email': '',
+                'phone': '',
+                'mobile': '',
+                'second_mobile': '',
+                'address': '',
+                'second_address': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.customer_user.refresh_from_db()
+        self.customer_profile.refresh_from_db()
+        self.assertEqual(self.customer_user.email, '')
+        self.assertEqual(self.customer_profile.phone, '')
+        self.assertEqual(self.customer_profile.mobile, '')
+        self.assertEqual(self.customer_profile.second_mobile, '')
+        self.assertEqual(self.customer_profile.address, '')
+        self.assertEqual(self.customer_profile.second_address, '')
+
 
 class UserManagementTests(TestCase):
     def setUp(self):

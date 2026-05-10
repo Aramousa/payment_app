@@ -98,6 +98,14 @@
                 {{ customer_profile.mobile|default:'-' }}
             </div>
             <div class="customer-header-item">
+                <strong>شماره همراه دوم:</strong>
+                {{ customer_profile.second_mobile|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>ایمیل:</strong>
+                {{ customer_user.email|default:'-' }}
+            </div>
+            <div class="customer-header-item">
                 <strong>استان:</strong>
                 {{ customer_profile.province|default:'-' }}
             </div>
@@ -108,6 +116,10 @@
             <div class="customer-header-item">
                 <strong>آدرس:</strong>
                 {{ customer_profile.address|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>آدرس دوم:</strong>
+                {{ customer_profile.second_address|default:'-' }}
             </div>
             <div class="customer-header-item">
                 <strong>تاریخ آغاز فعالیت:</strong>
@@ -225,6 +237,18 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if payments_page_obj.has_other_pages %}
+            <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
+                {% if payments_page_obj.has_previous %}
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
+                {% endif %}
+                <span style="font-size:13px; color:#333;">صفحه {{ payments_page_obj.number }} از {{ payments_page_obj.paginator.num_pages }}</span>
+                {% if payments_page_obj.has_next %}
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                {% endif %}
+            </div>
+        {% endif %}
     {% else %}
         <div class="empty-message">هیچ فیش پرداختی برای این مشتری ثبت نشده است.</div>
     {% endif %}
@@ -239,6 +263,7 @@
                     <input id="invoice-number-filter" type="text" name="invoice_number" value="{{ filters.invoice_number }}" placeholder="جستجوی شماره فاکتور" />
                 </div>
                 <div class="invoice-filter-actions">
+                    <input type="hidden" name="invoice_page" value="{{ invoices_page_obj.number }}">
                     <button type="submit">اعمال فیلتر</button>
                     <a href="{% url 'customer_detail' customer_user.id %}">حذف فیلتر</a>
                 </div>
@@ -284,9 +309,19 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if invoices_page_obj.has_other_pages %}
+            <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
+                {% if invoices_page_obj.has_previous %}
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
+                {% endif %}
+                <span style="font-size:13px; color:#333;">صفحه {{ invoices_page_obj.number }} از {{ invoices_page_obj.paginator.num_pages }}</span>
+                {% if invoices_page_obj.has_next %}
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                {% endif %}
+            </div>
+        {% endif %}
     {% else %}
-        <div class="empty-message">هیچ فاکتوری برای این مشتری ثبت نشده است.</div>
-    {% endif %}
     
     <script>
         function toggleDetail(id) {

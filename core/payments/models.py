@@ -164,12 +164,14 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     first_name = models.CharField('نام', max_length=50, blank=True)
     last_name = models.CharField('نام خانوادگی', max_length=50, blank=True)
-    phone = models.CharField('شماره تلفن', max_length=20)
+    phone = models.CharField('شماره تلفن', max_length=20, blank=True)
     mobile = models.CharField('شماره همراه', max_length=20, blank=True)
+    second_mobile = models.CharField('شماره همراه دوم', max_length=20, blank=True)
     organization = models.CharField('نام مجموعه', max_length=100, blank=True)
     city = models.CharField('شهر', max_length=50, blank=True)
     province = models.CharField('استان', max_length=50, blank=True)
     address = models.TextField('آدرس', blank=True)
+    second_address = models.TextField('آدرس دوم', blank=True)
     role = models.CharField('نوع کاربر', max_length=10, choices=ROLE_CHOICES, default='customer')
     active_from = jmodels.jDateField('تاریخ آغاز فعالیت', null=True, blank=True)
     valid_until = jmodels.jDateField('تاریخ اعتبار', null=True, blank=True)
@@ -223,11 +225,13 @@ class SystemActivityLog(models.Model):
     ACTION_USER_CREATED = 'user_created'
     ACTION_USER_UPDATED = 'user_updated'
     ACTION_PASSWORD_RESET = 'password_reset'
+    ACTION_PROFILE_UPDATED = 'profile_updated'
 
     ACTION_CHOICES = [
         (ACTION_USER_CREATED, 'ایجاد کاربر'),
         (ACTION_USER_UPDATED, 'ویرایش کاربر'),
         (ACTION_PASSWORD_RESET, 'ریست رمز عبور'),
+        (ACTION_PROFILE_UPDATED, 'ویرایش مشخصات کاربر'),
     ]
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='performed_system_logs')
@@ -255,9 +259,9 @@ class InvoiceRecord(models.Model):
         blank=True,
         related_name='uploaded_invoice_records',
     )
-    amount = models.BigIntegerField('مبلغ')
-    invoice_date = jmodels.jDateField('تاریخ فاکتور')
-    invoice_number = models.CharField('شماره فاکتور', max_length=80, blank=False)
+    amount = models.BigIntegerField('مبلغ', null=True, blank=True)
+    invoice_date = jmodels.jDateField('تاریخ فاکتور', null=True, blank=True)
+    invoice_number = models.CharField('شماره فاکتور', max_length=80, blank=True)
     reference_number = models.CharField('شماره حواله', max_length=80, blank=True)
     attachment = models.FileField('فایل فاکتور', upload_to='invoices/')
     customer_visible_note = models.TextField('توضیحات قابل مشاهده برای مشتری', blank=True)

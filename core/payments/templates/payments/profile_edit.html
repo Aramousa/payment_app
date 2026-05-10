@@ -3,30 +3,33 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>حساب کاربری و تغییر رمز عبور</title>
+    <title>ویرایش مشخصات شخصی</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f5f6f8; padding: 24px; }
-        .box { max-width: 520px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+        .box { max-width: 760px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
         h2 { margin-top: 0; text-align: center; }
-        .note { background: #fff3cd; color: #7a5300; border-radius: 8px; padding: 10px; margin-bottom: 12px; font-size: 13px; }
-        input { width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-top: 4px; margin-bottom: 10px; }
+        .note { background: #eef6fd; color: #174463; border-radius: 8px; padding: 10px; margin-bottom: 14px; font-size: 13px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
+        .field-box.full-row { grid-column: 1 / -1; }
+        label { display: block; margin-bottom: 5px; }
+        input, textarea { width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
         ul.errorlist { margin: 0 0 8px 0; color: #c62828; }
+        .actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
         button, .back-link { border: none; border-radius: 6px; padding: 9px 12px; cursor: pointer; text-decoration: none; display: inline-block; }
         button { background: #0d6efd; color: #fff; }
-        .back-link { background: #6c757d; color: #fff; margin-right: 8px; }
-        .system-message { border-radius: 6px; padding: 8px; margin-bottom: 10px; font-size: 13px; border: 1px solid #b71c1c; background: #ffebee; color: #b71c1c; }
-        .actions { margin-top: 8px; }
+        .back-link { background: #6c757d; color: #fff; }
+        @media (max-width: 700px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .field-box.full-row { grid-column: auto; }
+        }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2>حساب کاربری و تغییر رمز عبور</h2>
+        <h2>ویرایش مشخصات شخصی</h2>
         <div class="note">نام کاربری: <strong>{{ username }}</strong></div>
-        {% if show_initial_password_change_note %}
-            <div class="note">به دلایل امنیتی، در اولین ورود باید رمز عبور خود را تغییر دهید.</div>
-        {% endif %}
 
         {% if messages %}
             <div id="systemPopup" class="system-popup-overlay open" tabindex="-1" onclick="this.classList.remove('open')">
@@ -45,13 +48,19 @@
 
         <form method="post">
             {% csrf_token %}
-            {{ form.as_p }}
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="field-box {% if field.name == 'address' or field.name == 'second_address' %}full-row{% endif %}">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </div>
+                {% endfor %}
+            </div>
             <div class="actions">
-                <button type="submit" name="action" value="save">ثبت رمز جدید</button>
-                <a class="back-link" href="{% url 'profile_password_cancel' %}">انصراف</a>
-                {% if not is_force_change %}
-                    <a class="back-link" href="{% url 'profile_edit' %}">ویرایش مشخصات</a>
-                {% endif %}
+                <button type="submit">ذخیره مشخصات</button>
+                <a class="back-link" href="{% url 'submit' %}">بازگشت به صفحه اصلی</a>
+                <a class="back-link" href="{% url 'profile_password_change' %}">تغییر رمز عبور</a>
             </div>
         </form>
     </div>
