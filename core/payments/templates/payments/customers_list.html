@@ -105,7 +105,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{% url 'customer_detail' customer.user.id %}" class="customer-link">مشاهده جزئیات</a>
+                            <a href="{% url 'customer_detail' customer.user.id %}?next={{ request.get_full_path|urlencode }}" class="customer-link">مشاهده جزئیات</a>
                         </td>
                     </tr>
                 {% endfor %}

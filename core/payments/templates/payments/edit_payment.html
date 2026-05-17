@@ -116,6 +116,7 @@
 
         <form id="payment-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
+            {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
             {% for hidden in form.hidden_fields %}
                 {{ hidden }}
             {% endfor %}
@@ -162,7 +163,7 @@
                 {{ form.customer_notes.errors }}
             </p>
             <button type="submit" class="save-btn">ثبت اصلاحات</button>
-            <a href="{% url 'submit' %}" class="back-link">بازگشت</a>
+            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}" class="back-link">بازگشت</a>
         </form>
         {{ source_profiles|json_script:"source-profiles-data" }}
         {{ destination_profiles|json_script:"destination-profiles-data" }}

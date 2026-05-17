@@ -485,13 +485,14 @@
                 <td>
                     {% if not is_staff_user %}
                         {% if payment.status == 'incomplete' %}
-                            <a class="edit-link" href="{% url 'edit_payment' payment.id %}">ویرایش</a>
+                            <a class="edit-link" href="{% url 'edit_payment' payment.id %}?next={{ request.get_full_path|urlencode }}">ویرایش</a>
                         {% endif %}
-                        <a class="track-link" href="{% url 'payment_timeline' payment.id %}">پیگیری وضعیت</a>
+                        <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
                     {% else %}
                         {% if payment.staff_can_act %}
                             <form class="staff-quick" method="post" action="{% url 'staff_update_status' payment.id %}">
                                 {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                 <select name="status" required>
                                     {% for value, label in payment.staff_allowed_choices %}
                                         <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
@@ -569,7 +570,7 @@
                                     <li>تاریخچه‌ای ثبت نشده است.</li>
                                 {% endfor %}
                             </ul>
-                            <a href="{% url 'payment_timeline' payment.id %}">نمایش کامل تاریخچه</a>
+                            <a href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">نمایش کامل تاریخچه</a>
                         </div>
 
                         {% if is_staff_user %}
@@ -578,6 +579,7 @@
                             {% if payment.staff_can_act %}
                                 <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
                                     {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                     <select name="status" required>
                                         {% for value, label in payment.staff_allowed_choices %}
                                             <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>

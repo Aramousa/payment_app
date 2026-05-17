@@ -35,7 +35,7 @@
     <div class="top-bar">
         <h2>جزئیات برنامه واریز روزانه</h2>
         <div>
-            <a href="{% url 'daily_payment_plans' %}" class="button-link alt">بازگشت به برنامه ها</a>
+            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'daily_payment_plans' %}{% endif %}" class="button-link alt">بازگشت به برنامه ها</a>
             <a href="{% url 'submit' %}" class="button-link alt">صفحه اصلی</a>
         </div>
     </div>
@@ -73,6 +73,7 @@
         <h3>افزودن مشتری به برنامه</h3>
         <form method="post" class="form-grid" id="assignment-form">
             {% csrf_token %}
+            {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
             {% for field in assignment_form %}
                 <div>
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -118,6 +119,7 @@
                     <td>
                         <form method="post">
                             {% csrf_token %}
+                            {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
                             <input type="hidden" name="action" value="remove_assignment">
                             <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
                             <button type="submit" class="danger">حذف</button>

@@ -34,7 +34,7 @@
                 <li>تاریخچه‌ای ثبت نشده است.</li>
             {% endfor %}
         </ul>
-        <p><a href="{% url 'submit' %}">بازگشت</a></p>
+        <p><a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}">بازگشت</a></p>
     </div>
 </body>
 </html>

@@ -10,6 +10,7 @@ from django.db import IntegrityError
 from django.db.models import Count, Max, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth import logout as auth_logout
@@ -19,6 +20,7 @@ from django.conf import settings
 from django.contrib.sessions.models import Session
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
@@ -117,6 +119,13 @@ def _can_access_invoice(user, invoice):
     if _is_staff_user(user):
         return _can_view_invoices(user)
     return invoice.customer_id == user.id
+
+
+def _safe_next_url(request, default=''):
+    next_url = (request.POST.get('next') or request.GET.get('next') or '').strip()
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        return next_url
+    return default
 
 
 def _file_response(field_file, as_attachment=False):
@@ -742,7 +751,8 @@ def daily_payment_plans(request):
             plan.created_by = request.user
             plan.save()
             messages.success(request, 'برنامه واریز روزانه ثبت شد.')
-            return redirect('daily_payment_plan_detail', plan_id=plan.id)
+            detail_url = f"{reverse('daily_payment_plan_detail', kwargs={'plan_id': plan.id})}?{urlencode({'next': request.get_full_path()})}"
+            return redirect(detail_url)
     else:
         plan_form = DailyPaymentPlanForm(initial={'deposit_date': _today_jalali_date()})
 
@@ -782,6 +792,8 @@ def daily_payment_plan_detail(request, plan_id):
 
     plan = get_object_or_404(DailyPaymentPlan.objects.select_related('created_by'), id=plan_id)
     can_manage = _can_manage_daily_payments(request.user)
+    return_url = _safe_next_url(request, default=f"{reverse('daily_payment_plans')}?date={_format_jalali_date(plan.deposit_date)}")
+    detail_url = f"{request.path}?{urlencode({'next': return_url})}"
 
     if request.method == 'POST':
         if not can_manage:
@@ -791,7 +803,7 @@ def daily_payment_plan_detail(request, plan_id):
             assignment = get_object_or_404(DailyPaymentAssignment, id=assignment_id, plan=plan)
             assignment.delete()
             messages.success(request, 'تخصیص مشتری حذف شد.')
-            return redirect('daily_payment_plan_detail', plan_id=plan.id)
+            return redirect(detail_url)
 
         assignment_form = DailyPaymentAssignmentForm(request.POST)
         if assignment_form.is_valid():
@@ -803,7 +815,7 @@ def daily_payment_plan_detail(request, plan_id):
                 assignment_form.add_error('customer', 'برای این مشتری در این برنامه قبلاً تخصیص ثبت شده است.')
             else:
                 messages.success(request, 'تخصیص مشتری ثبت شد.')
-                return redirect('daily_payment_plan_detail', plan_id=plan.id)
+                return redirect(detail_url)
     else:
         assignment_form = DailyPaymentAssignmentForm()
 
@@ -840,6 +852,7 @@ def daily_payment_plan_detail(request, plan_id):
         'totals': totals,
         'can_manage_daily_payments': can_manage,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+        'return_url': return_url,
     })
 
 
@@ -1054,7 +1067,9 @@ def profile_password_cancel(request):
 @login_required
 @require_POST
 def staff_update_status(request, payment_id):
-    redirect_target = request.META.get('HTTP_REFERER') or 'submit'
+    redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or '')
+    if not redirect_target:
+        redirect_target = 'submit'
 
     if not _is_staff_user(request.user):
         messages.error(request, 'شما دسترسی بررسی اسناد را ندارید.')
@@ -1118,6 +1133,7 @@ def staff_update_status(request, payment_id):
 @login_required
 def edit_payment(request, payment_id):
     payment = get_object_or_404(PaymentRecord, id=payment_id)
+    return_url = _safe_next_url(request)
 
     if _is_staff_user(request.user):
         return HttpResponseForbidden('کاربران واحدها امکان ویرایش سند مشتری را ندارند.')
@@ -1152,7 +1168,7 @@ def edit_payment(request, payment_id):
             payment.save()
             _save_receipts(payment, form)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_EDITED, from_status=from_status, to_status=payment.status)
-            return redirect('submit')
+            return redirect(return_url or 'submit')
     else:
         form = PaymentRecordForm(instance=payment, initial=initial_data)
 
@@ -1163,6 +1179,7 @@ def edit_payment(request, payment_id):
         'destination_profiles': _destination_profiles_for_user(request.user),
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user),
+        'return_url': return_url,
     })
 
 
@@ -1182,7 +1199,12 @@ def payment_timeline(request, payment_id):
         for log in raw_logs
     ]
 
-    return render(request, 'payments/timeline.html', {'payment': payment, 'logs': logs, 'is_staff_user': _is_staff_user(request.user)})
+    return render(request, 'payments/timeline.html', {
+        'payment': payment,
+        'logs': logs,
+        'is_staff_user': _is_staff_user(request.user),
+        'return_url': _safe_next_url(request),
+    })
 
 
 @login_required
@@ -1351,6 +1373,7 @@ def invoice_detail(request, invoice_id):
     )
     is_staff_user = _is_staff_user(request.user)
     just_marked_seen = False
+    return_url = _safe_next_url(request)
 
     # Staff needs permission to view invoices
     if is_staff_user and not _can_view_invoices(request.user):
@@ -1372,7 +1395,10 @@ def invoice_detail(request, invoice_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'یادداشت شما ذخیره شد.')
-            return redirect('invoice_detail', invoice_id=invoice.id)
+            redirect_url = request.path
+            if return_url:
+                redirect_url = f"{redirect_url}?{urlencode({'next': return_url})}"
+            return redirect(redirect_url)
     else:
         form = InvoiceCustomerNoteForm(instance=invoice)
 
@@ -1383,6 +1409,7 @@ def invoice_detail(request, invoice_id):
         'is_staff_user': is_staff_user,
         'customer_profile': customer_profile,
         'just_marked_seen': just_marked_seen,
+        'return_url': return_url,
     })
 
 
@@ -1527,6 +1554,7 @@ def customer_detail(request, user_id):
     is_staff_user = _is_staff_user(request.user)
     if not is_staff_user:
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدها قابل دسترسی است.')
+    return_url = _safe_next_url(request)
 
     # Get the customer user
     customer_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
@@ -1598,6 +1626,7 @@ def customer_detail(request, user_id):
             'invoice_number': invoice_number_filter,
         },
         'user_display_name': user_display_name,
+        'return_url': return_url,
     })
 
 

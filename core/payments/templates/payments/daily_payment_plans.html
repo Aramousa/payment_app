@@ -104,7 +104,7 @@
                     <td class="money">{{ plan.confirmed_total|thousand_sep }}</td>
                     <td class="money">{{ plan.remaining_total|thousand_sep }}</td>
                     <td>{{ plan.assignment_count }}</td>
-                    <td><a href="{% url 'daily_payment_plan_detail' plan.id %}" class="button-link">جزئیات</a></td>
+                    <td><a href="{% url 'daily_payment_plan_detail' plan.id %}?next={{ request.get_full_path|urlencode }}" class="button-link">جزئیات</a></td>
                 </tr>
                 {% endfor %}
             </tbody>

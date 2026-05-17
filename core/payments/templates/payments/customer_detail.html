@@ -66,7 +66,7 @@
     <div class="top-bar">
         <h2>اطلاعات مشتری: {{ customer_user.username }}</h2>
         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <a href="{% url 'customers_list' %}" class="back-link">بازگشت به لیست مشتریان</a>
+            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'customers_list' %}{% endif %}" class="back-link">بازگشت به لیست مشتریان</a>
             <a href="{% url 'submit' %}" class="back-link">بازگشت به صفحه اصلی</a>
         </div>
     </div>
@@ -271,6 +271,7 @@
     {% if can_view_invoices %}
         <div class="invoice-filter-box">
             <form method="get" class="invoice-filter-grid">
+                {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
                 <div>
                     <label for="invoice-number-filter">شماره فاکتور</label>
                     <input id="invoice-number-filter" type="text" name="invoice_number" value="{{ filters.invoice_number }}" placeholder="جستجوی شماره فاکتور" />
@@ -278,7 +279,7 @@
                 <div class="invoice-filter-actions">
                     <input type="hidden" name="invoice_page" value="{{ invoices_page_obj.number }}">
                     <button type="submit">اعمال فیلتر</button>
-                    <a href="{% url 'customer_detail' customer_user.id %}">حذف فیلتر</a>
+                    <a href="{% url 'customer_detail' customer_user.id %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">حذف فیلتر</a>
                 </div>
             </form>
         </div>

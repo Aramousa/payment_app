@@ -8,6 +8,7 @@ Offline upgrade rule
 - Do not run `pip install` against the internet on the target server.
 - If `requirements.txt` or `requirements-py310.txt` changes, the matching wheel folder must be updated in the same release package.
 - New frontend assets must be committed under `static/`; do not use CDN links.
+- The offline wheel bundle includes transitive runtime dependencies such as `typing_extensions`; keep these pinned in the requirements files so installation does not depend on online dependency resolution.
 
 Folders
 - `vendor/wheels`: Windows / local development bundle

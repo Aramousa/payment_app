@@ -303,7 +303,7 @@
                                 <span class="status-badge status-unseen">دیده نشده</span>
                             {% endif %}
                         </td>
-                        <td><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}">جزئیات</a></td>
+                        <td><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
                     </tr>
                     <tr class="detail-row" id="detail-{{ invoice.id }}">
                         <td colspan="{% if is_staff_user %}9{% else %}7{% endif %}">
@@ -321,7 +321,7 @@
                                     <div class="label">وضعیت و فایل</div>
                                     <div class="value">وضعیت مشاهده: {% if invoice.is_seen_by_customer %}دیده شده{% else %}دیده نشده{% endif %}</div>
                                     <div class="value"><a class="detail-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود فایل</a></div>
-                                    <div class="value" style="margin-top:8px;"><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}">مشاهده صفحه کامل</a></div>
+                                    <div class="value" style="margin-top:8px;"><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">مشاهده صفحه کامل</a></div>
                                 </div>
                                 {% if invoice.customer_visible_note %}
                                     <div class="detail-card">
