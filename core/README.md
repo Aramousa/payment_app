@@ -20,7 +20,7 @@
 ## بسته‌های آفلاین
 
 پوشه‌های `vendor/` شامل wheelهای آماده نصب هستند:
-- `vendor/wheels/` : بسته‌های ویندوز برای `requirements.txt`
+- `vendor/wheels/` : بسته کامل‌تر عمومی برای نصب آفلاین؛ شامل wheelهای ویندوز و لینوکس مورد نیاز
 - `vendor/wheels-linux/` : بسته‌های لینوکس برای Python 3.13+ و `requirements.txt`
 - `vendor/wheels-linux-py310-django52/` : بسته‌های لینوکس برای Python 3.10 و همان `requirements.txt`
 
@@ -45,6 +45,12 @@ python3.13 -m pip install --no-index --find-links=vendor/wheels-linux -r require
 
 ```bash
 python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements.txt
+```
+
+اگر در سرور عملیاتی فقط مسیر `vendor/wheels` را در دستور نصب استفاده می‌کنید، این مسیر هم شامل wheelهای لینوکس Python 3.10 است و می‌توانید این دستور را اجرا کنید:
+
+```bash
+python3.10 -m pip install --no-index --find-links=vendor/wheels -r requirements.txt
 ```
 
 ## تنظیم محیط

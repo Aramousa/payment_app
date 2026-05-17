@@ -12,7 +12,7 @@ Offline upgrade rule
 - Production server packages such as `gunicorn` and its dependency `packaging` are included in the wheel folders. The deployment package must include the complete `vendor/` directory, not only the Django source files.
 
 Folders
-- `vendor/wheels`: Windows / local development bundle
+- `vendor/wheels`: General offline bundle; includes Windows and Linux wheels used by the supported deployment paths
 - `vendor/wheels-linux`: Linux bundle for `Python 3.13` with `requirements.txt` (`Django 6` is selected by the Python version marker)
 - `vendor/wheels-linux-py310-django52`: Linux bundle for `Python 3.10` with `requirements.txt` (`Django 5.2` is selected by the Python version marker)
 
@@ -44,6 +44,12 @@ Windows offline install
 
 ```powershell
 python -m pip install --no-index --find-links=vendor/wheels -r requirements.txt
+```
+
+Linux fallback if the deployment script already points to `vendor/wheels`:
+
+```bash
+python3.10 -m pip install --no-index --find-links=vendor/wheels -r requirements.txt
 ```
 
 Offline version upgrade
