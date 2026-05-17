@@ -1,4 +1,5 @@
 import jdatetime
+import logging
 import mimetypes
 import random
 from openpyxl import Workbook
@@ -6,7 +7,7 @@ from urllib.parse import urlencode
 import json
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db import IntegrityError
+from django.db import DatabaseError, IntegrityError
 from django.db.models import Count, Max, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,6 +15,7 @@ from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth import logout as auth_logout
+from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.conf import settings
@@ -28,6 +30,7 @@ from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, Invo
 
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
+logger = logging.getLogger(__name__)
 STATUS_FLAG_META = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('رویت بازرگانی', 'flag-blue'),
     PaymentRecord.STATUS_FINANCE_REVIEW: ('رویت مالی', 'flag-purple'),
@@ -142,6 +145,44 @@ def _file_response(field_file, as_attachment=False):
         filename=field_file.name.rsplit('/', 1)[-1],
         content_type=content_type or 'application/octet-stream',
     )
+
+
+@require_POST
+def safe_logout(request):
+    try:
+        auth_logout(request)
+        return redirect(settings.LOGOUT_REDIRECT_URL)
+    except Exception:
+        logger.exception('Logout failed; clearing client cookies as a fallback.')
+        response = redirect(settings.LOGOUT_REDIRECT_URL)
+        response.delete_cookie(
+            settings.SESSION_COOKIE_NAME,
+            path=settings.SESSION_COOKIE_PATH,
+            domain=settings.SESSION_COOKIE_DOMAIN,
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+        )
+        response.delete_cookie(
+            settings.CSRF_COOKIE_NAME,
+            path=settings.CSRF_COOKIE_PATH,
+            domain=settings.CSRF_COOKIE_DOMAIN,
+            samesite=settings.CSRF_COOKIE_SAMESITE,
+        )
+        return response
+
+
+class SafeLoginView(LoginView):
+    template_name = 'registration/login.html'
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except DatabaseError:
+            logger.exception('Login failed because the session/database could not be written.')
+            form.add_error(
+                None,
+                'ورود انجام نشد، چون سامانه در حال حاضر امکان ثبت نشست کاربر در دیتابیس را ندارد. لطفا با مدیر سیستم تماس بگیرید.',
+            )
+            return self.form_invalid(form)
 
 
 def _suggest_five_digit_password():

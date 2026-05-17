@@ -72,13 +72,21 @@ DJANGO_CSRF_COOKIE_SECURE=False
 python manage.py migrate
 ```
 
-3. ساخت فایل‌های استاتیک:
+3. کنترل دسترسی نوشتن دیتابیس و فایل‌های runtime:
+
+```bash
+python manage.py check_runtime_storage
+```
+
+اگر این دستور خطا داد، مالکیت یا سطح دسترسی فایل `db.sqlite3`، پوشه پروژه، و پوشه `media/` برای کاربر سرویس‌دهنده وب درست نیست. در این حالت ورود و خروج کاربران ممکن است با خطای 500 روبه‌رو شود، چون Django باید نشست کاربر را در جدول session ذخیره یا حذف کند.
+
+4. ساخت فایل‌های استاتیک:
 
 ```bash
 python manage.py collectstatic --noinput
 ```
 
-4. اجرای سرور توسعه:
+5. اجرای سرور توسعه:
 
 ```bash
 python manage.py runserver

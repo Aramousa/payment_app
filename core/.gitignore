@@ -8,10 +8,14 @@ venv/
 .env
 
 # Database
-# db.sqlite3
+db.sqlite3
 
 # Django static files
 staticfiles/
+
+# Uploaded/runtime media
+media/*
+!media/.gitkeep
 
 # Logs
 *.log

@@ -18,12 +18,15 @@ from django.urls import include
 from django.contrib import admin
 from django.urls import path
 from django.shortcuts import redirect
+from payments.views import SafeLoginView, safe_logout
 
 def redirect_to_submit(request):
     return redirect('submit')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/login/', SafeLoginView.as_view(), name='login'),
+    path('accounts/logout/', safe_logout, name='logout'),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', include('payments.urls')),
     path('', redirect_to_submit),
