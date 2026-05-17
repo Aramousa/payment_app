@@ -6,14 +6,15 @@ Frontend static dependencies are also bundled in the repository under `static/cs
 Offline upgrade rule
 - Every application version must ship with all required Python wheels in `vendor/`.
 - Do not run `pip install` against the internet on the target server.
-- If `requirements.txt` or `requirements-py310.txt` changes, the matching wheel folder must be updated in the same release package.
+- If `requirements.txt` changes, the matching wheel folder must be updated in the same release package.
 - New frontend assets must be committed under `static/`; do not use CDN links.
 - The offline wheel bundle includes transitive runtime dependencies such as `typing_extensions`; keep these pinned in the requirements files so installation does not depend on online dependency resolution.
+- Production server packages such as `gunicorn` and its dependency `packaging` are included in the wheel folders. The deployment package must include the complete `vendor/` directory, not only the Django source files.
 
 Folders
 - `vendor/wheels`: Windows / local development bundle
-- `vendor/wheels-linux`: Linux bundle for `Python 3.13` with current `requirements.txt` (`Django 6`)
-- `vendor/wheels-linux-py310-django52`: Linux bundle for `Python 3.10` with `requirements-py310.txt` (`Django 5.2`)
+- `vendor/wheels-linux`: Linux bundle for `Python 3.13` with `requirements.txt` (`Django 6` is selected by the Python version marker)
+- `vendor/wheels-linux-py310-django52`: Linux bundle for `Python 3.10` with `requirements.txt` (`Django 5.2` is selected by the Python version marker)
 
 Deployment path 1: Ubuntu 22.04 with Python 3.12/3.13
 
@@ -21,6 +22,7 @@ Use the current app dependencies:
 
 ```bash
 python3.13 -m pip install --no-index --find-links=vendor/wheels-linux -r requirements.txt
+python3.13 -m gunicorn --version
 ```
 
 Deployment path 2: Ubuntu 22.04 default Python 3.10
@@ -28,7 +30,8 @@ Deployment path 2: Ubuntu 22.04 default Python 3.10
 Use the compatibility dependency set:
 
 ```bash
-python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements-py310.txt
+python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements.txt
+python3.10 -m gunicorn --version
 ```
 
 Collect local static files before starting the app:
@@ -56,7 +59,7 @@ python3.13 manage.py collectstatic --noinput
 For Python `3.10` compatibility deployments:
 
 ```bash
-python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements-py310.txt
+python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements.txt
 python3.10 manage.py migrate
 python3.10 manage.py collectstatic --noinput
 ```
@@ -70,8 +73,7 @@ python manage.py collectstatic --noinput
 ```
 
 Important
-- `requirements.txt` is the current main stack and uses `Django 6`, which needs `Python >= 3.12`.
-- `requirements-py310.txt` is the compatibility stack for Ubuntu 22.04 default Python `3.10`.
+- `requirements.txt` is the single dependency file. It uses Python version markers to install `Django 5.2.12` on Python `<3.12` and `Django 6.0.2` on Python `>=3.12`.
 - The Persian font and frontend vendor assets are stored in the repository and served locally after `collectstatic`.
 - `db.sqlite3`, `media/`, and generated `staticfiles/` are runtime artifacts and should not be deployed as source replacements.
 - The Linux bundles assume:

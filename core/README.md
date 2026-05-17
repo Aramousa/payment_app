@@ -14,18 +14,18 @@
 
 ## وابستگی‌های Python
 
-فایل‌های وابستگی:
-- `requirements.txt` : پشته اصلی با Django 6.0.2 و Python 3.13+
-- `requirements-py310.txt` : پشته سازگار با Python 3.10 و Django 5.2.12
+فایل وابستگی:
+- `requirements.txt` : فایل واحد نصب آفلاین. این فایل با شرط نسخه پایتون، روی Python 3.10/3.11 از Django 5.2.12 و روی Python 3.12+ از Django 6.0.2 استفاده می‌کند.
 
 ## بسته‌های آفلاین
 
 پوشه‌های `vendor/` شامل wheelهای آماده نصب هستند:
 - `vendor/wheels/` : بسته‌های ویندوز برای `requirements.txt`
 - `vendor/wheels-linux/` : بسته‌های لینوکس برای Python 3.13+ و `requirements.txt`
-- `vendor/wheels-linux-py310-django52/` : بسته‌های لینوکس برای Python 3.10 و `requirements-py310.txt`
+- `vendor/wheels-linux-py310-django52/` : بسته‌های لینوکس برای Python 3.10 و همان `requirements.txt`
 
 > اگر از سرور آفلاین استفاده می‌کنید، حتما باید از گزینه `--no-index --find-links=...` استفاده کنید و به اینترنت متصل نباشید.
+> در بسته انتشار عملیاتی باید کل پوشه `vendor/` همراه پروژه کپی شود. اگر این پوشه روی سرور وجود نداشته باشد، نصب آفلاین با خطای پیدا نشدن بسته‌هایی مثل `asgiref`، `Django` یا `gunicorn` متوقف می‌شود.
 
 ## نصب آفلاین
 
@@ -44,7 +44,7 @@ python3.13 -m pip install --no-index --find-links=vendor/wheels-linux -r require
 ### لینوکس با Python 3.10
 
 ```bash
-python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements-py310.txt
+python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements.txt
 ```
 
 ## تنظیم محیط
@@ -123,7 +123,7 @@ python manage.py runserver
 ## نحوه به‌روزرسانی
 
 1. **به‌روزرسانی وابستگی‌ها**
-   - اگر بسته‌ای جدید اضافه کردید یا نسخه‌ای را تغییر دادید، ابتدا `requirements.txt` یا `requirements-py310.txt` را اصلاح کنید.
+   - اگر بسته‌ای جدید اضافه کردید یا نسخه‌ای را تغییر دادید، ابتدا `requirements.txt` را اصلاح کنید.
    - اگر فقط نیازمندید در محیط آفلاین همان مجموعه فعلی را نصب کنید، همین فایل‌ها کافی هستند.
 
 2. **به‌روزرسانی wheelهای آفلاین**
