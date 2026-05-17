@@ -17,6 +17,7 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
         th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
         th { background-color: #007bff; color: white; }
+        .money-cell { direction: ltr; white-space: nowrap; }
         
         tr:hover { background: #f5f9ff; }
         
@@ -65,7 +66,10 @@
                     <th>شماره تماس</th>
                     <th>تعداد فیش‌ها</th>
                     <th>تعداد فاکتورها</th>
-                    <th>مجموع مبالغ (ریال)</th>
+                    <th>جمع فاکتورها (ریال)</th>
+                    <th>جمع واریزی‌ها (ریال)</th>
+                    <th>بدهی ممیزی‌نشده (ریال)</th>
+                    <th>بدهی تاییدشده (ریال)</th>
                     <th>آخرین سند</th>
                     <th>وضعیت</th>
                     <th>عملیات</th>
@@ -82,7 +86,10 @@
                         <td>{{ customer.profile.phone|default:'-' }}</td>
                         <td>{{ customer.payment_count }}</td>
                         <td>{{ customer.invoice_count }}</td>
-                        <td>{{ customer.total_amount|thousand_sep }}</td>
+                        <td class="money-cell">{{ customer.invoice_total|thousand_sep }}</td>
+                        <td class="money-cell">{{ customer.total_amount|thousand_sep }}</td>
+                        <td class="money-cell">{{ customer.review_debt|thousand_sep }}</td>
+                        <td class="money-cell">{{ customer.confirmed_debt|thousand_sep }}</td>
                         <td>
                             {% if customer.latest_payment_date %}
                                 {{ customer.latest_payment_date|jalali_date }}

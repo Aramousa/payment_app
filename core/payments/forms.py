@@ -11,9 +11,28 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 
-from .models import Counterparty, InvoiceRecord, PaymentRecord, UserProfile
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, UserProfile
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
+
+
+class BankNameAutocompleteWidget(forms.TextInput):
+    """
+    Custom widget for bank name autocomplete field.
+    """
+    
+    def __init__(self, attrs=None, bank_type='payer'):
+        super().__init__(attrs)
+        self.bank_type = bank_type
+        if self.attrs is None:
+            self.attrs = {}
+        
+        # Add classes and data attributes
+        css_class = self.attrs.get('class', '')
+        self.attrs['class'] = (css_class + ' bank-autocomplete-input').strip()
+        self.attrs['data-bank-type'] = bank_type
+        self.attrs['autocomplete'] = 'off'
+
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):
@@ -192,6 +211,7 @@ class PaymentRecordForm(forms.ModelForm):
 
         for name in self.REQUIRED_CUSTOMER_FIELDS:
             self.fields[name].required = True
+        self.fields['customer_notes'].required = False
 
         has_existing_files = bool(self.instance and self.instance.pk and self.instance.receipts.exists())
         self.fields['receipt_images'].required = not has_existing_files
@@ -207,6 +227,15 @@ class PaymentRecordForm(forms.ModelForm):
                 self.initial[name] = ''
             if self.instance and getattr(self.instance, name, '') == 'Z' and not self.is_bound:
                 self.initial[name] = ''
+
+        # Ensure bank name fields have autocomplete classes
+        for bank_field in ['payer_bank_name', 'beneficiary_bank_name']:
+            if bank_field in self.fields:
+                css_class = self.fields[bank_field].widget.attrs.get('class', '')
+                self.fields[bank_field].widget.attrs['class'] = (css_class + ' bank-autocomplete-input').strip()
+                bank_type = 'payer' if bank_field == 'payer_bank_name' else 'beneficiary'
+                self.fields[bank_field].widget.attrs['data-bank-type'] = bank_type
+                self.fields[bank_field].widget.attrs['autocomplete'] = 'off'
 
         for name, field in self.fields.items():
             if field.required and not field.disabled:
@@ -224,16 +253,18 @@ class PaymentRecordForm(forms.ModelForm):
             'amount',
             'tracking_code',
             'pay_date',
+            'customer_notes',
         ]
         widgets = {
             'payer_account_number': forms.TextInput(),
             'payer_full_name': forms.TextInput(),
-            'payer_bank_name': forms.TextInput(),
-            'beneficiary_bank_name': forms.TextInput(),
+            'payer_bank_name': BankNameAutocompleteWidget(bank_type='payer'),
+            'beneficiary_bank_name': BankNameAutocompleteWidget(bank_type='beneficiary'),
             'beneficiary_account_number': forms.TextInput(),
             'beneficiary_account_owner': forms.TextInput(),
             'amount': forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
             'pay_date': jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+            'customer_notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'اختیاری'}),
         }
         labels = {
             'payer_account_number': 'شماره حساب واریز کننده',
@@ -246,6 +277,7 @@ class PaymentRecordForm(forms.ModelForm):
             'tracking_code': 'کد پیگیری',
             'pay_date': 'تاریخ',
             'receipt_images': 'فایل های فیش',
+            'customer_notes': 'توضیح',
         }
 
     def clean_amount(self):
@@ -297,6 +329,95 @@ class StaffStatusUpdateForm(forms.Form):
         choices=PaymentRecord.STATUS_CHOICES,
         label='وضعیت جدید',
     )
+
+
+class DailyPaymentPlanForm(forms.ModelForm):
+    total_expected_amount = forms.CharField(
+        label='مبلغ کل مورد انتظار',
+        widget=forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
+    )
+    deposit_date = jDateField(
+        label='تاریخ واریز',
+        input_formats=['%Y/%m/%d'],
+        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+    )
+
+    class Meta:
+        model = DailyPaymentPlan
+        fields = ['deposit_date', 'bank_name', 'account_number', 'account_owner', 'total_expected_amount', 'note']
+        widgets = {
+            'bank_name': BankNameAutocompleteWidget(bank_type='beneficiary'),
+            'account_number': forms.TextInput(attrs={'dir': 'ltr'}),
+            'account_owner': forms.TextInput(),
+            'note': forms.Textarea(attrs={'rows': 2}),
+        }
+        labels = {
+            'bank_name': 'نام بانک',
+            'account_number': 'شماره حساب مقصد',
+            'account_owner': 'نام صاحب حساب',
+            'note': 'توضیح',
+        }
+
+    def clean_total_expected_amount(self):
+        raw_amount = str(self.cleaned_data.get('total_expected_amount') or '').replace(',', '').strip()
+        if not raw_amount.isdigit():
+            raise ValidationError('مبلغ کل باید یک عدد صحیح مثبت باشد.')
+        amount = int(raw_amount)
+        if amount <= 0:
+            raise ValidationError('مبلغ کل باید یک عدد صحیح مثبت باشد.')
+        return amount
+
+
+class DailyPaymentAssignmentForm(forms.ModelForm):
+    expected_amount = forms.CharField(
+        label='مبلغ مورد انتظار مشتری',
+        widget=forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
+    )
+    customer = forms.ModelChoiceField(
+        queryset=UserProfile.objects.none(),
+        label='مشتری',
+        empty_label='انتخاب مشتری',
+    )
+
+    class Meta:
+        model = DailyPaymentAssignment
+        fields = ['customer', 'expected_amount', 'note']
+        widgets = {
+            'note': forms.Textarea(attrs={'rows': 2}),
+        }
+        labels = {
+            'note': 'توضیح',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['customer'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
+            'user__first_name', 'user__last_name', 'user__username'
+        )
+        self.fields['customer'].label_from_instance = self._customer_label
+
+    @staticmethod
+    def _customer_label(profile):
+        full_name = profile.user.get_full_name().strip() or profile.user.username
+        parts = [full_name]
+        if profile.organization:
+            parts.append(profile.organization)
+        if profile.phone:
+            parts.append(profile.phone)
+        return ' | '.join(parts)
+
+    def clean_customer(self):
+        profile = self.cleaned_data['customer']
+        return profile.user
+
+    def clean_expected_amount(self):
+        raw_amount = str(self.cleaned_data.get('expected_amount') or '').replace(',', '').strip()
+        if not raw_amount.isdigit():
+            raise ValidationError('مبلغ مشتری باید یک عدد صحیح مثبت باشد.')
+        amount = int(raw_amount)
+        if amount <= 0:
+            raise ValidationError('مبلغ مشتری باید یک عدد صحیح مثبت باشد.')
+        return amount
     note = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'rows': 2}),

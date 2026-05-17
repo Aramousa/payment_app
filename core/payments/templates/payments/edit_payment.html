@@ -1,5 +1,6 @@
 ﻿<!DOCTYPE html>
 {% load static %}
+{% load payment_dates %}
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
@@ -11,6 +12,7 @@
     <script src="{% static 'js/jquery.min.js' %}"></script>
     <script src="{% static 'js/persian-date.min.js' %}"></script>
     <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <script src="{% static 'js/bank-autocomplete.js' %}?v=3"></script>
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
         .box { max-width: 980px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
@@ -23,6 +25,7 @@
         #payment-form { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 10px 14px; }
         #payment-form > p { margin: 0; }
         #payment-form .full-row { grid-column: 1 / -1; }
+        #payment-form p:has(textarea[name="customer_notes"]) { grid-column: 1 / -1; }
         #payment-form .save-btn, #payment-form .back-link { grid-column: span 1; margin-top: 4px; }
         @media (max-width: 860px) {
             #payment-form { grid-template-columns: 1fr; }
@@ -39,6 +42,12 @@
         .customer-info { background: #fff; border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
         .customer-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
         .customer-info-item { font-size: 13px; color: #333; }
+        .debt-summary { background: #fff; border: 1px solid #d7e7ff; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+        .debt-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+        .debt-summary-item { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
+        .debt-summary-item strong { display: block; font-size: 12px; color: #345; margin-bottom: 6px; }
+        .debt-summary-item .value { font-size: 16px; color: #111; font-weight: 700; direction: ltr; text-align: right; }
+        .debt-summary-note { margin-top: 8px; color: #666; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -66,6 +75,29 @@
                 <div class="customer-info-item"><strong>شماره تلفن:</strong> {{ customer_info.phone|default:'-' }}</div>
             </div>
         </div>
+        {% if customer_debt %}
+        <div class="debt-summary">
+            <div class="debt-summary-grid">
+                <div class="debt-summary-item">
+                    <strong>بدهی فعلی (ممیزی نشده)</strong>
+                    <div class="value">{{ customer_debt.review_debt|thousand_sep }} ریال</div>
+                </div>
+                <div class="debt-summary-item">
+                    <strong>بدهی تایید شده</strong>
+                    <div class="value">{{ customer_debt.confirmed_debt|thousand_sep }} ریال</div>
+                </div>
+                <div class="debt-summary-item">
+                    <strong>جمع فاکتورها</strong>
+                    <div class="value">{{ customer_debt.invoice_total|thousand_sep }} ریال</div>
+                </div>
+                <div class="debt-summary-item">
+                    <strong>فیش‌های در انتظار تایید</strong>
+                    <div class="value">{{ customer_debt.pending_review_payment_total|thousand_sep }} ریال</div>
+                </div>
+            </div>
+            <div class="debt-summary-note">بدهی ممیزی نشده با فیش‌های ثبت‌شده و ردنشده محاسبه می‌شود؛ بدهی تایید شده فقط فیش‌های تایید شده را کسر می‌کند.</div>
+        </div>
+        {% endif %}
 
         {% if payment.last_staff_note %}
             <div class="note-box">
@@ -84,7 +116,19 @@
 
         <form id="payment-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            {{ form.as_p }}
+            {% for hidden in form.hidden_fields %}
+                {{ hidden }}
+            {% endfor %}
+            {% for field in form.visible_fields %}
+                {% if field.name != 'customer_notes' %}
+                    <p>
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+                        {{ field.errors }}
+                    </p>
+                {% endif %}
+            {% endfor %}
             <p class="full-row">
                 <label for="source_profile_picker">استفاده از اطلاعات مبدا قبلی</label>
                 <select id="source_profile_picker">
@@ -110,6 +154,12 @@
                         <option value="" disabled>اطلاعات مقصد قبلی موجود نیست</option>
                     {% endfor %}
                 </select>
+            </p>
+            <p class="full-row">
+                <label for="{{ form.customer_notes.id_for_label }}">توضیح (اختیاری)</label>
+                {{ form.customer_notes }}
+                {% if form.customer_notes.help_text %}<span class="helptext">{{ form.customer_notes.help_text }}</span>{% endif %}
+                {{ form.customer_notes.errors }}
             </p>
             <button type="submit" class="save-btn">ثبت اصلاحات</button>
             <a href="{% url 'submit' %}" class="back-link">بازگشت</a>

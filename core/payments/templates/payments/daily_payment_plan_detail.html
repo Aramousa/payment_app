@@ -1,0 +1,150 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>جزئیات برنامه واریز روزانه</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <script src="{% static 'js/cleave.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
+        .top-bar, .panel { max-width: 1200px; margin: 0 auto 16px; }
+        .top-bar { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .button-link, button { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
+        .button-link.alt { background: #6c757d; }
+        .danger { background: #dc3545; }
+        .panel { background: #fff; border: 1px solid #e4e9f2; border-radius: 10px; padding: 16px; }
+        .info-grid, .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+        .info-item, .summary-item { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
+        .info-item strong, .summary-item strong { display: block; font-size: 12px; color: #345; margin-bottom: 6px; }
+        .value, .money { direction: ltr; white-space: nowrap; font-weight: 700; }
+        .form-grid { display: grid; grid-template-columns: minmax(220px, 1.3fr) minmax(180px, .8fr) minmax(220px, 1fr) auto; gap: 12px; align-items: end; }
+        label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
+        input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+        th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
+        th { background: #007bff; color: #fff; }
+        .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
+        .messages { max-width: 1200px; margin: 0 auto 12px; color: #155724; }
+        @media (max-width: 900px) { .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>جزئیات برنامه واریز روزانه</h2>
+        <div>
+            <a href="{% url 'daily_payment_plans' %}" class="button-link alt">بازگشت به برنامه ها</a>
+            <a href="{% url 'submit' %}" class="button-link alt">صفحه اصلی</a>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="panel">
+        <div class="info-grid">
+            <div class="info-item"><strong>تاریخ معتبر</strong><div>{{ plan.deposit_date }}</div></div>
+            <div class="info-item"><strong>بانک</strong><div>{{ plan.bank_name|default:'-' }}</div></div>
+            <div class="info-item"><strong>شماره حساب</strong><div class="value">{{ plan.account_number }}</div></div>
+            <div class="info-item"><strong>صاحب حساب</strong><div>{{ plan.account_owner|default:'-' }}</div></div>
+            <div class="info-item"><strong>مبلغ کل اعلامی</strong><div class="value">{{ plan.total_expected_amount|thousand_sep }} ریال</div></div>
+        </div>
+        {% if plan.note %}<p>{{ plan.note }}</p>{% endif %}
+    </div>
+
+    <div class="panel">
+        <div class="summary-grid">
+            <div class="summary-item"><strong>جمع تخصیص مشتریان</strong><div class="value">{{ totals.expected|thousand_sep }} ریال</div></div>
+            <div class="summary-item"><strong>واریز ممیزی نشده</strong><div class="value">{{ totals.paid|thousand_sep }} ریال</div></div>
+            <div class="summary-item"><strong>واریز تایید شده</strong><div class="value">{{ totals.confirmed|thousand_sep }} ریال</div></div>
+            <div class="summary-item"><strong>کسری ممیزی نشده</strong><div class="value">{{ totals.remaining|thousand_sep }} ریال</div></div>
+            <div class="summary-item"><strong>کسری تایید شده</strong><div class="value">{{ totals.confirmed_remaining|thousand_sep }} ریال</div></div>
+            <div class="summary-item"><strong>تعداد فیش</strong><div class="value">{{ totals.payment_count }}</div></div>
+        </div>
+    </div>
+
+    {% if can_manage_daily_payments %}
+    <div class="panel">
+        <h3>افزودن مشتری به برنامه</h3>
+        <form method="post" class="form-grid" id="assignment-form">
+            {% csrf_token %}
+            {% for field in assignment_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            <button type="submit">ثبت تخصیص</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <h3>وضعیت مشتریان</h3>
+        {% if assignments %}
+        <table>
+            <thead>
+                <tr>
+                    <th>مشتری</th>
+                    <th>مبلغ مورد انتظار</th>
+                    <th>واریز ممیزی نشده</th>
+                    <th>واریز تایید شده</th>
+                    <th>کسری ممیزی نشده</th>
+                    <th>تعداد فیش</th>
+                    <th>توضیح</th>
+                    {% if can_manage_daily_payments %}<th>عملیات</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for assignment in assignments %}
+                <tr>
+                    <td>
+                        {{ assignment.customer.get_full_name|default:assignment.customer.username }}<br>
+                        {{ assignment.customer.profile.organization|default:'-' }}
+                    </td>
+                    <td class="money">{{ assignment.expected_amount|thousand_sep }}</td>
+                    <td class="money">{{ assignment.report.paid_amount|thousand_sep }}</td>
+                    <td class="money">{{ assignment.report.confirmed_amount|thousand_sep }}</td>
+                    <td class="money">{{ assignment.remaining_amount|thousand_sep }}</td>
+                    <td>{{ assignment.report.payment_count }}</td>
+                    <td>{{ assignment.note|default:'-' }}</td>
+                    {% if can_manage_daily_payments %}
+                    <td>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="remove_assignment">
+                            <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+                            <button type="submit" class="danger">حذف</button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p>هنوز مشتری به این برنامه اضافه نشده است.</p>
+        {% endif %}
+    </div>
+
+    <script>
+    document.querySelectorAll('.amount-input').forEach(function (el) {
+        new Cleave(el, { numeral: true, numeralThousandsGroupStyle: 'thousand' });
+    });
+    const form = document.getElementById('assignment-form');
+    if (form) {
+        form.addEventListener('submit', function () {
+            document.querySelectorAll('.amount-input').forEach(function (input) {
+                input.value = input.value.replace(/,/g, '');
+            });
+        });
+    }
+    </script>
+</body>
+</html>

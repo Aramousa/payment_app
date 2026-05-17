@@ -1,10 +1,13 @@
 from django.urls import path
 from .views import (
+    bank_names_autocomplete,
     counterparty_edit,
     counterparties_manage,
     create_payment,
     customer_detail,
     customers_list,
+    daily_payment_plan_detail,
+    daily_payment_plans,
     edit_payment,
     export_records,
     invoice_detail,
@@ -27,8 +30,11 @@ from .views import (
 urlpatterns = [
     path('submit/', create_payment, name='submit'),
     path('success/', success, name='success'),
+    path('api/bank-names/', bank_names_autocomplete, name='bank_names_autocomplete'),
     path('customer/<int:user_id>/', customer_detail, name='customer_detail'),
     path('customers/', customers_list, name='customers_list'),
+    path('daily-payments/', daily_payment_plans, name='daily_payment_plans'),
+    path('daily-payments/<int:plan_id>/', daily_payment_plan_detail, name='daily_payment_plan_detail'),
     path('users/reset-password/<int:user_id>/', reset_user_password, name='reset_user_password'),
     path('payments/<int:payment_id>/status/', staff_update_status, name='staff_update_status'),
     path('payments/<int:payment_id>/edit/', edit_payment, name='edit_payment'),

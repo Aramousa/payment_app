@@ -106,9 +106,11 @@ class PaymentRecord(models.Model):
     beneficiary_account_number = models.CharField(max_length=64, blank=True, default='')
     beneficiary_account_owner = models.CharField(max_length=128, blank=True, default='')
     receipt_image = models.ImageField(upload_to='receipts/', blank=True, null=True)
+    daily_assignment = models.ForeignKey('DailyPaymentAssignment', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     locked_by_finance = models.BooleanField(default=False)
     last_staff_note = models.TextField('آخرین توضیح کارشناس', blank=True)
+    customer_notes = models.TextField('توضیحات مشتری', blank=True, help_text='توضیحات یا نکات مشتری در مورد این واریزی')
     created_at = models.DateTimeField(auto_now_add=True)
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
 
@@ -194,6 +196,46 @@ class PaymentReceipt(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['payment', 'file_hash'], name='uniq_payment_receipt_hash'),
         ]
+
+
+class DailyPaymentPlan(models.Model):
+    deposit_date = jmodels.jDateField('تاریخ واریز')
+    bank_name = models.CharField('نام بانک', max_length=64, blank=True)
+    account_number = models.CharField('شماره حساب مقصد', max_length=64)
+    account_owner = models.CharField('نام صاحب حساب', max_length=128, blank=True)
+    total_expected_amount = models.BigIntegerField('مبلغ کل مورد انتظار', default=0)
+    note = models.TextField('توضیح', blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_daily_payment_plans')
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        ordering = ['-deposit_date', '-id']
+        verbose_name = 'برنامه واریز روزانه'
+        verbose_name_plural = 'برنامه های واریز روزانه'
+
+    def __str__(self):
+        return f"{self.deposit_date} - {self.account_number}"
+
+
+class DailyPaymentAssignment(models.Model):
+    plan = models.ForeignKey(DailyPaymentPlan, on_delete=models.CASCADE, related_name='assignments')
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='daily_payment_assignments')
+    expected_amount = models.BigIntegerField('مبلغ مورد انتظار')
+    note = models.TextField('توضیح', blank=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        ordering = ['customer__first_name', 'customer__last_name', 'customer__username']
+        constraints = [
+            models.UniqueConstraint(fields=['plan', 'customer'], name='uniq_daily_payment_assignment_customer'),
+        ]
+        verbose_name = 'تخصیص واریز روزانه'
+        verbose_name_plural = 'تخصیص های واریز روزانه'
+
+    def __str__(self):
+        return f"{self.customer} - {self.expected_amount}"
 
 
 class PaymentActivityLog(models.Model):

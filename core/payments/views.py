@@ -3,10 +3,12 @@ import mimetypes
 import random
 from openpyxl import Workbook
 from urllib.parse import urlencode
+import json
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db import IntegrityError
 from django.db.models import Count, Max, Q, Sum
-from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -19,8 +21,8 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
-from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
+from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
@@ -195,6 +197,10 @@ def _parse_jalali_date(date_text):
         return jdatetime.datetime.strptime(date_text, '%Y/%m/%d').date()
     except ValueError:
         return None
+
+
+def _today_jalali_date():
+    return jdatetime.date.fromgregorian(date=timezone.localdate())
 
 
 def _format_jalali_datetime(value, date_format='%Y/%m/%d %H:%M'):
@@ -560,6 +566,98 @@ def _invoice_customer_rows():
     return rows
 
 
+def _customer_debt_summary(user):
+    invoice_total = InvoiceRecord.objects.filter(customer=user).aggregate(total=Sum('amount'))['total'] or 0
+    confirmed_payment_total = PaymentRecord.objects.filter(
+        user=user,
+        status__in=[
+            PaymentRecord.STATUS_APPROVED,
+            PaymentRecord.STATUS_FINAL_APPROVED,
+        ],
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    review_payment_total = PaymentRecord.objects.filter(user=user).exclude(
+        status=PaymentRecord.STATUS_REJECTED,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    return {
+        'invoice_total': invoice_total,
+        'confirmed_payment_total': confirmed_payment_total,
+        'review_payment_total': review_payment_total,
+        'confirmed_debt': invoice_total - confirmed_payment_total,
+        'review_debt': invoice_total - review_payment_total,
+        'pending_review_payment_total': review_payment_total - confirmed_payment_total,
+    }
+
+
+def _can_manage_daily_payments(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) in {'staff', 'commercial'}
+
+
+def _can_view_daily_payments(user):
+    return _is_staff_user(user)
+
+
+def _active_daily_assignment_for_user(user):
+    if not user or not user.is_authenticated:
+        return None
+    today = _today_jalali_date()
+    return (
+        DailyPaymentAssignment.objects
+        .select_related('plan', 'customer')
+        .filter(customer=user, plan__deposit_date=today)
+        .order_by('-id')
+        .first()
+    )
+
+
+def _daily_assignment_stats(assignments):
+    assignment_ids = [assignment.id for assignment in assignments]
+    if not assignment_ids:
+        return {}
+
+    paid_rows = (
+        PaymentRecord.objects
+        .filter(daily_assignment_id__in=assignment_ids)
+        .exclude(status=PaymentRecord.STATUS_REJECTED)
+        .values('daily_assignment')
+        .annotate(total=Sum('amount'), count=Count('id'))
+    )
+    confirmed_rows = (
+        PaymentRecord.objects
+        .filter(
+            daily_assignment_id__in=assignment_ids,
+            status__in=[
+                PaymentRecord.STATUS_APPROVED,
+                PaymentRecord.STATUS_FINAL_APPROVED,
+            ],
+        )
+        .values('daily_assignment')
+        .annotate(total=Sum('amount'), count=Count('id'))
+    )
+    stats = {
+        assignment_id: {
+            'paid_amount': 0,
+            'payment_count': 0,
+            'confirmed_amount': 0,
+            'confirmed_count': 0,
+        }
+        for assignment_id in assignment_ids
+    }
+    for row in paid_rows:
+        data = stats[row['daily_assignment']]
+        data['paid_amount'] = row['total'] or 0
+        data['payment_count'] = row['count'] or 0
+    for row in confirmed_rows:
+        data = stats[row['daily_assignment']]
+        data['confirmed_amount'] = row['total'] or 0
+        data['confirmed_count'] = row['count'] or 0
+    return stats
+
+
 def _managed_users():
     return User.objects.select_related('profile').order_by('username')
 
@@ -606,6 +704,118 @@ def _apply_invoice_filters(records, request, is_staff_user):
 
 
 @login_required
+def daily_payment_plans(request):
+    if not _can_view_daily_payments(request.user):
+        return HttpResponseForbidden('این بخش فقط برای کاربران واحدهای شرکت قابل دسترسی است.')
+
+    can_manage = _can_manage_daily_payments(request.user)
+    if request.method == 'POST':
+        if not can_manage:
+            return HttpResponseForbidden('شما دسترسی ایجاد برنامه واریز روزانه را ندارید.')
+        plan_form = DailyPaymentPlanForm(request.POST)
+        if plan_form.is_valid():
+            plan = plan_form.save(commit=False)
+            plan.created_by = request.user
+            plan.save()
+            messages.success(request, 'برنامه واریز روزانه ثبت شد.')
+            return redirect('daily_payment_plan_detail', plan_id=plan.id)
+    else:
+        plan_form = DailyPaymentPlanForm()
+
+    plans = list(
+        DailyPaymentPlan.objects
+        .select_related('created_by')
+        .prefetch_related('assignments')
+        .order_by('-deposit_date', '-id')
+    )
+    for plan in plans:
+        assignments = list(plan.assignments.all())
+        stats = _daily_assignment_stats(assignments)
+        plan.assignment_count = len(assignments)
+        plan.assigned_expected_total = sum(assignment.expected_amount for assignment in assignments)
+        plan.paid_total = sum(stats.get(assignment.id, {}).get('paid_amount', 0) for assignment in assignments)
+        plan.confirmed_total = sum(stats.get(assignment.id, {}).get('confirmed_amount', 0) for assignment in assignments)
+        plan.remaining_total = plan.assigned_expected_total - plan.paid_total
+
+    page_obj = _paginate_queryset(request, plans, per_page=15, page_param='page')
+    return render(request, 'payments/daily_payment_plans.html', {
+        'form': plan_form,
+        'plans': page_obj,
+        'page_obj': page_obj,
+        'can_manage_daily_payments': can_manage,
+        'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+    })
+
+
+@login_required
+def daily_payment_plan_detail(request, plan_id):
+    if not _can_view_daily_payments(request.user):
+        return HttpResponseForbidden('این بخش فقط برای کاربران واحدهای شرکت قابل دسترسی است.')
+
+    plan = get_object_or_404(DailyPaymentPlan.objects.select_related('created_by'), id=plan_id)
+    can_manage = _can_manage_daily_payments(request.user)
+
+    if request.method == 'POST':
+        if not can_manage:
+            return HttpResponseForbidden('شما دسترسی ویرایش تخصیص واریز روزانه را ندارید.')
+        if request.POST.get('action') == 'remove_assignment':
+            assignment_id = request.POST.get('assignment_id')
+            assignment = get_object_or_404(DailyPaymentAssignment, id=assignment_id, plan=plan)
+            assignment.delete()
+            messages.success(request, 'تخصیص مشتری حذف شد.')
+            return redirect('daily_payment_plan_detail', plan_id=plan.id)
+
+        assignment_form = DailyPaymentAssignmentForm(request.POST)
+        if assignment_form.is_valid():
+            assignment = assignment_form.save(commit=False)
+            assignment.plan = plan
+            try:
+                assignment.save()
+            except IntegrityError:
+                assignment_form.add_error('customer', 'برای این مشتری در این برنامه قبلاً تخصیص ثبت شده است.')
+            else:
+                messages.success(request, 'تخصیص مشتری ثبت شد.')
+                return redirect('daily_payment_plan_detail', plan_id=plan.id)
+    else:
+        assignment_form = DailyPaymentAssignmentForm()
+
+    assignments = list(
+        plan.assignments
+        .select_related('customer', 'customer__profile')
+        .prefetch_related('payments', 'payments__receipts')
+        .all()
+    )
+    stats = _daily_assignment_stats(assignments)
+    for assignment in assignments:
+        assignment.report = stats.get(assignment.id, {
+            'paid_amount': 0,
+            'payment_count': 0,
+            'confirmed_amount': 0,
+            'confirmed_count': 0,
+        })
+        assignment.remaining_amount = assignment.expected_amount - assignment.report['paid_amount']
+        assignment.confirmed_remaining_amount = assignment.expected_amount - assignment.report['confirmed_amount']
+
+    totals = {
+        'expected': sum(assignment.expected_amount for assignment in assignments),
+        'paid': sum(assignment.report['paid_amount'] for assignment in assignments),
+        'confirmed': sum(assignment.report['confirmed_amount'] for assignment in assignments),
+        'payment_count': sum(assignment.report['payment_count'] for assignment in assignments),
+    }
+    totals['remaining'] = totals['expected'] - totals['paid']
+    totals['confirmed_remaining'] = totals['expected'] - totals['confirmed']
+
+    return render(request, 'payments/daily_payment_plan_detail.html', {
+        'plan': plan,
+        'assignments': assignments,
+        'assignment_form': assignment_form,
+        'totals': totals,
+        'can_manage_daily_payments': can_manage,
+        'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+    })
+
+
+@login_required
 def create_payment(request):
     profile = None
     try:
@@ -617,26 +827,54 @@ def create_payment(request):
     is_staff_user = _is_staff_user(request.user)
     staff_role = _user_role(request.user) if is_staff_user else ''
     is_system_admin = request.user.is_superuser
+    active_daily_assignment = _active_daily_assignment_for_user(request.user) if not is_staff_user else None
+    form_initial = initial_data.copy()
+    if active_daily_assignment and request.method != 'POST':
+        form_initial.update({
+            'beneficiary_bank_name': active_daily_assignment.plan.bank_name,
+            'beneficiary_account_number': active_daily_assignment.plan.account_number,
+            'beneficiary_account_owner': active_daily_assignment.plan.account_owner,
+            'pay_date': active_daily_assignment.plan.deposit_date,
+        })
 
     if request.method == 'POST':
         if is_staff_user:
             return HttpResponseForbidden('کاربران واحدها امکان ثبت سند از این فرم را ندارند.')
-        form = PaymentRecordForm(request.POST, request.FILES, initial=initial_data)
+        form = PaymentRecordForm(request.POST, request.FILES, initial=form_initial)
         if form.is_valid():
-            payment = form.save(commit=False)
-            payment.user = request.user
-            payment.first_name = initial_data['first_name']
-            payment.last_name = initial_data['last_name']
-            payment.organization = initial_data['organization']
-            payment.city = initial_data['city']
-            payment.phone = initial_data['phone']
-            payment.status = PaymentRecord.STATUS_PENDING
-            payment.save()
-            _save_receipts(payment, form)
-            _log_activity(payment, request.user, PaymentActivityLog.ACTION_CREATED, to_status=payment.status)
-            return redirect('success')
+            submitted_account = (form.cleaned_data.get('beneficiary_account_number') or '').replace(' ', '').strip()
+            if active_daily_assignment:
+                expected_date = active_daily_assignment.plan.deposit_date
+                if form.cleaned_data.get('pay_date') != expected_date:
+                    form.add_error('pay_date', 'این شماره حساب فقط برای تاریخ اعلام شده امروز معتبر است.')
+                expected_account = (active_daily_assignment.plan.account_number or '').replace(' ', '').strip()
+                if submitted_account != expected_account:
+                    form.add_error('beneficiary_account_number', 'شماره حساب مقصد باید همان شماره حساب اعلام شده امروز باشد.')
+            elif submitted_account:
+                assigned_accounts = (
+                    DailyPaymentAssignment.objects
+                    .select_related('plan')
+                    .filter(customer=request.user, plan__account_number__iexact=form.cleaned_data.get('beneficiary_account_number'))
+                )
+                if assigned_accounts.exists():
+                    form.add_error('beneficiary_account_number', 'این شماره حساب برای امروز معتبر نیست و امکان ثبت فیش با آن وجود ندارد.')
+
+            if not form.errors:
+                payment = form.save(commit=False)
+                payment.user = request.user
+                payment.first_name = initial_data['first_name']
+                payment.last_name = initial_data['last_name']
+                payment.organization = initial_data['organization']
+                payment.city = initial_data['city']
+                payment.phone = initial_data['phone']
+                payment.status = PaymentRecord.STATUS_PENDING
+                payment.daily_assignment = active_daily_assignment
+                payment.save()
+                _save_receipts(payment, form)
+                _log_activity(payment, request.user, PaymentActivityLog.ACTION_CREATED, to_status=payment.status)
+                return redirect('success')
     else:
-        form = PaymentRecordForm(initial=initial_data)
+        form = PaymentRecordForm(initial=form_initial)
 
     records = _records_for_user(request.user)
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
@@ -667,6 +905,8 @@ def create_payment(request):
         'current_sort_dir': current_sort_dir,
         'sort_base_query': sort_base_query,
         'customer_info': initial_data,
+        'customer_debt': _customer_debt_summary(request.user) if not is_staff_user else None,
+        'active_daily_assignment': active_daily_assignment,
     })
 
 
@@ -890,6 +1130,7 @@ def edit_payment(request, payment_id):
         'source_profiles': _source_profiles_for_user(request.user),
         'destination_profiles': _destination_profiles_for_user(request.user),
         'customer_info': initial_data,
+        'customer_debt': _customer_debt_summary(request.user),
     })
 
 
@@ -1145,6 +1386,37 @@ def login_ad_image(request, ad_id):
     return _file_response(ad.image)
 
 
+@login_required
+def bank_names_autocomplete(request):
+    """
+    API endpoint for bank names autocomplete.
+    Returns list of unique bank names matching the search query.
+    """
+    query = (request.GET.get('q') or '').strip()
+    field_type = (request.GET.get('type') or 'payer').strip()  # 'payer' or 'beneficiary'
+    
+    if len(query) < 1:
+        return JsonResponse({'results': []})
+    
+    if field_type == 'beneficiary':
+        bank_names = (
+            PaymentRecord.objects
+            .filter(beneficiary_bank_name__icontains=query)
+            .values_list('beneficiary_bank_name', flat=True)
+            .distinct()
+            .order_by('beneficiary_bank_name')[:20]
+        )
+    else:  # payer
+        bank_names = (
+            PaymentRecord.objects
+            .filter(payer_bank_name__icontains=query)
+            .values_list('payer_bank_name', flat=True)
+            .distinct()
+            .order_by('payer_bank_name')[:20]
+        )
+    
+    results = [{'text': name, 'id': name} for name in bank_names if name]
+    return JsonResponse({'results': results})
 
 
 @login_required
@@ -1285,6 +1557,7 @@ def customer_detail(request, user_id):
         'total_invoices': total_invoices,
         'total_amount': total_amount,
         'invoice_total_amount': invoice_total_amount,
+        'customer_debt': _customer_debt_summary(customer_user),
         'status_counts': status_counts,
         'is_staff_user': is_staff_user,
         'staff_user_role': _user_role(request.user),
@@ -1321,6 +1594,31 @@ def customers_list(request):
             )
         )
     }
+    confirmed_payment_totals = {
+        row['user']: row['total'] or 0
+        for row in (
+            PaymentRecord.objects
+            .filter(
+                user__profile__role='customer',
+                status__in=[
+                    PaymentRecord.STATUS_APPROVED,
+                    PaymentRecord.STATUS_FINAL_APPROVED,
+                ],
+            )
+            .values('user')
+            .annotate(total=Sum('amount'))
+        )
+    }
+    review_payment_totals = {
+        row['user']: row['total'] or 0
+        for row in (
+            PaymentRecord.objects
+            .filter(user__profile__role='customer')
+            .exclude(status=PaymentRecord.STATUS_REJECTED)
+            .values('user')
+            .annotate(total=Sum('amount'))
+        )
+    }
     invoice_counts = {
         row['customer']: row['invoice_count']
         for row in (
@@ -1330,11 +1628,23 @@ def customers_list(request):
             .annotate(invoice_count=Count('id'))
         )
     }
+    invoice_totals = {
+        row['customer']: row['total'] or 0
+        for row in (
+            InvoiceRecord.objects
+            .filter(customer__profile__role='customer')
+            .values('customer')
+            .annotate(total=Sum('amount'))
+        )
+    }
 
     # Calculate counts for each customer
     customer_data = []
     for profile in customers:
         stats = payment_stats.get(profile.user_id, {})
+        invoice_total = invoice_totals.get(profile.user_id, 0)
+        confirmed_payment_total = confirmed_payment_totals.get(profile.user_id, 0)
+        review_payment_total = review_payment_totals.get(profile.user_id, 0)
 
         customer_data.append({
             'profile': profile,
@@ -1342,6 +1652,9 @@ def customers_list(request):
             'payment_count': stats.get('payment_count') or 0,
             'invoice_count': invoice_counts.get(profile.user_id, 0),
             'total_amount': stats.get('total_amount') or 0,
+            'invoice_total': invoice_total,
+            'confirmed_debt': invoice_total - confirmed_payment_total,
+            'review_debt': invoice_total - review_payment_total,
             'latest_payment_date': stats.get('latest_payment_date'),
         })
 

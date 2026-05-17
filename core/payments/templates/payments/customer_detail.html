@@ -8,6 +8,7 @@
     <title>اطلاعات مشتری - {{ customer_user.username }}</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <script src="{% static 'js/bank-autocomplete.js' %}?v=3"></script>
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
         h2 { text-align: center; margin-bottom: 20px; }
@@ -158,6 +159,14 @@
             <h3>جمع مبالغ واریزی (ریال)</h3>
             <div class="value">{{ total_amount|thousand_sep }}</div>
         </div>
+        <div class="summary-card">
+            <h3>بدهی فعلی ممیزی نشده (ریال)</h3>
+            <div class="value">{{ customer_debt.review_debt|thousand_sep }}</div>
+        </div>
+        <div class="summary-card">
+            <h3>بدهی تایید شده (ریال)</h3>
+            <div class="value">{{ customer_debt.confirmed_debt|thousand_sep }}</div>
+        </div>
     </div>
     
     <!-- Payments Section -->
@@ -216,6 +225,10 @@
                                 <div class="detail-card">
                                     <strong>تاریخ ثبت:</strong><br>
                                     {{ payment.created_at|jalali_datetime }}
+                                </div>
+                                <div class="detail-card">
+                                    <strong>توضیح مشتری:</strong><br>
+                                    {{ payment.customer_notes|default:'-' }}
                                 </div>
                                 {% if payment.last_staff_note %}
                                 <div class="detail-card">
@@ -322,7 +335,9 @@
             </div>
         {% endif %}
     {% else %}
-    
+        <div class="empty-message">هیچ فاکتوری برای این مشتری ثبت نشده است.</div>
+    {% endif %}
+
     <script>
         function toggleDetail(id) {
             var row = document.getElementById(id);

@@ -15,6 +15,7 @@
     <script src="{% static 'js/jquery.min.js' %}"></script>
     <script src="{% static 'js/persian-date.min.js' %}"></script>
     <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <script src="{% static 'js/bank-autocomplete.js' %}?v=3"></script>
 
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
@@ -43,11 +44,61 @@
         #payment-form button { background-color: #007bff; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 4px; grid-column: 1 / -1; }
         #payment-form .helptext { display: block; font-size: 12px; color: #6c757d; margin-top: -10px; margin-bottom: 12px; }
         #payment-form .full-row { grid-column: 1 / -1; }
+        #payment-form p:has(textarea[name="customer_notes"]) { grid-column: 1 / -1; }
         @media (max-width: 860px) {
             #payment-form { grid-template-columns: 1fr; }
         }
 
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+        
+        /* Bank Autocomplete Styles */
+        .bank-autocomplete-container {
+            position: relative;
+        }
+        
+        .bank-autocomplete-suggestions {
+            list-style: none;
+            margin: 0 !important;
+            padding: 0 !important;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .bank-autocomplete-suggestions.show {
+            display: block;
+        }
+        
+        .bank-autocomplete-suggestions li {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            background: #fff;
+            color: #333;
+        }
+        
+        .bank-autocomplete-suggestions li:last-child {
+            border-bottom: none;
+        }
+        
+        .bank-autocomplete-suggestions li:hover {
+            background-color: #e8f4f8;
+        }
+        
+        .bank-autocomplete-suggestions li.highlighted {
+            background-color: #0d6efd;
+            color: white;
+        }
 
         .filter-box { max-width: 1200px; margin: 20px auto 0; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
         .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
@@ -103,6 +154,14 @@
         .customer-info { max-width: 980px; margin: 0 auto 14px auto; background: #fff; border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; }
         .customer-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
         .customer-info-item { font-size: 13px; color: #333; }
+        .debt-summary { max-width: 980px; margin: 0 auto 14px auto; background: #fff; border: 1px solid #d7e7ff; border-radius: 10px; padding: 12px; }
+        .debt-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+        .debt-summary-item { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
+        .debt-summary-item strong { display: block; font-size: 12px; color: #345; margin-bottom: 6px; }
+        .debt-summary-item .value { font-size: 16px; color: #111; font-weight: 700; direction: ltr; text-align: right; }
+        .debt-summary-note { margin-top: 8px; color: #666; font-size: 12px; }
+        .daily-payment-notice { max-width: 980px; margin: 0 auto 14px auto; background: #fff7e6; border: 1px solid #ffbf69; border-right: 6px solid #f08c00; border-radius: 10px; padding: 14px; color: #3d2b00; font-size: 14px; line-height: 2; }
+        .daily-payment-notice strong { color: #b35c00; }
 
         /* Notification Bell Styles */
         .notification-bell { position: relative; display: inline-block; }
@@ -165,6 +224,7 @@
             <a href="{% url 'invoices_dashboard' %}" class="button-link">بخش فاکتورها</a>
             {% if is_staff_user %}
                 <a href="{% url 'customers_list' %}" class="button-link">لیست مشتریان</a>
+                <a href="{% url 'daily_payment_plans' %}" class="button-link">واریز روزانه</a>
             {% endif %}
             {% if request.user.is_superuser %}
                 <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
@@ -197,10 +257,55 @@
                 <div class="customer-info-item"><strong>شماره تلفن:</strong> {{ customer_info.phone|default:'-' }}</div>
             </div>
         </div>
+        {% if customer_debt %}
+        <div class="debt-summary">
+            <div class="debt-summary-grid">
+                <div class="debt-summary-item">
+                    <strong>بدهی فعلی (ممیزی نشده)</strong>
+                    <div class="value">{{ customer_debt.review_debt|thousand_sep }} ریال</div>
+                </div>
+                <div class="debt-summary-item">
+                    <strong>بدهی تایید شده</strong>
+                    <div class="value">{{ customer_debt.confirmed_debt|thousand_sep }} ریال</div>
+                </div>
+                <div class="debt-summary-item">
+                    <strong>جمع فاکتورها</strong>
+                    <div class="value">{{ customer_debt.invoice_total|thousand_sep }} ریال</div>
+                </div>
+                <div class="debt-summary-item">
+                    <strong>فیش‌های در انتظار تایید</strong>
+                    <div class="value">{{ customer_debt.pending_review_payment_total|thousand_sep }} ریال</div>
+                </div>
+            </div>
+            <div class="debt-summary-note">بدهی ممیزی نشده با فیش‌های ثبت‌شده و ردنشده محاسبه می‌شود؛ بدهی تایید شده فقط فیش‌های تایید شده را کسر می‌کند.</div>
+        </div>
+        {% endif %}
+        {% if active_daily_assignment %}
+        <div class="daily-payment-notice">
+            لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date }}</strong>
+            مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
+            را به حساب <strong>{{ active_daily_assignment.plan.account_number }}</strong>
+            {% if active_daily_assignment.plan.bank_name %}بانک <strong>{{ active_daily_assignment.plan.bank_name }}</strong>{% endif %}
+            واریز نمایید و فیش‌های مربوطه را بارگذاری نمایید.
+            نکته اینکه این شماره حساب صرفا برای امروز مورد تایید می‌باشد.
+        </div>
+        {% endif %}
         <h2>ثبت اطلاعات واریزی</h2>
         <form id="payment-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            {{ form.as_p }}
+            {% for hidden in form.hidden_fields %}
+                {{ hidden }}
+            {% endfor %}
+            {% for field in form.visible_fields %}
+                {% if field.name != 'customer_notes' %}
+                    <p>
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+                        {{ field.errors }}
+                    </p>
+                {% endif %}
+            {% endfor %}
             <p class="full-row">
                 <label for="source_profile_picker">استفاده از اطلاعات مبدا قبلی</label>
                 <select id="source_profile_picker">
@@ -226,6 +331,12 @@
                         <option value="" disabled>اطلاعات مقصد قبلی موجود نیست</option>
                     {% endfor %}
                 </select>
+            </p>
+            <p class="full-row">
+                <label for="{{ form.customer_notes.id_for_label }}">توضیح (اختیاری)</label>
+                {{ form.customer_notes }}
+                {% if form.customer_notes.help_text %}<span class="helptext">{{ form.customer_notes.help_text }}</span>{% endif %}
+                {{ form.customer_notes.errors }}
             </p>
             <button type="submit">ثبت</button>
         </form>
@@ -260,7 +371,7 @@
                 <div><label for="tracking_code">کد پیگیری</label><input id="tracking_code" type="text" name="tracking_code" value="{{ filters.tracking_code }}"></div>
                 <div><label for="payer_full_name">نام و نام خانوادگی واریز کننده</label><input id="payer_full_name" type="text" name="payer_full_name" value="{{ filters.payer_full_name }}"></div>
                 <div><label for="payer_account_number">شماره حساب واریز کننده</label><input id="payer_account_number" type="text" name="payer_account_number" value="{{ filters.payer_account_number }}"></div>
-                <div><label for="payer_bank_name">نام بانک</label><input id="payer_bank_name" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}"></div>
+                <div><label for="payer_bank_name">نام بانک</label><input id="payer_bank_name" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}" class="bank-autocomplete-input" data-bank-type="payer" autocomplete="off"></div>
                 <div>
                     <label for="counterparty">طرف حساب</label>
                     <select id="counterparty" name="counterparty">
@@ -274,7 +385,7 @@
             {% if not is_staff_user %}
                 <div><label for="payer_full_name_filter">واریز کننده</label><input id="payer_full_name_filter" type="text" name="payer_full_name" value="{{ filters.payer_full_name }}"></div>
                 <div><label for="payer_account_number_filter">شماره حساب واریز کننده</label><input id="payer_account_number_filter" type="text" name="payer_account_number" value="{{ filters.payer_account_number }}"></div>
-                <div><label for="payer_bank_name_filter">نام بانک</label><input id="payer_bank_name_filter" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}"></div>
+                <div><label for="payer_bank_name_filter">نام بانک</label><input id="payer_bank_name_filter" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}" class="bank-autocomplete-input" data-bank-type="payer" autocomplete="off"></div>
             {% endif %}
             <div><label for="amount_filter">مبلغ (ریال)</label><input id="amount_filter" class="amount-input" type="text" inputmode="numeric" dir="ltr" name="amount" value="{{ filters.amount }}"></div>
             <div><label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
@@ -412,6 +523,7 @@
                             <div>شماره حساب مقصد: {% if payment.beneficiary_account_number and payment.beneficiary_account_number != 'Z' %}{{ payment.beneficiary_account_number }}{% else %}-{% endif %}</div>
                             <div>نام صاحب حساب مقصد: {% if payment.beneficiary_account_owner and payment.beneficiary_account_owner != 'Z' %}{{ payment.beneficiary_account_owner }}{% else %}-{% endif %}</div>
                             <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
+                            <div>توضیح مشتری: {{ payment.customer_notes|default:'-' }}</div>
                             {% if is_staff_user %}<div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>{% endif %}
                             {% if payment.status == 'rejected' or payment.status == 'incomplete' %}
                                 <div>توضیح کارشناس: {{ payment.last_staff_note|default:'-' }}</div>

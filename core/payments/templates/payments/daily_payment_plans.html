@@ -1,0 +1,118 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>برنامه های واریز روزانه</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
+    <script src="{% static 'js/cleave.min.js' %}"></script>
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/persian-date.min.js' %}"></script>
+    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
+        .top-bar { max-width: 1200px; margin: 0 auto 16px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
+        .button-link.alt { background: #6c757d; }
+        .panel { max-width: 1200px; margin: 0 auto 18px; background: #fff; border: 1px solid #e4e9f2; border-radius: 10px; padding: 16px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+        label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
+        input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
+        .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+        th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
+        th { background: #007bff; color: #fff; }
+        .money { direction: ltr; white-space: nowrap; }
+        .messages { max-width: 1200px; margin: 0 auto 12px; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>برنامه های واریز روزانه</h2>
+        <div>
+            <a href="{% url 'submit' %}" class="button-link alt">بازگشت</a>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+        </div>
+    {% endif %}
+
+    {% if can_manage_daily_payments %}
+    <div class="panel">
+        <h3>ثبت برنامه روزانه</h3>
+        <form method="post" class="form-grid" id="daily-plan-form">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="button-link">ثبت برنامه</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <h3>گزارش برنامه ها</h3>
+        {% if plans %}
+        <table>
+            <thead>
+                <tr>
+                    <th>تاریخ</th>
+                    <th>حساب مقصد</th>
+                    <th>مبلغ کل اعلامی</th>
+                    <th>جمع تخصیص مشتریان</th>
+                    <th>واریز ممیزی نشده</th>
+                    <th>واریز تایید شده</th>
+                    <th>کسری نسبت به تخصیص</th>
+                    <th>تعداد مشتری</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for plan in plans %}
+                <tr>
+                    <td>{{ plan.deposit_date }}</td>
+                    <td>{{ plan.bank_name|default:'-' }}<br>{{ plan.account_number }}</td>
+                    <td class="money">{{ plan.total_expected_amount|thousand_sep }}</td>
+                    <td class="money">{{ plan.assigned_expected_total|thousand_sep }}</td>
+                    <td class="money">{{ plan.paid_total|thousand_sep }}</td>
+                    <td class="money">{{ plan.confirmed_total|thousand_sep }}</td>
+                    <td class="money">{{ plan.remaining_total|thousand_sep }}</td>
+                    <td>{{ plan.assignment_count }}</td>
+                    <td><a href="{% url 'daily_payment_plan_detail' plan.id %}" class="button-link">جزئیات</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p>برنامه ای ثبت نشده است.</p>
+        {% endif %}
+    </div>
+
+    <script>
+    $(document).ready(function () {
+        $('.jalali-date').persianDatepicker({ format: 'YYYY/MM/DD', observer: true, initialValue: false });
+        document.querySelectorAll('.amount-input').forEach(function (el) {
+            new Cleave(el, { numeral: true, numeralThousandsGroupStyle: 'thousand' });
+        });
+        const form = document.getElementById('daily-plan-form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                document.querySelectorAll('.amount-input').forEach(function (input) {
+                    input.value = input.value.replace(/,/g, '');
+                });
+            });
+        }
+    });
+    </script>
+</body>
+</html>
