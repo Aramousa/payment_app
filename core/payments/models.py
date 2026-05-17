@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 from django_jalali.db import models as jmodels
@@ -55,6 +56,47 @@ class LoginAdvertisement(models.Model):
         super().clean()
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValidationError({'end_date': 'تاریخ خاتمه باید بعد از تاریخ شروع باشد.'})
+
+
+class UploadSettings(models.Model):
+    receipt_max_upload_size_mb = models.PositiveIntegerField(
+        'حداکثر حجم هر فایل فیش (مگابایت)',
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
+    invoice_max_upload_size_mb = models.PositiveIntegerField(
+        'حداکثر حجم فایل فاکتور (مگابایت)',
+        default=5,
+        validators=[MinValueValidator(1)],
+    )
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        verbose_name = 'تنظیمات بارگذاری فایل'
+        verbose_name_plural = 'تنظیمات بارگذاری فایل'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('تنظیمات بارگذاری فایل قابل حذف نیست.')
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def receipt_max_upload_size_bytes(self):
+        return self.receipt_max_upload_size_mb * 1024 * 1024
+
+    @property
+    def invoice_max_upload_size_bytes(self):
+        return self.invoice_max_upload_size_mb * 1024 * 1024
+
+    def __str__(self):
+        return 'تنظیمات بارگذاری فایل'
 
 
 class PaymentRecord(models.Model):

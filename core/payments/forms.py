@@ -1,4 +1,5 @@
 import hashlib
+from io import BytesIO
 import os
 import random
 import re
@@ -7,13 +8,105 @@ from django import forms
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
+from PIL import Image, ImageOps
 
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, UserProfile
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, UploadSettings, UserProfile
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
+DEFAULT_RECEIPT_MAX_UPLOAD_SIZE = 1 * 1024 * 1024
+DEFAULT_INVOICE_MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+IMAGE_RESIZE_MAX_SIDE = 2200
+
+
+def _size_label(max_size_bytes):
+    mb = max_size_bytes / (1024 * 1024)
+    if mb.is_integer():
+        return f'{int(mb)} مگابایت'
+    return f'{mb:.1f} مگابایت'
+
+
+def _upload_settings():
+    try:
+        return UploadSettings.load()
+    except Exception:
+        return None
+
+
+def _receipt_max_upload_size():
+    settings = _upload_settings()
+    return settings.receipt_max_upload_size_bytes if settings else DEFAULT_RECEIPT_MAX_UPLOAD_SIZE
+
+
+def _invoice_max_upload_size():
+    settings = _upload_settings()
+    return settings.invoice_max_upload_size_bytes if settings else DEFAULT_INVOICE_MAX_UPLOAD_SIZE
+
+
+def _optimized_image_name(name):
+    base = os.path.splitext(os.path.basename(name or 'upload'))[0] or 'upload'
+    return f'{base}.jpg'
+
+
+def _flatten_for_jpeg(image):
+    if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
+        canvas = Image.new('RGB', image.size, (255, 255, 255))
+        alpha = image.convert('RGBA').getchannel('A')
+        canvas.paste(image.convert('RGB'), mask=alpha)
+        return canvas
+    if image.mode != 'RGB':
+        return image.convert('RGB')
+    return image
+
+
+def _optimize_uploaded_image(uploaded, max_size_bytes, max_side=IMAGE_RESIZE_MAX_SIDE):
+    if not uploaded.size or uploaded.size <= max_size_bytes:
+        return uploaded
+
+    try:
+        uploaded.seek(0)
+        image = Image.open(uploaded)
+        image = ImageOps.exif_transpose(image)
+        image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+        image = _flatten_for_jpeg(image)
+    except Exception:
+        try:
+            uploaded.seek(0)
+        except Exception:
+            pass
+        return uploaded
+
+    quality = 92
+    while True:
+        output = BytesIO()
+        image.save(output, format='JPEG', quality=quality, optimize=True, progressive=True)
+        if output.tell() <= max_size_bytes:
+            output.seek(0)
+            return SimpleUploadedFile(
+                _optimized_image_name(uploaded.name),
+                output.getvalue(),
+                content_type='image/jpeg',
+            )
+
+        width, height = image.size
+        if quality > 78:
+            quality -= 4
+            continue
+        if max(width, height) <= 900:
+            break
+
+        image = image.resize((max(1, int(width * 0.9)), max(1, int(height * 0.9))), Image.Resampling.LANCZOS)
+        quality = 84
+
+    try:
+        uploaded.seek(0)
+    except Exception:
+        pass
+    return uploaded
 
 
 class BankNameAutocompleteWidget(forms.TextInput):
@@ -164,7 +257,6 @@ class MultiFileField(forms.FileField):
 
 
 class PaymentRecordForm(forms.ModelForm):
-    MAX_UPLOAD_SIZE = 1 * 1024 * 1024
     ALLOWED_EXTENSIONS = {
         '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf',
     }
@@ -200,6 +292,11 @@ class PaymentRecordForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._receipt_payload = []
+        self.max_upload_size = _receipt_max_upload_size()
+        self.fields['receipt_images'].help_text = (
+            f'فقط فایل های تصویر استاندارد و PDF مجاز است. حداکثر حجم هر فایل: {_size_label(self.max_upload_size)}. '
+            'اگر تصویر بزرگتر باشد، سیستم آن را تا حد امکان بدون افت محسوس کیفیت بهینه می کند.'
+        )
 
         if not self.is_bound:
             amount_initial = self.initial.get('amount')
@@ -302,8 +399,10 @@ class PaymentRecordForm(forms.ModelForm):
             ext = os.path.splitext(uploaded.name or '')[1].lower()
             if ext not in self.ALLOWED_EXTENSIONS:
                 raise ValidationError('فرمت فایل مجاز نیست. فقط تصویرهای استاندارد و PDF پذیرفته می شود.')
-            if uploaded.size and uploaded.size > self.MAX_UPLOAD_SIZE:
-                raise ValidationError('حجم هر فایل باید حداکثر ۱ مگابایت باشد.')
+            if ext in IMAGE_EXTENSIONS:
+                uploaded = _optimize_uploaded_image(uploaded, self.max_upload_size)
+            if uploaded.size and uploaded.size > self.max_upload_size:
+                raise ValidationError(f'حجم هر فایل باید حداکثر {_size_label(self.max_upload_size)} باشد.')
 
             digest = hashlib.sha256()
             for chunk in uploaded.chunks():
@@ -318,7 +417,7 @@ class PaymentRecordForm(forms.ModelForm):
             payload.append((uploaded, file_hash))
 
         self._receipt_payload = payload
-        return files
+        return [uploaded for uploaded, _file_hash in payload]
 
     def receipt_payload(self):
         return self._receipt_payload
@@ -441,7 +540,6 @@ class CounterpartyForm(forms.ModelForm):
 
 
 class InvoiceUploadForm(forms.ModelForm):
-    MAX_UPLOAD_SIZE = 5 * 1024 * 1024
     ALLOWED_EXTENSIONS = {
         '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf',
     }
@@ -493,6 +591,11 @@ class InvoiceUploadForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.max_upload_size = _invoice_max_upload_size()
+        self.fields['attachment'].help_text = (
+            f'فقط فایل های تصویری استاندارد و PDF مجاز است. حداکثر حجم فایل: {_size_label(self.max_upload_size)}. '
+            'اگر تصویر بزرگتر باشد، سیستم آن را تا حد امکان بدون افت محسوس کیفیت بهینه می کند.'
+        )
         if not self.is_bound:
             amount_initial = self.initial.get('amount')
             if amount_initial is not None:
@@ -565,8 +668,10 @@ class InvoiceUploadForm(forms.ModelForm):
         ext = os.path.splitext(uploaded.name or '')[1].lower()
         if ext not in self.ALLOWED_EXTENSIONS:
             raise ValidationError('فقط فایل های تصویری استاندارد و PDF مجاز است.')
-        if uploaded.size and uploaded.size > self.MAX_UPLOAD_SIZE:
-            raise ValidationError('حجم فایل باید حداکثر ۵ مگابایت باشد.')
+        if ext in IMAGE_EXTENSIONS:
+            uploaded = _optimize_uploaded_image(uploaded, self.max_upload_size)
+        if uploaded.size and uploaded.size > self.max_upload_size:
+            raise ValidationError(f'حجم فایل باید حداکثر {_size_label(self.max_upload_size)} باشد.')
         return uploaded
 
 

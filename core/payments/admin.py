@@ -2,7 +2,7 @@ from django.contrib import admin
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
+from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UploadSettings, UserProfile
 
 
 def format_jalali_datetime(value):
@@ -110,6 +110,31 @@ class LoginAdvertisementAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+
+@admin.register(UploadSettings)
+class UploadSettingsAdmin(admin.ModelAdmin):
+    list_display = ('receipt_max_upload_size_mb', 'invoice_max_upload_size_mb', 'jalali_updated_at')
+
+    def jalali_updated_at(self, obj):
+        return format_jalali_datetime(obj.updated_at)
+
+    jalali_updated_at.short_description = 'آخرین بروزرسانی'
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser and not UploadSettings.objects.exists()
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(UserProfile)
