@@ -203,6 +203,12 @@ def _today_jalali_date():
     return jdatetime.date.fromgregorian(date=timezone.localdate())
 
 
+def _format_jalali_date(value):
+    if not value:
+        return ''
+    return value.strftime('%Y/%m/%d')
+
+
 def _format_jalali_datetime(value, date_format='%Y/%m/%d %H:%M'):
     if not value:
         return ''
@@ -614,6 +620,19 @@ def _active_daily_assignment_for_user(user):
     )
 
 
+def _latest_expired_daily_assignment_for_user(user):
+    if not user or not user.is_authenticated:
+        return None
+    today = _today_jalali_date()
+    return (
+        DailyPaymentAssignment.objects
+        .select_related('plan', 'customer')
+        .filter(customer=user, plan__deposit_date__lt=today)
+        .order_by('-plan__deposit_date', '-id')
+        .first()
+    )
+
+
 def _daily_assignment_stats(assignments):
     assignment_ids = [assignment.id for assignment in assignments]
     if not assignment_ids:
@@ -709,6 +728,11 @@ def daily_payment_plans(request):
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدهای شرکت قابل دسترسی است.')
 
     can_manage = _can_manage_daily_payments(request.user)
+    selected_date_text = (request.GET.get('date') or '').strip()
+    selected_date = _parse_jalali_date(selected_date_text) or _today_jalali_date()
+    previous_date = selected_date - jdatetime.timedelta(days=1)
+    next_date = selected_date + jdatetime.timedelta(days=1)
+
     if request.method == 'POST':
         if not can_manage:
             return HttpResponseForbidden('شما دسترسی ایجاد برنامه واریز روزانه را ندارید.')
@@ -720,13 +744,14 @@ def daily_payment_plans(request):
             messages.success(request, 'برنامه واریز روزانه ثبت شد.')
             return redirect('daily_payment_plan_detail', plan_id=plan.id)
     else:
-        plan_form = DailyPaymentPlanForm()
+        plan_form = DailyPaymentPlanForm(initial={'deposit_date': _today_jalali_date()})
 
     plans = list(
         DailyPaymentPlan.objects
         .select_related('created_by')
         .prefetch_related('assignments')
-        .order_by('-deposit_date', '-id')
+        .filter(deposit_date=selected_date)
+        .order_by('-id')
     )
     for plan in plans:
         assignments = list(plan.assignments.all())
@@ -737,11 +762,14 @@ def daily_payment_plans(request):
         plan.confirmed_total = sum(stats.get(assignment.id, {}).get('confirmed_amount', 0) for assignment in assignments)
         plan.remaining_total = plan.assigned_expected_total - plan.paid_total
 
-    page_obj = _paginate_queryset(request, plans, per_page=15, page_param='page')
     return render(request, 'payments/daily_payment_plans.html', {
         'form': plan_form,
-        'plans': page_obj,
-        'page_obj': page_obj,
+        'plans': plans,
+        'selected_date': selected_date,
+        'selected_date_text': _format_jalali_date(selected_date),
+        'previous_date_text': _format_jalali_date(previous_date),
+        'next_date_text': _format_jalali_date(next_date),
+        'today_date_text': _format_jalali_date(_today_jalali_date()),
         'can_manage_daily_payments': can_manage,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
     })
@@ -828,6 +856,9 @@ def create_payment(request):
     staff_role = _user_role(request.user) if is_staff_user else ''
     is_system_admin = request.user.is_superuser
     active_daily_assignment = _active_daily_assignment_for_user(request.user) if not is_staff_user else None
+    expired_daily_assignment = None
+    if not is_staff_user and not active_daily_assignment:
+        expired_daily_assignment = _latest_expired_daily_assignment_for_user(request.user)
     form_initial = initial_data.copy()
     if active_daily_assignment and request.method != 'POST':
         form_initial.update({
@@ -907,6 +938,7 @@ def create_payment(request):
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user) if not is_staff_user else None,
         'active_daily_assignment': active_daily_assignment,
+        'expired_daily_assignment': expired_daily_assignment,
     })
 
 

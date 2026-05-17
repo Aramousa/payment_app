@@ -19,6 +19,7 @@
         .button-link.alt { background: #6c757d; }
         .panel { max-width: 1200px; margin: 0 auto 18px; background: #fff; border: 1px solid #e4e9f2; border-radius: 10px; padding: 16px; }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+        .calendar-toolbar { display: grid; grid-template-columns: auto minmax(220px, 1fr) auto auto auto; gap: 10px; align-items: end; }
         label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
         input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
         .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
@@ -27,6 +28,7 @@
         th { background: #007bff; color: #fff; }
         .money { direction: ltr; white-space: nowrap; }
         .messages { max-width: 1200px; margin: 0 auto 12px; color: #155724; }
+        @media (max-width: 800px) { .calendar-toolbar { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -42,6 +44,20 @@
             {% for message in messages %}<div>{{ message }}</div>{% endfor %}
         </div>
     {% endif %}
+
+    <div class="panel">
+        <h3>تقویم روزانه برنامه‌های واریز</h3>
+        <form method="get" class="calendar-toolbar">
+            <a class="button-link alt" href="{% url 'daily_payment_plans' %}?date={{ previous_date_text }}">روز قبل</a>
+            <div>
+                <label for="date-filter">تاریخ</label>
+                <input id="date-filter" class="jalali-date" type="text" name="date" value="{{ selected_date_text }}" inputmode="numeric" dir="ltr">
+            </div>
+            <button type="submit" class="button-link">نمایش روز</button>
+            <a class="button-link" href="{% url 'daily_payment_plans' %}?date={{ next_date_text }}">روز بعد</a>
+            <a class="button-link alt" href="{% url 'daily_payment_plans' %}?date={{ today_date_text }}">امروز</a>
+        </form>
+    </div>
 
     {% if can_manage_daily_payments %}
     <div class="panel">
@@ -61,7 +77,7 @@
     {% endif %}
 
     <div class="panel">
-        <h3>گزارش برنامه ها</h3>
+        <h3>برنامه‌های تاریخ {{ selected_date_text }}</h3>
         {% if plans %}
         <table>
             <thead>
@@ -94,13 +110,23 @@
             </tbody>
         </table>
         {% else %}
-            <p>برنامه ای ثبت نشده است.</p>
+            <p>برای این تاریخ برنامه‌ای ثبت نشده است.</p>
         {% endif %}
     </div>
 
     <script>
     $(document).ready(function () {
-        $('.jalali-date').persianDatepicker({ format: 'YYYY/MM/DD', observer: true, initialValue: false });
+        $('.jalali-date').persianDatepicker({
+            format: 'YYYY/MM/DD',
+            observer: true,
+            initialValue: false,
+            initialValueType: 'persian',
+            toolbox: {
+                calendarSwitch: {
+                    enabled: false
+                }
+            }
+        });
         document.querySelectorAll('.amount-input').forEach(function (el) {
             new Cleave(el, { numeral: true, numeralThousandsGroupStyle: 'thousand' });
         });

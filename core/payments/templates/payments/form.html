@@ -162,6 +162,7 @@
         .debt-summary-note { margin-top: 8px; color: #666; font-size: 12px; }
         .daily-payment-notice { max-width: 980px; margin: 0 auto 14px auto; background: #fff7e6; border: 1px solid #ffbf69; border-right: 6px solid #f08c00; border-radius: 10px; padding: 14px; color: #3d2b00; font-size: 14px; line-height: 2; }
         .daily-payment-notice strong { color: #b35c00; }
+        .daily-payment-expired { max-width: 980px; margin: 0 auto 14px auto; background: #fff1f1; border: 1px solid #f3a6a6; border-right: 6px solid #dc3545; border-radius: 10px; padding: 14px; color: #5b1111; font-size: 14px; line-height: 2; }
 
         /* Notification Bell Styles */
         .notification-bell { position: relative; display: inline-block; }
@@ -286,8 +287,14 @@
             مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
             را به حساب <strong>{{ active_daily_assignment.plan.account_number }}</strong>
             {% if active_daily_assignment.plan.bank_name %}بانک <strong>{{ active_daily_assignment.plan.bank_name }}</strong>{% endif %}
+            {% if active_daily_assignment.plan.account_owner %}به نام <strong>{{ active_daily_assignment.plan.account_owner }}</strong>{% endif %}
             واریز نمایید و فیش‌های مربوطه را بارگذاری نمایید.
             نکته اینکه این شماره حساب صرفا برای امروز مورد تایید می‌باشد.
+        </div>
+        {% elif expired_daily_assignment %}
+        <div class="daily-payment-expired">
+            برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date }}</strong> بوده و منقضی شده است.
+            برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
         </div>
         {% endif %}
         <h2>ثبت اطلاعات واریزی</h2>
