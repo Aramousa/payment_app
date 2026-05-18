@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 {% load static %}
 <html lang="fa">
 <head>
@@ -29,17 +29,18 @@
 
         <table>
             <thead>
-                <tr><th>نام</th><th>توضیحات</th><th>عملیات</th></tr>
+                <tr><th>ردیف</th><th>نام</th><th>توضیحات</th><th>عملیات</th></tr>
             </thead>
             <tbody>
                 {% for cp in counterparties %}
                 <tr>
+                    <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                     <td>{{ cp.name }}</td>
                     <td>{{ cp.description|default:'-' }}</td>
                     <td><a href="{% url 'counterparty_edit' cp.id %}">ویرایش</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="3">طرف حسابی ثبت نشده است.</td></tr>
+                <tr><td colspan="4">طرف حسابی ثبت نشده است.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -56,5 +57,6 @@
             </div>
         {% endif %}
     </div>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

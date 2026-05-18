@@ -188,7 +188,7 @@
             <tbody>
                 {% for payment in payments %}
                     <tr class="summary-row" onclick="toggleDetail('payment-{{ payment.id }}')">
-                        <td>{{ forloop.counter }}</td>
+                        <td>{{ payments_page_obj.start_index|add:forloop.counter0 }}</td>
                         <td>{{ payment.amount|thousand_sep }}</td>
                         <td>{{ payment.pay_date }}</td>
                         <td>{{ payment.tracking_code|default:'-' }}</td>
@@ -305,7 +305,7 @@
             <tbody>
                 {% for invoice in invoices %}
                     <tr>
-                        <td>{{ forloop.counter }}</td>
+                        <td>{{ invoices_page_obj.start_index|add:forloop.counter0 }}</td>
                         <td>{{ invoice.invoice_number }}</td>
                         <td>{{ invoice.reference_number }}</td>
                         <td>{{ invoice.amount|thousand_sep }}</td>
@@ -347,5 +347,6 @@
             }
         }
     </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

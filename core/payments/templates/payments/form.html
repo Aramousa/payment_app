@@ -1,4 +1,4 @@
-﻿{% load humanize %}
+{% load humanize %}
 {% load static %}
 {% load payment_dates %}
 <!DOCTYPE html>
@@ -416,6 +416,7 @@
     <table>
         <thead>
             <tr>
+                <th>ردیف</th>
                 {% if is_staff_user %}
                 <th>نام مشتری</th>
                 <th>مجموعه</th>
@@ -458,6 +459,7 @@
         <tbody>
             {% for payment in records %}
             <tr class="summary-row" data-row="{{ payment.id }}">
+                <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                 {% if is_staff_user %}
                 <td>{{ payment.first_name }} {{ payment.last_name }}</td>
                 <td>{{ payment.organization|default:'-' }}</td>
@@ -517,7 +519,7 @@
                 </td>
             </tr>
             <tr class="detail-row" id="detail-{{ payment.id }}">
-                <td colspan="{% if is_staff_user %}11{% else %}7{% endif %}">
+                <td colspan="{% if is_staff_user %}12{% else %}8{% endif %}">
                     <div class="detail-grid">
                         <div class="detail-card">
                             <strong>اطلاعات رکورد</strong>
@@ -605,7 +607,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="{% if is_staff_user %}11{% else %}7{% endif %}">اطلاعاتی موجود نیست</td></tr>
+            <tr><td colspan="{% if is_staff_user %}12{% else %}8{% endif %}">اطلاعاتی موجود نیست</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -827,5 +829,6 @@
         }
     });
     </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

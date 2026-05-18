@@ -50,8 +50,26 @@
         </div>
     </div>
     
-    <div class="search-box">
-        <input type="text" id="customerSearch" placeholder="جستجو در نام، نام خانوادگی، نام کاربری، مجموعه، شهر یا شماره تماس..." onkeyup="filterCustomers()">
+    <div class="app-filter-panel">
+        <form method="get" class="app-filter-grid">
+            <div>
+                <label for="customerSearch">جستجوی مشتری</label>
+                <input type="search" id="customerSearch" name="q" value="{{ filters.q }}" placeholder="نام، نام کاربری، مجموعه، شهر یا شماره تماس">
+            </div>
+            <div>
+                <label for="statusFilter">وضعیت</label>
+                <select id="statusFilter" name="status">
+                    <option value="">همه وضعیت‌ها</option>
+                    <option value="active" {% if filters.status == 'active' %}selected{% endif %}>فعال</option>
+                    <option value="suspended" {% if filters.status == 'suspended' %}selected{% endif %}>معلق</option>
+                    <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>غیرفعال</option>
+                </select>
+            </div>
+            <div class="app-filter-actions">
+                <button type="submit" class="customer-link">اعمال فیلتر</button>
+                <a href="{% url 'customers_list' %}" class="back-link">حذف فیلتر</a>
+            </div>
+        </form>
     </div>
     
     {% if customer_data %}
@@ -78,7 +96,7 @@
             <tbody id="customerTableBody">
                 {% for customer in customer_data %}
                     <tr class="customer-row" data-search="{{ customer.user.username }} {{ customer.profile.first_name|default:'' }} {{ customer.profile.last_name|default:'' }} {{ customer.profile.organization|default:'' }} {{ customer.profile.city|default:'' }} {{ customer.profile.phone|default:'' }} {{ customer.profile.mobile|default:'' }}">
-                        <td>{{ forloop.counter }}</td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                         <td>{{ customer.user.username }}</td>
                         <td>{{ customer.profile.first_name|default:'-' }} {{ customer.profile.last_name|default:'' }}</td>
                         <td>{{ customer.profile.organization|default:'-' }}</td>
@@ -127,20 +145,6 @@
         <div class="empty-message">هیچ مشتری ثبت نشده است.</div>
     {% endif %}
     
-    <script>
-        function filterCustomers() {
-            var searchText = document.getElementById('customerSearch').value.toLowerCase();
-            var rows = document.getElementsByClassName('customer-row');
-            
-            for (var i = 0; i < rows.length; i++) {
-                var searchData = rows[i].getAttribute('data-search').toLowerCase();
-                if (searchData.indexOf(searchText) > -1) {
-                    rows[i].style.display = '';
-                } else {
-                    rows[i].style.display = 'none';
-                }
-            }
-        }
-    </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

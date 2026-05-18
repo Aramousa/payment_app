@@ -92,6 +92,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>ردیف</th>
                     <th>مشتری</th>
                     <th>مبلغ مورد انتظار</th>
                     <th>واریز ممیزی نشده</th>
@@ -105,6 +106,7 @@
             <tbody>
                 {% for assignment in assignments %}
                 <tr>
+                    <td>{{ forloop.counter }}</td>
                     <td>
                         {{ assignment.customer.get_full_name|default:assignment.customer.username }}<br>
                         {{ assignment.customer.profile.organization|default:'-' }}
@@ -148,5 +150,6 @@
         });
     }
     </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

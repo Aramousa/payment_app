@@ -102,9 +102,41 @@
 
     <div class="section">
         <h2>فهرست کاربران</h2>
+        <form method="get" class="app-filter-panel">
+            <div class="app-filter-grid">
+                <div>
+                    <label for="userSearch">جستجوی کاربر</label>
+                    <input id="userSearch" type="search" name="q" value="{{ filters.q }}" placeholder="نام، نام کاربری، موبایل، مجموعه یا شهر">
+                </div>
+                <div>
+                    <label for="roleFilter">نقش</label>
+                    <select id="roleFilter" name="role">
+                        <option value="">همه نقش‌ها</option>
+                        <option value="customer" {% if filters.role == 'customer' %}selected{% endif %}>مشتری</option>
+                        <option value="commercial" {% if filters.role == 'commercial' %}selected{% endif %}>بازرگانی</option>
+                        <option value="finance" {% if filters.role == 'finance' %}selected{% endif %}>مالی</option>
+                        <option value="staff" {% if filters.role == 'staff' %}selected{% endif %}>کارمند</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="statusFilter">وضعیت</label>
+                    <select id="statusFilter" name="status">
+                        <option value="">همه وضعیت‌ها</option>
+                        <option value="active" {% if filters.status == 'active' %}selected{% endif %}>فعال</option>
+                        <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>غیرفعال</option>
+                        <option value="suspended" {% if filters.status == 'suspended' %}selected{% endif %}>معلق</option>
+                    </select>
+                </div>
+                <div class="app-filter-actions">
+                    <button type="submit" class="button-link">اعمال فیلتر</button>
+                    <a href="{% url 'users_manage' %}" class="cancel-link">حذف فیلتر</a>
+                </div>
+            </div>
+        </form>
         <table>
             <thead>
                 <tr>
+                    <th>ردیف</th>
                     <th>نام کاربر</th>
                     <th>نام و نام خانوادگی</th>
                     <th>نقش</th>
@@ -121,6 +153,7 @@
             <tbody>
                 {% for item in users %}
                     <tr>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                         <td>{{ item.username }}</td>
                         <td>{{ item.first_name }} {{ item.last_name }}</td>
                         <td>{{ item.profile.get_role_display }}</td>
@@ -139,7 +172,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="11">کاربری ثبت نشده است.</td></tr>
+                    <tr><td colspan="12">کاربری ثبت نشده است.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -235,5 +268,6 @@
             });
         });
     </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

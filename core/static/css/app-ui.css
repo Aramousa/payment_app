@@ -1,5 +1,5 @@
 :root {
-    --app-bg: #f3f6f9;
+    --app-bg: #eef2f6;
     --app-surface: #ffffff;
     --app-surface-soft: #f8fafc;
     --app-border: #dbe3ec;
@@ -14,6 +14,7 @@
     --app-radius: 8px;
     --app-shadow: 0 10px 28px rgba(31, 41, 51, 0.08);
     --app-shadow-soft: 0 4px 14px rgba(31, 41, 51, 0.06);
+    --app-shadow-menu: 0 18px 45px rgba(31, 41, 51, 0.18);
 }
 
 * {
@@ -29,6 +30,7 @@ body {
     background:
         linear-gradient(180deg, #eef4f8 0, var(--app-bg) 260px) !important;
     line-height: 1.75;
+    min-height: 100vh;
 }
 
 a {
@@ -49,6 +51,7 @@ h3 {
     border-radius: var(--app-radius);
     box-shadow: var(--app-shadow-soft);
     padding: 12px 14px;
+    position: relative;
 }
 
 .top-bar h2 {
@@ -60,6 +63,63 @@ h3 {
 .filter-actions,
 .invoice-filter-actions {
     align-items: center;
+}
+
+.app-menu-trigger {
+    align-items: center;
+    background: #17212f !important;
+    border: 1px solid #17212f !important;
+    border-radius: var(--app-radius) !important;
+    color: #fff !important;
+    cursor: pointer;
+    display: inline-flex;
+    font-family: Vazir, sans-serif;
+    font-weight: 700;
+    gap: 8px;
+    min-height: 38px;
+    padding: 8px 14px;
+}
+
+.app-menu-static-item {
+    flex: 0 0 auto;
+}
+
+.app-menu-trigger::before {
+    content: "☰";
+    font-size: 15px;
+    line-height: 1;
+}
+
+.top-bar.app-menu-ready .top-actions {
+    background: #fff;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow-menu);
+    display: none !important;
+    gap: 8px;
+    inset-inline-start: 14px;
+    max-width: min(360px, calc(100vw - 34px));
+    min-width: 240px;
+    padding: 10px;
+    position: absolute;
+    top: calc(100% + 8px);
+    z-index: 20;
+}
+
+.top-bar.app-menu-open .top-actions {
+    display: grid !important;
+    grid-template-columns: 1fr;
+}
+
+.top-bar.app-menu-ready .top-actions > * {
+    width: 100%;
+}
+
+.top-bar.app-menu-ready .top-actions a,
+.top-bar.app-menu-ready .top-actions button {
+    justify-content: center;
+    text-align: center;
+    width: 100%;
 }
 
 .button-link,
@@ -142,6 +202,56 @@ button[type="submit"] {
     box-shadow: var(--app-shadow-soft) !important;
 }
 
+.app-toolbar,
+.app-filter-panel {
+    background: var(--app-surface) !important;
+    border: 1px solid var(--app-border) !important;
+    border-radius: var(--app-radius) !important;
+    box-shadow: var(--app-shadow-soft) !important;
+    margin: 0 auto 16px;
+    max-width: 1200px;
+    padding: 14px;
+}
+
+.app-filter-panel {
+    position: sticky;
+    top: 10px;
+    z-index: 5;
+}
+
+.app-filter-grid {
+    align-items: end;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.app-filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.app-table-tools {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin: 0 0 10px;
+}
+
+.app-table-search {
+    max-width: 360px;
+}
+
+.app-table-wrap {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    overflow: auto;
+    width: 100%;
+}
+
 .section,
 .filter-box,
 .search-box,
@@ -193,6 +303,7 @@ table {
     border-radius: var(--app-radius);
     box-shadow: var(--app-shadow-soft) !important;
     overflow: hidden;
+    table-layout: auto;
 }
 
 th {
@@ -207,6 +318,17 @@ th {
 td,
 th {
     border-bottom-color: #e7edf3 !important;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+td {
+    color: #243447;
+}
+
+td:first-child,
+th:first-child {
+    padding-inline-start: 14px;
 }
 
 tbody tr:nth-child(even):not(.detail-row) {
@@ -227,6 +349,12 @@ tr.detail-row {
     background: var(--app-surface-soft) !important;
     border: 1px solid var(--app-border) !important;
     border-radius: var(--app-radius) !important;
+}
+
+.money,
+.money-cell,
+.value[dir="ltr"] {
+    font-variant-numeric: tabular-nums;
 }
 
 .status-pill,
@@ -332,5 +460,18 @@ tr.detail-row {
         display: block;
         overflow-x: auto;
         white-space: nowrap;
+    }
+
+    .app-filter-panel {
+        position: static;
+    }
+
+    .app-table-tools {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .app-table-search {
+        max-width: 100%;
     }
 }

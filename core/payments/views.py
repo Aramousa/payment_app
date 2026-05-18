@@ -284,6 +284,107 @@ def _paginate_queryset(request, queryset, per_page=15, page_param='page'):
     return page_obj
 
 
+def _excel_response(filename, sheets):
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb = Workbook()
+    first = True
+    for title, headers, rows in sheets:
+        ws = wb.active if first else wb.create_sheet()
+        first = False
+        ws.title = title[:31]
+        ws.append(headers)
+        for row in rows:
+            ws.append(row)
+    wb.save(response)
+    return response
+
+
+def _customer_list_rows(request):
+    customers = UserProfile.objects.filter(role='customer').select_related('user').order_by('user__username')
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'status': (request.GET.get('status') or '').strip(),
+    }
+    if filters['q']:
+        customers = customers.filter(
+            Q(user__username__icontains=filters['q']) |
+            Q(user__first_name__icontains=filters['q']) |
+            Q(user__last_name__icontains=filters['q']) |
+            Q(first_name__icontains=filters['q']) |
+            Q(last_name__icontains=filters['q']) |
+            Q(organization__icontains=filters['q']) |
+            Q(city__icontains=filters['q']) |
+            Q(province__icontains=filters['q']) |
+            Q(phone__icontains=filters['q']) |
+            Q(mobile__icontains=filters['q'])
+        )
+    if filters['status'] == 'active':
+        customers = customers.filter(suspended=False, user__is_active=True)
+    elif filters['status'] == 'suspended':
+        customers = customers.filter(suspended=True)
+    elif filters['status'] == 'inactive':
+        customers = customers.filter(user__is_active=False)
+
+    payment_stats = {
+        row['user']: row
+        for row in (
+            PaymentRecord.objects
+            .filter(user__profile__role='customer')
+            .values('user')
+            .annotate(payment_count=Count('id'), total_amount=Sum('amount'), latest_payment_date=Max('created_at'))
+        )
+    }
+    confirmed_payment_totals = {
+        row['user']: row['total'] or 0
+        for row in (
+            PaymentRecord.objects
+            .filter(user__profile__role='customer', status__in=[PaymentRecord.STATUS_APPROVED, PaymentRecord.STATUS_FINAL_APPROVED])
+            .values('user')
+            .annotate(total=Sum('amount'))
+        )
+    }
+    review_payment_totals = {
+        row['user']: row['total'] or 0
+        for row in (
+            PaymentRecord.objects
+            .filter(user__profile__role='customer')
+            .exclude(status=PaymentRecord.STATUS_REJECTED)
+            .values('user')
+            .annotate(total=Sum('amount'))
+        )
+    }
+    invoice_counts = {
+        row['customer']: row['invoice_count']
+        for row in InvoiceRecord.objects.filter(customer__profile__role='customer').values('customer').annotate(invoice_count=Count('id'))
+    }
+    invoice_totals = {
+        row['customer']: row['total'] or 0
+        for row in InvoiceRecord.objects.filter(customer__profile__role='customer').values('customer').annotate(total=Sum('amount'))
+    }
+
+    customer_data = []
+    for profile in customers:
+        stats = payment_stats.get(profile.user_id, {})
+        invoice_total = invoice_totals.get(profile.user_id, 0)
+        confirmed_payment_total = confirmed_payment_totals.get(profile.user_id, 0)
+        review_payment_total = review_payment_totals.get(profile.user_id, 0)
+        customer_data.append({
+            'profile': profile,
+            'user': profile.user,
+            'payment_count': stats.get('payment_count') or 0,
+            'invoice_count': invoice_counts.get(profile.user_id, 0),
+            'total_amount': stats.get('total_amount') or 0,
+            'invoice_total': invoice_total,
+            'confirmed_debt': invoice_total - confirmed_payment_total,
+            'review_debt': invoice_total - review_payment_total,
+            'latest_payment_date': stats.get('latest_payment_date'),
+        })
+    return customer_data, filters
+
+
 def _log_activity(payment, actor, action, from_status='', to_status='', note=''):
     PaymentActivityLog.objects.create(
         payment=payment,
@@ -727,8 +828,29 @@ def _daily_assignment_stats(assignments):
     return stats
 
 
-def _managed_users():
-    return User.objects.select_related('profile').order_by('username')
+def _managed_users(query='', role='', status=''):
+    users = User.objects.select_related('profile').order_by('username')
+    if query:
+        users = users.filter(
+            Q(username__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query) |
+            Q(profile__phone__icontains=query) |
+            Q(profile__mobile__icontains=query) |
+            Q(profile__organization__icontains=query) |
+            Q(profile__city__icontains=query) |
+            Q(profile__province__icontains=query)
+        )
+    if role:
+        users = users.filter(profile__role=role)
+    if status == 'active':
+        users = users.filter(is_active=True)
+    elif status == 'inactive':
+        users = users.filter(is_active=False)
+    elif status == 'suspended':
+        users = users.filter(profile__suspended=True)
+    return users
 
 
 def _apply_invoice_filters(records, request, is_staff_user):
@@ -1296,6 +1418,11 @@ def users_manage(request):
         return HttpResponseForbidden('شما دسترسی مدیریت کاربران را ندارید.')
 
     password_suggestion = _suggest_five_digit_password()
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'role': (request.GET.get('role') or '').strip(),
+        'status': (request.GET.get('status') or '').strip(),
+    }
     if request.method == 'POST':
         form = UserAccountManagementForm(request.POST, password_suggestion=password_suggestion)
         if form.is_valid():
@@ -1314,7 +1441,12 @@ def users_manage(request):
             password_suggestion=password_suggestion,
         )
 
-    users_page = _paginate_queryset(request, _managed_users(), per_page=15, page_param='page')
+    users_page = _paginate_queryset(
+        request,
+        _managed_users(query=filters['q'], role=filters['role'], status=filters['status']),
+        per_page=15,
+        page_param='page',
+    )
     page_base_query = _build_query_string(request, remove_keys=['page'])
     return render(request, 'payments/users_manage.html', {
         'form': form,
@@ -1323,6 +1455,7 @@ def users_manage(request):
         'page_base_query': page_base_query,
         'password_suggestion': password_suggestion,
         'editing_user': None,
+        'filters': filters,
     })
 
 
@@ -1333,6 +1466,11 @@ def user_edit(request, user_id):
 
     managed_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
     password_suggestion = _suggest_five_digit_password()
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'role': (request.GET.get('role') or '').strip(),
+        'status': (request.GET.get('status') or '').strip(),
+    }
 
     if request.method == 'POST':
         form = UserAccountManagementForm(
@@ -1353,7 +1491,12 @@ def user_edit(request, user_id):
     else:
         form = UserAccountManagementForm(instance=managed_user, password_suggestion=password_suggestion)
 
-    users_page = _paginate_queryset(request, _managed_users(), per_page=15, page_param='page')
+    users_page = _paginate_queryset(
+        request,
+        _managed_users(query=filters['q'], role=filters['role'], status=filters['status']),
+        per_page=15,
+        page_param='page',
+    )
     page_base_query = _build_query_string(request, remove_keys=['page'])
     return render(request, 'payments/users_manage.html', {
         'form': form,
@@ -1362,6 +1505,7 @@ def user_edit(request, user_id):
         'page_base_query': page_base_query,
         'password_suggestion': password_suggestion,
         'editing_user': managed_user,
+        'filters': filters,
     })
 
 
@@ -1682,6 +1826,29 @@ def customers_list(request):
 
     # Get all customer profiles
     customers = UserProfile.objects.filter(role='customer').select_related('user').order_by('user__username')
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'status': (request.GET.get('status') or '').strip(),
+    }
+    if filters['q']:
+        customers = customers.filter(
+            Q(user__username__icontains=filters['q']) |
+            Q(user__first_name__icontains=filters['q']) |
+            Q(user__last_name__icontains=filters['q']) |
+            Q(first_name__icontains=filters['q']) |
+            Q(last_name__icontains=filters['q']) |
+            Q(organization__icontains=filters['q']) |
+            Q(city__icontains=filters['q']) |
+            Q(province__icontains=filters['q']) |
+            Q(phone__icontains=filters['q']) |
+            Q(mobile__icontains=filters['q'])
+        )
+    if filters['status'] == 'active':
+        customers = customers.filter(suspended=False, user__is_active=True)
+    elif filters['status'] == 'suspended':
+        customers = customers.filter(suspended=True)
+    elif filters['status'] == 'inactive':
+        customers = customers.filter(user__is_active=False)
 
     payment_stats = {
         row['user']: row
@@ -1771,6 +1938,7 @@ def customers_list(request):
         'is_staff_user': is_staff_user,
         'can_manage_users': _can_manage_users(request.user),
         'user_display_name': user_display_name,
+        'filters': filters,
     })
 
 

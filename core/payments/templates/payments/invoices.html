@@ -271,6 +271,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>ردیف</th>
                     {% if is_staff_user %}
                         <th>مشتری</th>
                         <th>مجموعه</th>
@@ -287,6 +288,7 @@
             <tbody>
                 {% for invoice in records %}
                     <tr class="summary-row {% if not invoice.is_seen_by_customer %}unseen-row{% endif %}" data-row="{{ invoice.id }}">
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                         {% if is_staff_user %}
                             <td>{{ invoice.customer.get_full_name|default:invoice.customer.username }}</td>
                             <td>{{ invoice.customer.profile.organization|default:'-' }}</td>
@@ -306,7 +308,7 @@
                         <td><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
                     </tr>
                     <tr class="detail-row" id="detail-{{ invoice.id }}">
-                        <td colspan="{% if is_staff_user %}9{% else %}7{% endif %}">
+                        <td colspan="{% if is_staff_user %}10{% else %}8{% endif %}">
                             <div class="detail-grid">
                                 <div class="detail-card">
                                     <div class="label">اطلاعات فاکتور</div>
@@ -348,7 +350,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{% if is_staff_user %}8{% else %}6{% endif %}">فاکتوری ثبت نشده است.</td></tr>
+                    <tr><td colspan="{% if is_staff_user %}10{% else %}8{% endif %}">فاکتوری ثبت نشده است.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -466,5 +468,6 @@
             });
         });
     </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

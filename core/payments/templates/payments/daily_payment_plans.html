@@ -82,6 +82,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>ردیف</th>
                     <th>تاریخ</th>
                     <th>حساب مقصد</th>
                     <th>مبلغ کل اعلامی</th>
@@ -96,6 +97,7 @@
             <tbody>
                 {% for plan in plans %}
                 <tr>
+                    <td>{{ forloop.counter }}</td>
                     <td>{{ plan.deposit_date }}</td>
                     <td>{{ plan.bank_name|default:'-' }}<br>{{ plan.account_number }}</td>
                     <td class="money">{{ plan.total_expected_amount|thousand_sep }}</td>
@@ -140,5 +142,6 @@
         }
     });
     </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

@@ -116,9 +116,16 @@ python manage.py runserver
 - `static/js/persian-datepicker.min.js`
 - `static/js/cleave.min.js`
 - `static/js/bank-autocomplete.js`
+- `static/js/app-ui.js`
 - `static/css/app-ui.css`
 - `static/css/font-face.css`
 - `static/fonts/`
+
+## UI/UX و منابع لوکال
+
+لایه ظاهری مشترک برنامه در `static/css/app-ui.css` و رفتارهای عمومی رابط کاربری در `static/js/app-ui.js` نگهداری می‌شود. این فایل‌ها کاملا لوکال هستند و برای منوی عملیات، اسکرول بهتر جدول‌ها، جستجوی سریع در ردیف‌های صفحه، و ظاهر یکپارچه فرم‌ها و فیلترها استفاده می‌شوند.
+
+در تغییرات UI نباید از CDN، فونت آنلاین، آیکن آنلاین یا کتابخانه‌ای که روی سرور موجود نیست استفاده شود. هر منبع جدید باید داخل `static/` یا `vendor/` قرار بگیرد و همراه بسته عملیاتی منتقل شود.
 
 ## نکات مهم
 
