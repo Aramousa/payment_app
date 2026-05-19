@@ -268,6 +268,24 @@
             </div>
         </form>
 
+        <div class="per-page-control">
+            <form method="get">
+                {% for key, value in request.GET.items %}
+                    {% if key != 'page' and key != 'per_page' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+                <label for="per-page-select">تعداد نمایش</label>
+                <select id="per-page-select" class="per-page-select" name="per_page" onchange="this.form.submit()">
+                    <option value="10" {% if request.GET.per_page == '10' or not request.GET.per_page %}selected{% endif %}>10</option>
+                    <option value="20" {% if request.GET.per_page == '20' %}selected{% endif %}>20</option>
+                    <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                    <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100</option>
+                    <option value="all" {% if request.GET.per_page == 'all' %}selected{% endif %}>همه</option>
+                </select>
+            </form>
+        </div>
+
         <table>
             <thead>
                 <tr>
@@ -357,13 +375,29 @@
 
         {% if page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
-                {% if page_obj.has_previous %}
-                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="button-link" style="display:inline-block;">قبلی</a>
-                {% endif %}
-                <span style="font-size:13px; color:#333;">صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
-                {% if page_obj.has_next %}
-                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="button-link" style="display:inline-block;">بعدی</a>
-                {% endif %}
+                    {% if page_obj.number > 1 %}
+                        <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page=1" class="customer-link">اول</a>
+                    {% endif %}
+                    {% if page_obj.has_previous %}
+                        <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="customer-link">قبلی</a>
+                    {% endif %}
+
+                    <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
+                        {% for key, value in request.GET.items %}
+                            {% if key != 'page' and key != 'per_page' %}
+                                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                            {% endif %}
+                        {% endfor %}
+                        <input type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
+                        <button type="submit" class="customer-link">برو</button>
+                    </form>
+
+                    {% if page_obj.has_next %}
+                        <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="customer-link">بعدی</a>
+                    {% endif %}
+                    {% if page_obj.number < page_obj.paginator.num_pages %}
+                        <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="customer-link">آخر</a>
+                    {% endif %}
             </div>
         {% endif %}
     </div>

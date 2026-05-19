@@ -94,10 +94,28 @@
         .bank-autocomplete-suggestions li:hover {
             background-color: #e8f4f8;
         }
-        
+
         .bank-autocomplete-suggestions li.highlighted {
             background-color: #0d6efd;
             color: white;
+        }
+
+        /* Hide all required-marker decorations on fields in this payment form */
+        #payment-form label span,
+        #payment-form label::after,
+        #payment-form label::before {
+            display: none !important;
+            content: none !important;
+        }
+
+        /* Remove red asterisks if they are rendered as text nodes */
+        #payment-form label {
+            white-space: normal;
+        }
+        #payment-form label > span,
+        #payment-form label > .required,
+        #payment-form label > .required-star {
+            display: none !important;
         }
 
         .filter-box { max-width: 1200px; margin: 20px auto 0; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
@@ -298,7 +316,8 @@
         </div>
         {% endif %}
         <h2>ثبت اطلاعات واریزی</h2>
-        <form id="payment-form" method="post" enctype="multipart/form-data">
+        <p style="max-width:980px; margin:0 auto 12px auto; color:#333; font-size:14px;">فقط بارگذاری فایل فیش (عکس یا PDF) در این فرم الزامی است. سایر اطلاعات در صورت تمایل می‌توانند خالی بمانند.</p>
+        <form id="payment-form" method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             {% for hidden in form.hidden_fields %}
                 {{ hidden }}
@@ -306,7 +325,7 @@
             {% for field in form.visible_fields %}
                 {% if field.name != 'customer_notes' %}
                     <p>
-                        {{ field.label_tag }}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
                         {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
                         {{ field.errors }}
@@ -410,6 +429,24 @@
                 <button type="submit" class="apply-btn">اعمال فیلتر</button>
                 <a href="{% url 'submit' %}" class="clear-btn">حذف فیلتر</a>
             </div>
+        </form>
+    </div>
+
+    <div class="filter-box per-page-control">
+        <form method="get">
+            {% for key, value in request.GET.items %}
+                {% if key != 'page' and key != 'per_page' %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+            <label for="per-page-select">تعداد نمایش</label>
+            <select id="per-page-select" class="per-page-select" name="per_page" onchange="this.form.submit()">
+                <option value="10" {% if request.GET.per_page == '10' or not request.GET.per_page %}selected{% endif %}>10</option>
+                <option value="20" {% if request.GET.per_page == '20' %}selected{% endif %}>20</option>
+                <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100</option>
+                <option value="all" {% if request.GET.per_page == 'all' %}selected{% endif %}>همه</option>
+            </select>
         </form>
     </div>
 
@@ -614,12 +651,28 @@
 
     {% if page_obj.has_other_pages %}
         <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
-            {% if page_obj.has_previous %}
-                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="button-link" style="display:inline-block;">قبلی</a>
+            {% if page_obj.number > 1 %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page=1" class="button-link">اول</a>
             {% endif %}
-            <span style="font-size:13px; color:#333;">صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_previous %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="button-link">قبلی</a>
+            {% endif %}
+
+            <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
+                {% for key, value in request.GET.items %}
+                    {% if key != 'page' and key != 'per_page' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+                <input type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
+                <button type="submit" class="button-link">برو</button>
+            </form>
+
             {% if page_obj.has_next %}
-                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="button-link" style="display:inline-block;">بعدی</a>
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="button-link">بعدی</a>
+            {% endif %}
+            {% if page_obj.number < page_obj.paginator.num_pages %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="button-link">آخر</a>
             {% endif %}
         </div>
     {% endif %}
@@ -649,6 +702,14 @@
 
         const paymentForm = document.querySelector('#payment-form');
         if (paymentForm) {
+            // Ensure only receipt_images stays required on the client side.
+            paymentForm.querySelectorAll('input, select, textarea').forEach(function (el) {
+                if (el.name !== 'receipt_images') {
+                    el.removeAttribute('required');
+                    el.removeAttribute('aria-required');
+                }
+            });
+
             paymentForm.addEventListener('submit', function () {
                 document.querySelectorAll('.amount-input').forEach(function (amountInput) {
                     amountInput.value = amountInput.value.replace(/,/g, '');

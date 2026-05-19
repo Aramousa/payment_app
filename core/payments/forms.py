@@ -306,8 +306,13 @@ class PaymentRecordForm(forms.ModelForm):
                 except (ValueError, TypeError):
                     pass
 
-        for name in self.REQUIRED_CUSTOMER_FIELDS:
-            self.fields[name].required = True
+        for field in self.fields.values():
+            field.required = False
+            if hasattr(field.widget, 'attrs'):
+                field.widget.attrs.pop('required', None)
+                field.widget.attrs.pop('aria-required', None)
+            if hasattr(field, 'label_suffix'):
+                field.label_suffix = ''
         self.fields['customer_notes'].required = False
 
         has_existing_files = bool(self.instance and self.instance.pk and self.instance.receipts.exists())
@@ -335,8 +340,8 @@ class PaymentRecordForm(forms.ModelForm):
                 self.fields[bank_field].widget.attrs['autocomplete'] = 'off'
 
         for name, field in self.fields.items():
-            if field.required and not field.disabled:
-                field.label = mark_safe(f'{field.label} <span style="color:#d00;">*</span>')
+            if field.label:
+                field.label = re.sub(r'\s*<span[^>]*>\*</span>$', '', str(field.label))
 
     class Meta:
         model = PaymentRecord
@@ -379,9 +384,17 @@ class PaymentRecordForm(forms.ModelForm):
 
     def clean_amount(self):
         amount = self.cleaned_data.get('amount')
-        if amount is None or amount <= 0:
+        if amount is None:
+            return 0
+        if amount <= 0:
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
         return amount
+
+    def clean_pay_date(self):
+        pay_date = self.cleaned_data.get('pay_date')
+        if pay_date is None:
+            return timezone.localdate()
+        return pay_date
 
     def clean_receipt_images(self):
         files = self.files.getlist('receipt_images')

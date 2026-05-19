@@ -171,6 +171,23 @@
     
     <!-- Payments Section -->
     <h3 class="section-title">فیش‌های پرداخت</h3>
+    <div class="per-page-control">
+        <form method="get">
+            {% for key, value in request.GET.items %}
+                {% if key != 'payments_page' and key != 'payments_per_page' %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+            <label for="payments-per-page-select">تعداد نمایش</label>
+            <select id="payments-per-page-select" class="per-page-select" name="payments_per_page" onchange="this.form.submit()">
+                <option value="10" {% if request.GET.payments_per_page == '10' or not request.GET.payments_per_page %}selected{% endif %}>10</option>
+                <option value="20" {% if request.GET.payments_per_page == '20' %}selected{% endif %}>20</option>
+                <option value="50" {% if request.GET.payments_per_page == '50' %}selected{% endif %}>50</option>
+                <option value="100" {% if request.GET.payments_per_page == '100' %}selected{% endif %}>100</option>
+                <option value="all" {% if request.GET.payments_per_page == 'all' %}selected{% endif %}>همه</option>
+            </select>
+        </form>
+    </div>
     {% if payments %}
         <table>
             <thead>
@@ -253,12 +270,28 @@
 
         {% if payments_page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
+                {% if payments_page_obj.number > 1 %}
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page=1" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
+                {% endif %}
                 {% if payments_page_obj.has_previous %}
                     <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
                 {% endif %}
-                <span style="font-size:13px; color:#333;">صفحه {{ payments_page_obj.number }} از {{ payments_page_obj.paginator.num_pages }}</span>
+
+                <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
+                    {% for key, value in request.GET.items %}
+                        {% if key != 'payments_page' and key != 'payments_per_page' %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endif %}
+                    {% endfor %}
+                    <input type="number" name="payments_page" min="1" max="{{ payments_page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
+                    <button type="submit" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
+                </form>
+
                 {% if payments_page_obj.has_next %}
                     <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                {% endif %}
+                {% if payments_page_obj.number < payments_page_obj.paginator.num_pages %}
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.paginator.num_pages }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
                 {% endif %}
             </div>
         {% endif %}
@@ -281,6 +314,25 @@
                     <button type="submit">اعمال فیلتر</button>
                     <a href="{% url 'customer_detail' customer_user.id %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">حذف فیلتر</a>
                 </div>
+            </form>
+        </div>
+
+        <div class="per-page-control">
+            <form method="get">
+                {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
+                {% for key, value in request.GET.items %}
+                    {% if key != 'invoice_page' and key != 'invoice_per_page' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+                <label for="invoice-per-page-select">تعداد نمایش</label>
+                <select id="invoice-per-page-select" class="per-page-select" name="invoice_per_page" onchange="this.form.submit()">
+                    <option value="10" {% if request.GET.invoice_per_page == '10' or not request.GET.invoice_per_page %}selected{% endif %}>10</option>
+                    <option value="20" {% if request.GET.invoice_per_page == '20' %}selected{% endif %}>20</option>
+                    <option value="50" {% if request.GET.invoice_per_page == '50' %}selected{% endif %}>50</option>
+                    <option value="100" {% if request.GET.invoice_per_page == '100' %}selected{% endif %}>100</option>
+                    <option value="all" {% if request.GET.invoice_per_page == 'all' %}selected{% endif %}>همه</option>
+                </select>
             </form>
         </div>
     {% endif %}
@@ -326,12 +378,28 @@
 
         {% if invoices_page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
+                {% if invoices_page_obj.number > 1 %}
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page=1" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
+                {% endif %}
                 {% if invoices_page_obj.has_previous %}
                     <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
                 {% endif %}
-                <span style="font-size:13px; color:#333;">صفحه {{ invoices_page_obj.number }} از {{ invoices_page_obj.paginator.num_pages }}</span>
+
+                <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
+                    {% for key, value in request.GET.items %}
+                        {% if key != 'invoice_page' and key != 'invoice_per_page' %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endif %}
+                    {% endfor %}
+                    <input type="number" name="invoice_page" min="1" max="{{ invoices_page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
+                    <button type="submit" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
+                </form>
+
                 {% if invoices_page_obj.has_next %}
                     <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                {% endif %}
+                {% if invoices_page_obj.number < invoices_page_obj.paginator.num_pages %}
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.paginator.num_pages }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
                 {% endif %}
             </div>
         {% endif %}

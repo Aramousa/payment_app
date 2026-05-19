@@ -27,6 +27,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
+import os
 
 
 STAFF_ROLES = {'staff', 'finance', 'commercial'}
@@ -274,8 +275,24 @@ def _build_query_string(request, remove_keys=None):
     return query_params.urlencode()
 
 
-def _paginate_queryset(request, queryset, per_page=15, page_param='page'):
-    paginator = Paginator(queryset, per_page)
+def _get_page_size(request, page_param='page', default=10):
+    page_size_key = 'per_page' if page_param == 'page' else page_param.replace('_page', '_per_page')
+    page_size_value = (request.GET.get(page_size_key) or '').strip().lower()
+    if page_size_value == 'all':
+        return 'all', page_size_key
+    try:
+        page_size = int(page_size_value)
+    except (TypeError, ValueError):
+        return default, page_size_key
+    return (page_size if page_size in {10, 20, 50, 100} else default), page_size_key
+
+
+def _paginate_queryset(request, queryset, per_page=10, page_param='page'):
+    page_size, _ = _get_page_size(request, page_param=page_param, default=per_page)
+    if page_size == 'all':
+        paginator = Paginator(queryset, max(len(queryset), 1))
+    else:
+        paginator = Paginator(queryset, page_size)
     page_number = request.GET.get(page_param) or 1
     try:
         page_obj = paginator.page(page_number)
@@ -1048,14 +1065,32 @@ def create_payment(request):
         if is_staff_user:
             return HttpResponseForbidden('کاربران واحدها امکان ثبت سند از این فرم را ندارند.')
         form = PaymentRecordForm(request.POST, request.FILES, initial=form_initial)
-        if form.is_valid():
+        valid = form.is_valid()
+        if not valid:
+            try:
+                log_path = os.path.join(getattr(settings, 'BASE_DIR', '.'), 'payment_submit_debug.log')
+                with open(log_path, 'a', encoding='utf-8') as fh:
+                    fh.write(f"USER:{request.user.username} VALID={valid} ERRORS:{getattr(form.errors, 'as_json', lambda: str(form.errors))()} FILES:[")
+                    first = True
+                    for key in request.FILES:
+                        for f in request.FILES.getlist(key):
+                            if not first:
+                                fh.write(',')
+                            fh.write(f"{key}:{getattr(f, 'name', '')}:{getattr(f, 'size', 0)}")
+                            first = False
+                    fh.write("]\n")
+            except Exception:
+                logger.exception('Failed to write payment_submit_debug.log')
+
+        if valid:
             submitted_account = (form.cleaned_data.get('beneficiary_account_number') or '').replace(' ', '').strip()
             if active_daily_assignment:
                 expected_date = active_daily_assignment.plan.deposit_date
-                if form.cleaned_data.get('pay_date') != expected_date:
+                submitted_date = form.cleaned_data.get('pay_date')
+                if submitted_date and submitted_date != expected_date:
                     form.add_error('pay_date', 'این شماره حساب فقط برای تاریخ اعلام شده امروز معتبر است.')
                 expected_account = (active_daily_assignment.plan.account_number or '').replace(' ', '').strip()
-                if submitted_account != expected_account:
+                if submitted_account and submitted_account != expected_account:
                     form.add_error('beneficiary_account_number', 'شماره حساب مقصد باید همان شماره حساب اعلام شده امروز باشد.')
             elif submitted_account:
                 assigned_accounts = (
@@ -1087,7 +1122,7 @@ def create_payment(request):
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
     records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
     records = _enrich_records(records, staff_role=staff_role, is_system_admin=is_system_admin)
-    page_obj = _paginate_queryset(request, records, per_page=15, page_param='page')
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
@@ -1384,7 +1419,7 @@ def counterparties_manage(request):
         form = CounterpartyForm()
 
     counterparties = Counterparty.objects.all()
-    page_obj = _paginate_queryset(request, counterparties, per_page=15, page_param='page')
+    page_obj = _paginate_queryset(request, counterparties, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     return render(request, 'payments/counterparties.html', {
         'form': form,
@@ -1444,7 +1479,7 @@ def users_manage(request):
     users_page = _paginate_queryset(
         request,
         _managed_users(query=filters['q'], role=filters['role'], status=filters['status']),
-        per_page=15,
+        per_page=10,
         page_param='page',
     )
     page_base_query = _build_query_string(request, remove_keys=['page'])
@@ -1494,7 +1529,7 @@ def user_edit(request, user_id):
     users_page = _paginate_queryset(
         request,
         _managed_users(query=filters['q'], role=filters['role'], status=filters['status']),
-        per_page=15,
+        per_page=10,
         page_param='page',
     )
     page_base_query = _build_query_string(request, remove_keys=['page'])
@@ -1532,7 +1567,7 @@ def invoices_dashboard(request):
     can_view_invoices = _can_view_invoices(request.user)
     records = _invoice_records_for_user(request.user)
     records, filters = _apply_invoice_filters(records, request, is_staff_user=is_staff_user)
-    page_obj = _paginate_queryset(request, records, per_page=15, page_param='page')
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
@@ -1673,6 +1708,17 @@ def export_records(request):
     records = _records_for_user(request.user)
     records, _ = _apply_record_filters(records, request, is_staff_user=is_staff_user)
 
+    page_size, _ = _get_page_size(request, page_param='page', default=10)
+    if page_size == 'all':
+        export_records = records
+    else:
+        paginator = Paginator(records, page_size)
+        page_number = request.GET.get('page') or 1
+        try:
+            export_records = paginator.page(page_number).object_list
+        except (PageNotAnInteger, EmptyPage):
+            export_records = paginator.page(1).object_list
+
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
@@ -1704,7 +1750,7 @@ def export_records(request):
         'تاریخ ثبت',
     ])
 
-    for payment in records:
+    for payment in export_records:
         ws.append([
             payment.id,
             payment.user.get_full_name() if payment.user else '',
@@ -1776,8 +1822,8 @@ def customer_detail(request, user_id):
     total_amount = sum(p.amount for p in payments)
     invoice_total_amount = invoices.aggregate(total=Sum('amount'))['total'] or 0
 
-    payments_page_obj = _paginate_queryset(request, payments, per_page=15, page_param='payments_page')
-    invoices_page_obj = _paginate_queryset(request, invoices, per_page=15, page_param='invoice_page')
+    payments_page_obj = _paginate_queryset(request, payments, per_page=10, page_param='payments_page')
+    invoices_page_obj = _paginate_queryset(request, invoices, per_page=10, page_param='invoice_page')
     payments_page_base_query = _build_query_string(request, remove_keys=['payments_page'])
     invoices_page_base_query = _build_query_string(request, remove_keys=['invoice_page'])
 
@@ -1928,7 +1974,7 @@ def customers_list(request):
         })
 
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
-    page_obj = _paginate_queryset(request, customer_data, per_page=15, page_param='page')
+    page_obj = _paginate_queryset(request, customer_data, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
 
     return render(request, 'payments/customers_list.html', {

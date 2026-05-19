@@ -66,18 +66,7 @@ try:
         """)
 
     else:
-        print("Amount column is already nullables_invoicerecord_new RENAME TO payments_invoicerecord")
-
-        print("Table recreated successfully!")
-
-        # Update django_migrations table
-        cursor.execute("""
-        INSERT OR REPLACE INTO django_migrations (app, name, applied)
-        VALUES ('payments', '0030_alter_invoicerecord_fields', datetime('now'))
-        """)
-
-    else:
-        print("Amount column is already nullable!")
+        print("Amount column is already nullable or no migration is needed.")
 
     conn.commit()
 
