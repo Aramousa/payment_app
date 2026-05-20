@@ -609,10 +609,48 @@ tr.detail-row {
     color: #704b00 !important;
 }
 
+.system-popup-overlay {
+    align-items: center;
+    background: rgba(0, 0, 0, 0.75);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    padding: 20px;
+    position: fixed;
+    z-index: 9999;
+}
+
+.system-popup-overlay.open {
+    display: flex;
+}
+
 .system-popup-box {
+    background: #fff;
     border: 1px solid var(--app-border);
     border-radius: var(--app-radius) !important;
     box-shadow: var(--app-shadow);
+    max-height: 90vh;
+    max-width: 560px;
+    overflow: auto;
+    padding: 18px;
+    width: 100%;
+}
+
+.system-popup-box h3 {
+    font-size: 18px;
+    margin-top: 0;
+}
+
+.system-popup-list {
+    list-style: none;
+    margin: 0;
+    padding-right: 18px;
+}
+
+.system-popup-help {
+    color: var(--app-muted);
+    font-size: 12px;
+    margin-top: 10px;
 }
 
 .system-popup-item,
@@ -620,6 +658,18 @@ tr.detail-row {
 .field-error,
 .errorlist {
     color: var(--app-danger) !important;
+}
+
+.system-popup-item.success {
+    color: var(--app-success) !important;
+}
+
+.system-popup-item.warning {
+    color: var(--app-warning) !important;
+}
+
+.system-popup-item.info {
+    color: var(--app-primary) !important;
 }
 
 .helptext,

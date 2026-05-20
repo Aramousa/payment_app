@@ -1,0 +1,30 @@
+{% if messages %}
+<div id="systemPopup" class="system-popup-overlay open" tabindex="-1">
+    <div class="system-popup-box">
+        <h3>پیام سیستم</h3>
+        <ul class="system-popup-list">
+            {% for message in messages %}
+                <li class="system-popup-item {{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        <div class="system-popup-help">برای بستن پیام، روی پشت‌زمینه کلیک کنید یا Esc بزنید.</div>
+    </div>
+</div>
+<script>
+(function () {
+    var popup = document.getElementById('systemPopup');
+    if (!popup) return;
+    popup.focus();
+    popup.addEventListener('click', function (event) {
+        if (event.target === popup) {
+            popup.classList.remove('open');
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            popup.classList.remove('open');
+        }
+    });
+}());
+</script>
+{% endif %}

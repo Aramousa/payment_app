@@ -375,19 +375,7 @@
     {% endif %}
 
     <h2>{% if is_history_mode %}سوابق واریزی ها{% else %}گزارش واریزی ها{% endif %}{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
-    {% if messages %}
-        <div id="flashOverlay" class="preview-overlay open" tabindex="-1">
-            <div class="preview-box">
-                <h3 class="flash-title">پیام سیستم</h3>
-                <ul class="system-message-list">
-                    {% for message in messages %}
-                        <li class="system-message">{{ message }}</li>
-                    {% endfor %}
-                </ul>
-                <div class="preview-hint">برای بستن پیام، روی صفحه کلیک کنید یا کلید ورود را بزنید.</div>
-            </div>
-        </div>
-    {% endif %}
+    {% include "payments/partials/system_messages_popup.html" %}
 
     <div class="filter-box">
         <form method="get" class="filter-grid">

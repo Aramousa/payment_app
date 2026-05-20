@@ -40,11 +40,7 @@
         </div>
     </div>
 
-    {% if messages %}
-        <div class="messages">
-            {% for message in messages %}<div>{{ message }}</div>{% endfor %}
-        </div>
-    {% endif %}
+    {% include "payments/partials/system_messages_popup.html" %}
 
     <div class="panel">
         <div class="info-grid">
