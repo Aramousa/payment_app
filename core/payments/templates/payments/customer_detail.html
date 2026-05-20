@@ -171,6 +171,7 @@
     
     <!-- Payments Section -->
     <h3 class="section-title">فیش‌های پرداخت</h3>
+    {% include "payments/partials/export_panel.html" with export_dataset="customer_payments" export_fields=payment_export_fields export_extra_params=customer_export_params %}
     <div class="per-page-control">
         <form method="get">
             {% for key, value in request.GET.items %}
@@ -268,7 +269,8 @@
             </tbody>
         </table>
 
-        {% if payments_page_obj.has_other_pages %}
+        {% include "payments/partials/pagination.html" with page_obj=payments_page_obj page_param="payments_page" page_base_query=payments_page_base_query link_class="customer-link" %}
+        {% if legacy_pagination_enabled and payments_page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
                 {% if payments_page_obj.number > 1 %}
                     <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page=1" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
@@ -302,6 +304,7 @@
     <!-- Invoices Section -->
     <h3 class="section-title">فاکتورها</h3>
     {% if can_view_invoices %}
+        {% include "payments/partials/export_panel.html" with export_dataset="customer_invoices" export_fields=invoice_export_fields export_extra_params=customer_export_params %}
         <div class="invoice-filter-box">
             <form method="get" class="invoice-filter-grid">
                 {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
@@ -376,7 +379,8 @@
             </tbody>
         </table>
 
-        {% if invoices_page_obj.has_other_pages %}
+        {% include "payments/partials/pagination.html" with page_obj=invoices_page_obj page_param="invoice_page" page_base_query=invoices_page_base_query link_class="customer-link" %}
+        {% if legacy_pagination_enabled and invoices_page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
                 {% if invoices_page_obj.number > 1 %}
                     <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page=1" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>

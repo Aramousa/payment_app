@@ -78,6 +78,7 @@
 
     <div class="panel">
         <h3>برنامه‌های تاریخ {{ selected_date_text }}</h3>
+        {% include "payments/partials/export_panel.html" %}
         {% if plans %}
         <table>
             <thead>

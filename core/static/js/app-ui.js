@@ -52,7 +52,7 @@
             wrapper.appendChild(table);
 
             if (table.dataset.noClientSearch === '1') return;
-            var searchableRows = table.querySelectorAll('tbody tr');
+            var searchableRows = table.querySelectorAll('tbody tr:not(.detail-row)');
             if (searchableRows.length < 8) return;
 
             var tools = document.createElement('div');

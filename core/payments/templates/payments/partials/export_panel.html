@@ -1,0 +1,39 @@
+{% if export_dataset and export_fields %}
+<details class="app-export-panel">
+    <summary>خروجی اکسل</summary>
+    <form method="get" action="{% url 'export_data' export_dataset %}">
+        {% for key, value in request.GET.items %}
+            {% if key != 'fields' and key != 'page' and key != 'per_page' and key != 'payments_page' and key != 'invoice_page' %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endif %}
+        {% endfor %}
+        {% if export_extra_params %}
+            {% for key, value in export_extra_params.items %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+        {% endif %}
+        <div class="app-export-fields">
+            {% for field in export_fields %}
+                <label>
+                    <input type="checkbox" name="fields" value="{{ field.key }}">
+                    <span>{{ field.label }}</span>
+                </label>
+            {% endfor %}
+        </div>
+        <div class="app-export-scope">
+            <label>
+                <input type="radio" name="scope" value="all" checked>
+                <span>کل نتایج فیلتر شده</span>
+            </label>
+            <label>
+                <input type="radio" name="scope" value="page">
+                <span>فقط صفحه فعلی</span>
+            </label>
+        </div>
+        <div class="app-export-actions">
+            <button type="submit" class="button-link">دریافت اکسل</button>
+            <span class="tiny">اگر فیلدی انتخاب نشود، همه فیلدها خروجی گرفته می‌شود.</span>
+        </div>
+    </form>
+</details>
+{% endif %}

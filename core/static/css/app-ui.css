@@ -249,11 +249,181 @@ button[type="submit"] {
     color: var(--app-text);
 }
 
+.app-pagination {
+    align-items: center;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow-soft);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    margin: 18px auto 0;
+    max-width: 1200px;
+    padding: 10px 12px;
+}
+
+.app-pagination-summary {
+    color: var(--app-muted);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.8;
+}
+
+.app-pagination-divider {
+    color: var(--app-border-strong);
+    margin: 0 8px;
+}
+
+.app-pagination-actions,
+.app-pagination-pages {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.app-pagination-pages {
+    background: #f4f7fa;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    gap: 4px;
+    padding: 4px;
+}
+
+.app-pagination-link {
+    min-height: 34px;
+    padding: 6px 12px !important;
+}
+
+.app-pagination-link.is-disabled {
+    background: #e7edf3 !important;
+    border-color: #d9e2ec !important;
+    box-shadow: none;
+    color: #8a99a8 !important;
+    cursor: default;
+    pointer-events: none;
+}
+
+.app-pagination-page,
+.app-pagination-ellipsis {
+    align-items: center;
+    border-radius: 6px;
+    color: var(--app-text);
+    display: inline-flex;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    height: 34px;
+    justify-content: center;
+    min-width: 34px;
+    padding: 0 9px;
+    text-decoration: none;
+}
+
+.app-pagination-page {
+    background: #fff;
+    border: 1px solid transparent;
+}
+
+.app-pagination-page:hover {
+    border-color: var(--app-primary);
+    color: var(--app-primary-dark);
+}
+
+.app-pagination-page.is-current {
+    background: #17212f;
+    border-color: #17212f;
+    color: #fff;
+}
+
+.app-pagination-ellipsis {
+    color: var(--app-muted);
+    min-width: 24px;
+    padding: 0 4px;
+}
+
 .app-filter-grid {
     align-items: end;
     display: grid;
     gap: 10px;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.app-export-panel {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow-soft);
+    margin: 0 auto 14px;
+    max-width: 1200px;
+    padding: 10px 12px;
+}
+
+.app-export-panel summary {
+    color: var(--app-primary-dark);
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.app-export-panel form {
+    margin-top: 12px;
+}
+
+.app-export-fields {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin-bottom: 12px;
+}
+
+.app-export-scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.app-export-fields label {
+    align-items: center;
+    background: var(--app-surface-soft);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 7px 9px;
+}
+
+.app-export-scope label {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    display: inline-flex;
+    gap: 8px;
+    margin: 0;
+    padding: 7px 10px;
+}
+
+.app-export-fields input {
+    flex: 0 0 auto;
+    margin: 0;
+    width: auto;
+}
+
+.app-export-scope input {
+    margin: 0;
+    width: auto;
+}
+
+.app-export-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
 }
 
 .app-filter-actions {
@@ -397,10 +567,22 @@ tr.detail-row {
 
 .flag-blue {
     background: #1769aa !important;
+    color: #fff !important;
 }
 
 .flag-purple {
     background: #6f4aa8 !important;
+    color: #fff !important;
+}
+
+.flag-orange {
+    background: #f08c00 !important;
+    color: #2b1700 !important;
+}
+
+.flag-gray {
+    background: #6b7280 !important;
+    color: #fff !important;
 }
 
 .flag-green,
@@ -503,5 +685,31 @@ tr.detail-row {
 
     .app-table-search {
         max-width: 100%;
+    }
+
+    .app-pagination,
+    .app-pagination-actions,
+    .app-pagination-pages {
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .app-pagination-actions {
+        justify-content: center;
+    }
+
+    .app-pagination-pages {
+        align-items: center;
+        justify-content: center;
+    }
+
+    .app-pagination-summary {
+        text-align: center;
+        width: 100%;
+    }
+
+    .app-pagination-link {
+        flex: 1 1 78px;
+        text-align: center;
     }
 }

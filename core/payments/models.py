@@ -170,21 +170,23 @@ class PaymentRecord(models.Model):
     def status_flag_class(self):
         return {
             self.STATUS_COMMERCIAL_REVIEW: 'flag-blue',
-            self.STATUS_FINANCE_REVIEW: 'flag-purple',
-            self.STATUS_APPROVED: 'flag-green',
+            self.STATUS_FINANCE_REVIEW: 'flag-orange',
+            self.STATUS_APPROVED: 'flag-orange',
             self.STATUS_FINAL_APPROVED: 'flag-green',
             self.STATUS_REJECTED: 'flag-red',
             self.STATUS_INCOMPLETE: 'flag-yellow',
-            self.STATUS_RETURNED_TO_COMMERCIAL: 'flag-blue',
+            self.STATUS_RETURNED_TO_COMMERCIAL: 'flag-gray',
         }.get(self.status, 'flag-gray')
 
     @property
     def customer_flag_class(self):
         if self.status == self.STATUS_FINANCE_REVIEW:
-            return 'flag-purple'
+            return 'flag-orange'
         if self.status in {self.STATUS_PENDING, self.STATUS_COMMERCIAL_REVIEW, self.STATUS_RETURNED_TO_COMMERCIAL}:
-            return 'flag-blue'
-        if self.status in {self.STATUS_APPROVED, self.STATUS_FINAL_APPROVED}:
+            return 'flag-gray'
+        if self.status == self.STATUS_APPROVED:
+            return 'flag-orange'
+        if self.status == self.STATUS_FINAL_APPROVED:
             return 'flag-green'
         if self.status == self.STATUS_REJECTED:
             return 'flag-red'
@@ -202,6 +204,8 @@ class UserProfile(models.Model):
         ('customer', 'مشتری'),
         ('finance', 'واحد مالی'),
         ('commercial', 'واحد بازرگانی'),
+        ('sales', 'فروش'),
+        ('data_entry', 'تکمیل اطلاعات فیش'),
         ('staff', 'کارمند'),
     )
 
@@ -223,6 +227,7 @@ class UserProfile(models.Model):
     suspended = models.BooleanField('معلق', default=False)
     can_view_invoices = models.BooleanField('دسترسی مشاهده فاکتورها', default=False)
     can_upload_invoices = models.BooleanField('دسترسی بارگذاری فاکتورها', default=False)
+    can_edit_payment_details = models.BooleanField('دسترسی تکمیل اطلاعات فیش‌ها', default=False)
 
     def __str__(self):
         return self.user.username

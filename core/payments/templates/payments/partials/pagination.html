@@ -1,0 +1,45 @@
+{% load payment_dates %}
+{% if page_obj %}
+    <nav class="app-pagination" aria-label="صفحه بندی">
+        <div class="app-pagination-summary">
+            {% if page_obj.paginator.count %}
+                نمایش {{ page_obj.start_index }} تا {{ page_obj.end_index }} از {{ page_obj.paginator.count }} مورد
+                <span class="app-pagination-divider">|</span>
+                صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}
+            {% else %}
+                موردی برای نمایش وجود ندارد
+            {% endif %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+            <div class="app-pagination-actions">
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}{{ page_param }}=1" class="{{ link_class|default:'button-link' }} app-pagination-link{% if page_obj.number == 1 %} is-disabled{% endif %}" {% if page_obj.number == 1 %}aria-disabled="true" tabindex="-1"{% endif %}>اول</a>
+                {% if page_obj.has_previous %}
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}{{ page_param }}={{ page_obj.previous_page_number }}" class="{{ link_class|default:'button-link' }} app-pagination-link">قبلی</a>
+                {% else %}
+                    <span class="{{ link_class|default:'button-link' }} app-pagination-link is-disabled">قبلی</span>
+                {% endif %}
+
+                <div class="app-pagination-pages" aria-label="شماره صفحه ها">
+                    {% pagination_window page_obj as pages %}
+                    {% for page_number in pages %}
+                        {% if page_number == '...' %}
+                            <span class="app-pagination-ellipsis">...</span>
+                        {% elif page_number == page_obj.number %}
+                            <span class="app-pagination-page is-current" aria-current="page">{{ page_number }}</span>
+                        {% else %}
+                            <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}{{ page_param }}={{ page_number }}" class="app-pagination-page">{{ page_number }}</a>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                {% if page_obj.has_next %}
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}{{ page_param }}={{ page_obj.next_page_number }}" class="{{ link_class|default:'button-link' }} app-pagination-link">بعدی</a>
+                {% else %}
+                    <span class="{{ link_class|default:'button-link' }} app-pagination-link is-disabled">بعدی</span>
+                {% endif %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}{{ page_param }}={{ page_obj.paginator.num_pages }}" class="{{ link_class|default:'button-link' }} app-pagination-link{% if page_obj.number == page_obj.paginator.num_pages %} is-disabled{% endif %}" {% if page_obj.number == page_obj.paginator.num_pages %}aria-disabled="true" tabindex="-1"{% endif %}>آخر</a>
+            </div>
+        {% endif %}
+    </nav>
+{% endif %}

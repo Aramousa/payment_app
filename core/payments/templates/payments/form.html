@@ -244,6 +244,11 @@
             {% if is_staff_user %}
                 <a href="{% url 'customers_list' %}" class="button-link">لیست مشتریان</a>
                 <a href="{% url 'daily_payment_plans' %}" class="button-link">واریز روزانه</a>
+                {% if is_history_mode %}
+                    <a href="{% url 'submit' %}" class="button-link">صف کاری اسناد</a>
+                {% else %}
+                    <a href="{% url 'payment_history' %}" class="button-link">سوابق اسناد</a>
+                {% endif %}
             {% endif %}
             {% if request.user.is_superuser %}
                 <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
@@ -252,9 +257,6 @@
             <a href="{% url 'profile_password_change' %}" class="button-link">تغییر رمز عبور</a>
             {% if can_manage_counterparties %}
                 <a href="{% url 'counterparties_manage' %}" class="button-link">مدیریت طرف حساب</a>
-            {% endif %}
-            {% if can_export_records %}
-                <a href="{% url 'export_records' %}?{{ request.GET.urlencode }}" class="button-link">خروجی اکسل</a>
             {% endif %}
         </div>
         <div class="logout-wrap">
@@ -369,10 +371,10 @@
         {{ source_profiles|json_script:"source-profiles-data" }}
         {{ destination_profiles|json_script:"destination-profiles-data" }}
     {% else %}
-        <h2>بررسی اسناد ارسالی</h2>
+        <h2>{% if is_history_mode %}سوابق اسناد{% else %}بررسی اسناد ارسالی{% endif %}</h2>
     {% endif %}
 
-    <h2>گزارش واریزی ها{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
+    <h2>{% if is_history_mode %}سوابق واریزی ها{% else %}گزارش واریزی ها{% endif %}{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
     {% if messages %}
         <div id="flashOverlay" class="preview-overlay open" tabindex="-1">
             <div class="preview-box">
@@ -427,10 +429,12 @@
             </div>
             <div class="filter-actions">
                 <button type="submit" class="apply-btn">اعمال فیلتر</button>
-                <a href="{% url 'submit' %}" class="clear-btn">حذف فیلتر</a>
+                <a href="{% url records_url_name %}" class="clear-btn">حذف فیلتر</a>
             </div>
         </form>
     </div>
+
+    {% include "payments/partials/export_panel.html" %}
 
     <div class="filter-box per-page-control">
         <form method="get">
@@ -461,32 +465,32 @@
                 <th>حساب مقصد</th>
                 {% endif %}
                 <th>
-                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_full_name&dir={% if current_sort == 'payer_full_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_full_name&dir={% if current_sort == 'payer_full_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         نام واریز کننده{% if current_sort == 'payer_full_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=pay_date&dir={% if current_sort == 'pay_date' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=pay_date&dir={% if current_sort == 'pay_date' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         تاریخ{% if current_sort == 'pay_date' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=tracking_code&dir={% if current_sort == 'tracking_code' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=tracking_code&dir={% if current_sort == 'tracking_code' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         شماره پیگیری{% if current_sort == 'tracking_code' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=amount&dir={% if current_sort == 'amount' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=amount&dir={% if current_sort == 'amount' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         مبلغ (ریال){% if current_sort == 'amount' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_bank_name&dir={% if current_sort == 'payer_bank_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_bank_name&dir={% if current_sort == 'payer_bank_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         نام بانک{% if current_sort == 'payer_bank_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a class="sort-link" href="{% url 'submit' %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=status&dir={% if current_sort == 'status' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=status&dir={% if current_sort == 'status' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         وضعیت{% if current_sort == 'status' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
@@ -550,6 +554,9 @@
                             </form>
                         {% else %}
                             <span title="قفل">🔒</span>
+                        {% endif %}
+                        {% if payment.can_edit_details %}
+                            <a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل اطلاعات</a>
                         {% endif %}
                         <button type="button" class="expand-btn" data-row="{{ payment.id }}">نمایش جزئیات</button>
                     {% endif %}
@@ -638,6 +645,11 @@
                             {% else %}
                                 <div class="tiny">در این مرحله امکان تغییر وضعیت برای نقش شما وجود ندارد.</div>
                             {% endif %}
+                            {% if payment.can_edit_details %}
+                                <div style="margin-top:8px;">
+                                    <a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل یا اصلاح اطلاعات فیش</a>
+                                </div>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
@@ -649,7 +661,8 @@
         </tbody>
     </table>
 
-    {% if page_obj.has_other_pages %}
+    {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
+    {% if legacy_pagination_enabled and page_obj.has_other_pages %}
         <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
             {% if page_obj.number > 1 %}
                 <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page=1" class="button-link">اول</a>

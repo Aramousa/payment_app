@@ -25,21 +25,21 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
 import os
 
 
-STAFF_ROLES = {'staff', 'finance', 'commercial'}
+STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
 logger = logging.getLogger(__name__)
 STATUS_FLAG_META = {
-    PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('رویت بازرگانی', 'flag-blue'),
-    PaymentRecord.STATUS_FINANCE_REVIEW: ('رویت مالی', 'flag-purple'),
-    PaymentRecord.STATUS_APPROVED: ('تایید شده', 'flag-green'),
+    PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('بررسی بازرگانی', 'flag-blue'),
+    PaymentRecord.STATUS_FINANCE_REVIEW: ('رویت مالی', 'flag-orange'),
+    PaymentRecord.STATUS_APPROVED: ('تایید شده', 'flag-orange'),
     PaymentRecord.STATUS_FINAL_APPROVED: ('تایید نهایی', 'flag-green'),
     PaymentRecord.STATUS_REJECTED: ('رد شده', 'flag-red'),
     PaymentRecord.STATUS_INCOMPLETE: ('ناقص', 'flag-yellow'),
-    PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: ('عودت به بازرگانی', 'flag-blue'),
+    PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: ('عودت به بازرگانی', 'flag-gray'),
 }
 STATUS_PROGRESS_FLOWS = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW],
@@ -78,6 +78,8 @@ def _staff_role_label(role):
     return {
         'commercial': 'بازرگانی',
         'finance': 'مالی',
+        'sales': 'فروش',
+        'data_entry': 'تکمیل اطلاعات فیش',
         'staff': 'کارمندی',
     }.get(role, '')
 
@@ -113,6 +115,17 @@ def _can_view_invoices(user):
 
 def _can_manage_users(user):
     return bool(user and user.is_authenticated and user.is_superuser)
+
+
+def _can_edit_payment_details(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        return bool(user.profile.can_edit_payment_details)
+    except UserProfile.DoesNotExist:
+        return False
 
 
 def _can_access_payment(user, payment):
@@ -207,31 +220,32 @@ def _suggest_five_digit_password():
 def _staff_status_choices_for_role(role):
     if role == 'commercial':
         return [
-            (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'تایید بازرگانی'),
+            (PaymentRecord.STATUS_APPROVED, 'تایید شده'),
             (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
             (PaymentRecord.STATUS_REJECTED, 'رد شده'),
         ]
     if role == 'finance':
         return [
-            (PaymentRecord.STATUS_FINANCE_REVIEW, 'تایید مالی'),
             (PaymentRecord.STATUS_FINAL_APPROVED, 'تایید نهایی'),
-            (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
-            (PaymentRecord.STATUS_REJECTED, 'رد شده'),
             (PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
         ]
+    if role == 'staff':
+        return []
     return PaymentRecord.STATUS_CHOICES
 
 
 def _can_staff_act_on_payment(role, payment, is_system_admin=False):
     if is_system_admin:
         return True
-    if payment.locked_by_finance:
-        return False
     if role == 'commercial':
-        return payment.status in {PaymentRecord.STATUS_PENDING, PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL}
+        return payment.status in {
+            PaymentRecord.STATUS_PENDING,
+            PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+            PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        }
     if role == 'finance':
-        return True
-    return True
+        return payment.status == PaymentRecord.STATUS_APPROVED
+    return False
 
 
 def _records_for_user(user):
@@ -239,6 +253,91 @@ def _records_for_user(user):
     if _is_staff_user(user):
         return qs.order_by('-id')
     return qs.filter(user=user).order_by('-id')
+
+
+def _active_payment_records_for_user(user):
+    records = _records_for_user(user)
+    if not _is_staff_user(user) or user.is_superuser:
+        return records
+
+    role = _user_role(user)
+    if role == 'commercial':
+        return records.filter(status__in=[
+            PaymentRecord.STATUS_PENDING,
+            PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+            PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        ])
+    if role == 'finance':
+        return records.filter(status__in=[
+            PaymentRecord.STATUS_PENDING,
+            PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+            PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+            PaymentRecord.STATUS_APPROVED,
+            PaymentRecord.STATUS_INCOMPLETE,
+        ])
+    if role in {'data_entry', 'sales'}:
+        return records.exclude(status__in=[
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+        ])
+    return records.none()
+
+
+def _history_payment_records_for_user(user):
+    if not _is_staff_user(user):
+        return PaymentRecord.objects.none()
+
+    records = _records_for_user(user)
+    if user.is_superuser:
+        return records.filter(status__in=[
+            PaymentRecord.STATUS_APPROVED,
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+        ])
+
+    role = _user_role(user)
+    if role == 'commercial':
+        return records.filter(status__in=[
+            PaymentRecord.STATUS_APPROVED,
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+        ])
+    if role == 'finance':
+        return records.filter(status__in=[
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+        ])
+    if role in {'data_entry', 'sales'}:
+        return records.filter(status__in=[
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+        ])
+    return records.none()
+
+
+def _mark_commercial_records_seen(records, actor):
+    if not actor.is_authenticated or actor.is_superuser or _user_role(actor) != 'commercial':
+        return
+
+    pending_records = list(records.filter(status=PaymentRecord.STATUS_PENDING))
+    for payment in pending_records:
+        from_status = payment.status
+        payment.status = PaymentRecord.STATUS_COMMERCIAL_REVIEW
+        payment.save(update_fields=['status'])
+        _log_activity(
+            payment,
+            actor,
+            PaymentActivityLog.ACTION_STATUS_CHANGED,
+            from_status=from_status,
+            to_status=payment.status,
+            note='رویت توسط بازرگانی',
+        )
+        _log_activity(
+            payment,
+            actor,
+            PaymentActivityLog.ACTION_VIEWED,
+            note='مشاهده در صف بررسی بازرگانی',
+        )
 
 
 def _parse_jalali_date(date_text):
@@ -317,6 +416,159 @@ def _excel_response(filename, sheets):
             ws.append(row)
     wb.save(response)
     return response
+
+
+def _field(key, label, getter):
+    return {'key': key, 'label': label, 'getter': getter}
+
+
+def _selected_export_fields(request, fields):
+    selected = set(request.GET.getlist('fields'))
+    if not selected:
+        return fields
+    return [field for field in fields if field['key'] in selected] or fields
+
+
+def _export_response(filename, sheet_title, fields, records):
+    headers = [field['label'] for field in fields]
+    rows = [
+        [field['getter'](record) for field in fields]
+        for record in records
+    ]
+    return _excel_response(filename, [(sheet_title, headers, rows)])
+
+
+def _export_scope_records(request, records, page_param='page'):
+    if request.GET.get('scope') != 'page':
+        return records
+
+    page_size, _ = _get_page_size(request, page_param=page_param, default=10)
+    if page_size == 'all':
+        return records
+
+    paginator = Paginator(records, page_size)
+    page_number = request.GET.get(page_param) or 1
+    try:
+        return paginator.page(page_number).object_list
+    except (PageNotAnInteger, EmptyPage):
+        return paginator.page(1).object_list
+
+
+PAYMENT_EXPORT_FIELDS = [
+    _field('id', 'ID', lambda p: p.id),
+    _field('username', 'نام کاربری', lambda p: p.user.username if p.user else ''),
+    _field('customer_name', 'نام مشتری', lambda p: p.user.get_full_name() if p.user else ''),
+    _field('first_name', 'نام', lambda p: p.first_name),
+    _field('last_name', 'نام خانوادگی', lambda p: p.last_name),
+    _field('organization', 'مجموعه', lambda p: p.organization),
+    _field('city', 'شهر', lambda p: p.city),
+    _field('phone', 'شماره تماس', lambda p: p.phone),
+    _field('payer_full_name', 'نام واریز کننده', lambda p: p.payer_full_name),
+    _field('payer_account_number', 'شماره حساب واریز کننده', lambda p: p.payer_account_number),
+    _field('payer_bank_name', 'بانک واریز کننده', lambda p: p.payer_bank_name),
+    _field('beneficiary_bank_name', 'بانک مقصد', lambda p: p.beneficiary_bank_name),
+    _field('beneficiary_account_number', 'شماره حساب مقصد', lambda p: p.beneficiary_account_number),
+    _field('beneficiary_account_owner', 'صاحب حساب مقصد', lambda p: p.beneficiary_account_owner),
+    _field('amount', 'مبلغ', lambda p: p.amount),
+    _field('pay_date', 'تاریخ واریز', lambda p: str(p.pay_date or '')),
+    _field('tracking_code', 'کد پیگیری', lambda p: p.tracking_code or ''),
+    _field('status', 'وضعیت', lambda p: p.get_status_display()),
+    _field('counterparty', 'طرف حساب', lambda p: p.counterparty.name if p.counterparty else ''),
+    _field('last_staff_note', 'آخرین توضیح کارشناس', lambda p: p.last_staff_note),
+    _field('customer_notes', 'توضیح مشتری', lambda p: p.customer_notes),
+    _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime(p.created_at)),
+    _field('updated_seen_at', 'زمان مشاهده مشتری', lambda p: _format_jalali_datetime(p.customer_seen_at)),
+]
+
+INVOICE_EXPORT_FIELDS = [
+    _field('id', 'ID', lambda i: i.id),
+    _field('customer_username', 'نام کاربری مشتری', lambda i: i.customer.username),
+    _field('customer_name', 'نام مشتری', lambda i: i.customer.get_full_name() or i.customer.username),
+    _field('organization', 'مجموعه', lambda i: getattr(i.customer.profile, 'organization', '')),
+    _field('invoice_number', 'شماره فاکتور', lambda i: i.invoice_number),
+    _field('invoice_date', 'تاریخ فاکتور', lambda i: str(i.invoice_date or '')),
+    _field('amount', 'مبلغ', lambda i: i.amount),
+    _field('reference_number', 'شماره حواله', lambda i: i.reference_number),
+    _field('uploaded_by', 'بارگذاری کننده', lambda i: i.uploaded_by.get_full_name() if i.uploaded_by else ''),
+    _field('seen', 'وضعیت مشاهده', lambda i: 'دیده شده' if i.is_seen_by_customer else 'دیده نشده'),
+    _field('customer_visible_note', 'توضیح قابل مشاهده مشتری', lambda i: i.customer_visible_note),
+    _field('internal_note', 'توضیح داخلی', lambda i: i.internal_note),
+    _field('customer_note', 'یادداشت مشتری', lambda i: i.customer_note),
+    _field('created_at', 'تاریخ ثبت', lambda i: _format_jalali_datetime(i.created_at)),
+]
+
+CUSTOMER_EXPORT_FIELDS = [
+    _field('username', 'نام کاربری', lambda c: c['user'].username),
+    _field('full_name', 'نام و نام خانوادگی', lambda c: f"{c['profile'].first_name or c['user'].first_name} {c['profile'].last_name or c['user'].last_name}".strip()),
+    _field('organization', 'مجموعه', lambda c: c['profile'].organization),
+    _field('city', 'شهر', lambda c: c['profile'].city),
+    _field('province', 'استان', lambda c: c['profile'].province),
+    _field('phone', 'شماره تماس', lambda c: c['profile'].phone),
+    _field('mobile', 'شماره همراه', lambda c: c['profile'].mobile),
+    _field('second_mobile', 'شماره همراه دوم', lambda c: c['profile'].second_mobile),
+    _field('payment_count', 'تعداد فیش ها', lambda c: c['payment_count']),
+    _field('invoice_count', 'تعداد فاکتورها', lambda c: c['invoice_count']),
+    _field('invoice_total', 'جمع فاکتورها', lambda c: c['invoice_total']),
+    _field('total_amount', 'جمع واریزی ها', lambda c: c['total_amount']),
+    _field('review_debt', 'بدهی ممیزی نشده', lambda c: c['review_debt']),
+    _field('confirmed_debt', 'بدهی تایید شده', lambda c: c['confirmed_debt']),
+    _field('latest_payment_date', 'آخرین سند', lambda c: _format_jalali_datetime(c['latest_payment_date'])),
+    _field('status', 'وضعیت', lambda c: 'معلق' if c['profile'].suspended else ('فعال' if c['user'].is_active else 'غیرفعال')),
+]
+
+USER_EXPORT_FIELDS = [
+    _field('username', 'نام کاربری', lambda u: u.username),
+    _field('first_name', 'نام', lambda u: u.first_name),
+    _field('last_name', 'نام خانوادگی', lambda u: u.last_name),
+    _field('role', 'نقش', lambda u: u.profile.get_role_display()),
+    _field('email', 'ایمیل', lambda u: u.email),
+    _field('phone', 'شماره تماس', lambda u: u.profile.phone),
+    _field('mobile', 'شماره همراه', lambda u: u.profile.mobile),
+    _field('second_mobile', 'شماره همراه دوم', lambda u: u.profile.second_mobile),
+    _field('organization', 'مجموعه', lambda u: u.profile.organization),
+    _field('city', 'شهر', lambda u: u.profile.city),
+    _field('province', 'استان', lambda u: u.profile.province),
+    _field('active_from', 'تاریخ آغاز', lambda u: str(u.profile.active_from or '')),
+    _field('valid_until', 'تاریخ اعتبار', lambda u: str(u.profile.valid_until or '')),
+    _field('is_active', 'فعال', lambda u: 'بله' if u.is_active else 'خیر'),
+    _field('suspended', 'معلق', lambda u: 'بله' if u.profile.suspended else 'خیر'),
+    _field('can_edit_payment_details', 'دسترسی تکمیل اطلاعات فیش‌ها', lambda u: 'بله' if u.profile.can_edit_payment_details else 'خیر'),
+]
+
+COUNTERPARTY_EXPORT_FIELDS = [
+    _field('id', 'ID', lambda c: c.id),
+    _field('name', 'نام', lambda c: c.name),
+    _field('description', 'توضیحات', lambda c: c.description),
+    _field('created_at', 'تاریخ ثبت', lambda c: _format_jalali_datetime(c.created_at)),
+    _field('updated_at', 'آخرین بروزرسانی', lambda c: _format_jalali_datetime(c.updated_at)),
+]
+
+DAILY_PLAN_EXPORT_FIELDS = [
+    _field('id', 'ID', lambda p: p.id),
+    _field('deposit_date', 'تاریخ', lambda p: str(p.deposit_date or '')),
+    _field('bank_name', 'بانک', lambda p: p.bank_name),
+    _field('account_number', 'شماره حساب', lambda p: p.account_number),
+    _field('account_owner', 'صاحب حساب', lambda p: p.account_owner),
+    _field('total_expected_amount', 'مبلغ کل اعلامی', lambda p: p.total_expected_amount),
+    _field('assigned_expected_total', 'جمع تخصیص مشتریان', lambda p: getattr(p, 'assigned_expected_total', 0)),
+    _field('paid_total', 'واریز ممیزی نشده', lambda p: getattr(p, 'paid_total', 0)),
+    _field('confirmed_total', 'واریز تایید شده', lambda p: getattr(p, 'confirmed_total', 0)),
+    _field('remaining_total', 'کسری', lambda p: getattr(p, 'remaining_total', 0)),
+    _field('assignment_count', 'تعداد مشتری', lambda p: getattr(p, 'assignment_count', 0)),
+    _field('note', 'توضیح', lambda p: p.note),
+]
+
+DAILY_ASSIGNMENT_EXPORT_FIELDS = [
+    _field('customer_username', 'نام کاربری مشتری', lambda a: a.customer.username),
+    _field('customer_name', 'مشتری', lambda a: a.customer.get_full_name() or a.customer.username),
+    _field('organization', 'مجموعه', lambda a: getattr(a.customer.profile, 'organization', '')),
+    _field('expected_amount', 'مبلغ مورد انتظار', lambda a: a.expected_amount),
+    _field('paid_amount', 'واریز ممیزی نشده', lambda a: a.report['paid_amount']),
+    _field('confirmed_amount', 'واریز تایید شده', lambda a: a.report['confirmed_amount']),
+    _field('remaining_amount', 'کسری ممیزی نشده', lambda a: a.remaining_amount),
+    _field('payment_count', 'تعداد فیش', lambda a: a.report['payment_count']),
+    _field('note', 'توضیح', lambda a: a.note),
+]
 
 
 def _customer_list_rows(request):
@@ -402,6 +654,31 @@ def _customer_list_rows(request):
     return customer_data, filters
 
 
+def _daily_plans_for_date(selected_date):
+    plans = _daily_plans_for_date(selected_date)
+    return plans
+
+
+def _daily_assignments_for_plan(plan):
+    assignments = list(
+        plan.assignments
+        .select_related('customer', 'customer__profile')
+        .prefetch_related('payments', 'payments__receipts')
+        .all()
+    )
+    stats = _daily_assignment_stats(assignments)
+    for assignment in assignments:
+        assignment.report = stats.get(assignment.id, {
+            'paid_amount': 0,
+            'payment_count': 0,
+            'confirmed_amount': 0,
+            'confirmed_count': 0,
+        })
+        assignment.remaining_amount = assignment.expected_amount - assignment.report['paid_amount']
+        assignment.confirmed_remaining_amount = assignment.expected_amount - assignment.report['confirmed_amount']
+    return assignments
+
+
 def _log_activity(payment, actor, action, from_status='', to_status='', note=''):
     PaymentActivityLog.objects.create(
         payment=payment,
@@ -423,6 +700,8 @@ def _role_title(user):
     return {
         'commercial': 'کاربر بازرگانی',
         'finance': 'کاربر مالی',
+        'sales': 'کاربر فروش',
+        'data_entry': 'کاربر تکمیل اطلاعات فیش',
         'staff': 'کاربر کارمند',
         'customer': 'مشتری',
     }.get(role, 'کاربر')
@@ -451,7 +730,7 @@ def _log_text(log):
     return f"{role} ({actor}) عملیاتی انجام داد."
 
 
-def _enrich_records(records, staff_role='', is_system_admin=False):
+def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_payment_details=False):
     status_order = [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_FINANCE_REVIEW,
@@ -494,6 +773,7 @@ def _enrich_records(records, staff_role='', is_system_admin=False):
             is_system_admin=is_system_admin,
         ) if staff_role else False
         payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
+        payment.can_edit_details = bool(can_edit_payment_details)
     return records
 
 
@@ -962,6 +1242,8 @@ def daily_payment_plans(request):
         'today_date_text': _format_jalali_date(_today_jalali_date()),
         'can_manage_daily_payments': can_manage,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+        'export_dataset': 'daily_plans',
+        'export_fields': DAILY_PLAN_EXPORT_FIELDS,
     })
 
 
@@ -999,22 +1281,7 @@ def daily_payment_plan_detail(request, plan_id):
     else:
         assignment_form = DailyPaymentAssignmentForm()
 
-    assignments = list(
-        plan.assignments
-        .select_related('customer', 'customer__profile')
-        .prefetch_related('payments', 'payments__receipts')
-        .all()
-    )
-    stats = _daily_assignment_stats(assignments)
-    for assignment in assignments:
-        assignment.report = stats.get(assignment.id, {
-            'paid_amount': 0,
-            'payment_count': 0,
-            'confirmed_amount': 0,
-            'confirmed_count': 0,
-        })
-        assignment.remaining_amount = assignment.expected_amount - assignment.report['paid_amount']
-        assignment.confirmed_remaining_amount = assignment.expected_amount - assignment.report['confirmed_amount']
+    assignments = _daily_assignments_for_plan(plan)
 
     totals = {
         'expected': sum(assignment.expected_amount for assignment in assignments),
@@ -1033,6 +1300,9 @@ def daily_payment_plan_detail(request, plan_id):
         'can_manage_daily_payments': can_manage,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
         'return_url': return_url,
+        'export_dataset': 'daily_assignments',
+        'export_fields': DAILY_ASSIGNMENT_EXPORT_FIELDS,
+        'export_extra_params': {'plan_id': plan.id},
     })
 
 
@@ -1118,10 +1388,17 @@ def create_payment(request):
     else:
         form = PaymentRecordForm(initial=form_initial)
 
-    records = _records_for_user(request.user)
+    records = _active_payment_records_for_user(request.user)
+    _mark_commercial_records_seen(records, request.user)
+    records = _active_payment_records_for_user(request.user)
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
     records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
-    records = _enrich_records(records, staff_role=staff_role, is_system_admin=is_system_admin)
+    records = _enrich_records(
+        records,
+        staff_role=staff_role,
+        is_system_admin=is_system_admin,
+        can_edit_payment_details=_can_edit_payment_details(request.user),
+    )
     page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
@@ -1146,10 +1423,65 @@ def create_payment(request):
         'current_sort': current_sort,
         'current_sort_dir': current_sort_dir,
         'sort_base_query': sort_base_query,
+        'is_history_mode': False,
+        'records_url_name': 'submit',
+        'export_dataset': 'payments',
+        'export_fields': PAYMENT_EXPORT_FIELDS,
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user) if not is_staff_user else None,
         'active_daily_assignment': active_daily_assignment,
         'expired_daily_assignment': expired_daily_assignment,
+    })
+
+
+@login_required
+def payment_history(request):
+    if not _is_staff_user(request.user):
+        return HttpResponseForbidden('این بخش فقط برای پرسنل واحدها قابل دسترسی است.')
+
+    staff_role = _user_role(request.user)
+    is_system_admin = request.user.is_superuser
+    records = _history_payment_records_for_user(request.user)
+    records, active_filters = _apply_record_filters(records, request, True)
+    records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
+    records = _enrich_records(
+        records,
+        staff_role=staff_role,
+        is_system_admin=is_system_admin,
+        can_edit_payment_details=_can_edit_payment_details(request.user),
+    )
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+    return render(request, 'payments/form.html', {
+        'form': PaymentRecordForm(),
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'is_staff_user': True,
+        'filters': active_filters,
+        'status_choices': PaymentRecord.STATUS_CHOICES,
+        'counterparties': Counterparty.objects.all(),
+        'staff_user_role': staff_role,
+        'staff_role_label': _staff_role_label(staff_role),
+        'can_manage_counterparties': is_system_admin,
+        'can_export_records': is_system_admin or staff_role in {'finance', 'commercial'},
+        'is_system_admin': is_system_admin,
+        'user_display_name': user_display_name,
+        'source_profiles': [],
+        'destination_profiles': [],
+        'current_sort': current_sort,
+        'current_sort_dir': current_sort_dir,
+        'sort_base_query': sort_base_query,
+        'is_history_mode': True,
+        'records_url_name': 'payment_history',
+        'export_dataset': 'payment_history',
+        'export_fields': PAYMENT_EXPORT_FIELDS,
+        'customer_info': {},
+        'customer_debt': None,
+        'active_daily_assignment': None,
+        'expired_daily_assignment': None,
     })
 
 
@@ -1426,6 +1758,71 @@ def counterparties_manage(request):
         'counterparties': page_obj,
         'page_obj': page_obj,
         'page_base_query': page_base_query,
+        'export_dataset': 'counterparties',
+        'export_fields': COUNTERPARTY_EXPORT_FIELDS,
+    })
+
+
+def _payment_detail_changes_note(before, after, form):
+    lines = []
+    for field_name in form.fields:
+        old_value = before.get(field_name)
+        new_value = getattr(after, field_name)
+        old_text = '' if old_value is None else str(old_value)
+        new_text = '' if new_value is None else str(new_value)
+        if old_text != new_text:
+            label = form.fields[field_name].label or field_name
+            lines.append(f'{label}: «{old_text or "-"}» به «{new_text or "-"}»')
+    return '\n'.join(lines)
+
+
+@login_required
+def staff_edit_payment_details(request, payment_id):
+    if not _can_edit_payment_details(request.user):
+        return HttpResponseForbidden('شما دسترسی تکمیل اطلاعات فیش‌ها را ندارید.')
+
+    payment = get_object_or_404(
+        PaymentRecord.objects.select_related('user', 'counterparty').prefetch_related('receipts'),
+        id=payment_id,
+    )
+    return_url = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or reverse('submit'))
+    editable_statuses = {
+        PaymentRecord.STATUS_PENDING,
+        PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        PaymentRecord.STATUS_APPROVED,
+        PaymentRecord.STATUS_INCOMPLETE,
+    }
+    if not request.user.is_superuser and payment.status not in editable_statuses:
+        return HttpResponseForbidden('این سند در وضعیت فعلی قابل تکمیل اطلاعات نیست.')
+
+    if request.method == 'POST':
+        form = StaffPaymentDetailsForm(request.POST, instance=payment)
+        before = {field_name: getattr(payment, field_name) for field_name in form.fields}
+        if form.is_valid():
+            payment = form.save(commit=False)
+            change_note = _payment_detail_changes_note(before, payment, form)
+            if change_note:
+                payment.save(update_fields=list(form.fields.keys()))
+                _log_activity(
+                    payment,
+                    request.user,
+                    PaymentActivityLog.ACTION_EDITED,
+                    from_status=payment.status,
+                    to_status=payment.status,
+                    note=change_note,
+                )
+                messages.success(request, 'اطلاعات فیش ثبت و در تاریخچه سند لاگ شد.')
+            else:
+                messages.info(request, 'تغییری برای ثبت وجود نداشت.')
+            return redirect(return_url)
+    else:
+        form = StaffPaymentDetailsForm(instance=payment, initial={'amount': payment.amount})
+
+    return render(request, 'payments/staff_edit_payment_details.html', {
+        'form': form,
+        'payment': payment,
+        'return_url': return_url,
     })
 
 
@@ -1491,6 +1888,8 @@ def users_manage(request):
         'password_suggestion': password_suggestion,
         'editing_user': None,
         'filters': filters,
+        'export_dataset': 'users',
+        'export_fields': USER_EXPORT_FIELDS,
     })
 
 
@@ -1541,6 +1940,8 @@ def user_edit(request, user_id):
         'password_suggestion': password_suggestion,
         'editing_user': managed_user,
         'filters': filters,
+        'export_dataset': 'users',
+        'export_fields': USER_EXPORT_FIELDS,
     })
 
 
@@ -1582,6 +1983,8 @@ def invoices_dashboard(request):
         'can_view_invoices': can_view_invoices,
         'user_display_name': user_display_name,
         'customer_rows': _invoice_customer_rows() if can_upload_invoices else [],
+        'export_dataset': 'invoices',
+        'export_fields': INVOICE_EXPORT_FIELDS,
     })
 
 
@@ -1646,6 +2049,7 @@ def receipt_file(request, receipt_id):
     receipt = get_object_or_404(PaymentReceipt.objects.select_related('payment'), id=receipt_id)
     if not _can_access_payment(request.user, receipt.payment):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فیش‌های خودتان وجود دارد.')
+    _log_activity(receipt.payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده فایل فیش')
     return _file_response(receipt.image)
 
 
@@ -1654,6 +2058,7 @@ def legacy_payment_receipt_file(request, payment_id):
     payment = get_object_or_404(PaymentRecord, id=payment_id)
     if not _can_access_payment(request.user, payment):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فیش‌های خودتان وجود دارد.')
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده فایل فیش')
     return _file_response(payment.receipt_image)
 
 
@@ -1700,81 +2105,94 @@ def bank_names_autocomplete(request):
 
 @login_required
 def export_records(request):
-    is_staff_user = _is_staff_user(request.user)
-    role = _user_role(request.user)
-    if is_staff_user and not request.user.is_superuser and role not in {'finance', 'commercial'}:
-        return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+    return export_data(request, 'payments')
 
-    records = _records_for_user(request.user)
-    records, _ = _apply_record_filters(records, request, is_staff_user=is_staff_user)
 
-    page_size, _ = _get_page_size(request, page_param='page', default=10)
-    if page_size == 'all':
-        export_records = records
-    else:
-        paginator = Paginator(records, page_size)
-        page_number = request.GET.get('page') or 1
-        try:
-            export_records = paginator.page(page_number).object_list
-        except (PageNotAnInteger, EmptyPage):
-            export_records = paginator.page(1).object_list
+@login_required
+def export_data(request, dataset):
+    if dataset in {'payments', 'payment_history'}:
+        is_staff_user = _is_staff_user(request.user)
+        records = _history_payment_records_for_user(request.user) if dataset == 'payment_history' else _active_payment_records_for_user(request.user)
+        records, _ = _apply_record_filters(records, request, is_staff_user=is_staff_user)
+        records = _export_scope_records(request, records, page_param='page')
+        fields = _selected_export_fields(request, PAYMENT_EXPORT_FIELDS)
+        return _export_response(f'{dataset}.xlsx', 'Payments', fields, records)
 
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = 'attachment; filename="payment_records.xlsx"'
+    if dataset == 'customer_payments':
+        if not _is_staff_user(request.user):
+            return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+        customer = get_object_or_404(User, id=request.GET.get('customer_id'))
+        records = (
+            PaymentRecord.objects
+            .filter(user=customer)
+            .select_related('counterparty', 'user')
+            .order_by('-created_at')
+        )
+        records = _export_scope_records(request, records, page_param='payments_page')
+        fields = _selected_export_fields(request, PAYMENT_EXPORT_FIELDS)
+        return _export_response('customer_payments.xlsx', 'Payments', fields, records)
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = 'Payments'
+    if dataset in {'invoices', 'customer_invoices'}:
+        if dataset == 'customer_invoices':
+            if not _is_staff_user(request.user):
+                return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+            customer = get_object_or_404(User, id=request.GET.get('customer_id'))
+            records = InvoiceRecord.objects.filter(customer=customer).select_related('customer', 'customer__profile', 'uploaded_by')
+            invoice_number_filter = (request.GET.get('invoice_number') or '').strip()
+            if invoice_number_filter:
+                records = records.filter(invoice_number__icontains=invoice_number_filter)
+            records = _export_scope_records(request, records, page_param='invoice_page')
+        else:
+            records = _invoice_records_for_user(request.user)
+            records, _ = _apply_invoice_filters(records, request, is_staff_user=_is_staff_user(request.user))
+            records = _export_scope_records(request, records, page_param='page')
+        fields = _selected_export_fields(request, INVOICE_EXPORT_FIELDS)
+        return _export_response(f'{dataset}.xlsx', 'Invoices', fields, records)
 
-    ws.append([
-        'ID',
-        'کاربر',
-        'نام کاربر',
-        'نام',
-        'نام خانوادگی',
-        'نام و نام خانوادگی واریز کننده',
-        'شماره حساب واریز کننده',
-        'نام بانک',
-        'نام بانک مقصد',
-        'شماره حساب مقصد',
-        'نام صاحب حساب مقصد',
-        'مجموعه',
-        'شهر',
-        'شماره تلفن',
-        'مبلغ (ریال)',
-        'تاریخ واریز',
-        'کد پیگیری',
-        'طرف حساب',
-        'تاریخ ثبت',
-    ])
+    if dataset == 'customers':
+        if not _is_staff_user(request.user):
+            return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+        records, _ = _customer_list_rows(request)
+        records = _export_scope_records(request, records, page_param='page')
+        fields = _selected_export_fields(request, CUSTOMER_EXPORT_FIELDS)
+        return _export_response('customers.xlsx', 'Customers', fields, records)
 
-    for payment in export_records:
-        ws.append([
-            payment.id,
-            payment.user.get_full_name() if payment.user else '',
-            payment.user.username if payment.user else '',
-            payment.first_name,
-            payment.last_name,
-            payment.payer_full_name,
-            payment.payer_account_number,
-            payment.payer_bank_name,
-            payment.beneficiary_bank_name,
-            payment.beneficiary_account_number,
-            payment.beneficiary_account_owner,
-            payment.organization,
-            payment.city,
-            payment.phone,
-            payment.amount,
-            str(payment.pay_date),
-            payment.tracking_code or '',
-            payment.counterparty.name if payment.counterparty else '',
-            _format_jalali_datetime(payment.created_at),
-        ])
+    if dataset == 'users':
+        if not _can_manage_users(request.user):
+            return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+        records = _managed_users(
+            query=(request.GET.get('q') or '').strip(),
+            role=(request.GET.get('role') or '').strip(),
+            status=(request.GET.get('status') or '').strip(),
+        )
+        records = _export_scope_records(request, records, page_param='page')
+        fields = _selected_export_fields(request, USER_EXPORT_FIELDS)
+        return _export_response('users.xlsx', 'Users', fields, records)
 
-    wb.save(response)
-    return response
+    if dataset == 'counterparties':
+        if not request.user.is_superuser:
+            return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+        fields = _selected_export_fields(request, COUNTERPARTY_EXPORT_FIELDS)
+        records = _export_scope_records(request, Counterparty.objects.all(), page_param='page')
+        return _export_response('counterparties.xlsx', 'Counterparties', fields, records)
+
+    if dataset == 'daily_plans':
+        if not _can_view_daily_payments(request.user):
+            return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+        selected_date = _parse_jalali_date((request.GET.get('date') or '').strip()) or _today_jalali_date()
+        fields = _selected_export_fields(request, DAILY_PLAN_EXPORT_FIELDS)
+        records = _export_scope_records(request, _daily_plans_for_date(selected_date), page_param='page')
+        return _export_response('daily_payment_plans.xlsx', 'Daily Plans', fields, records)
+
+    if dataset == 'daily_assignments':
+        if not _can_view_daily_payments(request.user):
+            return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
+        plan = get_object_or_404(DailyPaymentPlan, id=request.GET.get('plan_id'))
+        fields = _selected_export_fields(request, DAILY_ASSIGNMENT_EXPORT_FIELDS)
+        records = _export_scope_records(request, _daily_assignments_for_plan(plan), page_param='page')
+        return _export_response('daily_assignments.xlsx', 'Assignments', fields, records)
+
+    raise Http404
 
 
 @login_required
@@ -1799,7 +2217,12 @@ def customer_detail(request, user_id):
         .prefetch_related('receipts', 'activity_logs', 'activity_logs__actor')
         .order_by('-created_at')
     )
-    payments = _enrich_records(payments, staff_role=_user_role(request.user), is_system_admin=request.user.is_superuser)
+    payments = _enrich_records(
+        payments,
+        staff_role=_user_role(request.user),
+        is_system_admin=request.user.is_superuser,
+        can_edit_payment_details=_can_edit_payment_details(request.user),
+    )
 
     # Get all invoices for this customer
     invoices = (
@@ -1858,6 +2281,9 @@ def customer_detail(request, user_id):
         },
         'user_display_name': user_display_name,
         'return_url': return_url,
+        'payment_export_fields': PAYMENT_EXPORT_FIELDS,
+        'invoice_export_fields': INVOICE_EXPORT_FIELDS,
+        'customer_export_params': {'customer_id': customer_user.id},
     })
 
 
@@ -1985,6 +2411,8 @@ def customers_list(request):
         'can_manage_users': _can_manage_users(request.user),
         'user_display_name': user_display_name,
         'filters': filters,
+        'export_dataset': 'customers',
+        'export_fields': CUSTOMER_EXPORT_FIELDS,
     })
 
 

@@ -115,6 +115,8 @@
                         <option value="customer" {% if filters.role == 'customer' %}selected{% endif %}>مشتری</option>
                         <option value="commercial" {% if filters.role == 'commercial' %}selected{% endif %}>بازرگانی</option>
                         <option value="finance" {% if filters.role == 'finance' %}selected{% endif %}>مالی</option>
+                        <option value="sales" {% if filters.role == 'sales' %}selected{% endif %}>فروش</option>
+                        <option value="data_entry" {% if filters.role == 'data_entry' %}selected{% endif %}>تکمیل اطلاعات فیش</option>
                         <option value="staff" {% if filters.role == 'staff' %}selected{% endif %}>کارمند</option>
                     </select>
                 </div>
@@ -151,6 +153,8 @@
                 </select>
             </form>
         </div>
+
+        {% include "payments/partials/export_panel.html" %}
 
         <table>
             <thead>
@@ -196,7 +200,8 @@
             </tbody>
         </table>
 
-        {% if page_obj.has_other_pages %}
+        {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
+        {% if legacy_pagination_enabled and page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
                 {% if page_obj.number > 1 %}
                     <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page=1" class="button-link">اول</a>

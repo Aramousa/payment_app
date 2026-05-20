@@ -90,6 +90,8 @@
         </form>
     </div>
 
+    {% include "payments/partials/export_panel.html" %}
+
     {% if customer_data %}
         <table>
             <thead>
@@ -148,7 +150,8 @@
             </tbody>
         </table>
 
-        {% if page_obj.has_other_pages %}
+        {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="customer-link" %}
+        {% if legacy_pagination_enabled and page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
                 {% if page_obj.number > 1 %}
                     <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page=1" class="customer-link">اول</a>

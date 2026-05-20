@@ -1,12 +1,14 @@
 import jdatetime
+from io import BytesIO
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core import mail
 from django.test import override_settings
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import load_workbook
 
-from .models import InvoiceRecord, PaymentReceipt, PaymentRecord, SystemActivityLog
+from .models import InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, SystemActivityLog
 
 
 class InvoiceFlowTests(TestCase):
@@ -22,6 +24,27 @@ class InvoiceFlowTests(TestCase):
         self.commercial_user.profile.can_upload_invoices = True
         self.commercial_user.profile.can_view_invoices = True
         self.commercial_user.profile.save()
+
+        self.finance_user = User.objects.create_user(
+            username='finance1',
+            password='pass1234',
+            first_name='Ú©Ø§Ø±Ø¨Ø±',
+            last_name='Ù…Ø§Ù„ÛŒ',
+        )
+        self.finance_user.profile.role = 'finance'
+        self.finance_user.profile.force_password_change = False
+        self.finance_user.profile.save()
+
+        self.data_entry_user = User.objects.create_user(
+            username='dataentry1',
+            password='pass1234',
+            first_name='کاربر',
+            last_name='ورود اطلاعات',
+        )
+        self.data_entry_user.profile.role = 'data_entry'
+        self.data_entry_user.profile.can_edit_payment_details = True
+        self.data_entry_user.profile.force_password_change = False
+        self.data_entry_user.profile.save()
 
         self.customer_user = User.objects.create_user(
             username='customer1',
@@ -197,6 +220,201 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
         response = self.client.get(reverse('receipt_file', args=[other_receipt.id]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_payment_workflow_active_queue_history_and_logs(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='WF-APPROVE',
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_COMMERCIAL_REVIEW)
+        self.assertTrue(
+            PaymentActivityLog.objects.filter(
+                payment=payment,
+                actor=self.commercial_user,
+                action=PaymentActivityLog.ACTION_STATUS_CHANGED,
+                to_status=PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+            ).exists()
+        )
+        self.assertTrue(
+            PaymentActivityLog.objects.filter(
+                payment=payment,
+                actor=self.commercial_user,
+                action=PaymentActivityLog.ACTION_VIEWED,
+            ).exists()
+        )
+
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {'status': PaymentRecord.STATUS_APPROVED, 'note': '', 'next': reverse('submit')},
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_APPROVED)
+
+        response = self.client.get(reverse('submit'))
+        self.assertNotContains(response, 'WF-APPROVE')
+        response = self.client.get(reverse('payment_history'))
+        self.assertContains(response, 'WF-APPROVE')
+
+        self.client.logout()
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertContains(response, 'WF-APPROVE')
+
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {'status': PaymentRecord.STATUS_FINAL_APPROVED, 'note': '', 'next': reverse('submit')},
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_FINAL_APPROVED)
+
+        response = self.client.get(reverse('submit'))
+        self.assertNotContains(response, 'WF-APPROVE')
+        response = self.client.get(reverse('payment_history'))
+        self.assertContains(response, 'WF-APPROVE')
+
+    def test_finance_can_see_pending_but_cannot_change_until_commercial_approval(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='WF-PENDING',
+        )
+
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertContains(response, 'WF-PENDING')
+
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {'status': PaymentRecord.STATUS_FINAL_APPROVED, 'note': '', 'next': reverse('submit')},
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_PENDING)
+
+    def test_excel_export_defaults_to_all_fields_and_accepts_selected_fields(self):
+        for index in range(11):
+            PaymentRecord.objects.create(
+                user=self.customer_user,
+                first_name='Ali',
+                last_name='Customer',
+                organization='Alpha',
+                city='Tehran',
+                phone='09120000002',
+                amount=100000 + index,
+                pay_date=jdatetime.date(1405, 2, 8),
+                tracking_code=f'EXPORT-{index + 1}',
+            )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('export_data', args=['payments']))
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        headers = [cell.value for cell in workbook.active[1]]
+        self.assertIn('کد پیگیری', headers)
+        self.assertIn('مبلغ', headers)
+
+        response = self.client.get(
+            reverse('export_data', args=['payments']),
+            {'fields': ['tracking_code', 'amount']},
+        )
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        headers = [cell.value for cell in workbook.active[1]]
+        self.assertEqual(headers, ['مبلغ', 'کد پیگیری'])
+
+        response = self.client.get(
+            reverse('export_data', args=['payments']),
+            {'fields': ['tracking_code'], 'scope': 'page', 'per_page': '10', 'page': '1'},
+        )
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        rows = list(workbook.active.iter_rows(values_only=True))
+        self.assertEqual(rows[0], ('کد پیگیری',))
+        self.assertEqual(len(rows), 11)
+
+    def test_data_entry_user_can_complete_payment_details_and_changes_are_logged(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=0,
+            tracking_code='',
+        )
+
+        self.client.login(username='dataentry1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse('staff_edit_payment_details', args=[payment.id]))
+
+        response = self.client.post(
+            reverse('staff_edit_payment_details', args=[payment.id]),
+            {
+                'payer_account_number': '111222333',
+                'payer_full_name': 'Ali Customer',
+                'payer_bank_name': 'Melli',
+                'beneficiary_bank_name': 'Saderat',
+                'beneficiary_account_number': '444555666',
+                'beneficiary_account_owner': 'Company',
+                'amount': '250000',
+                'tracking_code': 'TRACK-250',
+                'pay_date': '1405/02/08',
+                'next': reverse('submit'),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_PENDING)
+        self.assertEqual(payment.tracking_code, 'TRACK-250')
+        self.assertEqual(payment.amount, 250000)
+
+        log = PaymentActivityLog.objects.filter(
+            payment=payment,
+            actor=self.data_entry_user,
+            action=PaymentActivityLog.ACTION_EDITED,
+        ).latest('created_at')
+        self.assertEqual(log.from_status, PaymentRecord.STATUS_PENDING)
+        self.assertEqual(log.to_status, PaymentRecord.STATUS_PENDING)
+        self.assertIn('کد پیگیری', log.note)
+        self.assertIn('TRACK-250', log.note)
+
+    def test_user_without_payment_detail_permission_cannot_edit_customer_payment_details(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            tracking_code='NO-EDIT',
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('staff_edit_payment_details', args=[payment.id]))
         self.assertEqual(response.status_code, 403)
 
     def test_uploaded_files_are_not_served_from_direct_media_url(self):

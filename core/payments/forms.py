@@ -16,7 +16,7 @@ from PIL import Image, ImageOps
 
 from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, UploadSettings, UserProfile
 
-STAFF_ROLES = {'staff', 'finance', 'commercial'}
+STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
 DEFAULT_RECEIPT_MAX_UPLOAD_SIZE = 1 * 1024 * 1024
 DEFAULT_INVOICE_MAX_UPLOAD_SIZE = 5 * 1024 * 1024
@@ -436,10 +436,86 @@ class PaymentRecordForm(forms.ModelForm):
         return self._receipt_payload
 
 
+class StaffPaymentDetailsForm(forms.ModelForm):
+    pay_date = jDateField(
+        label='تاریخ',
+        required=False,
+        input_formats=['%Y/%m/%d'],
+        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+    )
+
+    class Meta:
+        model = PaymentRecord
+        fields = [
+            'payer_account_number',
+            'payer_full_name',
+            'payer_bank_name',
+            'beneficiary_bank_name',
+            'beneficiary_account_number',
+            'beneficiary_account_owner',
+            'amount',
+            'tracking_code',
+            'pay_date',
+        ]
+        widgets = {
+            'payer_account_number': forms.TextInput(),
+            'payer_full_name': forms.TextInput(),
+            'payer_bank_name': BankNameAutocompleteWidget(bank_type='payer'),
+            'beneficiary_bank_name': BankNameAutocompleteWidget(bank_type='beneficiary'),
+            'beneficiary_account_number': forms.TextInput(),
+            'beneficiary_account_owner': forms.TextInput(),
+            'amount': forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
+            'pay_date': jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+        }
+        labels = {
+            'payer_account_number': 'شماره حساب واریز کننده',
+            'payer_full_name': 'نام و نام خانوادگی واریز کننده',
+            'payer_bank_name': 'بانک مبدا',
+            'beneficiary_bank_name': 'بانک مقصد',
+            'beneficiary_account_number': 'شماره حساب مقصد',
+            'beneficiary_account_owner': 'نام صاحب حساب مقصد',
+            'amount': 'مبلغ (ریال)',
+            'tracking_code': 'کد پیگیری',
+            'pay_date': 'تاریخ',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.is_bound and self.initial.get('amount') is not None:
+            try:
+                self.initial['amount'] = '{:,}'.format(int(str(self.initial['amount']).replace(',', '').strip()))
+            except (ValueError, TypeError):
+                pass
+        for bank_field in ['payer_bank_name', 'beneficiary_bank_name']:
+            css_class = self.fields[bank_field].widget.attrs.get('class', '')
+            self.fields[bank_field].widget.attrs['class'] = (css_class + ' bank-autocomplete-input').strip()
+            self.fields[bank_field].widget.attrs['data-bank-type'] = 'payer' if bank_field == 'payer_bank_name' else 'beneficiary'
+            self.fields[bank_field].widget.attrs['autocomplete'] = 'off'
+
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if amount is None:
+            return 0
+        if amount <= 0:
+            raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
+        return amount
+
+
 class StaffStatusUpdateForm(forms.Form):
     status = forms.ChoiceField(
         choices=PaymentRecord.STATUS_CHOICES,
         label='وضعیت جدید',
+    )
+    note = forms.CharField(
+        required=False,
+        label='توضیح',
+        widget=forms.Textarea(attrs={'rows': 2}),
+    )
+    counterparty = forms.ModelChoiceField(
+        queryset=Counterparty.objects.all(),
+        required=False,
+        label='طرف حساب',
+        empty_label='بدون طرف حساب',
     )
 
 
@@ -712,6 +788,9 @@ class UserAccountManagementForm(forms.Form):
         ('customer', 'مشتری'),
         ('commercial', 'بازرگانی'),
         ('finance', 'مالی'),
+        ('sales', 'فروش'),
+        ('data_entry', 'تکمیل اطلاعات فیش'),
+        ('staff', 'کارمند'),
     )
 
     first_name = forms.CharField(label='نام', max_length=50, required=True)
@@ -741,6 +820,7 @@ class UserAccountManagementForm(forms.Form):
     suspended = forms.BooleanField(label='معلق', required=False, initial=False)
     can_view_invoices = forms.BooleanField(label='دسترسی مشاهده فاکتورها', required=False)
     can_upload_invoices = forms.BooleanField(label='دسترسی بارگذاری فاکتورها', required=False)
+    can_edit_payment_details = forms.BooleanField(label='دسترسی تکمیل اطلاعات فیش‌ها', required=False)
     is_active = forms.BooleanField(label='فعال', required=False, initial=True)
 
     def __init__(self, *args, **kwargs):
@@ -767,6 +847,7 @@ class UserAccountManagementForm(forms.Form):
                 'suspended': getattr(profile, 'suspended', False),
                 'can_view_invoices': getattr(profile, 'can_view_invoices', False),
                 'can_upload_invoices': getattr(profile, 'can_upload_invoices', False),
+                'can_edit_payment_details': getattr(profile, 'can_edit_payment_details', False),
             })
 
         for name, field in self.fields.items():
@@ -886,5 +967,6 @@ class UserAccountManagementForm(forms.Form):
         profile.suspended = self.cleaned_data.get('suspended', False)
         profile.can_view_invoices = self.cleaned_data.get('can_view_invoices', False)
         profile.can_upload_invoices = self.cleaned_data.get('can_upload_invoices', False)
+        profile.can_edit_payment_details = self.cleaned_data.get('can_edit_payment_details', False)
         profile.save()
         return instance
