@@ -218,28 +218,41 @@
             padding: 10px 14px;
             border-bottom: 1px solid #eee;
             font-size: 13px;
+            display: block;
+            color: #333;
+            text-decoration: none;
         }
+        a.notification-item:hover { background: #f5f9ff; }
         .notification-item:last-child { border-bottom: none; }
         .notification-item strong { color: #0d6efd; }
+        .notification-actions { padding: 8px 10px; border-bottom: 1px solid #eee; display: flex; gap: 6px; flex-wrap: wrap; }
+        .notification-actions button { border: 0; border-radius: 5px; background: #0d6efd; color: #fff; padding: 6px 8px; cursor: pointer; font-size: 12px; }
+        .notification-actions button.secondary { background: #6c757d; }
+        .notification-empty { padding: 10px 14px; color: #666; font-size: 13px; }
     </style>
 </head>
 <body>
     <div class="top-bar">
         <div class="top-actions">
-            {% if unread_notifications.total > 0 %}
-            <div class="notification-bell">
-                <span style="font-size: 20px; cursor: pointer;">🔔</span>
-                <span class="notification-badge">{{ unread_notifications.total }}</span>
+            <div class="notification-bell" title="اعلان‌ها">
+                <span style="font-size: 20px; cursor: pointer;">&#128276;</span>
+                <span class="notification-badge{% if unread_notifications.total == 0 %} zero{% endif %}">{{ unread_notifications.total }}</span>
                 <div class="notification-dropdown">
-                    <div class="notification-item">
-                        <strong>اسناد جدید:</strong> {{ unread_notifications.payments }} فیش پرداخت
+                    <div class="notification-actions">
+                        <button type="button" id="enableBrowserNotifications">فعال‌سازی اعلان سیستم</button>
+                        <button type="button" id="markNotificationsRead" class="secondary">خوانده شد</button>
                     </div>
-                    <div class="notification-item">
-                        <strong>فاکتورهای جدید:</strong> {{ unread_notifications.invoices }} فاکتور
+                    <div id="notificationList">
+                        {% for item in unread_notifications.items %}
+                            <a class="notification-item" href="{{ item.url }}">
+                                <strong>{{ item.title }}:</strong> {{ item.message }}
+                            </a>
+                        {% empty %}
+                            <div class="notification-empty">اعلان جدیدی وجود ندارد.</div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
-            {% endif %}
             <a href="{% url 'invoices_dashboard' %}" class="button-link">بخش فاکتورها</a>
             {% if is_staff_user %}
                 <a href="{% url 'customers_list' %}" class="button-link">لیست مشتریان</a>
@@ -477,11 +490,8 @@
                         نام بانک{% if current_sort == 'payer_bank_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
-                <th>
-                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=status&dir={% if current_sort == 'status' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                        وضعیت{% if current_sort == 'status' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
-                    </a>
-                </th>
+                <th>وضعیت بازرگانی</th>
+                <th>وضعیت مالی</th>
                 <th>اقدام سریع</th>
             </tr>
         </thead>
@@ -506,13 +516,8 @@
                 <td>{{ payment.tracking_code|default:'-' }}</td>
                 <td>{{ payment.amount|thousand_sep }}</td>
                 <td>{% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</td>
-                <td>
-                    {% if is_staff_user %}
-                        <span class="status-pill {{ payment.status_flag_class }}">&#9873; {{ payment.get_status_display }}</span>
-                    {% else %}
-                        <span class="status-pill {{ payment.customer_flag_class }}">&#9873; {{ payment.customer_status_label }}</span>
-                    {% endif %}
-                </td>
+                <td><span class="status-pill {{ payment.commercial_flag_class }}">&#9873; {{ payment.commercial_status_label }}</span></td>
+                <td><span class="status-pill {{ payment.finance_flag_class }}">&#9873; {{ payment.finance_status_label }}</span></td>
                 <td>
                     {% if not is_staff_user %}
                         {% if payment.status == 'incomplete' %}
@@ -889,6 +894,125 @@
                 flashOverlay.classList.remove('open');
             });
         }
+
+        const notificationBadge = document.querySelector('.notification-badge');
+        const notificationList = document.getElementById('notificationList');
+        const enableNotificationsBtn = document.getElementById('enableBrowserNotifications');
+        const markNotificationsReadBtn = document.getElementById('markNotificationsRead');
+        const notificationFeedUrl = "{% url 'notifications_feed' %}";
+        const notificationReadUrl = "{% url 'notifications_mark_read' %}";
+        const lastSeenStorageKey = 'paymentAppNotificationLastSeen:{{ request.user.id }}';
+        let lastSeenNotificationId = Number(localStorage.getItem(lastSeenStorageKey) || '0');
+        let firstNotificationPoll = true;
+
+        function getCookie(name) {
+            const value = '; ' + document.cookie;
+            const parts = value.split('; ' + name + '=');
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        function updateNotificationBadge(count) {
+            if (!notificationBadge) return;
+            notificationBadge.textContent = count;
+            notificationBadge.classList.toggle('zero', count === 0);
+        }
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, function (char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[char];
+            });
+        }
+
+        function renderNotificationList(items) {
+            if (!notificationList) return;
+            if (!items.length) {
+                notificationList.innerHTML = '<div class="notification-empty">اعلان جدیدی وجود ندارد.</div>';
+                return;
+            }
+            notificationList.innerHTML = items.map(function (item) {
+                return '<a class="notification-item" href="' + escapeHtml(item.url) + '">' +
+                    '<strong>' + escapeHtml(item.title) + ':</strong> ' + escapeHtml(item.message) +
+                    '</a>';
+            }).join('');
+        }
+
+        function showBrowserNotification(item) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            const notification = new Notification(item.title, {
+                body: item.message,
+                tag: 'payment-app-' + item.id
+            });
+            notification.onclick = function () {
+                window.focus();
+                if (item.url) window.location.href = item.url;
+                notification.close();
+            };
+        }
+
+        async function pollNotifications() {
+            try {
+                const response = await fetch(notificationFeedUrl, { credentials: 'same-origin' });
+                if (!response.ok) return;
+                const data = await response.json();
+                const items = data.items || [];
+                updateNotificationBadge(data.unread_count || 0);
+                renderNotificationList(items);
+
+                const sortedItems = items.slice().sort(function (a, b) { return a.id - b.id; });
+                sortedItems.forEach(function (item) {
+                    if (item.id > lastSeenNotificationId && !firstNotificationPoll) {
+                        showBrowserNotification(item);
+                    }
+                    if (item.id > lastSeenNotificationId) {
+                        lastSeenNotificationId = item.id;
+                    }
+                });
+                if (lastSeenNotificationId) {
+                    localStorage.setItem(lastSeenStorageKey, String(lastSeenNotificationId));
+                }
+                firstNotificationPoll = false;
+            } catch (error) {
+                firstNotificationPoll = false;
+            }
+        }
+
+        if (enableNotificationsBtn) {
+            if (!('Notification' in window)) {
+                enableNotificationsBtn.style.display = 'none';
+            } else if (Notification.permission === 'granted') {
+                enableNotificationsBtn.textContent = 'اعلان سیستم فعال است';
+            }
+            enableNotificationsBtn.addEventListener('click', async function () {
+                if (!('Notification' in window)) return;
+                const permission = await Notification.requestPermission();
+                enableNotificationsBtn.textContent = permission === 'granted' ? 'اعلان سیستم فعال است' : 'اجازه اعلان داده نشد';
+            });
+        }
+
+        if (markNotificationsReadBtn) {
+            markNotificationsReadBtn.addEventListener('click', async function () {
+                await fetch(notificationReadUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: ''
+                });
+                await pollNotifications();
+            });
+        }
+
+        pollNotifications();
+        setInterval(pollNotifications, 30000);
     });
     </script>
     <script src="{% static 'js/app-ui.js' %}"></script>

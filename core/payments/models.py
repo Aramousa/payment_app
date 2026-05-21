@@ -113,7 +113,7 @@ class PaymentRecord(models.Model):
         (STATUS_PENDING, 'در حال بررسی'),
         (STATUS_COMMERCIAL_REVIEW, 'بررسی بازرگانی'),
         (STATUS_FINANCE_REVIEW, 'تایید مالی'),
-        (STATUS_APPROVED, 'تایید شده'),
+        (STATUS_APPROVED, 'ثبت بازرگانی'),
         (STATUS_FINAL_APPROVED, 'تایید نهایی'),
         (STATUS_REJECTED, 'رد شده'),
         (STATUS_INCOMPLETE, 'ناقص'),
@@ -125,7 +125,7 @@ class PaymentRecord(models.Model):
         STATUS_COMMERCIAL_REVIEW: 'در حال بررسی',
         STATUS_FINANCE_REVIEW: 'در حال بررسی',
         STATUS_RETURNED_TO_COMMERCIAL: 'در حال بررسی',
-        STATUS_APPROVED: 'تایید نهایی',
+        STATUS_APPROVED: 'ثبت بازرگانی',
         STATUS_FINAL_APPROVED: 'تایید نهایی',
         STATUS_REJECTED: 'رد شده',
         STATUS_INCOMPLETE: 'ناقص',
@@ -165,6 +165,60 @@ class PaymentRecord(models.Model):
     @property
     def customer_status_label(self):
         return self.CUSTOMER_VISIBLE_LABELS.get(self.status, 'در حال بررسی')
+
+    @property
+    def commercial_status_label(self):
+        if self.status == self.STATUS_PENDING:
+            return 'در حال بررسی'
+        if self.status == self.STATUS_COMMERCIAL_REVIEW:
+            return 'بررسی بازرگانی'
+        if self.status in {self.STATUS_APPROVED, self.STATUS_FINAL_APPROVED}:
+            return 'ثبت بازرگانی'
+        if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
+            return 'عودت به بازرگانی'
+        if self.status == self.STATUS_REJECTED:
+            return 'رد شده'
+        if self.status == self.STATUS_INCOMPLETE:
+            return 'ناقص'
+        return self.get_status_display()
+
+    @property
+    def commercial_flag_class(self):
+        if self.status == self.STATUS_COMMERCIAL_REVIEW:
+            return 'flag-blue'
+        if self.status in {self.STATUS_APPROVED, self.STATUS_FINAL_APPROVED}:
+            return 'flag-orange'
+        if self.status == self.STATUS_REJECTED:
+            return 'flag-red'
+        if self.status == self.STATUS_INCOMPLETE:
+            return 'flag-yellow'
+        return 'flag-gray'
+
+    @property
+    def finance_status_label(self):
+        if self.status in {self.STATUS_PENDING, self.STATUS_COMMERCIAL_REVIEW, self.STATUS_INCOMPLETE}:
+            return 'در انتظار بازرگانی'
+        if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
+            return 'عودت به بازرگانی'
+        if self.status == self.STATUS_APPROVED:
+            return 'در انتظار تایید مالی'
+        if self.status == self.STATUS_FINAL_APPROVED:
+            return 'تایید نهایی'
+        if self.status == self.STATUS_REJECTED:
+            return 'رد شده'
+        return self.get_status_display()
+
+    @property
+    def finance_flag_class(self):
+        if self.status == self.STATUS_APPROVED:
+            return 'flag-orange'
+        if self.status == self.STATUS_FINAL_APPROVED:
+            return 'flag-green'
+        if self.status == self.STATUS_REJECTED:
+            return 'flag-red'
+        if self.status == self.STATUS_INCOMPLETE:
+            return 'flag-yellow'
+        return 'flag-gray'
 
     @property
     def status_flag_class(self):
@@ -337,6 +391,39 @@ class SystemActivityLog(models.Model):
     def __str__(self):
         target = self.target_user.username if self.target_user else '-'
         return f"{self.get_action_display()} - {target}"
+
+
+class UserNotification(models.Model):
+    CATEGORY_PAYMENT = 'payment'
+    CATEGORY_INVOICE = 'invoice'
+    CATEGORY_SYSTEM = 'system'
+
+    CATEGORY_CHOICES = [
+        (CATEGORY_PAYMENT, 'فیش واریزی'),
+        (CATEGORY_INVOICE, 'فاکتور'),
+        (CATEGORY_SYSTEM, 'سیستم'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_notifications')
+    title = models.CharField('عنوان', max_length=120)
+    message = models.TextField('متن اعلان')
+    url = models.CharField('آدرس', max_length=255, blank=True)
+    category = models.CharField('نوع', max_length=20, choices=CATEGORY_CHOICES, default=CATEGORY_SYSTEM)
+    is_read = models.BooleanField('خوانده شده', default=False)
+    created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
+    read_at = models.DateTimeField('زمان خواندن', null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['user', 'is_read', '-created_at']),
+        ]
+        verbose_name = 'اعلان کاربر'
+        verbose_name_plural = 'اعلان‌های کاربران'
+
+    def __str__(self):
+        return f"{self.user} - {self.title}"
 
 
 class InvoiceRecord(models.Model):

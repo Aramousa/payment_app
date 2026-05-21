@@ -4,7 +4,7 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>برنامه های واریز روزانه</title>
+    <title>برنامه های واریز</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
@@ -19,21 +19,22 @@
         .button-link.alt { background: #6c757d; }
         .panel { max-width: 1200px; margin: 0 auto 18px; background: #fff; border: 1px solid #e4e9f2; border-radius: 10px; padding: 16px; }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
-        .calendar-toolbar { display: grid; grid-template-columns: auto minmax(220px, 1fr) auto auto auto; gap: 10px; align-items: end; }
+        .calendar-toolbar { display: grid; grid-template-columns: auto minmax(145px, .6fr) minmax(180px, .8fr) minmax(180px, .8fr) minmax(180px, .8fr) auto auto auto; gap: 10px; align-items: end; }
         label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
-        input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
+        input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
         .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
         table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
         th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
         th { background: #007bff; color: #fff; }
         .money { direction: ltr; white-space: nowrap; }
         .messages { max-width: 1200px; margin: 0 auto 12px; color: #155724; }
+        .period-summary { margin-top: 12px; color: #42526e; font-size: 13px; }
         @media (max-width: 800px) { .calendar-toolbar { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <h2>برنامه های واریز روزانه</h2>
+        <h2>برنامه های واریز</h2>
         <div>
             <a href="{% url 'submit' %}" class="button-link alt">بازگشت</a>
         </div>
@@ -42,17 +43,35 @@
     {% include "payments/partials/system_messages_popup.html" %}
 
     <div class="panel">
-        <h3>تقویم روزانه برنامه‌های واریز</h3>
+        <h3>تقویم برنامه‌های واریز</h3>
         <form method="get" class="calendar-toolbar">
-            <a class="button-link alt" href="{% url 'daily_payment_plans' %}?date={{ previous_date_text }}">روز قبل</a>
+            <a class="button-link alt" href="{% url 'daily_payment_plans' %}?{{ previous_period_query }}">بازه قبل</a>
             <div>
-                <label for="date-filter">تاریخ</label>
-                <input id="date-filter" class="jalali-date" type="text" name="date" value="{{ selected_date_text }}" inputmode="numeric" dir="ltr">
+                <label for="mode-filter">نمایش</label>
+                <select id="mode-filter" name="mode">
+                    <option value="day" {% if period_mode == 'day' %}selected{% endif %}>روزانه</option>
+                    <option value="week" {% if period_mode == 'week' %}selected{% endif %}>هفتگی</option>
+                    <option value="month" {% if period_mode == 'month' %}selected{% endif %}>ماهانه</option>
+                    <option value="range" {% if period_mode == 'range' %}selected{% endif %}>بازه دلخواه</option>
+                </select>
             </div>
-            <button type="submit" class="button-link">نمایش روز</button>
-            <a class="button-link" href="{% url 'daily_payment_plans' %}?date={{ next_date_text }}">روز بعد</a>
-            <a class="button-link alt" href="{% url 'daily_payment_plans' %}?date={{ today_date_text }}">امروز</a>
+            <div>
+                <label for="date-filter">تاریخ مرجع</label>
+                <input id="date-filter" class="jalali-date" type="text" name="date" value="{{ selected_date_text }}" inputmode="numeric" dir="ltr" data-period-role="reference">
+            </div>
+            <div>
+                <label for="start-date-filter">تاریخ آغاز</label>
+                <input id="start-date-filter" class="jalali-date" type="text" name="start_date" value="{{ period_start_text }}" inputmode="numeric" dir="ltr" data-period-role="start">
+            </div>
+            <div>
+                <label for="end-date-filter">تاریخ پایان</label>
+                <input id="end-date-filter" class="jalali-date" type="text" name="end_date" value="{{ period_end_text }}" inputmode="numeric" dir="ltr" data-period-role="end">
+            </div>
+            <button type="submit" class="button-link">نمایش بازه</button>
+            <a class="button-link" href="{% url 'daily_payment_plans' %}?{{ next_period_query }}">بازه بعد</a>
+            <a class="button-link alt" href="{% url 'daily_payment_plans' %}?{{ today_period_query }}">امروز</a>
         </form>
+        <div class="period-summary">بازه نمایش: {{ period_start_text }} تا {{ period_end_text }}</div>
     </div>
 
     {% if can_manage_daily_payments %}
@@ -73,7 +92,7 @@
     {% endif %}
 
     <div class="panel">
-        <h3>برنامه‌های تاریخ {{ selected_date_text }}</h3>
+        <h3>برنامه‌های {{ period_label }}</h3>
         {% include "payments/partials/export_panel.html" %}
         {% if plans %}
         <table>
@@ -109,7 +128,7 @@
             </tbody>
         </table>
         {% else %}
-            <p>برای این تاریخ برنامه‌ای ثبت نشده است.</p>
+            <p>برای این بازه برنامه‌ای ثبت نشده است.</p>
         {% endif %}
     </div>
 
@@ -136,6 +155,23 @@
                     input.value = input.value.replace(/,/g, '');
                 });
             });
+        }
+        const modeFilter = document.getElementById('mode-filter');
+        const referenceInput = document.querySelector('[data-period-role="reference"]');
+        const rangeInputs = document.querySelectorAll('[data-period-role="start"], [data-period-role="end"]');
+        function syncPeriodInputs() {
+            const isCustomRange = modeFilter && modeFilter.value === 'range';
+            if (referenceInput) {
+                referenceInput.disabled = isCustomRange;
+            }
+            rangeInputs.forEach(function (input) {
+                input.disabled = !isCustomRange;
+                input.readOnly = !isCustomRange;
+            });
+        }
+        if (modeFilter) {
+            modeFilter.addEventListener('change', syncPeriodInputs);
+            syncPeriodInputs();
         }
     });
     </script>

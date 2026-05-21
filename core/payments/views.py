@@ -26,7 +26,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserProfile
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserNotification, UserProfile
 import os
 
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 STATUS_FLAG_META = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('بررسی بازرگانی', 'flag-blue'),
     PaymentRecord.STATUS_FINANCE_REVIEW: ('رویت مالی', 'flag-orange'),
-    PaymentRecord.STATUS_APPROVED: ('تایید شده', 'flag-orange'),
+    PaymentRecord.STATUS_APPROVED: ('ثبت بازرگانی', 'flag-orange'),
     PaymentRecord.STATUS_FINAL_APPROVED: ('تایید نهایی', 'flag-green'),
     PaymentRecord.STATUS_REJECTED: ('رد شده', 'flag-red'),
     PaymentRecord.STATUS_INCOMPLETE: ('ناقص', 'flag-yellow'),
@@ -220,7 +220,7 @@ def _suggest_five_digit_password():
 def _staff_status_choices_for_role(role):
     if role == 'commercial':
         return [
-            (PaymentRecord.STATUS_APPROVED, 'تایید شده'),
+            (PaymentRecord.STATUS_APPROVED, 'ثبت بازرگانی'),
             (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
             (PaymentRecord.STATUS_REJECTED, 'رد شده'),
         ]
@@ -402,7 +402,7 @@ def _excel_response(filename, sheets):
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Content-Disposition'] = f'attachment; filename="{_timestamped_excel_filename(filename)}"'
     wb = Workbook()
     first = True
     for title, headers, rows in sheets:
@@ -414,6 +414,15 @@ def _excel_response(filename, sheets):
             ws.append(row)
     wb.save(response)
     return response
+
+
+def _timestamped_excel_filename(filename):
+    base, extension = os.path.splitext(filename)
+    if not extension:
+        extension = '.xlsx'
+    now = timezone.localtime()
+    timestamp = now.strftime('%Y%m%d_%H%M%S')
+    return f'{base}_{timestamp}{extension}'
 
 
 def _field(key, label, getter):
@@ -652,9 +661,105 @@ def _customer_list_rows(request):
     return customer_data, filters
 
 
-def _daily_plans_for_date(selected_date):
-    plans = _daily_plans_for_date(selected_date)
+def _enrich_daily_plans(plans):
+    for plan in plans:
+        assignments = list(plan.assignments.all())
+        stats = _daily_assignment_stats(assignments)
+        plan.assignment_count = len(assignments)
+        plan.assigned_expected_total = sum(assignment.expected_amount for assignment in assignments)
+        plan.paid_total = sum(stats.get(assignment.id, {}).get('paid_amount', 0) for assignment in assignments)
+        plan.confirmed_total = sum(stats.get(assignment.id, {}).get('confirmed_amount', 0) for assignment in assignments)
+        plan.remaining_total = plan.assigned_expected_total - plan.paid_total
     return plans
+
+
+def _daily_plans_for_period(start_date, end_date):
+    plans = list(
+        DailyPaymentPlan.objects
+        .select_related('created_by')
+        .prefetch_related('assignments')
+        .filter(deposit_date__gte=start_date, deposit_date__lte=end_date)
+        .order_by('-deposit_date', '-id')
+    )
+    return _enrich_daily_plans(plans)
+
+
+def _daily_plans_for_date(selected_date):
+    return _daily_plans_for_period(selected_date, selected_date)
+
+
+def _daily_payment_period(request):
+    mode = (request.GET.get('mode') or 'day').strip()
+    if mode not in {'day', 'week', 'month', 'range'}:
+        mode = 'day'
+    selected_date = _parse_jalali_date((request.GET.get('date') or '').strip()) or _today_jalali_date()
+
+    if mode == 'range':
+        start_date = _parse_jalali_date((request.GET.get('start_date') or '').strip()) or selected_date
+        end_date = _parse_jalali_date((request.GET.get('end_date') or '').strip()) or start_date
+        if end_date < start_date:
+            start_date, end_date = end_date, start_date
+        span_days = (end_date.togregorian() - start_date.togregorian()).days + 1
+        shift = jdatetime.timedelta(days=span_days)
+        label = f'بازه {start_date.strftime("%Y/%m/%d")} تا {end_date.strftime("%Y/%m/%d")}'
+        previous_date = start_date - shift
+        next_date = start_date + shift
+        previous_start_date = start_date - shift
+        previous_end_date = end_date - shift
+        next_start_date = start_date + shift
+        next_end_date = end_date + shift
+    elif mode == 'week':
+        end_date = selected_date
+        start_date = selected_date - jdatetime.timedelta(days=6)
+        label = f'۷ روز گذشته {start_date.strftime("%Y/%m/%d")} تا {end_date.strftime("%Y/%m/%d")}'
+        previous_date = selected_date - jdatetime.timedelta(days=7)
+        next_date = selected_date + jdatetime.timedelta(days=7)
+        previous_start_date = None
+        previous_end_date = None
+        next_start_date = None
+        next_end_date = None
+    elif mode == 'month':
+        end_date = selected_date
+        start_date = selected_date - jdatetime.timedelta(days=29)
+        label = f'۳۰ روز گذشته {start_date.strftime("%Y/%m/%d")} تا {end_date.strftime("%Y/%m/%d")}'
+        previous_date = selected_date - jdatetime.timedelta(days=30)
+        next_date = selected_date + jdatetime.timedelta(days=30)
+        previous_start_date = None
+        previous_end_date = None
+        next_start_date = None
+        next_end_date = None
+    else:
+        start_date = selected_date
+        end_date = selected_date
+        label = f'روز {selected_date.strftime("%Y/%m/%d")}'
+        previous_date = selected_date - jdatetime.timedelta(days=1)
+        next_date = selected_date + jdatetime.timedelta(days=1)
+        previous_start_date = None
+        previous_end_date = None
+        next_start_date = None
+        next_end_date = None
+
+    return {
+        'mode': mode,
+        'selected_date': selected_date,
+        'start_date': start_date,
+        'end_date': end_date,
+        'label': label,
+        'previous_date': previous_date,
+        'next_date': next_date,
+        'previous_start_date': previous_start_date,
+        'previous_end_date': previous_end_date,
+        'next_start_date': next_start_date,
+        'next_end_date': next_end_date,
+    }
+
+
+def _daily_period_query(mode, date_value, start_date=None, end_date=None):
+    query = {'mode': mode, 'date': _format_jalali_date(date_value)}
+    if mode == 'range':
+        query['start_date'] = _format_jalali_date(start_date or date_value)
+        query['end_date'] = _format_jalali_date(end_date or start_date or date_value)
+    return urlencode(query)
 
 
 def _daily_assignments_for_plan(plan):
@@ -685,6 +790,110 @@ def _log_activity(payment, actor, action, from_status='', to_status='', note='')
         from_status=from_status or '',
         to_status=to_status or '',
         note=note or '',
+    )
+
+
+def _notification_payload(notification):
+    return {
+        'id': notification.id,
+        'title': notification.title,
+        'message': notification.message,
+        'url': notification.url or reverse('submit'),
+        'category': notification.category,
+        'created_at': _format_jalali_datetime(notification.created_at),
+    }
+
+
+def _notify_users(users, title, message, url='', category=UserNotification.CATEGORY_SYSTEM, actor=None):
+    seen_user_ids = set()
+    notifications = []
+    for user in users:
+        if not user or not user.id or user.id in seen_user_ids or not user.is_active:
+            continue
+        seen_user_ids.add(user.id)
+        notifications.append(UserNotification(
+            user=user,
+            actor=actor if actor and actor.is_authenticated else None,
+            title=title,
+            message=message,
+            url=url,
+            category=category,
+        ))
+    if notifications:
+        UserNotification.objects.bulk_create(notifications)
+
+
+def _staff_notification_users(roles=None, exclude_user=None):
+    role_filter = Q(is_superuser=True)
+    if roles:
+        role_filter |= Q(profile__role__in=roles)
+    else:
+        role_filter |= Q(profile__role__in=STAFF_ROLES)
+    users = User.objects.filter(role_filter, is_active=True).distinct()
+    if exclude_user and exclude_user.is_authenticated:
+        users = users.exclude(id=exclude_user.id)
+    return users
+
+
+def _notify_payment_created(payment, actor):
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else '-')
+    _notify_users(
+        _staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor),
+        'فیش واریزی جدید',
+        f'یک فیش واریزی جدید برای {customer_name} ثبت شد.',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+    )
+
+
+def _notify_payment_status_changed(payment, actor, from_status, to_status):
+    status_labels = dict(PaymentRecord.STATUS_CHOICES)
+    status_text = status_labels.get(to_status, to_status)
+    recipients = []
+    if payment.user_id and (not actor or payment.user_id != actor.id):
+        recipients.append(payment.user)
+
+    if to_status == PaymentRecord.STATUS_APPROVED:
+        recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
+    elif to_status == PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL:
+        recipients.extend(_staff_notification_users(roles={'commercial'}, exclude_user=actor))
+    elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED, PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
+        recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
+
+    _notify_users(
+        recipients,
+        'تغییر وضعیت فیش',
+        f'وضعیت فیش به «{status_text}» تغییر کرد.',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+    )
+
+
+def _notify_payment_edited(payment, actor, title='ویرایش فیش واریزی'):
+    recipients = []
+    if payment.user_id and (not actor or payment.user_id != actor.id):
+        recipients.append(payment.user)
+    recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
+    _notify_users(
+        recipients,
+        title,
+        'اطلاعات فیش واریزی بروزرسانی شد.',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+    )
+
+
+def _notify_invoice_created(invoice, actor):
+    _notify_users(
+        [invoice.customer],
+        'فاکتور جدید',
+        'یک فاکتور جدید برای شما ثبت شد.',
+        reverse('invoice_detail', args=[invoice.id]),
+        category=UserNotification.CATEGORY_INVOICE,
+        actor=actor,
     )
 
 
@@ -996,6 +1205,35 @@ def _invoice_records_for_user(user):
     return qs.filter(customer=user).order_by('-created_at', '-id')
 
 
+def _dashboard_notifications_for_user(user):
+    if not user or not user.is_authenticated:
+        return {'payments': 0, 'invoices': 0, 'events': 0, 'total': 0, 'items': []}
+
+    if _is_staff_user(user):
+        payments_count = _active_payment_records_for_user(user).count()
+        invoices_count = _invoice_records_for_user(user).count() if _can_view_invoices(user) else 0
+    else:
+        payments_count = PaymentRecord.objects.filter(
+            user=user,
+            status=PaymentRecord.STATUS_INCOMPLETE,
+        ).count()
+        invoices_count = InvoiceRecord.objects.filter(
+            customer=user,
+            customer_seen_at__isnull=True,
+        ).count()
+    notification_qs = UserNotification.objects.filter(user=user, is_read=False)
+    event_count = notification_qs.count()
+    items = [_notification_payload(item) for item in notification_qs[:5]]
+
+    return {
+        'payments': payments_count,
+        'invoices': invoices_count,
+        'events': event_count,
+        'total': event_count,
+        'items': items,
+    }
+
+
 def _invoice_customer_rows():
     rows = []
     profiles = UserProfile.objects.filter(role='customer').select_related('user').order_by(
@@ -1016,6 +1254,28 @@ def _invoice_customer_rows():
             ).lower(),
         })
     return rows
+
+
+@login_required
+def notifications_feed(request):
+    notifications = UserNotification.objects.filter(user=request.user, is_read=False)[:10]
+    latest_id = UserNotification.objects.filter(user=request.user).order_by('-id').values_list('id', flat=True).first() or 0
+    return JsonResponse({
+        'unread_count': UserNotification.objects.filter(user=request.user, is_read=False).count(),
+        'latest_id': latest_id,
+        'items': [_notification_payload(notification) for notification in notifications],
+    })
+
+
+@login_required
+@require_POST
+def notifications_mark_read(request):
+    queryset = UserNotification.objects.filter(user=request.user, is_read=False)
+    notification_id = request.POST.get('id')
+    if notification_id:
+        queryset = queryset.filter(id=notification_id)
+    updated = queryset.update(is_read=True, read_at=timezone.now())
+    return JsonResponse({'ok': True, 'updated': updated})
 
 
 def _customer_debt_summary(user):
@@ -1195,10 +1455,7 @@ def daily_payment_plans(request):
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدهای شرکت قابل دسترسی است.')
 
     can_manage = _can_manage_daily_payments(request.user)
-    selected_date_text = (request.GET.get('date') or '').strip()
-    selected_date = _parse_jalali_date(selected_date_text) or _today_jalali_date()
-    previous_date = selected_date - jdatetime.timedelta(days=1)
-    next_date = selected_date + jdatetime.timedelta(days=1)
+    period = _daily_payment_period(request)
 
     if request.method == 'POST':
         if not can_manage:
@@ -1214,30 +1471,30 @@ def daily_payment_plans(request):
     else:
         plan_form = DailyPaymentPlanForm(initial={'deposit_date': _today_jalali_date()})
 
-    plans = list(
-        DailyPaymentPlan.objects
-        .select_related('created_by')
-        .prefetch_related('assignments')
-        .filter(deposit_date=selected_date)
-        .order_by('-id')
-    )
-    for plan in plans:
-        assignments = list(plan.assignments.all())
-        stats = _daily_assignment_stats(assignments)
-        plan.assignment_count = len(assignments)
-        plan.assigned_expected_total = sum(assignment.expected_amount for assignment in assignments)
-        plan.paid_total = sum(stats.get(assignment.id, {}).get('paid_amount', 0) for assignment in assignments)
-        plan.confirmed_total = sum(stats.get(assignment.id, {}).get('confirmed_amount', 0) for assignment in assignments)
-        plan.remaining_total = plan.assigned_expected_total - plan.paid_total
+    plans = _daily_plans_for_period(period['start_date'], period['end_date'])
 
     return render(request, 'payments/daily_payment_plans.html', {
         'form': plan_form,
         'plans': plans,
-        'selected_date': selected_date,
-        'selected_date_text': _format_jalali_date(selected_date),
-        'previous_date_text': _format_jalali_date(previous_date),
-        'next_date_text': _format_jalali_date(next_date),
-        'today_date_text': _format_jalali_date(_today_jalali_date()),
+        'selected_date': period['selected_date'],
+        'selected_date_text': _format_jalali_date(period['selected_date']),
+        'period_mode': period['mode'],
+        'period_label': period['label'],
+        'period_start_text': _format_jalali_date(period['start_date']),
+        'period_end_text': _format_jalali_date(period['end_date']),
+        'previous_period_query': _daily_period_query(
+            period['mode'],
+            period['previous_date'],
+            period['previous_start_date'],
+            period['previous_end_date'],
+        ),
+        'next_period_query': _daily_period_query(
+            period['mode'],
+            period['next_date'],
+            period['next_start_date'],
+            period['next_end_date'],
+        ),
+        'today_period_query': _daily_period_query(period['mode'], _today_jalali_date()),
         'can_manage_daily_payments': can_manage,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
         'export_dataset': 'daily_plans',
@@ -1382,6 +1639,7 @@ def create_payment(request):
                 payment.save()
                 _save_receipts(payment, form)
                 _log_activity(payment, request.user, PaymentActivityLog.ACTION_CREATED, to_status=payment.status)
+                _notify_payment_created(payment, request.user)
                 return redirect('success')
     else:
         form = PaymentRecordForm(initial=form_initial)
@@ -1429,6 +1687,7 @@ def create_payment(request):
         'customer_debt': _customer_debt_summary(request.user) if not is_staff_user else None,
         'active_daily_assignment': active_daily_assignment,
         'expired_daily_assignment': expired_daily_assignment,
+        'unread_notifications': _dashboard_notifications_for_user(request.user),
     })
 
 
@@ -1653,6 +1912,7 @@ def staff_update_status(request, payment_id):
         to_status=payment.status,
         note=payment.last_staff_note,
     )
+    _notify_payment_status_changed(payment, request.user, from_status, payment.status)
 
     messages.success(request, 'وضعیت سند با موفقیت ثبت شد.')
     return redirect(redirect_target)
@@ -1696,6 +1956,7 @@ def edit_payment(request, payment_id):
             payment.save()
             _save_receipts(payment, form)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_EDITED, from_status=from_status, to_status=payment.status)
+            _notify_payment_edited(payment, request.user)
             return redirect(return_url or 'submit')
     else:
         form = PaymentRecordForm(instance=payment, initial=initial_data)
@@ -1810,6 +2071,7 @@ def staff_edit_payment_details(request, payment_id):
                     to_status=payment.status,
                     note=change_note,
                 )
+                _notify_payment_edited(payment, request.user, title='تکمیل اطلاعات فیش')
                 messages.success(request, 'اطلاعات فیش ثبت و در تاریخچه سند لاگ شد.')
             else:
                 messages.info(request, 'تغییری برای ثبت وجود نداشت.')
@@ -1958,6 +2220,7 @@ def invoices_dashboard(request):
             # مقدار amount را تنظیم کنیم
             invoice.amount = form.cleaned_data.get('amount')
             invoice.save()
+            _notify_invoice_created(invoice, request.user)
             messages.success(request, 'فاکتور با موفقیت برای مشتری ثبت شد.')
             return redirect('invoices_dashboard')
     else:
@@ -2177,9 +2440,9 @@ def export_data(request, dataset):
     if dataset == 'daily_plans':
         if not _can_view_daily_payments(request.user):
             return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
-        selected_date = _parse_jalali_date((request.GET.get('date') or '').strip()) or _today_jalali_date()
+        period = _daily_payment_period(request)
         fields = _selected_export_fields(request, DAILY_PLAN_EXPORT_FIELDS)
-        records = _export_scope_records(request, _daily_plans_for_date(selected_date), page_param='page')
+        records = _export_scope_records(request, _daily_plans_for_period(period['start_date'], period['end_date']), page_param='page')
         return _export_response('daily_payment_plans.xlsx', 'Daily Plans', fields, records)
 
     if dataset == 'daily_assignments':

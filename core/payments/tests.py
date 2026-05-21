@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from .models import InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, SystemActivityLog
+from .models import DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -291,14 +291,126 @@ class InvoiceFlowTests(TestCase):
     def test_staff_status_choices_for_generic_staff_role_are_not_empty(self):
         choices = _staff_status_choices_for_role('staff')
         self.assertTrue(len(choices) > 0)
-        self.assertIn((PaymentRecord.STATUS_APPROVED, 'تایید شده'), choices)
+        self.assertIn((PaymentRecord.STATUS_APPROVED, 'ثبت بازرگانی'), choices)
+
+    def test_dashboard_notification_bell_is_visible_for_staff_roles(self):
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'notification-bell')
+
+        self.client.logout()
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'notification-bell')
+
+    def test_status_changes_create_user_notifications_and_feed_marks_read(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='NOTIFY-INCOMPLETE',
+            status=PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {'status': PaymentRecord.STATUS_INCOMPLETE, 'note': 'Needs correction', 'next': reverse('submit')},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            UserNotification.objects.filter(
+                user=self.customer_user,
+                category=UserNotification.CATEGORY_PAYMENT,
+                title='تغییر وضعیت فیش',
+                is_read=False,
+            ).exists()
+        )
+
+        self.client.logout()
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('notifications_feed'))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['unread_count'], 1)
+        self.assertEqual(payload['items'][0]['title'], 'تغییر وضعیت فیش')
+
+        response = self.client.post(reverse('notifications_mark_read'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(UserNotification.objects.filter(user=self.customer_user, is_read=False).count(), 0)
+
+    def test_customer_sees_commercial_and_final_approval_as_distinct_statuses(self):
+        commercial_payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='CUSTOMER-COMMERCIAL',
+            status=PaymentRecord.STATUS_APPROVED,
+        )
+        final_payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=200000,
+            pay_date=jdatetime.date(1405, 2, 9),
+            tracking_code='CUSTOMER-FINAL',
+            status=PaymentRecord.STATUS_FINAL_APPROVED,
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, commercial_payment.tracking_code)
+        self.assertContains(response, final_payment.tracking_code)
+        self.assertContains(response, 'ثبت بازرگانی')
+        self.assertContains(response, 'تایید نهایی')
+        self.assertContains(response, 'flag-orange')
+        self.assertContains(response, 'flag-green')
+
+    def test_payment_list_shows_commercial_and_finance_status_columns_for_customer(self):
+        PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='DUAL-STATUS',
+            status=PaymentRecord.STATUS_APPROVED,
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'وضعیت بازرگانی')
+        self.assertContains(response, 'وضعیت مالی')
+        self.assertContains(response, 'ثبت بازرگانی')
+        self.assertContains(response, 'در انتظار تایید مالی')
 
     def test_staff_status_choices_for_commercial_role(self):
         choices = _staff_status_choices_for_role('commercial')
         self.assertEqual(
             choices,
             [
-                (PaymentRecord.STATUS_APPROVED, 'تایید شده'),
+                (PaymentRecord.STATUS_APPROVED, 'ثبت بازرگانی'),
                 (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
                 (PaymentRecord.STATUS_REJECTED, 'رد شده'),
             ]
@@ -356,6 +468,10 @@ class InvoiceFlowTests(TestCase):
         self.client.login(username='commercial1', password='pass1234')
         response = self.client.get(reverse('export_data', args=['payments']))
         self.assertEqual(response.status_code, 200)
+        self.assertRegex(
+            response['Content-Disposition'],
+            r'filename="payments_\d{8}_\d{6}\.xlsx"',
+        )
         workbook = load_workbook(BytesIO(response.content))
         headers = [cell.value for cell in workbook.active[1]]
         self.assertIn('کد پیگیری', headers)
@@ -379,6 +495,84 @@ class InvoiceFlowTests(TestCase):
         rows = list(workbook.active.iter_rows(values_only=True))
         self.assertEqual(rows[0], ('کد پیگیری',))
         self.assertEqual(len(rows), 11)
+
+    def test_daily_payment_plans_support_day_week_month_views_and_export_period(self):
+        base_date = jdatetime.date(1405, 2, 10)
+        DailyPaymentPlan.objects.create(
+            deposit_date=base_date,
+            bank_name='Bank',
+            account_number='ACC-DAY',
+            total_expected_amount=100000,
+            created_by=self.commercial_user,
+        )
+        DailyPaymentPlan.objects.create(
+            deposit_date=base_date + jdatetime.timedelta(days=1),
+            bank_name='Bank',
+            account_number='ACC-MONTH',
+            total_expected_amount=200000,
+            created_by=self.commercial_user,
+        )
+        DailyPaymentPlan.objects.create(
+            deposit_date=base_date - jdatetime.timedelta(days=20),
+            bank_name='Bank',
+            account_number='ACC-PAST',
+            total_expected_amount=150000,
+            created_by=self.commercial_user,
+        )
+        DailyPaymentPlan.objects.create(
+            deposit_date=jdatetime.date(1405, 3, 1),
+            bank_name='Bank',
+            account_number='ACC-NEXT',
+            total_expected_amount=300000,
+            created_by=self.commercial_user,
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('daily_payment_plans'), {'mode': 'day', 'date': '1405/02/10'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ACC-DAY')
+        self.assertNotContains(response, 'ACC-MONTH')
+
+        response = self.client.get(reverse('daily_payment_plans'), {'mode': 'week', 'date': '1405/02/10'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ACC-DAY')
+        self.assertNotContains(response, 'ACC-MONTH')
+        self.assertNotContains(response, 'ACC-PAST')
+
+        response = self.client.get(reverse('daily_payment_plans'), {'mode': 'month', 'date': '1405/02/10'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ACC-DAY')
+        self.assertContains(response, 'ACC-PAST')
+        self.assertNotContains(response, 'ACC-MONTH')
+        self.assertNotContains(response, 'ACC-NEXT')
+
+        response = self.client.get(
+            reverse('daily_payment_plans'),
+            {'mode': 'range', 'date': '1405/02/11', 'start_date': '1405/02/11', 'end_date': '1405/03/01'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ACC-MONTH')
+        self.assertContains(response, 'ACC-NEXT')
+        self.assertNotContains(response, 'ACC-DAY')
+        self.assertNotContains(response, 'ACC-PAST')
+
+        response = self.client.get(
+            reverse('export_data', args=['daily_plans']),
+            {
+                'mode': 'range',
+                'date': '1405/02/11',
+                'start_date': '1405/02/11',
+                'end_date': '1405/03/01',
+                'fields': ['account_number'],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        rows = list(workbook.active.iter_rows(values_only=True))
+        exported_accounts = [row[0] for row in rows[1:]]
+        self.assertIn('ACC-MONTH', exported_accounts)
+        self.assertIn('ACC-NEXT', exported_accounts)
+        self.assertNotIn('ACC-DAY', exported_accounts)
 
     def test_data_entry_user_can_complete_payment_details_and_changes_are_logged(self):
         payment = PaymentRecord.objects.create(

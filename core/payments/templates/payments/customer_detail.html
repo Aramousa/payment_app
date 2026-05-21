@@ -199,7 +199,8 @@
                     <th>کد پیگیری</th>
                     <th>بانک مقصد</th>
                     <th>شماره حساب مقصد</th>
-                    <th>وضعیت</th>
+                    <th>وضعیت بازرگانی</th>
+                    <th>وضعیت مالی</th>
                     <th>عملیات</th>
                 </tr>
             </thead>
@@ -212,17 +213,14 @@
                         <td>{{ payment.tracking_code|default:'-' }}</td>
                         <td>{{ payment.beneficiary_bank_name|default:'-' }}</td>
                         <td>{{ payment.beneficiary_account_number|default:'-' }}</td>
-                        <td>
-                            <span class="status-pill {{ payment.status_flag_class }}">
-                                {{ payment.customer_status_label }}
-                            </span>
-                        </td>
+                        <td><span class="status-pill {{ payment.commercial_flag_class }}">{{ payment.commercial_status_label }}</span></td>
+                        <td><span class="status-pill {{ payment.finance_flag_class }}">{{ payment.finance_status_label }}</span></td>
                         <td>
                             <button class="expand-btn" type="button">مشاهده جزئیات</button>
                         </td>
                     </tr>
                     <tr class="detail-row" id="payment-{{ payment.id }}">
-                        <td colspan="8">
+                        <td colspan="9">
                             <div class="detail-grid">
                                 <div class="detail-card">
                                     <strong>نام و نام خانوادگی واریز کننده:</strong><br>
