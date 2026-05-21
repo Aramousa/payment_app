@@ -382,6 +382,48 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, 'flag-orange')
         self.assertContains(response, 'flag-green')
 
+    def test_customer_timeline_hides_staff_identity_and_internal_steps(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='CUSTOMER-TIMELINE',
+            status=PaymentRecord.STATUS_INCOMPLETE,
+        )
+        _log_activity = __import__('payments.views', fromlist=['_log_activity'])._log_activity
+        _log_activity(payment, self.commercial_user, PaymentActivityLog.ACTION_VIEWED, note='internal view')
+        _log_activity(
+            payment,
+            self.commercial_user,
+            PaymentActivityLog.ACTION_STATUS_CHANGED,
+            from_status=PaymentRecord.STATUS_PENDING,
+            to_status=PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        )
+        _log_activity(
+            payment,
+            self.commercial_user,
+            PaymentActivityLog.ACTION_STATUS_CHANGED,
+            from_status=PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+            to_status=PaymentRecord.STATUS_INCOMPLETE,
+            note='تصویر فیش واضح نیست',
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('payment_timeline', args=[payment.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'سند مشاهده شد.')
+        self.assertContains(response, 'نقص مدارک ثبت شد.')
+        self.assertContains(response, 'تصویر فیش واضح نیست')
+        self.assertNotContains(response, self.commercial_user.username)
+        self.assertNotContains(response, 'بررسی بازرگانی')
+        self.assertNotContains(response, 'وضعیت سند را')
+
     def test_payment_list_shows_commercial_and_finance_status_columns_for_customer(self):
         PaymentRecord.objects.create(
             user=self.customer_user,

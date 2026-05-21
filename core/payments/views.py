@@ -937,6 +937,38 @@ def _log_text(log):
     return f"{role} ({actor}) عملیاتی انجام داد."
 
 
+def _customer_log_text(log):
+    if log.action == PaymentActivityLog.ACTION_VIEWED:
+        return 'سند مشاهده شد.'
+    if log.action == PaymentActivityLog.ACTION_STATUS_CHANGED:
+        if log.to_status == PaymentRecord.STATUS_FINAL_APPROVED:
+            return 'سند تایید نهایی شد.'
+        if log.to_status == PaymentRecord.STATUS_INCOMPLETE:
+            return 'نقص مدارک ثبت شد.'
+        if log.to_status == PaymentRecord.STATUS_REJECTED:
+            return 'سند رد شد.'
+    return ''
+
+
+def _customer_visible_logs(logs):
+    visible = []
+    seen_keys = set()
+    for log in logs:
+        text = _customer_log_text(log)
+        if not text:
+            continue
+        key = (log.action, log.to_status or text)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        visible.append({
+            'text': text,
+            'note': log.note if log.to_status in {PaymentRecord.STATUS_INCOMPLETE, PaymentRecord.STATUS_REJECTED} else '',
+            'time': _format_jalali_datetime(log.created_at),
+        })
+    return visible
+
+
 def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_payment_details=False):
     status_order = [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
@@ -966,14 +998,17 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             for code in status_order
             if code in reached
         ]
-        payment.timeline_lines = [
-            {
-                'time': _format_jalali_datetime(log.created_at),
-                'text': _log_text(log),
-                'note': log.note,
-            }
-            for log in payment.activity_logs.all()[:5]
-        ]
+        if staff_role:
+            payment.timeline_lines = [
+                {
+                    'time': _format_jalali_datetime(log.created_at),
+                    'text': _log_text(log),
+                    'note': log.note,
+                }
+                for log in payment.activity_logs.all()[:5]
+            ]
+        else:
+            payment.timeline_lines = _customer_visible_logs(payment.activity_logs.all())[:5]
         payment.staff_can_act = _can_staff_act_on_payment(
             staff_role,
             payment,
@@ -1975,23 +2010,36 @@ def edit_payment(request, payment_id):
 @login_required
 def payment_timeline(request, payment_id):
     payment = get_object_or_404(PaymentRecord.objects.select_related('user', 'counterparty'), id=payment_id)
-    if not _is_staff_user(request.user) and payment.user_id != request.user.id:
+    is_staff_user = _is_staff_user(request.user)
+    if not is_staff_user and payment.user_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده تاریخچه اسناد خودتان وجود دارد.')
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده تاریخچه')
     raw_logs = payment.activity_logs.select_related('actor').all()
-    logs = [
-        {
-            'log': log,
-            'jalali_time': _format_jalali_datetime(log.created_at),
-        }
-        for log in raw_logs
-    ]
+    if is_staff_user:
+        logs = [
+            {
+                'log': log,
+                'text': _log_text(log),
+                'note': log.note,
+                'jalali_time': _format_jalali_datetime(log.created_at),
+            }
+            for log in raw_logs
+        ]
+    else:
+        logs = [
+            {
+                'text': row['text'],
+                'note': row['note'],
+                'jalali_time': row['time'],
+            }
+            for row in _customer_visible_logs(raw_logs)
+        ]
 
     return render(request, 'payments/timeline.html', {
         'payment': payment,
         'logs': logs,
-        'is_staff_user': _is_staff_user(request.user),
+        'is_staff_user': is_staff_user,
         'return_url': _safe_next_url(request),
     })
 

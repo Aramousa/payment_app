@@ -21,13 +21,8 @@
         <ul>
             {% for log in logs %}
                 <li>
-                    {% if log.log.actor %}
-                        {{ log.log.get_action_display }} توسط {{ log.log.actor.get_full_name|default:log.log.actor.username }}
-                    {% else %}
-                        {{ log.log.get_action_display }} توسط سیستم
-                    {% endif %}
-                    {% if log.log.to_status %} | وضعیت جدید: {{ log.log.to_status }}{% endif %}
-                    {% if log.log.note %}<div>توضیح: {{ log.log.note }}</div>{% endif %}
+                    {{ log.text }}
+                    {% if log.note %}<div>توضیح: {{ log.note }}</div>{% endif %}
                     <div class="tiny">{{ log.jalali_time }}</div>
                 </li>
             {% empty %}
