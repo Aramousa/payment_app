@@ -26,6 +26,11 @@
         table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
         th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
         th { background: #007bff; color: #fff; }
+        .flag-chip { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; margin: 2px; color: #fff; }
+        .flag-blue { background: #1e88e5; }
+        .flag-green { background: #2e7d32; }
+        .flag-red { background: #c62828; }
+        .flag-yellow { background: #f9a825; color: #111; }
         .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
         .messages { max-width: 1200px; margin: 0 auto 12px; color: #155724; }
         @media (max-width: 900px) { .form-grid { grid-template-columns: 1fr; } }
@@ -61,6 +66,9 @@
             <div class="summary-item"><strong>کسری ممیزی نشده</strong><div class="value">{{ totals.remaining|thousand_sep }} ریال</div></div>
             <div class="summary-item"><strong>کسری تایید شده</strong><div class="value">{{ totals.confirmed_remaining|thousand_sep }} ریال</div></div>
             <div class="summary-item"><strong>تعداد فیش</strong><div class="value">{{ totals.payment_count }}</div></div>
+            <div class="summary-item"><strong>بدون واریز</strong><div class="value">{{ totals.no_payment_count }}</div></div>
+            <div class="summary-item"><strong>واریز ناقص</strong><div class="value">{{ totals.partial_count }}</div></div>
+            <div class="summary-item"><strong>تکمیل یا بیشتر</strong><div class="value">{{ totals.complete_count }}</div></div>
         </div>
     </div>
 
@@ -95,6 +103,9 @@
                     <th>واریز ممیزی نشده</th>
                     <th>واریز تایید شده</th>
                     <th>کسری ممیزی نشده</th>
+                    <th>درصد تحقق</th>
+                    <th>وضعیت برنامه</th>
+                    <th>آخرین فیش</th>
                     <th>تعداد فیش</th>
                     <th>توضیح</th>
                     {% if can_manage_daily_payments %}<th>عملیات</th>{% endif %}
@@ -112,6 +123,9 @@
                     <td class="money">{{ assignment.report.paid_amount|thousand_sep }}</td>
                     <td class="money">{{ assignment.report.confirmed_amount|thousand_sep }}</td>
                     <td class="money">{{ assignment.remaining_amount|thousand_sep }}</td>
+                    <td>{{ assignment.paid_percent }}%</td>
+                    <td><span class="flag-chip {{ assignment.plan_status_class }}">{{ assignment.plan_status_label }}</span></td>
+                    <td>{{ assignment.latest_payment_text|default:'-' }}</td>
                     <td>{{ assignment.report.payment_count }}</td>
                     <td>{{ assignment.note|default:'-' }}</td>
                     {% if can_manage_daily_payments %}

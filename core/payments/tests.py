@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from .models import DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
+from .models import DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -627,6 +627,64 @@ class InvoiceFlowTests(TestCase):
         self.assertIn('ACC-MONTH', exported_accounts)
         self.assertIn('ACC-NEXT', exported_accounts)
         self.assertNotIn('ACC-DAY', exported_accounts)
+
+    def test_daily_assignment_payment_notifies_staff_roles_and_report_exports_status(self):
+        plan = DailyPaymentPlan.objects.create(
+            deposit_date=jdatetime.date(1405, 2, 8),
+            bank_name='Bank',
+            account_number='PLAN-ACC',
+            total_expected_amount=500000,
+            created_by=self.commercial_user,
+        )
+        assignment = DailyPaymentAssignment.objects.create(
+            plan=plan,
+            customer=self.customer_user,
+            expected_amount=500000,
+        )
+        DailyPaymentAssignment.objects.create(
+            plan=plan,
+            customer=self.other_customer,
+            expected_amount=300000,
+        )
+
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=500000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='PLAN-PAY',
+            daily_assignment=assignment,
+        )
+        _notify_payment_created = __import__('payments.views', fromlist=['_notify_payment_created'])._notify_payment_created
+        _notify_payment_created(payment, self.customer_user)
+        self.assertTrue(UserNotification.objects.filter(user=self.commercial_user, title='واریز برنامه‌ریزی‌شده ثبت شد').exists())
+        self.assertTrue(UserNotification.objects.filter(user=self.finance_user, title='واریز برنامه‌ریزی‌شده ثبت شد').exists())
+        self.assertTrue(UserNotification.objects.filter(user=self.sales_user, title='واریز برنامه‌ریزی‌شده ثبت شد').exists())
+
+        self.client.logout()
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.get(reverse('daily_payment_plan_detail', args=[plan.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'تکمیل شده')
+        self.assertContains(response, 'بدون واریز')
+
+        response = self.client.get(
+            reverse('export_data', args=['daily_assignments']),
+            {'plan_id': str(plan.id), 'fields': ['customer_name', 'plan_status', 'paid_percent']},
+        )
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        rows = list(workbook.active.iter_rows(values_only=True))
+        headers = rows[0]
+        self.assertIn('وضعیت برنامه', headers)
+        self.assertIn('درصد تحقق', headers)
+        values = [cell for row in rows[1:] for cell in row]
+        self.assertIn('تکمیل شده', values)
+        self.assertIn('بدون واریز', values)
 
     def test_data_entry_user_can_complete_payment_details_and_changes_are_logged(self):
         payment = PaymentRecord.objects.create(

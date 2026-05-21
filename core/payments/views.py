@@ -593,7 +593,11 @@ DAILY_ASSIGNMENT_EXPORT_FIELDS = [
     _field('paid_amount', 'واریز ممیزی نشده', lambda a: a.report['paid_amount']),
     _field('confirmed_amount', 'واریز تایید شده', lambda a: a.report['confirmed_amount']),
     _field('remaining_amount', 'کسری ممیزی نشده', lambda a: a.remaining_amount),
+    _field('confirmed_remaining_amount', 'کسری تایید شده', lambda a: a.confirmed_remaining_amount),
+    _field('paid_percent', 'درصد تحقق', lambda a: a.paid_percent),
+    _field('plan_status', 'وضعیت برنامه', lambda a: a.plan_status_label),
     _field('payment_count', 'تعداد فیش', lambda a: a.report['payment_count']),
+    _field('latest_payment', 'آخرین فیش', lambda a: a.latest_payment_text),
     _field('note', 'توضیح', lambda a: a.note),
 ]
 
@@ -799,6 +803,21 @@ def _daily_assignments_for_plan(plan):
         })
         assignment.remaining_amount = assignment.expected_amount - assignment.report['paid_amount']
         assignment.confirmed_remaining_amount = assignment.expected_amount - assignment.report['confirmed_amount']
+        paid_amount = assignment.report['paid_amount']
+        assignment.paid_percent = round((paid_amount / assignment.expected_amount) * 100, 1) if assignment.expected_amount else 0
+        if paid_amount <= 0:
+            assignment.plan_status_label = 'بدون واریز'
+            assignment.plan_status_class = 'flag-red'
+        elif paid_amount < assignment.expected_amount:
+            assignment.plan_status_label = 'واریز ناقص'
+            assignment.plan_status_class = 'flag-yellow'
+        elif paid_amount == assignment.expected_amount:
+            assignment.plan_status_label = 'تکمیل شده'
+            assignment.plan_status_class = 'flag-green'
+        else:
+            assignment.plan_status_label = 'بیش از برنامه'
+            assignment.plan_status_class = 'flag-blue'
+        assignment.latest_payment_text = _format_jalali_datetime(assignment.report.get('latest_payment'))
     return assignments
 
 
@@ -857,10 +876,19 @@ def _staff_notification_users(roles=None, exclude_user=None):
 
 def _notify_payment_created(payment, actor):
     customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else '-')
+    if payment.daily_assignment_id:
+        title = 'واریز برنامه‌ریزی‌شده ثبت شد'
+        plan = payment.daily_assignment.plan
+        message = f'{customer_name} برای برنامه واریز {plan.deposit_date} فیش ثبت کرد.'
+        roles = {'commercial', 'sales', 'finance'}
+    else:
+        title = 'فیش واریزی جدید'
+        message = f'یک فیش واریزی جدید برای {customer_name} ثبت شد.'
+        roles = {'commercial', 'finance'}
     _notify_users(
-        _staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor),
-        'فیش واریزی جدید',
-        f'یک فیش واریزی جدید برای {customer_name} ثبت شد.',
+        _staff_notification_users(roles=roles, exclude_user=actor),
+        title,
+        message,
         reverse('payment_timeline', args=[payment.id]),
         category=UserNotification.CATEGORY_PAYMENT,
         actor=actor,
@@ -1436,7 +1464,7 @@ def _daily_assignment_stats(assignments):
         .filter(daily_assignment_id__in=assignment_ids)
         .exclude(status=PaymentRecord.STATUS_REJECTED)
         .values('daily_assignment')
-        .annotate(total=Sum('amount'), count=Count('id'))
+        .annotate(total=Sum('amount'), count=Count('id'), latest_payment=Max('created_at'))
     )
     confirmed_rows = (
         PaymentRecord.objects
@@ -1456,6 +1484,7 @@ def _daily_assignment_stats(assignments):
             'payment_count': 0,
             'confirmed_amount': 0,
             'confirmed_count': 0,
+            'latest_payment': None,
         }
         for assignment_id in assignment_ids
     }
@@ -1463,6 +1492,7 @@ def _daily_assignment_stats(assignments):
         data = stats[row['daily_assignment']]
         data['paid_amount'] = row['total'] or 0
         data['payment_count'] = row['count'] or 0
+        data['latest_payment'] = row['latest_payment']
     for row in confirmed_rows:
         data = stats[row['daily_assignment']]
         data['confirmed_amount'] = row['total'] or 0
@@ -1630,6 +1660,9 @@ def daily_payment_plan_detail(request, plan_id):
         'paid': sum(assignment.report['paid_amount'] for assignment in assignments),
         'confirmed': sum(assignment.report['confirmed_amount'] for assignment in assignments),
         'payment_count': sum(assignment.report['payment_count'] for assignment in assignments),
+        'no_payment_count': sum(1 for assignment in assignments if assignment.report['paid_amount'] <= 0),
+        'partial_count': sum(1 for assignment in assignments if 0 < assignment.report['paid_amount'] < assignment.expected_amount),
+        'complete_count': sum(1 for assignment in assignments if assignment.expected_amount > 0 and assignment.report['paid_amount'] >= assignment.expected_amount),
     }
     totals['remaining'] = totals['expected'] - totals['paid']
     totals['confirmed_remaining'] = totals['expected'] - totals['confirmed']
