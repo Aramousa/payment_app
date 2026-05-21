@@ -25,8 +25,8 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, SystemActivityLog, UserNotification, UserProfile
+from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification, UserProfile
 import os
 
 
@@ -119,6 +119,14 @@ def _can_upload_price_lists(user):
     if user.is_superuser:
         return True
     return _user_role(user) in {'commercial', 'sales', 'finance'}
+
+
+def _can_issue_proformas(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) == 'commercial'
 
 
 def _can_view_price_list_history(user):
@@ -1264,6 +1272,26 @@ def _price_lists_for_user(user):
     return PriceList.objects.none()
 
 
+def _proformas_for_user(user):
+    qs = ProformaInvoice.objects.select_related('customer', 'customer__profile', 'issued_by')
+    if _is_staff_user(user):
+        return qs.order_by('-created_at', '-id')
+    return qs.filter(customer=user).order_by('-created_at', '-id')
+
+
+def _can_access_proforma(user, proforma):
+    return _is_staff_user(user) or proforma.customer_id == user.id
+
+
+def _log_proforma(proforma, actor, action, note=''):
+    ProformaInvoiceLog.objects.create(
+        proforma=proforma,
+        actor=actor if actor and actor.is_authenticated else None,
+        action=action,
+        note=note or '',
+    )
+
+
 def _dashboard_notifications_for_user(user):
     if not user or not user.is_authenticated:
         return {'payments': 0, 'invoices': 0, 'events': 0, 'total': 0, 'items': []}
@@ -2371,6 +2399,114 @@ def price_lists_dashboard(request):
 
 
 @login_required
+def proformas_dashboard(request):
+    is_staff_user = _is_staff_user(request.user)
+    can_issue = _can_issue_proformas(request.user)
+
+    if request.method == 'POST':
+        if not can_issue:
+            return HttpResponseForbidden('شما دسترسی صدور پیش فاکتور را ندارید.')
+        form = ProformaInvoiceForm(request.POST, request.FILES)
+        if form.is_valid():
+            proforma = form.save(commit=False)
+            proforma.issued_by = request.user
+            proforma.save()
+            _notify_users(
+                [proforma.customer],
+                'پیش فاکتور جدید',
+                'یک پیش فاکتور جدید برای شما صادر شد.',
+                reverse('proforma_detail', args=[proforma.id]),
+                category=UserNotification.CATEGORY_SYSTEM,
+                actor=request.user,
+            )
+            messages.success(request, 'پیش فاکتور با موفقیت صادر شد.')
+            return redirect('proformas')
+    else:
+        form = ProformaInvoiceForm()
+
+    records = _proformas_for_user(request.user)
+    customer_filter = (request.GET.get('customer') or '').strip()
+    if is_staff_user and customer_filter:
+        records = records.filter(
+            Q(customer__first_name__icontains=customer_filter) |
+            Q(customer__last_name__icontains=customer_filter) |
+            Q(customer__username__icontains=customer_filter) |
+            Q(customer__profile__organization__icontains=customer_filter)
+        )
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    return render(request, 'payments/proformas.html', {
+        'form': form,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'is_staff_user': is_staff_user,
+        'can_issue_proformas': can_issue,
+        'filters': {'customer': customer_filter},
+        'today_jalali': _today_jalali_date(),
+        'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+    })
+
+
+@login_required
+def proforma_detail(request, proforma_id):
+    proforma = get_object_or_404(
+        ProformaInvoice.objects.select_related('customer', 'customer__profile', 'issued_by').prefetch_related('logs', 'logs__actor'),
+        id=proforma_id,
+    )
+    if not _can_access_proforma(request.user, proforma):
+        return HttpResponseForbidden('فقط امکان مشاهده پیش فاکتورهای خودتان وجود دارد.')
+
+    is_staff_user = _is_staff_user(request.user)
+    if not is_staff_user:
+        _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_VIEWED)
+
+    today = _today_jalali_date()
+    can_approve = (
+        not is_staff_user
+        and proforma.customer_id == request.user.id
+        and not proforma.is_approved
+        and proforma.valid_until >= today
+    )
+    if request.method == 'POST':
+        if request.POST.get('action') != 'approve' or not can_approve:
+            return HttpResponseForbidden('امکان تایید این پیش فاکتور وجود ندارد.')
+        proforma.status = ProformaInvoice.STATUS_APPROVED
+        proforma.approved_at = timezone.now()
+        proforma.save(update_fields=['status', 'approved_at'])
+        _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_APPROVED)
+        if proforma.issued_by_id:
+            _notify_users(
+                [proforma.issued_by],
+                'تایید پیش فاکتور',
+                f'پیش فاکتور «{proforma.title or proforma.id}» توسط مشتری تایید شد.',
+                reverse('proforma_detail', args=[proforma.id]),
+                category=UserNotification.CATEGORY_SYSTEM,
+                actor=request.user,
+            )
+        messages.success(request, 'پیش فاکتور تایید شد.')
+        return redirect('proforma_detail', proforma_id=proforma.id)
+
+    logs = [
+        {
+            'action': log.get_action_display(),
+            'actor': log.actor.get_full_name() or log.actor.username if log.actor else 'سیستم',
+            'time': _format_jalali_datetime(log.created_at),
+            'note': log.note,
+        }
+        for log in proforma.logs.all()
+    ] if is_staff_user else []
+    return render(request, 'payments/proforma_detail.html', {
+        'proforma': proforma,
+        'is_staff_user': is_staff_user,
+        'can_approve': can_approve,
+        'is_expired': proforma.valid_until < today,
+        'logs': logs,
+        'return_url': _safe_next_url(request, default=reverse('proformas')),
+    })
+
+
+@login_required
 def invoice_detail(request, invoice_id):
     invoice = get_object_or_404(
         InvoiceRecord.objects.select_related('customer', 'customer__profile', 'uploaded_by'),
@@ -2436,6 +2572,16 @@ def price_list_file(request, price_list_id):
     if not latest or latest.id != price_list.id:
         return HttpResponseForbidden('فقط امکان مشاهده آخرین لیست قیمت خودتان وجود دارد.')
     return _file_response(price_list.file, as_attachment=request.GET.get('download') == '1')
+
+
+@login_required
+def proforma_file(request, proforma_id):
+    proforma = get_object_or_404(ProformaInvoice.objects.select_related('customer'), id=proforma_id)
+    if not _can_access_proforma(request.user, proforma):
+        return HttpResponseForbidden('فقط امکان مشاهده فایل پیش فاکتورهای خودتان وجود دارد.')
+    if not _is_staff_user(request.user):
+        _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_FILE_VIEWED)
+    return _file_response(proforma.file, as_attachment=request.GET.get('download') == '1')
 
 
 @login_required

@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from .models import DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, SystemActivityLog, UserNotification
+from .models import DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -802,6 +802,72 @@ class InvoiceFlowTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_commercial_can_issue_proforma_customer_view_and_approve_logs_notification(self):
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.post(
+            reverse('proformas'),
+            {
+                'customer': str(self.customer_profile.id),
+                'title': 'PF-1',
+                'valid_until': '1405/12/29',
+                'file': SimpleUploadedFile('pf.pdf', b'%PDF-1.4 proforma', content_type='application/pdf'),
+                'note': 'internal',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        proforma = ProformaInvoice.objects.get(title='PF-1')
+        self.assertEqual(proforma.issued_by, self.commercial_user)
+
+        self.client.logout()
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('proforma_detail', args=[proforma.id]))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(reverse('proforma_file', args=[proforma.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            ProformaInvoiceLog.objects.filter(proforma=proforma, actor=self.customer_user, action=ProformaInvoiceLog.ACTION_VIEWED).count(),
+            1,
+        )
+        self.assertEqual(
+            ProformaInvoiceLog.objects.filter(proforma=proforma, actor=self.customer_user, action=ProformaInvoiceLog.ACTION_FILE_VIEWED).count(),
+            1,
+        )
+
+        response = self.client.post(reverse('proforma_detail', args=[proforma.id]), {'action': 'approve'})
+        self.assertEqual(response.status_code, 302)
+        proforma.refresh_from_db()
+        self.assertEqual(proforma.status, ProformaInvoice.STATUS_APPROVED)
+        self.assertIsNotNone(proforma.approved_at)
+        self.assertTrue(
+            ProformaInvoiceLog.objects.filter(proforma=proforma, actor=self.customer_user, action=ProformaInvoiceLog.ACTION_APPROVED).exists()
+        )
+        self.assertTrue(
+            UserNotification.objects.filter(user=self.commercial_user, title='تایید پیش فاکتور').exists()
+        )
+
+    def test_customer_cannot_access_other_or_expired_proforma_approval(self):
+        expired = ProformaInvoice.objects.create(
+            customer=self.customer_user,
+            issued_by=self.commercial_user,
+            title='expired',
+            valid_until=jdatetime.date(1404, 1, 1),
+            file=SimpleUploadedFile('expired.pdf', b'%PDF-1.4 expired', content_type='application/pdf'),
+        )
+        other = ProformaInvoice.objects.create(
+            customer=self.other_customer,
+            issued_by=self.commercial_user,
+            title='other',
+            valid_until=jdatetime.date(1405, 12, 29),
+            file=SimpleUploadedFile('other-pf.pdf', b'%PDF-1.4 other', content_type='application/pdf'),
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        self.assertEqual(self.client.get(reverse('proforma_file', args=[other.id])).status_code, 403)
+        response = self.client.post(reverse('proforma_detail', args=[expired.id]), {'action': 'approve'})
+        self.assertEqual(response.status_code, 403)
+        expired.refresh_from_db()
+        self.assertEqual(expired.status, ProformaInvoice.STATUS_PENDING)
 
     def test_customer_can_edit_optional_profile_fields_and_change_is_logged(self):
         self.client.login(username='customer1', password='pass1234')

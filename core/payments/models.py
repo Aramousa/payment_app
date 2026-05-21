@@ -482,3 +482,64 @@ class PriceList(models.Model):
 
     def __str__(self):
         return f"{self.customer.username} - {self.title or self.file.name}"
+
+
+class ProformaInvoice(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'در انتظار تایید مشتری'),
+        (STATUS_APPROVED, 'تایید شده توسط مشتری'),
+    ]
+
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='proforma_invoices')
+    issued_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='issued_proforma_invoices',
+    )
+    title = models.CharField('عنوان', max_length=120, blank=True)
+    valid_until = jmodels.jDateField('اعتبار تا')
+    file = models.FileField('فایل پیش فاکتور', upload_to='proformas/')
+    note = models.TextField('توضیحات داخلی', blank=True)
+    status = models.CharField('وضعیت', max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    approved_at = models.DateTimeField('زمان تایید مشتری', null=True, blank=True)
+    created_at = models.DateTimeField('زمان صدور', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'پیش فاکتور'
+        verbose_name_plural = 'پیش فاکتورها'
+
+    def __str__(self):
+        return f"{self.customer.username} - {self.title or self.file.name}"
+
+    @property
+    def is_approved(self):
+        return self.status == self.STATUS_APPROVED
+
+
+class ProformaInvoiceLog(models.Model):
+    ACTION_VIEWED = 'viewed'
+    ACTION_FILE_VIEWED = 'file_viewed'
+    ACTION_APPROVED = 'approved'
+
+    ACTION_CHOICES = [
+        (ACTION_VIEWED, 'مشاهده'),
+        (ACTION_FILE_VIEWED, 'مشاهده فایل'),
+        (ACTION_APPROVED, 'تایید مشتری'),
+    ]
+
+    proforma = models.ForeignKey(ProformaInvoice, on_delete=models.CASCADE, related_name='logs')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='proforma_logs')
+    action = models.CharField('عملیات', max_length=20, choices=ACTION_CHOICES)
+    note = models.TextField('توضیح', blank=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'لاگ پیش فاکتور'
+        verbose_name_plural = 'لاگ‌های پیش فاکتور'

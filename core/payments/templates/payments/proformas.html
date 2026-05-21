@@ -1,0 +1,127 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>پیش فاکتورها</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/persian-date.min.js' %}"></script>
+    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
+        .top-bar, .section { max-width: 1100px; margin: 0 auto 16px; }
+        .top-bar { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .section { background: #fff; border: 1px solid #e4e9f2; border-radius: 8px; padding: 16px; }
+        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
+        .button-link.alt { background: #6c757d; }
+        .form-grid, .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+        label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
+        input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 12px; }
+        th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
+        th { background: #007bff; color: #fff; }
+        .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
+        .status { display: inline-block; padding: 4px 10px; border-radius: 14px; color: #fff; font-size: 12px; }
+        .status.pending { background: #f9a825; color: #111; }
+        .status.approved { background: #2e7d32; }
+        .status.expired { background: #c62828; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>پیش فاکتورها</h2>
+        <a href="{% url 'submit' %}" class="button-link alt">بازگشت</a>
+    </div>
+    {% include "payments/partials/system_messages_popup.html" %}
+
+    {% if can_issue_proformas %}
+    <div class="section">
+        <h3>صدور پیش فاکتور</h3>
+        <form method="post" enctype="multipart/form-data" class="form-grid">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="button-link">صدور پیش فاکتور</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <h3>{% if is_staff_user %}سوابق پیش فاکتورها{% else %}پیش فاکتورهای من{% endif %}</h3>
+        {% if is_staff_user %}
+        <form method="get" class="filters">
+            <div>
+                <label for="customer-filter">مشتری</label>
+                <input id="customer-filter" type="text" name="customer" value="{{ filters.customer }}">
+            </div>
+            <button type="submit" class="button-link">اعمال فیلتر</button>
+            <a href="{% url 'proformas' %}" class="button-link alt">حذف فیلتر</a>
+        </form>
+        {% endif %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ردیف</th>
+                    {% if is_staff_user %}
+                        <th>مشتری</th>
+                        <th>مجموعه</th>
+                    {% endif %}
+                    <th>عنوان</th>
+                    <th>اعتبار تا</th>
+                    <th>وضعیت</th>
+                    <th>صادرکننده</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for proforma in records %}
+                    <tr>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        {% if is_staff_user %}
+                            <td>{{ proforma.customer.get_full_name|default:proforma.customer.username }}</td>
+                            <td>{{ proforma.customer.profile.organization|default:'-' }}</td>
+                        {% endif %}
+                        <td>{{ proforma.title|default:'-' }}</td>
+                        <td>{{ proforma.valid_until }}</td>
+                        <td>
+                            {% if proforma.is_approved %}
+                                <span class="status approved">تایید شده</span>
+                            {% elif proforma.valid_until < today_jalali %}
+                                <span class="status expired">منقضی شده</span>
+                            {% else %}
+                                <span class="status pending">در انتظار تایید</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ proforma.issued_by.get_full_name|default:proforma.issued_by.username|default:'-' }}</td>
+                        <td><a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{% if is_staff_user %}8{% else %}6{% endif %}">پیش فاکتوری ثبت نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
+    </div>
+    <script>
+    $(document).ready(function () {
+        $('.jalali-date').persianDatepicker({
+            format: 'YYYY/MM/DD',
+            observer: true,
+            initialValue: false,
+            initialValueType: 'persian',
+            toolbox: { calendarSwitch: { enabled: false } }
+        });
+    });
+    </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

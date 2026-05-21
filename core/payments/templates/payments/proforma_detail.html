@@ -1,0 +1,83 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>جزئیات پیش فاکتور</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
+        .box { max-width: 960px; margin: 0 auto 16px; background: #fff; border: 1px solid #e4e9f2; border-radius: 8px; padding: 16px; }
+        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
+        .button-link.alt { background: #6c757d; }
+        .button-link.success { background: #198754; }
+        .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px; }
+        .meta-item { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
+        iframe { width: 100%; height: 70vh; border: 0; }
+        img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { padding: 9px; border-bottom: 1px solid #eee; text-align: right; }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/system_messages_popup.html" %}
+    <div class="box">
+        <h2>{{ proforma.title|default:'پیش فاکتور' }}</h2>
+        <div class="meta">
+            <div class="meta-item"><strong>مشتری:</strong> {{ proforma.customer.get_full_name|default:proforma.customer.username }}</div>
+            <div class="meta-item"><strong>اعتبار تا:</strong> {{ proforma.valid_until }}</div>
+            <div class="meta-item"><strong>وضعیت:</strong> {{ proforma.get_status_display }}</div>
+            <div class="meta-item"><strong>زمان صدور:</strong> {{ proforma.created_at|jalali_datetime }}</div>
+            {% if proforma.approved_at %}<div class="meta-item"><strong>زمان تایید:</strong> {{ proforma.approved_at|jalali_datetime }}</div>{% endif %}
+        </div>
+        <p>
+            <a class="button-link" href="{% url 'proforma_file' proforma.id %}?download=1">دانلود فایل</a>
+            <a class="button-link alt" href="{{ return_url }}">بازگشت</a>
+        </p>
+        {% if can_approve %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="approve">
+                <button type="submit" class="button-link success">تایید پیش فاکتور</button>
+            </form>
+        {% elif not is_staff_user and is_expired and not proforma.is_approved %}
+            <p>مهلت تایید این پیش فاکتور به پایان رسیده است.</p>
+        {% endif %}
+    </div>
+
+    <div class="box">
+        <h3>نمایش فایل</h3>
+        {% with file_url=proforma.file.name|lower %}
+            {% if ".pdf" in file_url %}
+                <iframe src="{% url 'proforma_file' proforma.id %}"></iframe>
+            {% else %}
+                <img src="{% url 'proforma_file' proforma.id %}" alt="پیش فاکتور">
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    {% if is_staff_user %}
+    <div class="box">
+        <h3>لاگ عملیات مشتری</h3>
+        <table>
+            <thead><tr><th>زمان</th><th>عملیات</th><th>کاربر</th><th>توضیح</th></tr></thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.time }}</td>
+                        <td>{{ log.action }}</td>
+                        <td>{{ log.actor }}</td>
+                        <td>{{ log.note|default:'-' }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4">لاگی ثبت نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>
