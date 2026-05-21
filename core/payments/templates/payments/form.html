@@ -545,7 +545,7 @@
                                 {% endif %}
                                 <button type="submit">ثبت</button>
                             </form>
-                        {% else %}
+                        {% elif staff_user_role != 'data_entry' %}
                             <span title="قفل">🔒</span>
                         {% endif %}
                         {% if payment.can_edit_details %}
@@ -612,7 +612,7 @@
                             <a href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">نمایش کامل تاریخچه</a>
                         </div>
 
-                        {% if is_staff_user %}
+                        {% if is_staff_user and staff_user_role != 'data_entry' %}
                         <div class="detail-card">
                             <strong>تغییر وضعیت و توضیح</strong>
                             {% if payment.staff_can_act %}

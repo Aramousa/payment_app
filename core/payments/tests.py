@@ -622,6 +622,35 @@ class InvoiceFlowTests(TestCase):
         self.assertIn('کد پیگیری', log.note)
         self.assertIn('TRACK-250', log.note)
 
+    def test_data_entry_user_cannot_change_status_and_only_sees_detail_edit_action(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='DATAENTRY-NO-STATUS',
+            status=PaymentRecord.STATUS_PENDING,
+        )
+
+        self.client.login(username='dataentry1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse('staff_edit_payment_details', args=[payment.id]))
+        self.assertNotContains(response, reverse('staff_update_status', args=[payment.id]))
+        self.assertNotContains(response, 'تغییر وضعیت و توضیح')
+
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {'status': PaymentRecord.STATUS_APPROVED, 'note': '', 'next': reverse('submit')},
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_PENDING)
+
     def test_user_without_payment_detail_permission_cannot_edit_customer_payment_details(self):
         payment = PaymentRecord.objects.create(
             user=self.customer_user,
