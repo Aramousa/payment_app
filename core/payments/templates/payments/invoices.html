@@ -44,6 +44,12 @@
         .compact-input input, .compact-input select { min-height: 38px; }
         .actions-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding-top: 6px; }
         .submit-btn { border: none; border-radius: 6px; background: #198754; color: #fff; padding: 9px 18px; cursor: pointer; font-family: inherit; font-size: 13px; }
+        .parse-btn { border: none; border-radius: 6px; background: #475569; color: #fff; padding: 8px 12px; cursor: pointer; font-family: inherit; font-size: 12px; margin-top: 6px; }
+        .parse-btn:disabled { opacity: .6; cursor: wait; }
+        .parse-status { display: none; margin-top: 7px; padding: 7px 9px; border-radius: 6px; font-size: 11px; line-height: 1.8; }
+        .parse-status.ok { display: block; background: #e8f5e9; color: #1b5e20; border: 1px solid #b7dfbb; }
+        .parse-status.warn { display: block; background: #fff8e1; color: #7a5600; border: 1px solid #f0d58a; }
+        .parse-status.error { display: block; background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; }
 
         .customer-picker-grid { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr); gap: 12px; }
         .customer-card { border: 1px solid #e2e7ef; border-radius: 8px; background: #f9fbff; padding: 12px; min-height: 108px; }
@@ -175,6 +181,8 @@
                             <div class="field-box compact-input">
                                 <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label|safe }}</label>
                                 {{ form.attachment }}
+                                <button type="button" id="parse-invoice-btn" class="parse-btn">خواندن اطلاعات از PDF</button>
+                                <div id="parse-invoice-status" class="parse-status" aria-live="polite"></div>
                                 {% if form.attachment.help_text %}<div class="field-help">{{ form.attachment.help_text }}</div>{% endif %}
                                 {% for error in form.attachment.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
                             </div>
@@ -458,6 +466,98 @@
                     renderPreview(selectEl.value);
                 });
                 renderPreview(selectEl.value);
+            }
+
+            const parseBtn = document.getElementById('parse-invoice-btn');
+            const parseStatus = document.getElementById('parse-invoice-status');
+            const attachmentInput = document.getElementById('{{ form.attachment.id_for_label }}');
+            const autofilledFields = new Set();
+
+            function setParseStatus(message, type) {
+                if (!parseStatus) return;
+                parseStatus.textContent = message || '';
+                parseStatus.className = message ? 'parse-status ' + (type || 'warn') : 'parse-status';
+            }
+
+            function formatNumber(value) {
+                const digits = String(value || '').replace(/\D/g, '');
+                return digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '';
+            }
+
+            function applyParsedField(fieldName, value) {
+                const input = document.getElementById('id_' + fieldName);
+                if (!input || !value) return false;
+                if (input.value && !autofilledFields.has(fieldName)) return false;
+                input.value = fieldName === 'amount' ? formatNumber(value) : value;
+                autofilledFields.add(fieldName);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                return true;
+            }
+
+            async function parseInvoiceAttachment() {
+                if (!attachmentInput || !attachmentInput.files || !attachmentInput.files.length) {
+                    setParseStatus('ابتدا فایل PDF فاکتور را انتخاب کنید.', 'warn');
+                    return;
+                }
+                const file = attachmentInput.files[0];
+                if (!/\.pdf$/i.test(file.name || '')) {
+                    setParseStatus('خواندن خودکار فعلا فقط برای فایل PDF فعال است.', 'warn');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('attachment', file);
+                if (parseBtn) {
+                    parseBtn.disabled = true;
+                    parseBtn.textContent = 'در حال خواندن...';
+                }
+                setParseStatus('در حال خواندن متن PDF...', 'warn');
+
+                try {
+                    const response = await fetch('{% url "invoice_parse_preview" %}', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value },
+                        body: formData
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) {
+                        setParseStatus(payload.message || 'خواندن فاکتور انجام نشد.', 'error');
+                        return;
+                    }
+
+                    let appliedCount = 0;
+                    const fields = payload.fields || {};
+                    ['invoice_date', 'invoice_number', 'amount', 'reference_number'].forEach(function (fieldName) {
+                        if (applyParsedField(fieldName, fields[fieldName])) appliedCount += 1;
+                    });
+
+                    if (appliedCount) {
+                        setParseStatus('اطلاعات پیشنهادی خوانده شد و در فیلدهای خالی فرم قرار گرفت. قبل از ثبت، مقدارها را کنترل کنید.', 'ok');
+                    } else {
+                        setParseStatus(payload.message || 'فیلد قابل اطمینانی برای تکمیل خودکار پیدا نشد.', payload.ok ? 'warn' : 'error');
+                    }
+                } catch (error) {
+                    setParseStatus('ارتباط با سرویس خواندن فاکتور برقرار نشد.', 'error');
+                } finally {
+                    if (parseBtn) {
+                        parseBtn.disabled = false;
+                        parseBtn.textContent = 'خواندن اطلاعات از PDF';
+                    }
+                }
+            }
+
+            if (parseBtn) {
+                parseBtn.addEventListener('click', parseInvoiceAttachment);
+            }
+            if (attachmentInput) {
+                attachmentInput.addEventListener('change', function () {
+                    autofilledFields.clear();
+                    setParseStatus('', 'warn');
+                    if (attachmentInput.files && attachmentInput.files.length && /\.pdf$/i.test(attachmentInput.files[0].name || '')) {
+                        parseInvoiceAttachment();
+                    }
+                });
             }
 
             function closeAllDetails(exceptId) {

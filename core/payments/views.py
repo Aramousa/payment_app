@@ -26,7 +26,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification, UserProfile
+from .invoice_parser import parse_invoice_upload
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -2380,6 +2381,25 @@ def invoices_dashboard(request):
         'export_dataset': 'invoices',
         'export_fields': INVOICE_EXPORT_FIELDS,
     })
+
+
+@login_required
+@require_POST
+def invoice_parse_preview(request):
+    if not _can_upload_invoices(request.user):
+        return JsonResponse({'ok': False, 'message': 'شما دسترسی خواندن اطلاعات فاکتور را ندارید.'}, status=403)
+
+    uploaded = request.FILES.get('attachment')
+    if not uploaded:
+        return JsonResponse({'ok': False, 'message': 'ابتدا فایل PDF فاکتور را انتخاب کنید.'}, status=400)
+    if os.path.splitext(uploaded.name or '')[1].lower() != '.pdf':
+        return JsonResponse({'ok': False, 'message': 'خواندن خودکار فقط برای فایل PDF فعال است.'}, status=400)
+    max_size = UploadSettings.load().invoice_max_upload_size_bytes
+    if uploaded.size and uploaded.size > max_size:
+        return JsonResponse({'ok': False, 'message': 'حجم فایل بیشتر از حد مجاز فاکتور است.'}, status=400)
+
+    result = parse_invoice_upload(uploaded)
+    return JsonResponse(result)
 
 
 @login_required

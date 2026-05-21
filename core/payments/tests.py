@@ -1,5 +1,6 @@
 import jdatetime
 from io import BytesIO
+from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core import mail
@@ -108,6 +109,37 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(invoice.amount, 2500000)
         self.assertEqual(invoice.customer_visible_note, 'توضیح برای مشتری')
         self.assertEqual(invoice.internal_note, 'یادداشت داخلی')
+
+    def test_invoice_pdf_parse_preview_suggests_form_fields(self):
+        self.client.login(username='commercial1', password='pass1234')
+        extracted_text = (
+            'شماره فاکتور: INV-2040\n'
+            'تاریخ فاکتور: 1405/02/08\n'
+            'مبلغ کل: 2,500,000 ریال\n'
+            'شماره حواله: REF-2040\n'
+        )
+
+        with patch('payments.invoice_parser._extract_text_with_optional_libraries', return_value=(extracted_text, '')):
+            response = self.client.post(
+                reverse('invoice_parse_preview'),
+                {'attachment': SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf')},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['ok'])
+        self.assertEqual(payload['fields']['invoice_number'], 'INV-2040')
+        self.assertEqual(payload['fields']['invoice_date'], '1405/02/08')
+        self.assertEqual(payload['fields']['amount'], '2500000')
+        self.assertEqual(payload['fields']['reference_number'], 'REF-2040')
+
+    def test_invoice_pdf_parse_preview_requires_upload_permission(self):
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.post(
+            reverse('invoice_parse_preview'),
+            {'attachment': SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf')},
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_customer_view_marks_invoice_seen_and_allows_note(self):
         invoice = InvoiceRecord.objects.create(
