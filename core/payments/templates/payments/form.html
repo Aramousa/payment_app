@@ -184,6 +184,7 @@
 
         /* Notification Bell Styles */
         .notification-bell { position: relative; display: inline-block; }
+        .notification-trigger { background: transparent; border: 0; padding: 0; font-size: 20px; cursor: pointer; line-height: 1; }
         .notification-badge {
             position: absolute;
             top: -5px;
@@ -213,7 +214,7 @@
             z-index: 1000;
             margin-top: 8px;
         }
-        .notification-bell:hover .notification-dropdown { display: block; }
+        .notification-bell.open .notification-dropdown { display: block; }
         .notification-item {
             padding: 10px 14px;
             border-bottom: 1px solid #eee;
@@ -235,7 +236,7 @@
     <div class="top-bar">
         <div class="top-actions">
             <div class="notification-bell" title="اعلان‌ها">
-                <span style="font-size: 20px; cursor: pointer;">&#128276;</span>
+                <button class="notification-trigger" type="button" aria-label="اعلان‌ها" aria-expanded="false">&#128276;</button>
                 <span class="notification-badge{% if unread_notifications.total == 0 %} zero{% endif %}">{{ unread_notifications.total }}</span>
                 <div class="notification-dropdown">
                     <div class="notification-actions">
@@ -896,6 +897,8 @@
         }
 
         const notificationBadge = document.querySelector('.notification-badge');
+        const notificationBell = document.querySelector('.notification-bell');
+        const notificationTrigger = document.querySelector('.notification-trigger');
         const notificationList = document.getElementById('notificationList');
         const enableNotificationsBtn = document.getElementById('enableBrowserNotifications');
         const markNotificationsReadBtn = document.getElementById('markNotificationsRead');
@@ -904,6 +907,33 @@
         const lastSeenStorageKey = 'paymentAppNotificationLastSeen:{{ request.user.id }}';
         let lastSeenNotificationId = Number(localStorage.getItem(lastSeenStorageKey) || '0');
         let firstNotificationPoll = true;
+
+        function setNotificationMenuOpen(open) {
+            if (!notificationBell) return;
+            notificationBell.classList.toggle('open', open);
+            if (notificationTrigger) {
+                notificationTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+        }
+
+        if (notificationTrigger && notificationBell) {
+            notificationTrigger.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                setNotificationMenuOpen(!notificationBell.classList.contains('open'));
+            });
+            notificationBell.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+            document.addEventListener('click', function () {
+                setNotificationMenuOpen(false);
+            });
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    setNotificationMenuOpen(false);
+                }
+            });
+        }
 
         function getCookie(name) {
             const value = '; ' + document.cookie;
