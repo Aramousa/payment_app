@@ -459,3 +459,26 @@ class InvoiceRecord(models.Model):
     @property
     def is_seen_by_customer(self):
         return bool(self.customer_seen_at)
+
+
+class PriceList(models.Model):
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='price_lists')
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_price_lists',
+    )
+    title = models.CharField('عنوان', max_length=120, blank=True)
+    file = models.FileField('فایل لیست قیمت', upload_to='price_lists/')
+    note = models.TextField('توضیحات داخلی', blank=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'لیست قیمت'
+        verbose_name_plural = 'لیست قیمت‌ها'
+
+    def __str__(self):
+        return f"{self.customer.username} - {self.title or self.file.name}"

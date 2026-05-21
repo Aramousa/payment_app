@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from .models import DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, SystemActivityLog, UserNotification
+from .models import DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -46,6 +46,16 @@ class InvoiceFlowTests(TestCase):
         self.data_entry_user.profile.can_edit_payment_details = True
         self.data_entry_user.profile.force_password_change = False
         self.data_entry_user.profile.save()
+
+        self.sales_user = User.objects.create_user(
+            username='sales1',
+            password='pass1234',
+            first_name='کاربر',
+            last_name='فروش',
+        )
+        self.sales_user.profile.role = 'sales'
+        self.sales_user.profile.force_password_change = False
+        self.sales_user.profile.save()
 
         self.customer_user = User.objects.create_user(
             username='customer1',
@@ -725,6 +735,73 @@ class InvoiceFlowTests(TestCase):
         self.client.login(username='customer1', password='pass1234')
         response = self.client.get(invoice.attachment.url)
         self.assertEqual(response.status_code, 404)
+
+    def test_price_list_upload_history_and_customer_latest_file_scope(self):
+        older = PriceList.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.commercial_user,
+            title='old',
+            file=SimpleUploadedFile('old.pdf', b'%PDF-1.4 old', content_type='application/pdf'),
+        )
+        latest = PriceList.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.sales_user,
+            title='latest',
+            file=SimpleUploadedFile('latest.pdf', b'%PDF-1.4 latest', content_type='application/pdf'),
+        )
+        other = PriceList.objects.create(
+            customer=self.other_customer,
+            uploaded_by=self.finance_user,
+            title='other',
+            file=SimpleUploadedFile('other.pdf', b'%PDF-1.4 other', content_type='application/pdf'),
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('price_lists'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, latest.title)
+        self.assertNotContains(response, older.title)
+        self.assertNotContains(response, other.title)
+        self.assertEqual(self.client.get(reverse('price_list_file', args=[latest.id])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('price_list_file', args=[older.id])).status_code, 403)
+        self.assertEqual(self.client.get(reverse('price_list_file', args=[other.id])).status_code, 403)
+
+        self.client.logout()
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.get(reverse('price_lists'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, latest.title)
+        self.assertContains(response, older.title)
+        self.assertContains(response, other.title)
+        self.assertEqual(self.client.get(reverse('price_list_file', args=[other.id])).status_code, 200)
+
+    def test_commercial_sales_finance_can_upload_price_list_but_customer_cannot(self):
+        upload = SimpleUploadedFile('price.pdf', b'%PDF-1.4 price', content_type='application/pdf')
+
+        self.client.login(username='sales1', password='pass1234')
+        response = self.client.post(
+            reverse('price_lists'),
+            {
+                'customer': str(self.customer_profile.id),
+                'title': 'sales price',
+                'file': upload,
+                'note': 'internal',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(PriceList.objects.filter(customer=self.customer_user, title='sales price').exists())
+
+        self.client.logout()
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.post(
+            reverse('price_lists'),
+            {
+                'customer': str(self.customer_profile.id),
+                'title': 'customer price',
+                'file': SimpleUploadedFile('customer.pdf', b'%PDF-1.4 customer', content_type='application/pdf'),
+            },
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_customer_can_edit_optional_profile_fields_and_change_is_logged(self):
         self.client.login(username='customer1', password='pass1234')

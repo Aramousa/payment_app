@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 from PIL import Image, ImageOps
 
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, UploadSettings, UserProfile
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, UploadSettings, UserProfile
 
 STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
@@ -761,6 +761,58 @@ class InvoiceUploadForm(forms.ModelForm):
             uploaded = _optimize_uploaded_image(uploaded, self.max_upload_size)
         if uploaded.size and uploaded.size > self.max_upload_size:
             raise ValidationError(f'حجم فایل باید حداکثر {_size_label(self.max_upload_size)} باشد.')
+        return uploaded
+
+
+class PriceListUploadForm(forms.ModelForm):
+    ALLOWED_EXTENSIONS = {
+        '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf',
+    }
+
+    customer = forms.ModelChoiceField(
+        queryset=UserProfile.objects.none(),
+        label='مشتری',
+        empty_label='انتخاب مشتری',
+        required=True,
+    )
+
+    class Meta:
+        model = PriceList
+        fields = ['customer', 'title', 'file', 'note']
+        widgets = {
+            'title': forms.TextInput(attrs={'placeholder': 'مثلا لیست قیمت اردیبهشت'}),
+            'file': forms.ClearableFileInput(attrs={
+                'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
+            }),
+            'note': forms.Textarea(attrs={'rows': 3, 'placeholder': 'فقط برای کارکنان شرکت'}),
+        }
+        labels = {
+            'title': 'عنوان',
+            'file': 'عکس یا فایل PDF لیست قیمت',
+            'note': 'توضیحات داخلی',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['customer'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
+            'user__first_name', 'user__last_name', 'user__username'
+        )
+        self.fields['customer'].label_from_instance = InvoiceUploadForm._customer_label
+        self.fields['file'].required = True
+
+    def clean_customer(self):
+        profile = self.cleaned_data['customer']
+        if profile.role != 'customer':
+            raise ValidationError('فقط کاربران مشتری قابل انتخاب هستند.')
+        return profile.user
+
+    def clean_file(self):
+        uploaded = self.cleaned_data.get('file')
+        if not uploaded:
+            return uploaded
+        ext = os.path.splitext(uploaded.name or '')[1].lower()
+        if ext not in self.ALLOWED_EXTENSIONS:
+            raise ValidationError('فقط فایل‌های تصویری استاندارد و PDF مجاز است.')
         return uploaded
 
 

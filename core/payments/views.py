@@ -25,8 +25,8 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UserNotification, UserProfile
+from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, SystemActivityLog, UserNotification, UserProfile
 import os
 
 
@@ -111,6 +111,18 @@ def _can_view_invoices(user):
         return user.profile.can_view_invoices
     except UserProfile.DoesNotExist:
         return False
+
+
+def _can_upload_price_lists(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) in {'commercial', 'sales', 'finance'}
+
+
+def _can_view_price_list_history(user):
+    return _is_staff_user(user)
 
 
 def _can_manage_users(user):
@@ -1242,6 +1254,16 @@ def _invoice_records_for_user(user):
     return qs.filter(customer=user).order_by('-created_at', '-id')
 
 
+def _price_lists_for_user(user):
+    qs = PriceList.objects.select_related('customer', 'customer__profile', 'uploaded_by')
+    if _can_view_price_list_history(user):
+        return qs.order_by('-created_at', '-id')
+    latest = qs.filter(customer=user).order_by('-created_at', '-id').first()
+    if latest:
+        return qs.filter(id=latest.id)
+    return PriceList.objects.none()
+
+
 def _dashboard_notifications_for_user(user):
     if not user or not user.is_authenticated:
         return {'payments': 0, 'invoices': 0, 'events': 0, 'total': 0, 'items': []}
@@ -2300,6 +2322,55 @@ def invoices_dashboard(request):
 
 
 @login_required
+def price_lists_dashboard(request):
+    is_staff_user = _is_staff_user(request.user)
+    can_upload = _can_upload_price_lists(request.user)
+
+    if request.method == 'POST':
+        if not can_upload:
+            return HttpResponseForbidden('شما دسترسی بارگذاری لیست قیمت را ندارید.')
+        form = PriceListUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            price_list = form.save(commit=False)
+            price_list.uploaded_by = request.user
+            price_list.save()
+            _notify_users(
+                [price_list.customer],
+                'لیست قیمت جدید',
+                'لیست قیمت جدید برای شما ثبت شد.',
+                reverse('price_list_file', args=[price_list.id]),
+                category=UserNotification.CATEGORY_SYSTEM,
+                actor=request.user,
+            )
+            messages.success(request, 'لیست قیمت با موفقیت برای مشتری ثبت شد.')
+            return redirect('price_lists')
+    else:
+        form = PriceListUploadForm()
+
+    records = _price_lists_for_user(request.user)
+    customer_filter = (request.GET.get('customer') or '').strip()
+    if is_staff_user and customer_filter:
+        records = records.filter(
+            Q(customer__first_name__icontains=customer_filter) |
+            Q(customer__last_name__icontains=customer_filter) |
+            Q(customer__username__icontains=customer_filter) |
+            Q(customer__profile__organization__icontains=customer_filter)
+        )
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    return render(request, 'payments/price_lists.html', {
+        'form': form,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'is_staff_user': is_staff_user,
+        'can_upload_price_lists': can_upload,
+        'filters': {'customer': customer_filter},
+        'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+    })
+
+
+@login_required
 def invoice_detail(request, invoice_id):
     invoice = get_object_or_404(
         InvoiceRecord.objects.select_related('customer', 'customer__profile', 'uploaded_by'),
@@ -2353,6 +2424,18 @@ def invoice_file(request, invoice_id):
     if not _can_access_invoice(request.user, invoice):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فاکتورهای خودتان وجود دارد.')
     return _file_response(invoice.attachment, as_attachment=request.GET.get('download') == '1')
+
+
+@login_required
+def price_list_file(request, price_list_id):
+    price_list = get_object_or_404(PriceList.objects.select_related('customer'), id=price_list_id)
+    if _is_staff_user(request.user):
+        return _file_response(price_list.file, as_attachment=request.GET.get('download') == '1')
+
+    latest = PriceList.objects.filter(customer=request.user).order_by('-created_at', '-id').first()
+    if not latest or latest.id != price_list.id:
+        return HttpResponseForbidden('فقط امکان مشاهده آخرین لیست قیمت خودتان وجود دارد.')
+    return _file_response(price_list.file, as_attachment=request.GET.get('download') == '1')
 
 
 @login_required
