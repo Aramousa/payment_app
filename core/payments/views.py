@@ -938,6 +938,8 @@ def _log_text(log):
 
 
 def _customer_log_text(log):
+    if log.action == PaymentActivityLog.ACTION_CREATED:
+        return 'فیش توسط مشتری ثبت شد.'
     if log.action == PaymentActivityLog.ACTION_VIEWED:
         return 'سند مشاهده شد.'
     if log.action == PaymentActivityLog.ACTION_STATUS_CHANGED:

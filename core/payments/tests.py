@@ -396,6 +396,7 @@ class InvoiceFlowTests(TestCase):
             status=PaymentRecord.STATUS_INCOMPLETE,
         )
         _log_activity = __import__('payments.views', fromlist=['_log_activity'])._log_activity
+        _log_activity(payment, self.customer_user, PaymentActivityLog.ACTION_CREATED, to_status=PaymentRecord.STATUS_PENDING)
         _log_activity(payment, self.commercial_user, PaymentActivityLog.ACTION_VIEWED, note='internal view')
         _log_activity(
             payment,
@@ -417,6 +418,7 @@ class InvoiceFlowTests(TestCase):
         response = self.client.get(reverse('payment_timeline', args=[payment.id]))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'فیش توسط مشتری ثبت شد.')
         self.assertContains(response, 'سند مشاهده شد.')
         self.assertContains(response, 'نقص مدارک ثبت شد.')
         self.assertContains(response, 'تصویر فیش واضح نیست')
