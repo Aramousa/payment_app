@@ -229,8 +229,6 @@ def _staff_status_choices_for_role(role):
             (PaymentRecord.STATUS_FINAL_APPROVED, 'تایید نهایی'),
             (PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
         ]
-    if role == 'staff':
-        return []
     return PaymentRecord.STATUS_CHOICES
 
 

@@ -9,6 +9,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from .models import InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, SystemActivityLog
+from .views import _staff_status_choices_for_role
 
 
 class InvoiceFlowTests(TestCase):
@@ -286,6 +287,32 @@ class InvoiceFlowTests(TestCase):
         self.assertNotContains(response, 'WF-APPROVE')
         response = self.client.get(reverse('payment_history'))
         self.assertContains(response, 'WF-APPROVE')
+
+    def test_staff_status_choices_for_generic_staff_role_are_not_empty(self):
+        choices = _staff_status_choices_for_role('staff')
+        self.assertTrue(len(choices) > 0)
+        self.assertIn((PaymentRecord.STATUS_APPROVED, 'تایید شده'), choices)
+
+    def test_staff_status_choices_for_commercial_role(self):
+        choices = _staff_status_choices_for_role('commercial')
+        self.assertEqual(
+            choices,
+            [
+                (PaymentRecord.STATUS_APPROVED, 'تایید شده'),
+                (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
+                (PaymentRecord.STATUS_REJECTED, 'رد شده'),
+            ]
+        )
+
+    def test_staff_status_choices_for_finance_role(self):
+        choices = _staff_status_choices_for_role('finance')
+        self.assertEqual(
+            choices,
+            [
+                (PaymentRecord.STATUS_FINAL_APPROVED, 'تایید نهایی'),
+                (PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
+            ]
+        )
 
     def test_finance_can_see_pending_but_cannot_change_until_commercial_approval(self):
         payment = PaymentRecord.objects.create(
