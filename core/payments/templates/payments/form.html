@@ -181,6 +181,19 @@
         .daily-payment-notice { max-width: 980px; margin: 0 auto 14px auto; background: #fff7e6; border: 1px solid #ffbf69; border-right: 6px solid #f08c00; border-radius: 10px; padding: 14px; color: #3d2b00; font-size: 14px; line-height: 2; }
         .daily-payment-notice strong { color: #b35c00; }
         .daily-payment-expired { max-width: 980px; margin: 0 auto 14px auto; background: #fff1f1; border: 1px solid #f3a6a6; border-right: 6px solid #dc3545; border-radius: 10px; padding: 14px; color: #5b1111; font-size: 14px; line-height: 2; }
+        .customer-dashboard { max-width: 1200px; margin: 0 auto 18px; display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; }
+        .dashboard-panel { background: #fff; border: 1px solid #e1e7f0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        .dashboard-panel h3 { margin: 0; font-size: 16px; color: #1f2d3d; }
+        .dashboard-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .dashboard-count { background: #eef5ff; color: #0d47a1; border-radius: 999px; padding: 3px 9px; font-size: 12px; white-space: nowrap; }
+        .dashboard-list { display: grid; gap: 8px; }
+        .dashboard-row { border: 1px solid #eef1f5; border-radius: 7px; padding: 9px; background: #fbfcfe; display: grid; gap: 4px; }
+        .dashboard-row-title { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; color: #1f2d3d; }
+        .dashboard-row-meta { color: #596579; font-size: 12px; line-height: 1.8; }
+        .dashboard-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+        .dashboard-actions .button-link { padding: 6px 10px; font-size: 12px; }
+        .dashboard-empty { color: #667085; font-size: 13px; background: #f8fafc; border-radius: 7px; padding: 10px; }
+        @media (max-width: 900px) { .customer-dashboard { grid-template-columns: 1fr; } }
 
         /* Notification Bell Styles */
         .notification-bell { position: relative; display: inline-block; }
@@ -318,6 +331,127 @@
         </div>
         {% endif %}
         {% if active_daily_assignment %}
+        <div class="daily-payment-notice">
+            لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date }}</strong>
+            مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
+            را به حساب <strong>{{ active_daily_assignment.plan.account_number }}</strong>
+            {% if active_daily_assignment.plan.bank_name %}بانک <strong>{{ active_daily_assignment.plan.bank_name }}</strong>{% endif %}
+            {% if active_daily_assignment.plan.account_owner %}به نام <strong>{{ active_daily_assignment.plan.account_owner }}</strong>{% endif %}
+            واریز نمایید و فیش‌های مربوطه را بارگذاری نمایید.
+            نکته اینکه این شماره حساب صرفا برای امروز مورد تایید می‌باشد.
+        </div>
+        {% elif expired_daily_assignment %}
+        <div class="daily-payment-expired">
+            برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date }}</strong> بوده و منقضی شده است.
+            برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
+        </div>
+        {% endif %}
+        {% if customer_home_summary %}
+        <div class="customer-dashboard">
+            <section class="dashboard-panel">
+                <div class="dashboard-head">
+                    <h3>فاکتورهای من</h3>
+                    <span class="dashboard-count">{{ customer_home_summary.invoice_count }} مورد</span>
+                </div>
+                <div class="dashboard-list">
+                    {% for invoice in customer_home_summary.invoices %}
+                        <div class="dashboard-row">
+                            <div class="dashboard-row-title">
+                                <span>{{ invoice.invoice_number|default:'بدون شماره' }}</span>
+                                <span>{{ invoice.amount|thousand_sep }} ریال</span>
+                            </div>
+                            <div class="dashboard-row-meta">تاریخ فاکتور: {{ invoice.invoice_date|default:'-' }} | شماره حواله: {{ invoice.reference_number|default:'-' }}</div>
+                            <div class="dashboard-actions">
+                                <a class="button-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">مشاهده</a>
+                                <a class="button-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود</a>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="dashboard-empty">هنوز فاکتوری برای شما ثبت نشده است.</div>
+                    {% endfor %}
+                </div>
+                <div class="dashboard-actions"><a class="button-link" href="{% url 'invoices_dashboard' %}">رفتن به بخش فاکتورها</a></div>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="dashboard-head">
+                    <h3>فیش‌های واریزی من</h3>
+                    <span class="dashboard-count">{{ customer_home_summary.payment_count }} مورد</span>
+                </div>
+                <div class="dashboard-list">
+                    {% for payment in customer_home_summary.payments %}
+                        <div class="dashboard-row">
+                            <div class="dashboard-row-title">
+                                <span>{{ payment.tracking_code|default:'بدون کد پیگیری' }}</span>
+                                <span>{{ payment.amount|thousand_sep }} ریال</span>
+                            </div>
+                            <div class="dashboard-row-meta">تاریخ: {{ payment.pay_date|default:'-' }} | وضعیت: {{ payment.customer_status_label }}</div>
+                            <div class="dashboard-actions">
+                                <a class="button-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
+                                {% if payment.status == 'incomplete' %}
+                                    <a class="button-link" href="{% url 'edit_payment' payment.id %}?next={{ request.get_full_path|urlencode }}">ویرایش</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="dashboard-empty">هنوز فیشی ثبت نکرده‌اید.</div>
+                    {% endfor %}
+                </div>
+                <div class="dashboard-actions"><a class="button-link" href="#payment-form">ثبت فیش جدید</a></div>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="dashboard-head">
+                    <h3>لیست قیمت اختصاصی</h3>
+                    <span class="dashboard-count">{{ customer_home_summary.price_list_count }} مورد</span>
+                </div>
+                <div class="dashboard-list">
+                    {% for price_list in customer_home_summary.price_lists %}
+                        <div class="dashboard-row">
+                            <div class="dashboard-row-title">
+                                <span>{{ price_list.title|default:'آخرین لیست قیمت' }}</span>
+                                <span>{{ price_list.created_at|jalali_date }}</span>
+                            </div>
+                            <div class="dashboard-row-meta">بارگذاری کننده: {{ price_list.uploaded_by.get_full_name|default:price_list.uploaded_by.username|default:'-' }}</div>
+                            <div class="dashboard-actions">
+                                <a class="button-link dashboard-file-preview-link" href="{% url 'price_list_file' price_list.id %}" data-file-name="{{ price_list.file.name }}">مشاهده فایل</a>
+                                <a class="button-link" href="{% url 'price_list_file' price_list.id %}?download=1" download>دانلود</a>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="dashboard-empty">لیست قیمت اختصاصی برای شما ثبت نشده است.</div>
+                    {% endfor %}
+                </div>
+                <div class="dashboard-actions"><a class="button-link" href="{% url 'price_lists' %}">رفتن به بخش لیست قیمت</a></div>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="dashboard-head">
+                    <h3>پیش‌فاکتورهای من</h3>
+                    <span class="dashboard-count">{{ customer_home_summary.proforma_count }} مورد</span>
+                </div>
+                <div class="dashboard-list">
+                    {% for proforma in customer_home_summary.proformas %}
+                        <div class="dashboard-row">
+                            <div class="dashboard-row-title">
+                                <span>{{ proforma.title|default:'پیش‌فاکتور' }}</span>
+                                <span>{{ proforma.get_status_display }}</span>
+                            </div>
+                            <div class="dashboard-row-meta">اعتبار تا: {{ proforma.valid_until }} | صادرکننده: {{ proforma.issued_by.get_full_name|default:proforma.issued_by.username|default:'-' }}</div>
+                            <div class="dashboard-actions">
+                                <a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">مشاهده و عملیات</a>
+                                <a class="button-link" href="{% url 'proforma_file' proforma.id %}?download=1" download>دانلود</a>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="dashboard-empty">پیش‌فاکتوری برای شما صادر نشده است.</div>
+                    {% endfor %}
+                </div>
+                <div class="dashboard-actions"><a class="button-link" href="{% url 'proformas' %}">رفتن به بخش پیش‌فاکتورها</a></div>
+            </section>
+        </div>
+        {% endif %}
+        {% if not customer_home_summary and active_daily_assignment %}
         <div class="daily-payment-notice">
             لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date }}</strong>
             مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
@@ -861,7 +995,7 @@
             overlay.focus();
         }
 
-        document.querySelectorAll('.receipt-preview-link').forEach(function (link) {
+        document.querySelectorAll('.receipt-preview-link, .dashboard-file-preview-link').forEach(function (link) {
             link.addEventListener('click', async function (event) {
                 event.preventDefault();
                 await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'));

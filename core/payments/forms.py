@@ -769,16 +769,16 @@ class PriceListUploadForm(forms.ModelForm):
         '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf',
     }
 
-    customer = forms.ModelChoiceField(
+    customers = forms.ModelMultipleChoiceField(
         queryset=UserProfile.objects.none(),
-        label='مشتری',
-        empty_label='انتخاب مشتری',
+        label='مشتریان',
         required=True,
+        widget=forms.SelectMultiple(attrs={'size': 8}),
     )
 
     class Meta:
         model = PriceList
-        fields = ['customer', 'title', 'file', 'note']
+        fields = ['customers', 'title', 'file', 'note']
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'مثلا لیست قیمت اردیبهشت'}),
             'file': forms.ClearableFileInput(attrs={
@@ -794,17 +794,19 @@ class PriceListUploadForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['customer'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
+        self.fields['customers'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
             'user__first_name', 'user__last_name', 'user__username'
         )
-        self.fields['customer'].label_from_instance = InvoiceUploadForm._customer_label
+        self.fields['customers'].label_from_instance = InvoiceUploadForm._customer_label
         self.fields['file'].required = True
 
-    def clean_customer(self):
-        profile = self.cleaned_data['customer']
-        if profile.role != 'customer':
+    def clean_customers(self):
+        profiles = self.cleaned_data['customers']
+        if not profiles:
+            raise ValidationError('حداقل یک مشتری را انتخاب کنید.')
+        if any(profile.role != 'customer' for profile in profiles):
             raise ValidationError('فقط کاربران مشتری قابل انتخاب هستند.')
-        return profile.user
+        return [profile.user for profile in profiles]
 
     def clean_file(self):
         uploaded = self.cleaned_data.get('file')

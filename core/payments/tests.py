@@ -276,6 +276,59 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, own_invoice.invoice_number)
         self.assertNotContains(response, other_invoice.invoice_number)
 
+    def test_customer_home_shows_operational_sections(self):
+        invoice = InvoiceRecord.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.commercial_user,
+            amount=700000,
+            invoice_date=jdatetime.date(1405, 2, 8),
+            invoice_number='HOME-INV',
+            reference_number='HOME-REF',
+            attachment=SimpleUploadedFile('home-invoice.pdf', b'%PDF-1.4 invoice', content_type='application/pdf'),
+        )
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=500000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='HOME-PAY',
+        )
+        price_list = PriceList.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.sales_user,
+            title='HOME-PRICE',
+            file=SimpleUploadedFile('home-price.pdf', b'%PDF-1.4 price', content_type='application/pdf'),
+        )
+        proforma = ProformaInvoice.objects.create(
+            customer=self.customer_user,
+            issued_by=self.commercial_user,
+            title='HOME-PROFORMA',
+            valid_until=jdatetime.date(1405, 12, 29),
+            file=SimpleUploadedFile('home-proforma.pdf', b'%PDF-1.4 proforma', content_type='application/pdf'),
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'فاکتورهای من')
+        self.assertContains(response, 'فیش‌های واریزی من')
+        self.assertContains(response, 'لیست قیمت اختصاصی')
+        self.assertContains(response, 'پیش‌فاکتورهای من')
+        self.assertContains(response, invoice.invoice_number)
+        self.assertContains(response, payment.tracking_code)
+        self.assertContains(response, price_list.title)
+        self.assertContains(response, proforma.title)
+        self.assertContains(response, reverse('invoice_detail', args=[invoice.id]))
+        self.assertContains(response, reverse('payment_timeline', args=[payment.id]))
+        self.assertContains(response, reverse('price_list_file', args=[price_list.id]))
+        self.assertContains(response, 'dashboard-file-preview-link')
+        self.assertContains(response, reverse('proforma_detail', args=[proforma.id]))
+
     def test_customer_cannot_access_other_customer_invoice_file(self):
         invoice = InvoiceRecord.objects.create(
             customer=self.other_customer,
@@ -943,7 +996,7 @@ class InvoiceFlowTests(TestCase):
         response = self.client.post(
             reverse('price_lists'),
             {
-                'customer': str(self.customer_profile.id),
+                'customers': [str(self.customer_profile.id), str(self.other_customer.profile.id)],
                 'title': 'sales price',
                 'file': upload,
                 'note': 'internal',
@@ -951,13 +1004,14 @@ class InvoiceFlowTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertTrue(PriceList.objects.filter(customer=self.customer_user, title='sales price').exists())
+        self.assertTrue(PriceList.objects.filter(customer=self.other_customer, title='sales price').exists())
 
         self.client.logout()
         self.client.login(username='customer1', password='pass1234')
         response = self.client.post(
             reverse('price_lists'),
             {
-                'customer': str(self.customer_profile.id),
+                'customers': [str(self.customer_profile.id)],
                 'title': 'customer price',
                 'file': SimpleUploadedFile('customer.pdf', b'%PDF-1.4 customer', content_type='application/pdf'),
             },

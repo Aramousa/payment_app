@@ -19,6 +19,7 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.contrib.sessions.models import Session
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -1308,6 +1309,24 @@ def _proformas_for_user(user):
     return qs.filter(customer=user).order_by('-created_at', '-id')
 
 
+def _customer_home_summary(user):
+    invoices = list(_invoice_records_for_user(user)[:5])
+    payments = list(_records_for_user(user).filter(user=user).order_by('-created_at', '-id')[:5])
+    payments = _enrich_records(payments)
+    price_lists = list(_price_lists_for_user(user)[:3])
+    proformas = list(_proformas_for_user(user)[:5])
+    return {
+        'invoices': invoices,
+        'payments': payments,
+        'price_lists': price_lists,
+        'proformas': proformas,
+        'invoice_count': _invoice_records_for_user(user).count(),
+        'payment_count': _records_for_user(user).filter(user=user).count(),
+        'price_list_count': _price_lists_for_user(user).count(),
+        'proforma_count': _proformas_for_user(user).count(),
+    }
+
+
 def _can_access_proforma(user, proforma):
     return _is_staff_user(user) or proforma.customer_id == user.id
 
@@ -1806,6 +1825,7 @@ def create_payment(request):
         'export_fields': PAYMENT_EXPORT_FIELDS,
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user) if not is_staff_user else None,
+        'customer_home_summary': _customer_home_summary(request.user) if not is_staff_user else None,
         'active_daily_assignment': active_daily_assignment,
         'expired_daily_assignment': expired_daily_assignment,
         'unread_notifications': _dashboard_notifications_for_user(request.user),
@@ -2437,18 +2457,29 @@ def price_lists_dashboard(request):
             return HttpResponseForbidden('شما دسترسی بارگذاری لیست قیمت را ندارید.')
         form = PriceListUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            price_list = form.save(commit=False)
-            price_list.uploaded_by = request.user
-            price_list.save()
-            _notify_users(
-                [price_list.customer],
-                'لیست قیمت جدید',
-                'لیست قیمت جدید برای شما ثبت شد.',
-                reverse('price_list_file', args=[price_list.id]),
-                category=UserNotification.CATEGORY_SYSTEM,
-                actor=request.user,
-            )
-            messages.success(request, 'لیست قیمت با موفقیت برای مشتری ثبت شد.')
+            uploaded_file = form.cleaned_data['file']
+            file_bytes = uploaded_file.read()
+            uploaded_file.seek(0)
+            created_price_lists = []
+            for customer in form.cleaned_data['customers']:
+                price_list = PriceList(
+                    customer=customer,
+                    uploaded_by=request.user,
+                    title=form.cleaned_data.get('title') or '',
+                    note=form.cleaned_data.get('note') or '',
+                )
+                price_list.file.save(uploaded_file.name, ContentFile(file_bytes), save=False)
+                price_list.save()
+                created_price_lists.append(price_list)
+                _notify_users(
+                    [price_list.customer],
+                    'لیست قیمت جدید',
+                    'لیست قیمت جدید برای شما ثبت شد.',
+                    reverse('price_list_file', args=[price_list.id]),
+                    category=UserNotification.CATEGORY_SYSTEM,
+                    actor=request.user,
+                )
+            messages.success(request, f'لیست قیمت با موفقیت برای {len(created_price_lists)} مشتری ثبت شد.')
             return redirect('price_lists')
     else:
         form = PriceListUploadForm()
