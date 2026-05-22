@@ -1,0 +1,6 @@
+# Optional OCR stack for invoice extraction.
+# Install these on worker machines, preferably from an offline wheelhouse.
+PyMuPDF>=1.24,<1.27
+opencv-python-headless>=4.10,<5
+paddleocr>=2.8,<3
+paddlepaddle>=3.0,<4

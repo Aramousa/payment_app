@@ -36,6 +36,7 @@
     <div class="box">
         <div class="actions">
             <a class="button-link" href="{% if return_url %}{{ return_url }}{% else %}{% url 'invoices_dashboard' %}{% endif %}">بازگشت به فاکتورها</a>
+            <a class="button-link" href="#file-preview">مشاهده فایل فاکتور</a>
             <a class="button-link download-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود فایل فاکتور</a>
         </div>
 
@@ -93,7 +94,7 @@
             </div>
         </div>
 
-        <div class="card" style="margin-bottom: 18px;">
+        <div class="card" id="file-preview" style="margin-bottom: 18px;">
             <div class="label">نمایش فایل</div>
             {% if '.pdf' in invoice.attachment.name|lower %}
                 <iframe src="{% url 'invoice_file' invoice.id %}" style="width:100%;height:70vh;border:0;"></iframe>

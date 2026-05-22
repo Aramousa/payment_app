@@ -2,9 +2,11 @@ import os
 import re
 
 import jdatetime
+from PIL import Image, ImageOps
 
 
 PERSIAN_DIGITS = str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
 
 
 def normalize_digits(value):
@@ -14,6 +16,8 @@ def normalize_digits(value):
 def normalize_text(value):
     text = normalize_digits(value)
     text = text.replace('\u200c', ' ')
+    text = text.replace('ك', 'ک').replace('ي', 'ی')
+    text = text.replace('٬', ',').replace('٫', '.')
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\r\n?', '\n', text)
     return text.strip()
@@ -22,8 +26,10 @@ def normalize_text(value):
 def _extract_text_with_optional_libraries(uploaded_file):
     uploaded_file.seek(0)
     ext = os.path.splitext(uploaded_file.name or '')[1].lower()
+    if ext in IMAGE_EXTENSIONS:
+        return _extract_text_from_image(uploaded_file)
     if ext != '.pdf':
-        return '', 'در حال حاضر خواندن خودکار فقط برای فایل PDF فعال است.'
+        return '', 'خواندن خودکار فقط برای فایل PDF یا تصویر فاکتور فعال است.'
 
     errors = []
 
@@ -60,6 +66,31 @@ def _extract_text_with_optional_libraries(uploaded_file):
         errors.append(f'pdfplumber: {exc}')
 
     return '', 'برای خواندن PDF متنی باید یکی از کتابخانه‌های pypdf، PyPDF2 یا pdfplumber روی سرور نصب باشد.'
+
+
+def _extract_text_from_image(uploaded_file):
+    try:
+        import pytesseract
+    except ImportError:
+        return '', 'برای خواندن اطلاعات از عکس باید pytesseract و موتور Tesseract OCR با زبان فارسی روی سرور نصب باشد.'
+
+    try:
+        uploaded_file.seek(0)
+        image = Image.open(uploaded_file)
+        image = ImageOps.exif_transpose(image)
+        image = image.convert('L')
+        image = ImageOps.autocontrast(image)
+        text = pytesseract.image_to_string(image, lang='fas+eng', config='--psm 6')
+        return text, ''
+    except pytesseract.TesseractNotFoundError:
+        return '', 'موتور Tesseract OCR روی سرور پیدا نشد. برای خواندن عکس فاکتور باید Tesseract و زبان فارسی نصب شود.'
+    except pytesseract.TesseractError as exc:
+        message = str(exc)
+        if 'fas' in message or 'traineddata' in message:
+            return '', 'زبان فارسی Tesseract نصب نیست. فایل زبان fas.traineddata باید روی سرور فعال باشد.'
+        return '', 'خواندن متن از عکس فاکتور انجام نشد.'
+    except Exception:
+        return '', 'فایل تصویر قابل خواندن نبود یا OCR روی آن موفق نشد.'
 
 
 def _line_after_label(text, labels):
@@ -108,20 +139,37 @@ def _extract_amount(text):
         r'grand\s*total',
     ]
     for label in amount_labels:
-        pattern = rf'{label}\s*[:：\-]?\s*([0-9,\s]+)'
+        pattern = rf'{label}[^\d\n]{{0,40}}([0-9][0-9,\s\.]{{3,}})'
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
             digits = re.sub(r'\D', '', match.group(1))
             if digits:
                 return digits
 
-    candidates = []
-    for match in re.finditer(r'(?<!\d)([0-9]{1,3}(?:[, ]?[0-9]{3}){1,})(?!\d)', text):
-        digits = re.sub(r'\D', '', match.group(1))
-        if len(digits) >= 5:
-            candidates.append(int(digits))
-    if candidates:
-        return str(max(candidates))
+    labeled_line_candidates = []
+    for line in text.splitlines():
+        if not re.search(r'ریال|تومان|rial|irr|toman', line, flags=re.IGNORECASE):
+            continue
+        if not re.search(r'کل|جمع|قابل\s*پرداخت|مانده|total|grand', line, flags=re.IGNORECASE):
+            continue
+        for match in re.finditer(r'(?<!\d)([0-9]{1,3}(?:[, ]?[0-9]{3})+|[0-9]{5,})(?!\d)', line):
+            digits = re.sub(r'\D', '', match.group(1))
+            if digits:
+                labeled_line_candidates.append(int(digits))
+    if labeled_line_candidates:
+        return str(max(labeled_line_candidates))
+
+    currency_candidates = []
+    for line in text.splitlines():
+        if not re.search(r'ریال|تومان|rial|irr|toman', line, flags=re.IGNORECASE):
+            continue
+        for match in re.finditer(r'(?<!\d)([0-9]{1,3}(?:[, ]?[0-9]{3})+|[0-9]{5,})(?!\d)', line):
+            digits = re.sub(r'\D', '', match.group(1))
+            if digits:
+                currency_candidates.append(int(digits))
+    unique_candidates = sorted(set(currency_candidates))
+    if len(unique_candidates) == 1:
+        return str(unique_candidates[0])
     return ''
 
 
@@ -166,12 +214,14 @@ def _clean_short_value(value):
 
 
 def parse_invoice_upload(uploaded_file):
+    ext = os.path.splitext(uploaded_file.name or '')[1].lower()
     text, warning = _extract_text_with_optional_libraries(uploaded_file)
     text = normalize_text(text)
     if not text:
+        file_kind = 'عکس' if ext in IMAGE_EXTENSIONS else 'PDF'
         return {
             'ok': False,
-            'message': warning or 'متنی از PDF خوانده نشد. اگر فایل اسکن‌شده یا عکس باشد، برای خواندن آن OCR فارسی لازم است.',
+            'message': warning or f'متنی از {file_kind} خوانده نشد. اگر فایل اسکن‌شده یا تصویر باشد، OCR فارسی لازم است.',
             'fields': {},
             'raw_text_preview': '',
         }
@@ -186,7 +236,7 @@ def parse_invoice_upload(uploaded_file):
 
     return {
         'ok': bool(fields),
-        'message': 'اطلاعات پیشنهادی از PDF خوانده شد.' if fields else 'متن PDF خوانده شد، اما فیلد قابل اطمینانی تشخیص داده نشد.',
+        'message': 'اطلاعات پیشنهادی از فایل خوانده شد.' if fields else 'متن فایل خوانده شد، اما فیلد قابل اطمینانی تشخیص داده نشد.',
         'fields': fields,
         'raw_text_preview': text[:1200],
     }

@@ -26,8 +26,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
-from .invoice_parser import parse_invoice_upload
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
+from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -2391,15 +2391,40 @@ def invoice_parse_preview(request):
 
     uploaded = request.FILES.get('attachment')
     if not uploaded:
-        return JsonResponse({'ok': False, 'message': 'ابتدا فایل PDF فاکتور را انتخاب کنید.'}, status=400)
-    if os.path.splitext(uploaded.name or '')[1].lower() != '.pdf':
-        return JsonResponse({'ok': False, 'message': 'خواندن خودکار فقط برای فایل PDF فعال است.'}, status=400)
+        return JsonResponse({'ok': False, 'message': 'ابتدا فایل فاکتور را انتخاب کنید.'}, status=400)
+    if os.path.splitext(uploaded.name or '')[1].lower() not in InvoiceUploadForm.ALLOWED_EXTENSIONS:
+        return JsonResponse({'ok': False, 'message': 'خواندن خودکار فقط برای فایل PDF یا تصویر فاکتور فعال است.'}, status=400)
     max_size = UploadSettings.load().invoice_max_upload_size_bytes
     if uploaded.size and uploaded.size > max_size:
         return JsonResponse({'ok': False, 'message': 'حجم فایل بیشتر از حد مجاز فاکتور است.'}, status=400)
 
-    result = parse_invoice_upload(uploaded)
-    return JsonResponse(result)
+    job = create_preview_extraction_job(uploaded, requested_by=request.user)
+    process_invoice_extraction_job(job.id)
+    job.refresh_from_db()
+    return JsonResponse(_invoice_extraction_payload(job))
+
+
+@login_required
+def invoice_parse_status(request, job_id):
+    job = get_object_or_404(InvoiceExtractionJob, id=job_id)
+    if job.requested_by_id != request.user.id and not request.user.is_superuser:
+        return JsonResponse({'ok': False, 'message': 'شما دسترسی مشاهده این پردازش را ندارید.'}, status=403)
+    return JsonResponse(_invoice_extraction_payload(job))
+
+
+def _invoice_extraction_payload(job):
+    result = job.result_json or {}
+    fields = flatten_fields(result)
+    return {
+        **result,
+        'job_id': job.id,
+        'status': job.status,
+        'fields': fields,
+        'raw_text_preview': result.get('raw_text_preview', ''),
+        'warnings': job.warnings,
+        'message': result.get('message') or job.error_message or 'پردازش انجام شد.',
+        'ok': bool(fields),
+    }
 
 
 @login_required

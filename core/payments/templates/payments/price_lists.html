@@ -22,6 +22,12 @@
         th { background: #007bff; color: #fff; }
         .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
         .notice { background: #fff7e6; border: 1px solid #ffbf69; border-radius: 8px; padding: 12px; margin-bottom: 12px; color: #3d2b00; }
+        .file-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+        .preview-row { display: none; background: #fbfcfe; }
+        .preview-row.open { display: table-row; }
+        .file-preview { border: 1px solid #dfe6ef; border-radius: 8px; background: #fff; padding: 10px; }
+        .file-preview iframe { width: 100%; height: 70vh; border: 0; }
+        .file-preview img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
     </style>
 </head>
 <body>
@@ -95,7 +101,25 @@
                         <td>{{ price_list.created_at|jalali_datetime }}</td>
                         <td>{{ price_list.uploaded_by.get_full_name|default:price_list.uploaded_by.username|default:'-' }}</td>
                         {% if is_staff_user %}<td>{{ price_list.note|default:'-'|linebreaksbr }}</td>{% endif %}
-                        <td><a class="button-link" href="{% url 'price_list_file' price_list.id %}?download=1">دانلود</a></td>
+                        <td>
+                            <div class="file-actions">
+                                <button type="button" class="button-link preview-toggle" data-preview="price-preview-{{ price_list.id }}">مشاهده</button>
+                                <a class="button-link alt" href="{% url 'price_list_file' price_list.id %}?download=1" download>دانلود</a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="price-preview-{{ price_list.id }}" class="preview-row">
+                        <td colspan="{% if is_staff_user %}7{% else %}5{% endif %}">
+                            <div class="file-preview">
+                                {% with file_name=price_list.file.name|lower %}
+                                    {% if ".pdf" in file_name %}
+                                        <iframe src="{% url 'price_list_file' price_list.id %}" title="نمایش لیست قیمت"></iframe>
+                                    {% else %}
+                                        <img src="{% url 'price_list_file' price_list.id %}" alt="لیست قیمت">
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="{% if is_staff_user %}7{% else %}5{% endif %}">لیست قیمتی ثبت نشده است.</td></tr>
@@ -105,5 +129,16 @@
 
         {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
     </div>
+    <script>
+        document.querySelectorAll('.preview-toggle').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const target = document.getElementById(button.getAttribute('data-preview'));
+                if (!target) return;
+                target.classList.toggle('open');
+                button.textContent = target.classList.contains('open') ? 'بستن نمایش' : 'مشاهده';
+            });
+        });
+    </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

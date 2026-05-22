@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from .models import DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
+from .models import DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -119,7 +119,7 @@ class InvoiceFlowTests(TestCase):
             'شماره حواله: REF-2040\n'
         )
 
-        with patch('payments.invoice_parser._extract_text_with_optional_libraries', return_value=(extracted_text, '')):
+        with patch('payments.invoice_extraction.extract_pdf_text_or_ocr', return_value=(extracted_text, 'pymupdf_text', [])):
             response = self.client.post(
                 reverse('invoice_parse_preview'),
                 {'attachment': SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf')},
@@ -132,6 +132,11 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(payload['fields']['invoice_date'], '1405/02/08')
         self.assertEqual(payload['fields']['amount'], '2500000')
         self.assertEqual(payload['fields']['reference_number'], 'REF-2040')
+        job = InvoiceExtractionJob.objects.get(requested_by=self.commercial_user, status=InvoiceExtractionJob.STATUS_DONE)
+        self.assertEqual(job.text_source, 'pymupdf_text')
+        status_response = self.client.get(reverse('invoice_parse_status', args=[job.id]))
+        self.assertEqual(status_response.status_code, 200)
+        self.assertEqual(status_response.json()['fields']['invoice_number'], 'INV-2040')
 
     def test_invoice_pdf_parse_preview_requires_upload_permission(self):
         self.client.login(username='customer1', password='pass1234')
@@ -140,6 +145,66 @@ class InvoiceFlowTests(TestCase):
             {'attachment': SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf')},
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_invoice_image_parse_preview_suggests_form_fields(self):
+        self.client.login(username='commercial1', password='pass1234')
+        extracted_text = (
+            'شماره فاکتور: IMG-2040\n'
+            'تاریخ صدور: 1405/03/01\n'
+            'جمع کل: 3,750,000 ریال\n'
+            'کد رهگیری: IMG-REF\n'
+        )
+
+        with patch('payments.invoice_extraction.extract_image_text', return_value=(extracted_text, 'paddleocr_image', [])):
+            response = self.client.post(
+                reverse('invoice_parse_preview'),
+                {'attachment': SimpleUploadedFile('invoice.jpg', b'fake-image', content_type='image/jpeg')},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['ok'])
+        self.assertEqual(payload['fields']['invoice_number'], 'IMG-2040')
+        self.assertEqual(payload['fields']['invoice_date'], '1405/03/01')
+        self.assertEqual(payload['fields']['amount'], '3750000')
+        self.assertEqual(payload['fields']['reference_number'], 'IMG-REF')
+
+    def test_invoice_parse_preview_does_not_guess_unlabeled_amount(self):
+        self.client.login(username='commercial1', password='pass1234')
+        extracted_text = (
+            'شماره فاکتور: INV-AMBIG\n'
+            'تاریخ فاکتور: 1405/03/01\n'
+            'ردیف 1 900,000\n'
+            'ردیف 2 8,750,000\n'
+        )
+
+        with patch('payments.invoice_extraction.extract_pdf_text_or_ocr', return_value=(extracted_text, 'pymupdf_text', [])):
+            response = self.client.post(
+                reverse('invoice_parse_preview'),
+                {'attachment': SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf')},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertNotIn('amount', payload['fields'])
+
+    def test_invoice_parse_preview_suggests_unique_currency_amount(self):
+        self.client.login(username='commercial1', password='pass1234')
+        extracted_text = (
+            'شماره فاکتور: INV-CURRENCY\n'
+            'تاریخ فاکتور: 1405/03/01\n'
+            '2,450,000 ریال\n'
+        )
+
+        with patch('payments.invoice_extraction.extract_pdf_text_or_ocr', return_value=(extracted_text, 'pymupdf_text', [])):
+            response = self.client.post(
+                reverse('invoice_parse_preview'),
+                {'attachment': SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf')},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['fields']['amount'], '2450000')
 
     def test_customer_view_marks_invoice_seen_and_allows_note(self):
         invoice = InvoiceRecord.objects.create(
@@ -159,6 +224,8 @@ class InvoiceFlowTests(TestCase):
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'متن قابل مشاهده')
+        self.assertContains(response, 'مشاهده فایل فاکتور')
+        self.assertContains(response, reverse('invoice_file', args=[invoice.id]))
         self.assertNotContains(response, 'متن داخلی')
         invoice.refresh_from_db()
         self.assertIsNotNone(invoice.customer_seen_at)
@@ -852,6 +919,9 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, latest.title)
         self.assertNotContains(response, older.title)
         self.assertNotContains(response, other.title)
+        self.assertContains(response, 'مشاهده')
+        self.assertContains(response, reverse('price_list_file', args=[latest.id]))
+        self.assertContains(response, '?download=1')
         self.assertEqual(self.client.get(reverse('price_list_file', args=[latest.id])).status_code, 200)
         self.assertEqual(self.client.get(reverse('price_list_file', args=[older.id])).status_code, 403)
         self.assertEqual(self.client.get(reverse('price_list_file', args=[other.id])).status_code, 403)
@@ -863,6 +933,7 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, latest.title)
         self.assertContains(response, older.title)
         self.assertContains(response, other.title)
+        self.assertContains(response, 'preview-toggle')
         self.assertEqual(self.client.get(reverse('price_list_file', args=[other.id])).status_code, 200)
 
     def test_commercial_sales_finance_can_upload_price_list_but_customer_cannot(self):
@@ -913,6 +984,8 @@ class InvoiceFlowTests(TestCase):
         self.client.login(username='customer1', password='pass1234')
         response = self.client.get(reverse('proforma_detail', args=[proforma.id]))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'مشاهده فایل')
+        self.assertContains(response, reverse('proforma_file', args=[proforma.id]))
         response = self.client.get(reverse('proforma_file', args=[proforma.id]))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(

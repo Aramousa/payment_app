@@ -50,6 +50,11 @@
         .parse-status.ok { display: block; background: #e8f5e9; color: #1b5e20; border: 1px solid #b7dfbb; }
         .parse-status.warn { display: block; background: #fff8e1; color: #7a5600; border: 1px solid #f0d58a; }
         .parse-status.error { display: block; background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; }
+        .parse-suggestions { display: grid; gap: 6px; margin-top: 8px; }
+        .parse-suggestion { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 6px; padding: 6px 8px; }
+        .parse-suggestion strong { color: #243447; }
+        .parse-suggestion code { direction: ltr; unicode-bidi: plaintext; font-family: inherit; color: #111827; }
+        .parse-apply-btn { width: auto; border: none; border-radius: 5px; background: #0d6efd; color: #fff; padding: 4px 8px; cursor: pointer; font-family: inherit; font-size: 11px; white-space: nowrap; }
 
         .customer-picker-grid { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr); gap: 12px; }
         .customer-card { border: 1px solid #e2e7ef; border-radius: 8px; background: #f9fbff; padding: 12px; min-height: 108px; }
@@ -181,7 +186,7 @@
                             <div class="field-box compact-input">
                                 <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label|safe }}</label>
                                 {{ form.attachment }}
-                                <button type="button" id="parse-invoice-btn" class="parse-btn">خواندن اطلاعات از PDF</button>
+                                <button type="button" id="parse-invoice-btn" class="parse-btn">خواندن اطلاعات از فایل</button>
                                 <div id="parse-invoice-status" class="parse-status" aria-live="polite"></div>
                                 {% if form.attachment.help_text %}<div class="field-help">{{ form.attachment.help_text }}</div>{% endif %}
                                 {% for error in form.attachment.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
@@ -337,7 +342,8 @@
                                 <div class="detail-card">
                                     <div class="label">وضعیت و فایل</div>
                                     <div class="value">وضعیت مشاهده: {% if invoice.is_seen_by_customer %}دیده شده{% else %}دیده نشده{% endif %}</div>
-                                    <div class="value"><a class="detail-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود فایل</a></div>
+                                    <div class="value"><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">مشاهده فایل</a></div>
+                                    <div class="value" style="margin-top:8px;"><a class="detail-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود فایل</a></div>
                                     <div class="value" style="margin-top:8px;"><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">مشاهده صفحه کامل</a></div>
                                 </div>
                                 {% if invoice.customer_visible_note %}
@@ -471,7 +477,12 @@
             const parseBtn = document.getElementById('parse-invoice-btn');
             const parseStatus = document.getElementById('parse-invoice-status');
             const attachmentInput = document.getElementById('{{ form.attachment.id_for_label }}');
-            const autofilledFields = new Set();
+            const parsedFieldLabels = {
+                invoice_date: 'تاریخ فاکتور',
+                invoice_number: 'شماره فاکتور',
+                amount: 'مبلغ',
+                reference_number: 'شماره حواله'
+            };
 
             function setParseStatus(message, type) {
                 if (!parseStatus) return;
@@ -484,25 +495,91 @@
                 return digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '';
             }
 
+            function parsedDisplayValue(fieldName, value) {
+                return fieldName === 'amount' ? formatNumber(value) : String(value || '');
+            }
+
             function applyParsedField(fieldName, value) {
                 const input = document.getElementById('id_' + fieldName);
                 if (!input || !value) return false;
-                if (input.value && !autofilledFields.has(fieldName)) return false;
-                input.value = fieldName === 'amount' ? formatNumber(value) : value;
-                autofilledFields.add(fieldName);
+                input.value = parsedDisplayValue(fieldName, value);
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 input.dispatchEvent(new Event('change', { bubbles: true }));
                 return true;
             }
 
+            function renderParsedSuggestions(fields, message, rawTextPreview) {
+                if (!parseStatus) return;
+                const entries = Object.entries(fields || {}).filter(function (entry) { return entry[1]; });
+                parseStatus.className = entries.length ? 'parse-status ok' : 'parse-status warn';
+                parseStatus.innerHTML = '';
+
+                const intro = document.createElement('div');
+                intro.textContent = entries.length
+                    ? 'اطلاعات زیر فقط پیشنهاد هستند. هر مقدار را با خود فاکتور کنترل کنید و در صورت درست بودن، جداگانه اعمال کنید.'
+                    : (message || 'فیلد قابل اطمینانی برای پیشنهاد پیدا نشد.');
+                parseStatus.appendChild(intro);
+
+                if (entries.length) {
+                    const list = document.createElement('div');
+                    list.className = 'parse-suggestions';
+                    entries.forEach(function ([fieldName, value]) {
+                        const row = document.createElement('div');
+                        row.className = 'parse-suggestion';
+
+                        const text = document.createElement('span');
+                        const label = document.createElement('strong');
+                        label.textContent = parsedFieldLabels[fieldName] || fieldName;
+                        const code = document.createElement('code');
+                        code.textContent = parsedDisplayValue(fieldName, value);
+                        text.appendChild(label);
+                        text.appendChild(document.createTextNode(': '));
+                        text.appendChild(code);
+
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'parse-apply-btn';
+                        button.textContent = 'اعمال';
+                        button.addEventListener('click', function () {
+                            if (applyParsedField(fieldName, value)) {
+                                button.textContent = 'اعمال شد';
+                                button.disabled = true;
+                            }
+                        });
+
+                        row.appendChild(text);
+                        row.appendChild(button);
+                        list.appendChild(row);
+                    });
+                    parseStatus.appendChild(list);
+                }
+
+                if (rawTextPreview) {
+                    const details = document.createElement('details');
+                    details.style.marginTop = '8px';
+                    const summary = document.createElement('summary');
+                    summary.textContent = 'نمایش متن خوانده‌شده برای کنترل';
+                    const preview = document.createElement('pre');
+                    preview.textContent = rawTextPreview;
+                    preview.style.whiteSpace = 'pre-wrap';
+                    preview.style.direction = 'rtl';
+                    preview.style.maxHeight = '160px';
+                    preview.style.overflow = 'auto';
+                    preview.style.margin = '8px 0 0';
+                    details.appendChild(summary);
+                    details.appendChild(preview);
+                    parseStatus.appendChild(details);
+                }
+            }
+
             async function parseInvoiceAttachment() {
                 if (!attachmentInput || !attachmentInput.files || !attachmentInput.files.length) {
-                    setParseStatus('ابتدا فایل PDF فاکتور را انتخاب کنید.', 'warn');
+                    setParseStatus('ابتدا فایل فاکتور را انتخاب کنید.', 'warn');
                     return;
                 }
                 const file = attachmentInput.files[0];
-                if (!/\.pdf$/i.test(file.name || '')) {
-                    setParseStatus('خواندن خودکار فعلا فقط برای فایل PDF فعال است.', 'warn');
+                if (!/\.(pdf|jpg|jpeg|png|gif|webp|bmp|tif|tiff)$/i.test(file.name || '')) {
+                    setParseStatus('خواندن خودکار فقط برای PDF یا تصویر فاکتور فعال است.', 'warn');
                     return;
                 }
 
@@ -512,7 +589,7 @@
                     parseBtn.disabled = true;
                     parseBtn.textContent = 'در حال خواندن...';
                 }
-                setParseStatus('در حال خواندن متن PDF...', 'warn');
+                setParseStatus('در حال خواندن متن فایل...', 'warn');
 
                 try {
                     const response = await fetch('{% url "invoice_parse_preview" %}', {
@@ -525,24 +602,14 @@
                         setParseStatus(payload.message || 'خواندن فاکتور انجام نشد.', 'error');
                         return;
                     }
-
-                    let appliedCount = 0;
                     const fields = payload.fields || {};
-                    ['invoice_date', 'invoice_number', 'amount', 'reference_number'].forEach(function (fieldName) {
-                        if (applyParsedField(fieldName, fields[fieldName])) appliedCount += 1;
-                    });
-
-                    if (appliedCount) {
-                        setParseStatus('اطلاعات پیشنهادی خوانده شد و در فیلدهای خالی فرم قرار گرفت. قبل از ثبت، مقدارها را کنترل کنید.', 'ok');
-                    } else {
-                        setParseStatus(payload.message || 'فیلد قابل اطمینانی برای تکمیل خودکار پیدا نشد.', payload.ok ? 'warn' : 'error');
-                    }
+                    renderParsedSuggestions(fields, payload.message, payload.raw_text_preview || '');
                 } catch (error) {
                     setParseStatus('ارتباط با سرویس خواندن فاکتور برقرار نشد.', 'error');
                 } finally {
                     if (parseBtn) {
                         parseBtn.disabled = false;
-                        parseBtn.textContent = 'خواندن اطلاعات از PDF';
+                        parseBtn.textContent = 'خواندن اطلاعات از فایل';
                     }
                 }
             }
@@ -552,9 +619,8 @@
             }
             if (attachmentInput) {
                 attachmentInput.addEventListener('change', function () {
-                    autofilledFields.clear();
                     setParseStatus('', 'warn');
-                    if (attachmentInput.files && attachmentInput.files.length && /\.pdf$/i.test(attachmentInput.files[0].name || '')) {
+                    if (attachmentInput.files && attachmentInput.files.length && /\.(pdf|jpg|jpeg|png|gif|webp|bmp|tif|tiff)$/i.test(attachmentInput.files[0].name || '')) {
                         parseInvoiceAttachment();
                     }
                 });

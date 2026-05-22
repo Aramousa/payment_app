@@ -461,6 +461,64 @@ class InvoiceRecord(models.Model):
         return bool(self.customer_seen_at)
 
 
+class InvoiceExtractionJob(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_PROCESSING = 'processing'
+    STATUS_DONE = 'done'
+    STATUS_FAILED = 'failed'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'در انتظار پردازش'),
+        (STATUS_PROCESSING, 'در حال پردازش'),
+        (STATUS_DONE, 'پردازش شده'),
+        (STATUS_FAILED, 'ناموفق'),
+    ]
+
+    SOURCE_PREVIEW = 'preview'
+    SOURCE_INVOICE = 'invoice'
+
+    SOURCE_CHOICES = [
+        (SOURCE_PREVIEW, 'پیش نمایش فرم'),
+        (SOURCE_INVOICE, 'فاکتور ثبت شده'),
+    ]
+
+    invoice = models.ForeignKey(
+        InvoiceRecord,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='extraction_jobs',
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invoice_extraction_jobs',
+    )
+    source = models.CharField('منبع', max_length=20, choices=SOURCE_CHOICES, default=SOURCE_PREVIEW)
+    file = models.FileField('فایل پردازش', upload_to='invoice_extractions/')
+    original_filename = models.CharField('نام فایل اصلی', max_length=255, blank=True)
+    file_kind = models.CharField('نوع فایل', max_length=30, blank=True)
+    text_source = models.CharField('منبع متن', max_length=30, blank=True)
+    status = models.CharField('وضعیت', max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    result_json = models.JSONField('خروجی JSON', default=dict, blank=True)
+    raw_text = models.TextField('متن خام استخراج شده', blank=True)
+    warnings = models.JSONField('هشدارها', default=list, blank=True)
+    error_message = models.TextField('خطا', blank=True)
+    created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
+    started_at = models.DateTimeField('زمان شروع', null=True, blank=True)
+    finished_at = models.DateTimeField('زمان پایان', null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'پردازش خواندن فاکتور'
+        verbose_name_plural = 'پردازش‌های خواندن فاکتور'
+
+    def __str__(self):
+        return f"{self.original_filename or self.file.name} - {self.status}"
+
+
 class PriceList(models.Model):
     customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='price_lists')
     uploaded_by = models.ForeignKey(

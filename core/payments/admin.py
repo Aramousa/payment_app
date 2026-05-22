@@ -2,7 +2,7 @@ from django.contrib import admin
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UploadSettings, UserProfile
+from .models import Counterparty, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UploadSettings, UserProfile
 
 
 def format_jalali_datetime(value):
@@ -257,6 +257,49 @@ class InvoiceRecordAdmin(admin.ModelAdmin):
     jalali_customer_seen_at.short_description = 'زمان مشاهده مشتری'
     jalali_created_at.short_description = 'زمان ثبت'
     formatted_amount.short_description = 'مبلغ (ریال)'
+
+
+@admin.register(InvoiceExtractionJob)
+class InvoiceExtractionJobAdmin(admin.ModelAdmin):
+    list_display = ('id', 'original_filename', 'source', 'file_kind', 'text_source', 'status', 'requested_by', 'jalali_created_at', 'jalali_finished_at')
+    list_filter = ('status', 'source', 'file_kind', 'text_source', 'created_at')
+    search_fields = ('original_filename', 'requested_by__username', 'invoice__reference_number', 'error_message')
+    readonly_fields = (
+        'invoice',
+        'requested_by',
+        'source',
+        'file',
+        'original_filename',
+        'file_kind',
+        'text_source',
+        'status',
+        'result_json',
+        'raw_text',
+        'warnings',
+        'error_message',
+        'jalali_created_at',
+        'jalali_started_at',
+        'jalali_finished_at',
+    )
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    def jalali_started_at(self, obj):
+        return format_jalali_datetime(obj.started_at)
+
+    def jalali_finished_at(self, obj):
+        return format_jalali_datetime(obj.finished_at)
+
+    jalali_created_at.short_description = 'زمان ایجاد'
+    jalali_started_at.short_description = 'زمان شروع'
+    jalali_finished_at.short_description = 'زمان پایان'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(SystemActivityLog)
