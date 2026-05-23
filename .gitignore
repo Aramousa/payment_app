@@ -6,3 +6,4 @@ core/db.sqlite3
 core/media/*
 !core/media/.gitkeep
 core/staticfiles/
+core/offline_packages/ocr-wheels/
