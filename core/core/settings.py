@@ -87,6 +87,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'payments.context_processors.login_ads',
                 'payments.context_processors.unread_notifications',
+                'payments.context_processors.app_navigation',
             ],
         },
     },

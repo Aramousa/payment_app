@@ -2,6 +2,7 @@ import jdatetime
 import logging
 import mimetypes
 import random
+import uuid
 from openpyxl import Workbook
 from urllib.parse import urlencode
 import json
@@ -133,6 +134,18 @@ def _can_issue_proformas(user):
 
 def _can_view_price_list_history(user):
     return _is_staff_user(user)
+
+
+def _can_delete_customer_documents(user):
+    return _is_staff_user(user)
+
+
+def _active_customer_profiles():
+    return UserProfile.objects.filter(
+        role='customer',
+        user__is_active=True,
+        suspended=False,
+    ).select_related('user')
 
 
 def _can_manage_users(user):
@@ -1298,7 +1311,7 @@ def _price_lists_for_user(user):
         return qs.order_by('-created_at', '-id')
     latest = qs.filter(customer=user).order_by('-created_at', '-id').first()
     if latest:
-        return qs.filter(id=latest.id)
+        return qs.filter(customer=user, batch_id=latest.batch_id).order_by('-created_at', '-id')
     return PriceList.objects.none()
 
 
@@ -1340,6 +1353,14 @@ def _log_proforma(proforma, actor, action, note=''):
     )
 
 
+def _delete_file_field(file_field):
+    if file_field:
+        try:
+            file_field.delete(save=False)
+        except OSError:
+            logger.debug('Could not delete file %s from storage.', getattr(file_field, 'name', ''))
+
+
 def _dashboard_notifications_for_user(user):
     if not user or not user.is_authenticated:
         return {'payments': 0, 'invoices': 0, 'events': 0, 'total': 0, 'items': []}
@@ -1371,7 +1392,7 @@ def _dashboard_notifications_for_user(user):
 
 def _invoice_customer_rows():
     rows = []
-    profiles = UserProfile.objects.filter(role='customer').select_related('user').order_by(
+    profiles = _active_customer_profiles().order_by(
         'user__first_name', 'user__last_name', 'user__username'
     )
     for profile in profiles:
@@ -1661,15 +1682,25 @@ def daily_payment_plan_detail(request, plan_id):
 
         assignment_form = DailyPaymentAssignmentForm(request.POST)
         if assignment_form.is_valid():
-            assignment = assignment_form.save(commit=False)
-            assignment.plan = plan
-            try:
-                assignment.save()
-            except IntegrityError:
-                assignment_form.add_error('customer', 'برای این مشتری در این برنامه قبلاً تخصیص ثبت شده است.')
-            else:
-                messages.success(request, 'تخصیص مشتری ثبت شد.')
+            created_count = 0
+            duplicate_count = 0
+            for customer in assignment_form.cleaned_data['customers']:
+                assignment = DailyPaymentAssignment(
+                    plan=plan,
+                    customer=customer,
+                    expected_amount=assignment_form.cleaned_data['expected_amount'],
+                    note=assignment_form.cleaned_data.get('note') or '',
+                )
+                try:
+                    assignment.save()
+                except IntegrityError:
+                    duplicate_count += 1
+                else:
+                    created_count += 1
+            if created_count:
+                messages.success(request, f'تخصیص برای {created_count} مشتری ثبت شد.')
                 return redirect(detail_url)
+            assignment_form.add_error('customers', 'برای مشتریان انتخاب شده در این برنامه قبلاً تخصیص ثبت شده است.')
     else:
         assignment_form = DailyPaymentAssignmentForm()
 
@@ -2371,7 +2402,6 @@ def invoices_dashboard(request):
         if form.is_valid():
             invoice = form.save(commit=False)
             invoice.uploaded_by = request.user
-            # مقدار amount را تنظیم کنیم
             invoice.amount = form.cleaned_data.get('amount')
             invoice.save()
             _notify_invoice_created(invoice, request.user)
@@ -2396,6 +2426,7 @@ def invoices_dashboard(request):
         'is_staff_user': is_staff_user,
         'can_upload_invoices': can_upload_invoices,
         'can_view_invoices': can_view_invoices,
+        'can_delete_documents': _can_delete_customer_documents(request.user),
         'user_display_name': user_display_name,
         'customer_rows': _invoice_customer_rows() if can_upload_invoices else [],
         'export_dataset': 'invoices',
@@ -2457,35 +2488,46 @@ def price_lists_dashboard(request):
             return HttpResponseForbidden('شما دسترسی بارگذاری لیست قیمت را ندارید.')
         form = PriceListUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            uploaded_file = form.cleaned_data['file']
-            file_bytes = uploaded_file.read()
-            uploaded_file.seek(0)
+            batch_id = uuid.uuid4()
             created_price_lists = []
-            for customer in form.cleaned_data['customers']:
-                price_list = PriceList(
-                    customer=customer,
-                    uploaded_by=request.user,
-                    title=form.cleaned_data.get('title') or '',
-                    note=form.cleaned_data.get('note') or '',
-                )
-                price_list.file.save(uploaded_file.name, ContentFile(file_bytes), save=False)
-                price_list.save()
-                created_price_lists.append(price_list)
+            for uploaded_file in form.cleaned_data['files']:
+                file_bytes = uploaded_file.read()
+                uploaded_file.seek(0)
+                for customer in form.cleaned_data['customers']:
+                    price_list = PriceList(
+                        customer=customer,
+                        uploaded_by=request.user,
+                        title=form.cleaned_data.get('title') or '',
+                        note=form.cleaned_data.get('note') or '',
+                        batch_id=batch_id,
+                    )
+                    price_list.file.save(uploaded_file.name, ContentFile(file_bytes), save=False)
+                    price_list.save()
+                    created_price_lists.append(price_list)
+            notified_customers = sorted({price_list.customer for price_list in created_price_lists}, key=lambda user: user.id)
+            for customer in notified_customers:
+                first_file = next(price_list for price_list in created_price_lists if price_list.customer_id == customer.id)
                 _notify_users(
-                    [price_list.customer],
+                    [customer],
                     'لیست قیمت جدید',
-                    'لیست قیمت جدید برای شما ثبت شد.',
-                    reverse('price_list_file', args=[price_list.id]),
+                    f'{len(form.cleaned_data["files"])} فایل لیست قیمت جدید برای شما ثبت شد.',
+                    reverse('price_list_file', args=[first_file.id]),
                     category=UserNotification.CATEGORY_SYSTEM,
                     actor=request.user,
                 )
-            messages.success(request, f'لیست قیمت با موفقیت برای {len(created_price_lists)} مشتری ثبت شد.')
+            messages.success(
+                request,
+                f'{len(form.cleaned_data["files"])} فایل لیست قیمت برای {len(notified_customers)} مشتری ثبت شد.'
+            )
             return redirect('price_lists')
     else:
         form = PriceListUploadForm()
 
     records = _price_lists_for_user(request.user)
     customer_filter = (request.GET.get('customer') or '').strip()
+    city_filter = (request.GET.get('city') or '').strip()
+    province_filter = (request.GET.get('province') or '').strip()
+    organization_filter = (request.GET.get('organization') or '').strip()
     if is_staff_user and customer_filter:
         records = records.filter(
             Q(customer__first_name__icontains=customer_filter) |
@@ -2493,6 +2535,12 @@ def price_lists_dashboard(request):
             Q(customer__username__icontains=customer_filter) |
             Q(customer__profile__organization__icontains=customer_filter)
         )
+    if is_staff_user and city_filter:
+        records = records.filter(customer__profile__city__icontains=city_filter)
+    if is_staff_user and province_filter:
+        records = records.filter(customer__profile__province__icontains=province_filter)
+    if is_staff_user and organization_filter:
+        records = records.filter(customer__profile__organization__icontains=organization_filter)
     page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     return render(request, 'payments/price_lists.html', {
@@ -2502,7 +2550,13 @@ def price_lists_dashboard(request):
         'page_base_query': page_base_query,
         'is_staff_user': is_staff_user,
         'can_upload_price_lists': can_upload,
-        'filters': {'customer': customer_filter},
+        'can_delete_documents': _can_delete_customer_documents(request.user),
+        'filters': {
+            'customer': customer_filter,
+            'city': city_filter,
+            'province': province_filter,
+            'organization': organization_filter,
+        },
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
     })
 
@@ -2517,18 +2571,30 @@ def proformas_dashboard(request):
             return HttpResponseForbidden('شما دسترسی صدور پیش فاکتور را ندارید.')
         form = ProformaInvoiceForm(request.POST, request.FILES)
         if form.is_valid():
-            proforma = form.save(commit=False)
-            proforma.issued_by = request.user
-            proforma.save()
-            _notify_users(
-                [proforma.customer],
-                'پیش فاکتور جدید',
-                'یک پیش فاکتور جدید برای شما صادر شد.',
-                reverse('proforma_detail', args=[proforma.id]),
-                category=UserNotification.CATEGORY_SYSTEM,
-                actor=request.user,
-            )
-            messages.success(request, 'پیش فاکتور با موفقیت صادر شد.')
+            uploaded_file = form.cleaned_data['file']
+            file_bytes = uploaded_file.read()
+            uploaded_file.seek(0)
+            created_proformas = []
+            for customer in form.cleaned_data['customers']:
+                proforma = ProformaInvoice(
+                    customer=customer,
+                    issued_by=request.user,
+                    title=form.cleaned_data.get('title') or '',
+                    valid_until=form.cleaned_data['valid_until'],
+                    note=form.cleaned_data.get('note') or '',
+                )
+                proforma.file.save(uploaded_file.name, ContentFile(file_bytes), save=False)
+                proforma.save()
+                created_proformas.append(proforma)
+                _notify_users(
+                    [proforma.customer],
+                    'پیش فاکتور جدید',
+                    'یک پیش فاکتور جدید برای شما صادر شد.',
+                    reverse('proforma_detail', args=[proforma.id]),
+                    category=UserNotification.CATEGORY_SYSTEM,
+                    actor=request.user,
+                )
+            messages.success(request, f'پیش فاکتور با موفقیت برای {len(created_proformas)} مشتری صادر شد.')
             return redirect('proformas')
     else:
         form = ProformaInvoiceForm()
@@ -2551,6 +2617,7 @@ def proformas_dashboard(request):
         'page_base_query': page_base_query,
         'is_staff_user': is_staff_user,
         'can_issue_proformas': can_issue,
+        'can_delete_documents': _can_delete_customer_documents(request.user),
         'filters': {'customer': customer_filter},
         'today_jalali': _today_jalali_date(),
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
@@ -2568,6 +2635,9 @@ def proforma_detail(request, proforma_id):
 
     is_staff_user = _is_staff_user(request.user)
     if not is_staff_user:
+        if proforma.customer_seen_at is None:
+            proforma.customer_seen_at = timezone.now()
+            proforma.save(update_fields=['customer_seen_at'])
         _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_VIEWED)
 
     today = _today_jalali_date()
@@ -2609,6 +2679,7 @@ def proforma_detail(request, proforma_id):
         'proforma': proforma,
         'is_staff_user': is_staff_user,
         'can_approve': can_approve,
+        'can_delete_documents': _can_delete_customer_documents(request.user),
         'is_expired': proforma.valid_until < today,
         'logs': logs,
         'return_url': _safe_next_url(request, default=reverse('proformas')),
@@ -2657,6 +2728,7 @@ def invoice_detail(request, invoice_id):
         'invoice': invoice,
         'form': form,
         'is_staff_user': is_staff_user,
+        'can_delete_documents': _can_delete_customer_documents(request.user) and _can_view_invoices(request.user),
         'customer_profile': customer_profile,
         'just_marked_seen': just_marked_seen,
         'return_url': return_url,
@@ -2678,8 +2750,11 @@ def price_list_file(request, price_list_id):
         return _file_response(price_list.file, as_attachment=request.GET.get('download') == '1')
 
     latest = PriceList.objects.filter(customer=request.user).order_by('-created_at', '-id').first()
-    if not latest or latest.id != price_list.id:
+    if not latest or price_list.customer_id != request.user.id or latest.batch_id != price_list.batch_id:
         return HttpResponseForbidden('فقط امکان مشاهده آخرین لیست قیمت خودتان وجود دارد.')
+    if price_list.customer_seen_at is None:
+        price_list.customer_seen_at = timezone.now()
+        price_list.save(update_fields=['customer_seen_at'])
     return _file_response(price_list.file, as_attachment=request.GET.get('download') == '1')
 
 
@@ -2689,8 +2764,54 @@ def proforma_file(request, proforma_id):
     if not _can_access_proforma(request.user, proforma):
         return HttpResponseForbidden('فقط امکان مشاهده فایل پیش فاکتورهای خودتان وجود دارد.')
     if not _is_staff_user(request.user):
+        if proforma.customer_seen_at is None:
+            proforma.customer_seen_at = timezone.now()
+            proforma.save(update_fields=['customer_seen_at'])
         _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_FILE_VIEWED)
     return _file_response(proforma.file, as_attachment=request.GET.get('download') == '1')
+
+
+def _document_delete_redirect(request, fallback):
+    next_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER') or reverse(fallback)
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        return reverse(fallback)
+    return next_url
+
+
+@login_required
+@require_POST
+def invoice_delete(request, invoice_id):
+    if not _can_delete_customer_documents(request.user) or not _can_view_invoices(request.user):
+        return HttpResponseForbidden('شما دسترسی حذف فاکتور را ندارید.')
+    invoice = get_object_or_404(InvoiceRecord, id=invoice_id)
+    _delete_file_field(invoice.attachment)
+    invoice.delete()
+    messages.success(request, 'فاکتور حذف شد.')
+    return redirect(_document_delete_redirect(request, 'invoices_dashboard'))
+
+
+@login_required
+@require_POST
+def price_list_delete(request, price_list_id):
+    if not _can_delete_customer_documents(request.user):
+        return HttpResponseForbidden('شما دسترسی حذف لیست قیمت را ندارید.')
+    price_list = get_object_or_404(PriceList, id=price_list_id)
+    _delete_file_field(price_list.file)
+    price_list.delete()
+    messages.success(request, 'لیست قیمت حذف شد.')
+    return redirect(_document_delete_redirect(request, 'price_lists'))
+
+
+@login_required
+@require_POST
+def proforma_delete(request, proforma_id):
+    if not _can_delete_customer_documents(request.user):
+        return HttpResponseForbidden('شما دسترسی حذف پیش فاکتور را ندارید.')
+    proforma = get_object_or_404(ProformaInvoice, id=proforma_id)
+    _delete_file_field(proforma.file)
+    proforma.delete()
+    messages.success(request, 'پیش فاکتور حذف شد.')
+    return redirect(_document_delete_redirect(request, 'proformas'))
 
 
 @login_required

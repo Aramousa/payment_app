@@ -15,6 +15,7 @@
     </style>
 </head>
 <body>
+    {% include "payments/partials/app_navigation.html" %}
     <div class="box">
         <h3>تاریخچه عملیات رکورد {{ payment.id }}</h3>
         <p>وضعیت فعلی: {{ payment.get_status_display }}</p>

@@ -1,4 +1,5 @@
 import jdatetime
+import uuid
 from io import BytesIO
 from unittest.mock import patch
 from django.contrib.auth.models import User
@@ -9,6 +10,7 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
+from .forms import DailyPaymentAssignmentForm, InvoiceUploadForm, PriceListUploadForm, ProformaInvoiceForm
 from .models import DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
@@ -109,6 +111,22 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(invoice.amount, 2500000)
         self.assertEqual(invoice.customer_visible_note, 'توضیح برای مشتری')
         self.assertEqual(invoice.internal_note, 'یادداشت داخلی')
+
+    def test_inactive_or_suspended_customers_are_excluded_from_operational_customer_choices(self):
+        self.other_customer.is_active = False
+        self.other_customer.save(update_fields=['is_active'])
+        self.customer_profile.suspended = True
+        self.customer_profile.save(update_fields=['suspended'])
+
+        forms = [
+            DailyPaymentAssignmentForm(),
+            InvoiceUploadForm(),
+            PriceListUploadForm(),
+            ProformaInvoiceForm(),
+        ]
+        for form in forms:
+            field_name = 'customer' if 'customer' in form.fields else 'customers'
+            self.assertEqual(list(form.fields[field_name].queryset), [])
 
     def test_invoice_pdf_parse_preview_suggests_form_fields(self):
         self.client.login(username='commercial1', password='pass1234')
@@ -953,11 +971,20 @@ class InvoiceFlowTests(TestCase):
             title='old',
             file=SimpleUploadedFile('old.pdf', b'%PDF-1.4 old', content_type='application/pdf'),
         )
+        latest_batch = uuid.uuid4()
         latest = PriceList.objects.create(
             customer=self.customer_user,
             uploaded_by=self.sales_user,
             title='latest',
             file=SimpleUploadedFile('latest.pdf', b'%PDF-1.4 latest', content_type='application/pdf'),
+            batch_id=latest_batch,
+        )
+        latest_second = PriceList.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.sales_user,
+            title='latest second',
+            file=SimpleUploadedFile('latest-2.pdf', b'%PDF-1.4 latest 2', content_type='application/pdf'),
+            batch_id=latest_batch,
         )
         other = PriceList.objects.create(
             customer=self.other_customer,
@@ -970,12 +997,15 @@ class InvoiceFlowTests(TestCase):
         response = self.client.get(reverse('price_lists'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, latest.title)
+        self.assertContains(response, latest_second.title)
         self.assertNotContains(response, older.title)
         self.assertNotContains(response, other.title)
         self.assertContains(response, 'مشاهده')
         self.assertContains(response, reverse('price_list_file', args=[latest.id]))
+        self.assertContains(response, reverse('price_list_file', args=[latest_second.id]))
         self.assertContains(response, '?download=1')
         self.assertEqual(self.client.get(reverse('price_list_file', args=[latest.id])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('price_list_file', args=[latest_second.id])).status_code, 200)
         self.assertEqual(self.client.get(reverse('price_list_file', args=[older.id])).status_code, 403)
         self.assertEqual(self.client.get(reverse('price_list_file', args=[other.id])).status_code, 403)
 
@@ -989,8 +1019,15 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, 'preview-toggle')
         self.assertEqual(self.client.get(reverse('price_list_file', args=[other.id])).status_code, 200)
 
+        response = self.client.get(reverse('price_lists'), {'city': 'اصفهان'})
+        self.assertContains(response, other.title)
+        self.assertNotContains(response, latest.title)
+
     def test_commercial_sales_finance_can_upload_price_list_but_customer_cannot(self):
-        upload = SimpleUploadedFile('price.pdf', b'%PDF-1.4 price', content_type='application/pdf')
+        uploads = [
+            SimpleUploadedFile('price.pdf', b'%PDF-1.4 price', content_type='application/pdf'),
+            SimpleUploadedFile('price-2.pdf', b'%PDF-1.4 price 2', content_type='application/pdf'),
+        ]
 
         self.client.login(username='sales1', password='pass1234')
         response = self.client.post(
@@ -998,13 +1035,13 @@ class InvoiceFlowTests(TestCase):
             {
                 'customers': [str(self.customer_profile.id), str(self.other_customer.profile.id)],
                 'title': 'sales price',
-                'file': upload,
+                'files': uploads,
                 'note': 'internal',
             },
         )
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(PriceList.objects.filter(customer=self.customer_user, title='sales price').exists())
-        self.assertTrue(PriceList.objects.filter(customer=self.other_customer, title='sales price').exists())
+        self.assertEqual(PriceList.objects.filter(customer=self.customer_user, title='sales price').count(), 2)
+        self.assertEqual(PriceList.objects.filter(customer=self.other_customer, title='sales price').count(), 2)
 
         self.client.logout()
         self.client.login(username='customer1', password='pass1234')
@@ -1013,17 +1050,60 @@ class InvoiceFlowTests(TestCase):
             {
                 'customers': [str(self.customer_profile.id)],
                 'title': 'customer price',
-                'file': SimpleUploadedFile('customer.pdf', b'%PDF-1.4 customer', content_type='application/pdf'),
+                'files': SimpleUploadedFile('customer.pdf', b'%PDF-1.4 customer', content_type='application/pdf'),
             },
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_customer_file_views_mark_seen_and_staff_can_delete_documents(self):
+        invoice = InvoiceRecord.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.commercial_user,
+            amount=700000,
+            invoice_date=jdatetime.date(1405, 2, 8),
+            invoice_number='DEL-INV',
+            attachment=SimpleUploadedFile('delete-invoice.pdf', b'%PDF-1.4 invoice', content_type='application/pdf'),
+        )
+        price_list = PriceList.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.sales_user,
+            title='DEL-PRICE',
+            file=SimpleUploadedFile('delete-price.pdf', b'%PDF-1.4 price', content_type='application/pdf'),
+        )
+        proforma = ProformaInvoice.objects.create(
+            customer=self.customer_user,
+            issued_by=self.commercial_user,
+            title='DEL-PF',
+            valid_until=jdatetime.date(1405, 12, 29),
+            file=SimpleUploadedFile('delete-proforma.pdf', b'%PDF-1.4 proforma', content_type='application/pdf'),
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        self.assertEqual(self.client.get(reverse('price_list_file', args=[price_list.id])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('proforma_file', args=[proforma.id])).status_code, 200)
+        price_list.refresh_from_db()
+        proforma.refresh_from_db()
+        self.assertIsNotNone(price_list.customer_seen_at)
+        self.assertIsNotNone(proforma.customer_seen_at)
+
+        response = self.client.post(reverse('price_list_delete', args=[price_list.id]))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.logout()
+        self.client.login(username='commercial1', password='pass1234')
+        self.assertEqual(self.client.post(reverse('invoice_delete', args=[invoice.id])).status_code, 302)
+        self.assertEqual(self.client.post(reverse('price_list_delete', args=[price_list.id])).status_code, 302)
+        self.assertEqual(self.client.post(reverse('proforma_delete', args=[proforma.id])).status_code, 302)
+        self.assertFalse(InvoiceRecord.objects.filter(id=invoice.id).exists())
+        self.assertFalse(PriceList.objects.filter(id=price_list.id).exists())
+        self.assertFalse(ProformaInvoice.objects.filter(id=proforma.id).exists())
 
     def test_commercial_can_issue_proforma_customer_view_and_approve_logs_notification(self):
         self.client.login(username='commercial1', password='pass1234')
         response = self.client.post(
             reverse('proformas'),
             {
-                'customer': str(self.customer_profile.id),
+                'customers': [str(self.customer_profile.id)],
                 'title': 'PF-1',
                 'valid_until': '1405/12/29',
                 'file': SimpleUploadedFile('pf.pdf', b'%PDF-1.4 proforma', content_type='application/pdf'),

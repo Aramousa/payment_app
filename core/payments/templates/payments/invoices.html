@@ -99,6 +99,7 @@
     </style>
 </head>
 <body>
+    {% include "payments/partials/app_navigation.html" %}
     <div class="top-bar">
         <div class="top-actions">
             <a href="{% url 'submit' %}" class="button-link">بخش فیش ها</a>
@@ -325,7 +326,16 @@
                                 <span class="status-badge status-unseen">دیده نشده</span>
                             {% endif %}
                         </td>
-                        <td><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
+                        <td>
+                            <a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a>
+                            {% if can_delete_documents %}
+                                <form method="post" action="{% url 'invoice_delete' invoice.id %}" style="display:inline;" onsubmit="return confirm('این فاکتور حذف شود؟');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="detail-link" style="background:#dc3545;">حذف</button>
+                                </form>
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr class="detail-row" id="detail-{{ invoice.id }}">
                         <td colspan="{% if is_staff_user %}10{% else %}8{% endif %}">
@@ -342,6 +352,7 @@
                                 <div class="detail-card">
                                     <div class="label">وضعیت و فایل</div>
                                     <div class="value">وضعیت مشاهده: {% if invoice.is_seen_by_customer %}دیده شده{% else %}دیده نشده{% endif %}</div>
+                                    <div class="value">زمان مشاهده: {{ invoice.customer_seen_at|jalali_datetime|default:'-' }}</div>
                                     <div class="value"><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">مشاهده فایل</a></div>
                                     <div class="value" style="margin-top:8px;"><a class="detail-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود فایل</a></div>
                                     <div class="value" style="margin-top:8px;"><a class="detail-link" href="{% url 'invoice_detail' invoice.id %}?next={{ request.get_full_path|urlencode }}">مشاهده صفحه کامل</a></div>
@@ -460,6 +471,7 @@
             }
 
             if (searchInput && selectEl) {
+                selectEl.dataset.customerSearchReady = '1';
                 searchInput.addEventListener('input', function () {
                     const keyword = searchInput.value.trim().toLowerCase();
                     Array.from(selectEl.options).forEach(function (option) {

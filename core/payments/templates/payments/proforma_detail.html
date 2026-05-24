@@ -22,6 +22,7 @@
     </style>
 </head>
 <body>
+    {% include "payments/partials/app_navigation.html" %}
     {% include "payments/partials/system_messages_popup.html" %}
     <div class="box">
         <h2>{{ proforma.title|default:'پیش فاکتور' }}</h2>
@@ -29,6 +30,7 @@
             <div class="meta-item"><strong>مشتری:</strong> {{ proforma.customer.get_full_name|default:proforma.customer.username }}</div>
             <div class="meta-item"><strong>اعتبار تا:</strong> {{ proforma.valid_until }}</div>
             <div class="meta-item"><strong>وضعیت:</strong> {{ proforma.get_status_display }}</div>
+            <div class="meta-item"><strong>وضعیت مشاهده:</strong> {% if proforma.is_seen_by_customer %}دیده شده - {{ proforma.customer_seen_at|jalali_datetime }}{% else %}دیده نشده{% endif %}</div>
             <div class="meta-item"><strong>زمان صدور:</strong> {{ proforma.created_at|jalali_datetime }}</div>
             {% if proforma.approved_at %}<div class="meta-item"><strong>زمان تایید:</strong> {{ proforma.approved_at|jalali_datetime }}</div>{% endif %}
         </div>
@@ -36,6 +38,13 @@
             <a class="button-link" href="#file-preview">مشاهده فایل</a>
             <a class="button-link" href="{% url 'proforma_file' proforma.id %}?download=1">دانلود فایل</a>
             <a class="button-link alt" href="{{ return_url }}">بازگشت</a>
+            {% if can_delete_documents %}
+                <form method="post" action="{% url 'proforma_delete' proforma.id %}" style="display:inline;" onsubmit="return confirm('این پیش فاکتور حذف شود؟');">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ return_url }}">
+                    <button type="submit" class="button-link" style="background:#dc3545;">حذف پیش فاکتور</button>
+                </form>
+            {% endif %}
         </p>
         {% if can_approve %}
             <form method="post">

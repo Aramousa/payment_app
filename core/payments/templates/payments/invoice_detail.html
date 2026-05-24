@@ -33,11 +33,19 @@
     </style>
 </head>
 <body>
+    {% include "payments/partials/app_navigation.html" %}
     <div class="box">
         <div class="actions">
             <a class="button-link" href="{% if return_url %}{{ return_url }}{% else %}{% url 'invoices_dashboard' %}{% endif %}">بازگشت به فاکتورها</a>
             <a class="button-link" href="#file-preview">مشاهده فایل فاکتور</a>
             <a class="button-link download-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود فایل فاکتور</a>
+            {% if can_delete_documents %}
+                <form method="post" action="{% url 'invoice_delete' invoice.id %}" style="display:inline;" onsubmit="return confirm('این فاکتور حذف شود؟');">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% if return_url %}{{ return_url }}{% else %}{% url 'invoices_dashboard' %}{% endif %}">
+                    <button type="submit" class="button-link" style="background:#dc3545;">حذف فاکتور</button>
+                </form>
+            {% endif %}
         </div>
 
         {% include "payments/partials/system_messages_popup.html" %}
@@ -83,6 +91,10 @@
             <div class="card">
                 <div class="label">وضعیت مشاهده</div>
                 <div class="value">{% if invoice.is_seen_by_customer %}دیده شده{% else %}دیده نشده{% endif %}</div>
+            </div>
+            <div class="card">
+                <div class="label">زمان مشاهده مشتری</div>
+                <div class="value">{{ invoice.customer_seen_at|jalali_datetime|default:'-' }}</div>
             </div>
             <div class="card">
                 <div class="label">تاریخ ثبت</div>

@@ -31,6 +31,7 @@
     </style>
 </head>
 <body>
+    {% include "payments/partials/app_navigation.html" %}
     <div class="top-bar">
         <h2>لیست قیمت‌ها</h2>
         <div>
@@ -42,7 +43,8 @@
 
     {% if can_upload_price_lists %}
     <div class="section">
-        <h3>بارگذاری لیست قیمت برای مشتری</h3>
+        <h3>بارگذاری لیست قیمت برای مشتریان</h3>
+        <div class="notice">می‌توانید چند فایل را همزمان انتخاب کنید و آن‌ها را برای مشتریان انتخاب‌شده یا مشتریان منطبق با فیلترهای زیر ارسال کنید.</div>
         <form method="post" enctype="multipart/form-data" class="form-grid">
             {% csrf_token %}
             {% for field in form %}
@@ -58,9 +60,9 @@
     {% endif %}
 
     <div class="section">
-        <h3>{% if is_staff_user %}سوابق لیست قیمت مشتریان{% else %}آخرین لیست قیمت من{% endif %}</h3>
+        <h3>{% if is_staff_user %}سوابق لیست قیمت مشتریان{% else %}آخرین لیست قیمت‌های من{% endif %}</h3>
         {% if not is_staff_user %}
-            <div class="notice">در این بخش فقط آخرین لیست قیمت اختصاصی شما نمایش داده می‌شود.</div>
+            <div class="notice">در این بخش فقط فایل‌های آخرین بسته لیست قیمت اختصاصی شما نمایش داده می‌شود.</div>
         {% endif %}
 
         {% if is_staff_user %}
@@ -68,6 +70,18 @@
             <div>
                 <label for="customer-filter">مشتری</label>
                 <input id="customer-filter" type="text" name="customer" value="{{ filters.customer }}">
+            </div>
+            <div>
+                <label for="province-filter">استان</label>
+                <input id="province-filter" type="text" name="province" value="{{ filters.province }}">
+            </div>
+            <div>
+                <label for="city-filter">شهر</label>
+                <input id="city-filter" type="text" name="city" value="{{ filters.city }}">
+            </div>
+            <div>
+                <label for="organization-filter">نام مجموعه</label>
+                <input id="organization-filter" type="text" name="organization" value="{{ filters.organization }}">
             </div>
             <button type="submit" class="button-link">اعمال فیلتر</button>
             <a href="{% url 'price_lists' %}" class="button-link alt">حذف فیلتر</a>
@@ -81,10 +95,13 @@
                     {% if is_staff_user %}
                         <th>مشتری</th>
                         <th>مجموعه</th>
+                        <th>استان</th>
+                        <th>شهر</th>
                     {% endif %}
                     <th>عنوان</th>
                     <th>تاریخ ثبت</th>
                     <th>بارگذاری کننده</th>
+                    {% if is_staff_user %}<th>وضعیت مشاهده</th>{% endif %}
                     {% if is_staff_user %}<th>توضیحات داخلی</th>{% endif %}
                     <th>فایل</th>
                 </tr>
@@ -96,20 +113,38 @@
                         {% if is_staff_user %}
                             <td>{{ price_list.customer.get_full_name|default:price_list.customer.username }}</td>
                             <td>{{ price_list.customer.profile.organization|default:'-' }}</td>
+                            <td>{{ price_list.customer.profile.province|default:'-' }}</td>
+                            <td>{{ price_list.customer.profile.city|default:'-' }}</td>
                         {% endif %}
                         <td>{{ price_list.title|default:'-' }}</td>
                         <td>{{ price_list.created_at|jalali_datetime }}</td>
                         <td>{{ price_list.uploaded_by.get_full_name|default:price_list.uploaded_by.username|default:'-' }}</td>
+                        {% if is_staff_user %}
+                            <td>
+                                {% if price_list.is_seen_by_customer %}
+                                    دیده شده<br><small>{{ price_list.customer_seen_at|jalali_datetime }}</small>
+                                {% else %}
+                                    دیده نشده
+                                {% endif %}
+                            </td>
+                        {% endif %}
                         {% if is_staff_user %}<td>{{ price_list.note|default:'-'|linebreaksbr }}</td>{% endif %}
                         <td>
                             <div class="file-actions">
                                 <button type="button" class="button-link preview-toggle" data-preview="price-preview-{{ price_list.id }}">مشاهده</button>
                                 <a class="button-link alt" href="{% url 'price_list_file' price_list.id %}?download=1" download>دانلود</a>
+                                {% if can_delete_documents %}
+                                    <form method="post" action="{% url 'price_list_delete' price_list.id %}" style="display:inline;" onsubmit="return confirm('این لیست قیمت حذف شود؟');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="button-link" style="background:#dc3545;">حذف</button>
+                                    </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
                     <tr id="price-preview-{{ price_list.id }}" class="preview-row">
-                        <td colspan="{% if is_staff_user %}7{% else %}5{% endif %}">
+                        <td colspan="{% if is_staff_user %}11{% else %}5{% endif %}">
                             <div class="file-preview">
                                 {% with file_name=price_list.file.name|lower %}
                                     {% if ".pdf" in file_name %}
@@ -122,7 +157,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{% if is_staff_user %}7{% else %}5{% endif %}">لیست قیمتی ثبت نشده است.</td></tr>
+                    <tr><td colspan="{% if is_staff_user %}11{% else %}5{% endif %}">لیست قیمتی ثبت نشده است.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

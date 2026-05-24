@@ -32,6 +32,7 @@
     </style>
 </head>
 <body>
+    {% include "payments/partials/app_navigation.html" %}
     <div class="top-bar">
         <h2>پیش فاکتورها</h2>
         <a href="{% url 'submit' %}" class="button-link alt">بازگشت</a>
@@ -78,6 +79,7 @@
                     <th>عنوان</th>
                     <th>اعتبار تا</th>
                     <th>وضعیت</th>
+                    {% if is_staff_user %}<th>وضعیت مشاهده</th>{% endif %}
                     <th>صادرکننده</th>
                     <th>عملیات</th>
                 </tr>
@@ -101,11 +103,29 @@
                                 <span class="status pending">در انتظار تایید</span>
                             {% endif %}
                         </td>
+                        {% if is_staff_user %}
+                            <td>
+                                {% if proforma.is_seen_by_customer %}
+                                    دیده شده<br><small>{{ proforma.customer_seen_at|jalali_datetime }}</small>
+                                {% else %}
+                                    دیده نشده
+                                {% endif %}
+                            </td>
+                        {% endif %}
                         <td>{{ proforma.issued_by.get_full_name|default:proforma.issued_by.username|default:'-' }}</td>
-                        <td><a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
+                        <td>
+                            <a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a>
+                            {% if can_delete_documents %}
+                                <form method="post" action="{% url 'proforma_delete' proforma.id %}" style="display:inline;" onsubmit="return confirm('این پیش فاکتور حذف شود؟');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="button-link" style="background:#dc3545;">حذف</button>
+                                </form>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{% if is_staff_user %}8{% else %}6{% endif %}">پیش فاکتوری ثبت نشده است.</td></tr>
+                    <tr><td colspan="{% if is_staff_user %}9{% else %}6{% endif %}">پیش فاکتوری ثبت نشده است.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

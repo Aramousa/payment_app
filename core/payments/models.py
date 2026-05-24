@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -530,6 +532,8 @@ class PriceList(models.Model):
     )
     title = models.CharField('عنوان', max_length=120, blank=True)
     file = models.FileField('فایل لیست قیمت', upload_to='price_lists/')
+    batch_id = models.UUIDField('شناسه بسته ارسال', default=uuid.uuid4, db_index=True)
+    customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
     note = models.TextField('توضیحات داخلی', blank=True)
     created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
 
@@ -540,6 +544,10 @@ class PriceList(models.Model):
 
     def __str__(self):
         return f"{self.customer.username} - {self.title or self.file.name}"
+
+    @property
+    def is_seen_by_customer(self):
+        return bool(self.customer_seen_at)
 
 
 class ProformaInvoice(models.Model):
@@ -564,6 +572,7 @@ class ProformaInvoice(models.Model):
     file = models.FileField('فایل پیش فاکتور', upload_to='proformas/')
     note = models.TextField('توضیحات داخلی', blank=True)
     status = models.CharField('وضعیت', max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
     approved_at = models.DateTimeField('زمان تایید مشتری', null=True, blank=True)
     created_at = models.DateTimeField('زمان صدور', auto_now_add=True)
 
@@ -578,6 +587,10 @@ class ProformaInvoice(models.Model):
     @property
     def is_approved(self):
         return self.status == self.STATUS_APPROVED
+
+    @property
+    def is_seen_by_customer(self):
+        return bool(self.customer_seen_at)
 
 
 class ProformaInvoiceLog(models.Model):

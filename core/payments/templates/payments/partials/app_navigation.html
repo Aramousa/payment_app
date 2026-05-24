@@ -1,0 +1,48 @@
+{% if request.user.is_authenticated and app_nav_items %}
+<nav class="app-shell-nav" aria-label="منوی اصلی برنامه">
+    <div class="app-shell-brand">
+        <a href="{% url 'submit' %}">سامانه پرداخت</a>
+        <span>{{ app_nav_role_label }}</span>
+    </div>
+
+    <button class="app-nav-toggle" type="button" aria-expanded="false" aria-label="باز کردن منوی اصلی">
+        منو
+    </button>
+
+    <div class="app-nav-panel">
+        <div class="app-nav-links">
+            {% for item in app_nav_items %}
+                <a class="app-nav-link app-nav-{{ item.group }}" href="{{ item.url }}">{{ item.label }}</a>
+            {% endfor %}
+        </div>
+
+        <div class="app-nav-side">
+            <div class="notification-bell app-nav-notification" title="اعلان‌ها" data-feed-url="{% url 'notifications_feed' %}" data-read-url="{% url 'notifications_mark_read' %}" data-user-id="{{ request.user.id }}">
+                <button class="notification-trigger" type="button" aria-label="اعلان‌ها" aria-expanded="false">زنگوله</button>
+                <span class="notification-badge{% if unread_notifications.total == 0 %} zero{% endif %}">{{ unread_notifications.total }}</span>
+                <div class="notification-dropdown">
+                    <div class="notification-actions">
+                        <button type="button" class="enable-browser-notifications">فعال‌سازی اعلان</button>
+                        <button type="button" class="mark-notifications-read secondary">خوانده شد</button>
+                    </div>
+                    <div class="notification-list">
+                        {% for item in unread_notifications.items %}
+                            <a class="notification-item" href="{{ item.url }}">
+                                <strong>{{ item.title }}:</strong> {{ item.message }}
+                            </a>
+                        {% empty %}
+                            <div class="notification-empty">اعلان جدیدی وجود ندارد.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="app-nav-user">{{ app_nav_user_display }}</div>
+            <form class="app-nav-logout" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit">خروج</button>
+            </form>
+        </div>
+    </div>
+</nav>
+{% endif %}

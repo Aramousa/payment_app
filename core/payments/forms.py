@@ -9,6 +9,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
@@ -21,6 +22,34 @@ IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.
 DEFAULT_RECEIPT_MAX_UPLOAD_SIZE = 1 * 1024 * 1024
 DEFAULT_INVOICE_MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 IMAGE_RESIZE_MAX_SIDE = 2200
+DATE_INPUT_AUTOCOMPLETE_ATTRS = {
+    'autocomplete': 'off',
+    'autocorrect': 'off',
+    'autocapitalize': 'off',
+    'spellcheck': 'false',
+    'data-lpignore': 'true',
+    'data-form-type': 'other',
+}
+
+
+def _date_input_attrs(**extra):
+    attrs = {'class': 'jalali-date', **DATE_INPUT_AUTOCOMPLETE_ATTRS}
+    attrs.update(extra)
+    return attrs
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('widget', MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        files = data if isinstance(data, (list, tuple)) else [data]
+        return [super(MultipleFileField, self).clean(file, initial) for file in files if file]
 
 
 def _size_label(max_size_bytes):
@@ -35,6 +64,14 @@ def _upload_settings():
         return UploadSettings.load()
     except Exception:
         return None
+
+
+def _active_customer_profiles():
+    return UserProfile.objects.filter(
+        role='customer',
+        user__is_active=True,
+        suspended=False,
+    ).select_related('user').order_by('user__first_name', 'user__last_name', 'user__username')
 
 
 def _receipt_max_upload_size():
@@ -286,7 +323,7 @@ class PaymentRecordForm(forms.ModelForm):
     pay_date = jDateField(
         label='تاریخ',
         input_formats=['%Y/%m/%d'],
-        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'})
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31', inputmode='numeric', dir='ltr'))
     )
 
     def __init__(self, *args, **kwargs):
@@ -365,7 +402,7 @@ class PaymentRecordForm(forms.ModelForm):
             'beneficiary_account_number': forms.TextInput(),
             'beneficiary_account_owner': forms.TextInput(),
             'amount': forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
-            'pay_date': jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+            'pay_date': jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31', inputmode='numeric', dir='ltr')),
             'customer_notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'اختیاری'}),
         }
         labels = {
@@ -441,7 +478,7 @@ class StaffPaymentDetailsForm(forms.ModelForm):
         label='تاریخ',
         required=False,
         input_formats=['%Y/%m/%d'],
-        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31', inputmode='numeric', dir='ltr')),
     )
 
     class Meta:
@@ -465,7 +502,7 @@ class StaffPaymentDetailsForm(forms.ModelForm):
             'beneficiary_account_number': forms.TextInput(),
             'beneficiary_account_owner': forms.TextInput(),
             'amount': forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
-            'pay_date': jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+            'pay_date': jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31', inputmode='numeric', dir='ltr')),
         }
         labels = {
             'payer_account_number': 'شماره حساب واریز کننده',
@@ -527,7 +564,7 @@ class DailyPaymentPlanForm(forms.ModelForm):
     deposit_date = jDateField(
         label='تاریخ واریز',
         input_formats=['%Y/%m/%d'],
-        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31', 'inputmode': 'numeric', 'dir': 'ltr'}),
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31', inputmode='numeric', dir='ltr')),
     )
 
     class Meta:
@@ -561,15 +598,15 @@ class DailyPaymentAssignmentForm(forms.ModelForm):
         label='مبلغ مورد انتظار مشتری',
         widget=forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
     )
-    customer = forms.ModelChoiceField(
+    customers = forms.ModelMultipleChoiceField(
         queryset=UserProfile.objects.none(),
-        label='مشتری',
-        empty_label='انتخاب مشتری',
+        label='مشتریان',
+        widget=forms.SelectMultiple(attrs={'size': 8, 'data-customer-select': '1'}),
     )
 
     class Meta:
         model = DailyPaymentAssignment
-        fields = ['customer', 'expected_amount', 'note']
+        fields = ['customers', 'expected_amount', 'note']
         widgets = {
             'note': forms.Textarea(attrs={'rows': 2}),
         }
@@ -579,24 +616,28 @@ class DailyPaymentAssignmentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['customer'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
-            'user__first_name', 'user__last_name', 'user__username'
-        )
-        self.fields['customer'].label_from_instance = self._customer_label
+        self.fields['customers'].queryset = _active_customer_profiles()
+        self.fields['customers'].label_from_instance = self._customer_label
 
     @staticmethod
     def _customer_label(profile):
         full_name = profile.user.get_full_name().strip() or profile.user.username
-        parts = [full_name]
+        parts = [full_name, profile.user.username]
         if profile.organization:
             parts.append(profile.organization)
+        if profile.province:
+            parts.append(profile.province)
+        if profile.city:
+            parts.append(profile.city)
         if profile.phone:
             parts.append(profile.phone)
         return ' | '.join(parts)
 
-    def clean_customer(self):
-        profile = self.cleaned_data['customer']
-        return profile.user
+    def clean_customers(self):
+        profiles = self.cleaned_data['customers']
+        if not profiles:
+            raise ValidationError('حداقل یک مشتری را انتخاب کنید.')
+        return [profile.user for profile in profiles]
 
     def clean_expected_amount(self):
         raw_amount = str(self.cleaned_data.get('expected_amount') or '').replace(',', '').strip()
@@ -638,6 +679,7 @@ class InvoiceUploadForm(forms.ModelForm):
         label='مشتری',
         empty_label='انتخاب مشتری',
         required=True,
+        widget=forms.Select(attrs={'data-customer-select': '1'}),
     )
     confirm_assignment = forms.BooleanField(
         required=True,
@@ -646,7 +688,7 @@ class InvoiceUploadForm(forms.ModelForm):
     invoice_date = jDateField(
         label='تاریخ فاکتور',
         input_formats=['%Y/%m/%d'],
-        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31'}),
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31')),
         required=False,
     )
     amount = forms.CharField(
@@ -693,9 +735,7 @@ class InvoiceUploadForm(forms.ModelForm):
                 except (ValueError, TypeError):
                     pass
 
-        self.fields['customer'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
-            'user__first_name', 'user__last_name', 'user__username'
-        )
+        self.fields['customer'].queryset = _active_customer_profiles()
         self.fields['customer'].label_from_instance = self._customer_label
         
         # فیلدهای ضروری
@@ -717,9 +757,13 @@ class InvoiceUploadForm(forms.ModelForm):
     @staticmethod
     def _customer_label(profile):
         full_name = profile.user.get_full_name().strip() or profile.user.username
-        parts = [full_name]
+        parts = [full_name, profile.user.username]
         if profile.organization:
             parts.append(profile.organization)
+        if profile.province:
+            parts.append(profile.province)
+        if profile.city:
+            parts.append(profile.city)
         if profile.phone:
             parts.append(profile.phone)
         return ' | '.join(parts)
@@ -773,32 +817,43 @@ class PriceListUploadForm(forms.ModelForm):
         queryset=UserProfile.objects.none(),
         label='مشتریان',
         required=True,
-        widget=forms.SelectMultiple(attrs={'size': 8}),
+        widget=forms.SelectMultiple(attrs={'size': 8, 'data-customer-select': '1'}),
+    )
+    files = MultipleFileField(
+        label='فایل‌های لیست قیمت',
+        required=True,
+        widget=MultipleFileInput(attrs={
+            'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
+            'multiple': True,
+        }),
     )
 
     class Meta:
         model = PriceList
-        fields = ['customers', 'title', 'file', 'note']
+        fields = ['customers', 'title', 'files', 'note']
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'مثلا لیست قیمت اردیبهشت'}),
-            'file': forms.ClearableFileInput(attrs={
-                'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
-            }),
             'note': forms.Textarea(attrs={'rows': 3, 'placeholder': 'فقط برای کارکنان شرکت'}),
         }
         labels = {
             'title': 'عنوان',
-            'file': 'عکس یا فایل PDF لیست قیمت',
             'note': 'توضیحات داخلی',
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['customers'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
-            'user__first_name', 'user__last_name', 'user__username'
-        )
+        self.fields['customers'].queryset = _active_customer_profiles()
         self.fields['customers'].label_from_instance = InvoiceUploadForm._customer_label
-        self.fields['file'].required = True
+
+    def clean_files(self):
+        files = self.cleaned_data.get('files') or []
+        if not files:
+            raise ValidationError('حداقل یک فایل را انتخاب کنید.')
+        for uploaded in files:
+            ext = os.path.splitext(uploaded.name or '')[1].lower()
+            if ext not in self.ALLOWED_EXTENSIONS:
+                raise ValidationError('فقط فایل‌های تصویری استاندارد و PDF مجاز است.')
+        return files
 
     def clean_customers(self):
         profiles = self.cleaned_data['customers']
@@ -808,35 +863,26 @@ class PriceListUploadForm(forms.ModelForm):
             raise ValidationError('فقط کاربران مشتری قابل انتخاب هستند.')
         return [profile.user for profile in profiles]
 
-    def clean_file(self):
-        uploaded = self.cleaned_data.get('file')
-        if not uploaded:
-            return uploaded
-        ext = os.path.splitext(uploaded.name or '')[1].lower()
-        if ext not in self.ALLOWED_EXTENSIONS:
-            raise ValidationError('فقط فایل‌های تصویری استاندارد و PDF مجاز است.')
-        return uploaded
-
 
 class ProformaInvoiceForm(forms.ModelForm):
     ALLOWED_EXTENSIONS = PriceListUploadForm.ALLOWED_EXTENSIONS
 
-    customer = forms.ModelChoiceField(
+    customers = forms.ModelMultipleChoiceField(
         queryset=UserProfile.objects.none(),
-        label='مشتری',
-        empty_label='انتخاب مشتری',
+        label='مشتریان',
         required=True,
+        widget=forms.SelectMultiple(attrs={'size': 8, 'data-customer-select': '1'}),
     )
     valid_until = jDateField(
         label='اعتبار تا',
         input_formats=['%Y/%m/%d'],
-        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31'}),
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31')),
         required=True,
     )
 
     class Meta:
         model = ProformaInvoice
-        fields = ['customer', 'title', 'valid_until', 'file', 'note']
+        fields = ['customers', 'title', 'valid_until', 'file', 'note']
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'مثلا پیش فاکتور اردیبهشت'}),
             'file': forms.ClearableFileInput(attrs={
@@ -852,17 +898,17 @@ class ProformaInvoiceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['customer'].queryset = UserProfile.objects.filter(role='customer').select_related('user').order_by(
-            'user__first_name', 'user__last_name', 'user__username'
-        )
-        self.fields['customer'].label_from_instance = InvoiceUploadForm._customer_label
+        self.fields['customers'].queryset = _active_customer_profiles()
+        self.fields['customers'].label_from_instance = InvoiceUploadForm._customer_label
         self.fields['file'].required = True
 
-    def clean_customer(self):
-        profile = self.cleaned_data['customer']
-        if profile.role != 'customer':
+    def clean_customers(self):
+        profiles = self.cleaned_data['customers']
+        if not profiles:
+            raise ValidationError('حداقل یک مشتری را انتخاب کنید.')
+        if any(profile.role != 'customer' for profile in profiles):
             raise ValidationError('فقط کاربران مشتری قابل انتخاب هستند.')
-        return profile.user
+        return [profile.user for profile in profiles]
 
     def clean_file(self):
         uploaded = self.cleaned_data.get('file')
@@ -918,13 +964,13 @@ class UserAccountManagementForm(forms.Form):
         label='تاریخ آغاز فعالیت',
         required=True,
         input_formats=['%Y/%m/%d'],
-        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/01/31'}),
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31')),
     )
     valid_until = jDateField(
         label='تاریخ اعتبار',
         required=True,
         input_formats=['%Y/%m/%d'],
-        widget=jDateInput(format='%Y/%m/%d', attrs={'class': 'jalali-date', 'placeholder': '1403/12/29'}),
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/12/29')),
     )
     force_password_change = forms.BooleanField(label='الزام تغییر رمز در ورود بعدی', required=False)
     suspended = forms.BooleanField(label='معلق', required=False, initial=False)
