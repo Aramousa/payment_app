@@ -1,48 +1,4 @@
 (function () {
-    function closeMenus(except) {
-        document.querySelectorAll('.top-bar.app-menu-open').forEach(function (bar) {
-            if (bar !== except) {
-                bar.classList.remove('app-menu-open');
-                var trigger = bar.querySelector('.app-menu-trigger');
-                if (trigger) trigger.setAttribute('aria-expanded', 'false');
-            }
-        });
-    }
-
-    function enhanceMenus() {
-        document.querySelectorAll('.top-bar').forEach(function (bar) {
-            var actions = bar.querySelector('.top-actions');
-            if (!actions || bar.querySelector('.app-menu-trigger')) return;
-
-            Array.from(actions.children).forEach(function (item) {
-                var isAction = item.matches('a, button, form') || item.querySelector('a, button');
-                var isDisplayOnly = item.classList.contains('notification-bell') || item.dataset.menuExclude === '1';
-                if (!isAction || isDisplayOnly) {
-                    item.classList.add('app-menu-static-item');
-                    actions.parentNode.insertBefore(item, actions);
-                }
-            });
-
-            if (actions.children.length < 3) return;
-
-            var trigger = document.createElement('button');
-            trigger.type = 'button';
-            trigger.className = 'app-menu-trigger';
-            trigger.textContent = 'منو';
-            trigger.setAttribute('aria-expanded', 'false');
-            trigger.setAttribute('aria-label', 'باز کردن منوی عملیات');
-            actions.parentNode.insertBefore(trigger, actions);
-            bar.classList.add('app-menu-ready');
-
-            trigger.addEventListener('click', function (event) {
-                event.stopPropagation();
-                var isOpen = bar.classList.toggle('app-menu-open');
-                trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-                closeMenus(bar);
-            });
-        });
-    }
-
     function enhanceShellNavigation() {
         document.querySelectorAll('.app-shell-nav').forEach(function (nav) {
             if (nav.dataset.navReady === '1') return;
@@ -59,37 +15,6 @@
                 event.stopPropagation();
             });
         });
-    }
-
-    function enhanceThemeToggle() {
-        var storedTheme = localStorage.getItem('paymentAppTheme');
-        if (storedTheme !== 'dark' && storedTheme !== 'light') {
-            storedTheme = 'light';
-        }
-        document.documentElement.setAttribute('data-theme', storedTheme);
-
-        function syncButtons(theme) {
-            document.querySelectorAll('.app-theme-toggle').forEach(function (button) {
-                var isDark = theme === 'dark';
-                button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-                button.setAttribute('title', isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب');
-                button.setAttribute('aria-label', isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب');
-            });
-        }
-
-        document.querySelectorAll('.app-theme-toggle').forEach(function (button) {
-            if (button.dataset.themeReady === '1') return;
-            button.dataset.themeReady = '1';
-            button.addEventListener('click', function (event) {
-                event.stopPropagation();
-                var currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-                var nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                document.documentElement.setAttribute('data-theme', nextTheme);
-                localStorage.setItem('paymentAppTheme', nextTheme);
-                syncButtons(nextTheme);
-            });
-        });
-        syncButtons(storedTheme);
     }
 
     function enhanceTables() {
@@ -372,7 +297,6 @@
     }
 
     document.addEventListener('click', function () {
-        closeMenus();
         document.querySelectorAll('.app-shell-nav.open').forEach(function (nav) {
             nav.classList.remove('open');
             var trigger = nav.querySelector('.app-nav-toggle');
@@ -387,7 +311,6 @@
 
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
-            closeMenus();
             document.querySelectorAll('.app-shell-nav.open').forEach(function (nav) {
                 nav.classList.remove('open');
                 var trigger = nav.querySelector('.app-nav-toggle');
@@ -402,9 +325,9 @@
     });
 
     document.addEventListener('DOMContentLoaded', function () {
-        enhanceThemeToggle();
+        localStorage.removeItem('paymentAppTheme');
+        document.documentElement.removeAttribute('data-theme');
         enhanceShellNavigation();
-        enhanceMenus();
         enhanceTables();
         enhanceCustomerSelects();
         disableDateAutocomplete();

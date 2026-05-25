@@ -1,8 +1,8 @@
+{% load static %}
 {% if request.user.is_authenticated and app_nav_items %}
 <nav class="app-shell-nav" aria-label="منوی اصلی برنامه">
     <div class="app-shell-brand">
-        <a href="{% url 'submit' %}">سامانه پرداخت</a>
-        <span>{{ app_nav_role_label }}</span>
+        <img class="app-shell-logo" src="{% static 'logo/logo-top.png' %}" alt="VISIUN">
     </div>
 
     <button class="app-nav-toggle" type="button" aria-expanded="false" aria-label="باز کردن منوی اصلی"></button>
@@ -16,7 +16,6 @@
     </div>
 
     <div class="app-nav-side">
-        <button class="app-theme-toggle" type="button" aria-label="تغییر پوسته" title="تغییر پوسته"></button>
         <div class="notification-bell app-nav-notification" title="اعلان‌ها" data-feed-url="{% url 'notifications_feed' %}" data-read-url="{% url 'notifications_mark_read' %}" data-user-id="{{ request.user.id }}">
             <button class="notification-trigger" type="button" aria-label="اعلان‌ها" aria-expanded="false"></button>
             <span class="notification-badge{% if unread_notifications.total == 0 %} zero{% endif %}">{{ unread_notifications.total }}</span>
@@ -37,7 +36,10 @@
             </div>
         </div>
 
-        <div class="app-nav-user">{{ app_nav_user_display }}</div>
+        <div class="app-nav-user">
+            <span class="app-nav-user-name">{{ app_nav_user_display }}</span>
+            <span class="app-nav-user-role">{{ app_nav_role_label }}</span>
+        </div>
         <form class="app-nav-logout" method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button type="submit">خروج</button>
