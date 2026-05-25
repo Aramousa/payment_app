@@ -23,6 +23,26 @@
 
 html {
     background: var(--app-bg);
+    color-scheme: light;
+}
+
+html[data-theme="dark"] {
+    --app-bg: #111827;
+    --app-surface: #1f2937;
+    --app-surface-soft: #17212f;
+    --app-border: #374151;
+    --app-border-strong: #4b5563;
+    --app-text: #e5e7eb;
+    --app-muted: #a8b3c2;
+    --app-primary: #3b82f6;
+    --app-primary-dark: #2563eb;
+    --app-success: #16a34a;
+    --app-warning: #f59e0b;
+    --app-danger: #ef4444;
+    --app-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+    --app-shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.24);
+    --app-shadow-menu: 0 18px 45px rgba(0, 0, 0, 0.38);
+    color-scheme: dark;
 }
 
 body {
@@ -31,6 +51,10 @@ body {
         linear-gradient(180deg, #eef4f8 0, var(--app-bg) 260px) !important;
     line-height: 1.75;
     min-height: 100vh;
+}
+
+html[data-theme="dark"] body {
+    background: linear-gradient(180deg, #17212f 0, var(--app-bg) 260px) !important;
 }
 
 a {
@@ -52,13 +76,112 @@ h3 {
     box-shadow: var(--app-shadow);
     display: grid;
     gap: 12px;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto 1fr auto;
     margin: 0 auto 16px;
     max-width: 1200px;
     padding: 10px 12px;
     position: sticky;
     top: 10px;
     z-index: 40;
+}
+
+html[data-theme="dark"] .app-shell-nav,
+html[data-theme="dark"] .top-bar,
+html[data-theme="dark"] .section,
+html[data-theme="dark"] .box,
+html[data-theme="dark"] .filter-box,
+html[data-theme="dark"] .search-box,
+html[data-theme="dark"] .customer-header,
+html[data-theme="dark"] .summary-card,
+html[data-theme="dark"] .empty-message,
+html[data-theme="dark"] .customer-info,
+html[data-theme="dark"] .invoice-filter-box,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] #payment-form,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .app-toolbar,
+html[data-theme="dark"] .app-filter-panel,
+html[data-theme="dark"] .app-export-panel,
+html[data-theme="dark"] .app-pagination,
+html[data-theme="dark"] .app-pagination-pages,
+html[data-theme="dark"] .app-table-wrap,
+html[data-theme="dark"] .system-popup-box {
+    background: var(--app-surface) !important;
+    color: var(--app-text) !important;
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] table,
+html[data-theme="dark"] .notification-dropdown,
+html[data-theme="dark"] .top-bar.app-menu-ready .top-actions {
+    background: #111827 !important;
+    border-color: var(--app-border-strong) !important;
+    color: var(--app-text) !important;
+}
+
+html[data-theme="dark"] th {
+    background: #1d4ed8 !important;
+}
+
+html[data-theme="dark"] td {
+    border-color: var(--app-border) !important;
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] label,
+html[data-theme="dark"] .label,
+html[data-theme="dark"] .value,
+html[data-theme="dark"] .customer-info-item,
+html[data-theme="dark"] .dashboard-row-title,
+html[data-theme="dark"] .dashboard-row-meta,
+html[data-theme="dark"] .detail-card,
+html[data-theme="dark"] .customer-card,
+html[data-theme="dark"] .app-shell-brand a,
+html[data-theme="dark"] .app-nav-link,
+html[data-theme="dark"] .notification-item {
+    color: var(--app-text) !important;
+}
+
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus {
+    background: #0f172a !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.28);
+}
+
+html[data-theme="dark"] tbody tr:not(.detail-row),
+html[data-theme="dark"] tr:not(.detail-row) td {
+    background: var(--app-surface) !important;
+}
+
+html[data-theme="dark"] tbody tr:hover:not(.detail-row),
+html[data-theme="dark"] tbody tr:hover:not(.detail-row) td {
+    background: #253449 !important;
+}
+
+html[data-theme="dark"] .detail-row,
+html[data-theme="dark"] tr.detail-row,
+html[data-theme="dark"] tr.detail-row td {
+    background: var(--app-surface-soft) !important;
+}
+
+html[data-theme="dark"] .app-pagination-page,
+html[data-theme="dark"] .app-export-scope label,
+html[data-theme="dark"] .app-export-fields label,
+html[data-theme="dark"] .user-chip {
+    background: var(--app-surface-soft) !important;
+    border-color: var(--app-border-strong) !important;
+    color: var(--app-text) !important;
+}
+
+html[data-theme="dark"] .app-pagination-page.is-current {
+    background: var(--app-primary) !important;
+    border-color: var(--app-primary) !important;
+    color: #fff !important;
 }
 
 .app-shell-brand,
@@ -98,8 +221,41 @@ h3 {
 
 .app-nav-panel {
     gap: 12px;
-    justify-content: space-between;
+    justify-content: center;
     min-width: 0;
+}
+
+.app-theme-toggle,
+.notification-trigger {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+}
+
+.app-theme-toggle {
+    background: #f8fafc !important;
+    border: 1px solid var(--app-border) !important;
+    border-radius: var(--app-radius);
+    color: #17212f;
+    cursor: pointer;
+    min-height: 34px;
+    min-width: 38px;
+    padding: 6px 10px;
+}
+
+.app-theme-toggle::before {
+    content: "\263E";
+    font-size: 18px;
+    line-height: 1;
+}
+
+html[data-theme="dark"] .app-theme-toggle {
+    background: #111827 !important;
+    color: #facc15;
+}
+
+html[data-theme="dark"] .app-theme-toggle::before {
+    content: "\2600";
 }
 
 .app-nav-links {
@@ -163,6 +319,11 @@ h3 {
     cursor: pointer;
     min-height: 34px;
     padding: 6px 10px;
+}
+
+.notification-trigger::before {
+    content: "🔔";
+    line-height: 1;
 }
 
 .notification-badge {
@@ -676,7 +837,7 @@ button[type="submit"] {
 }
 
 label {
-    color: #324456;
+    color: var(--app-text);
     font-weight: 600;
 }
 
@@ -701,7 +862,7 @@ textarea:focus {
 
 input::placeholder,
 textarea::placeholder {
-    color: #8a99a8;
+    color: var(--app-muted);
 }
 
 table {
@@ -729,7 +890,7 @@ th {
 }
 
 td {
-    color: #243447;
+    color: var(--app-text);
 }
 
 td:first-child,
@@ -737,17 +898,17 @@ th:first-child {
     padding-inline-start: 14px;
 }
 
-tbody tr:nth-child(even):not(.detail-row) {
-    background: #fbfdff;
+tbody tr:not(.detail-row) {
+    background: var(--app-surface);
 }
 
 tbody tr:hover:not(.detail-row) {
-    background: #eef6fd !important;
+    background: var(--app-surface-soft) !important;
 }
 
 .detail-row,
 tr.detail-row {
-    background: #f8fafc !important;
+    background: var(--app-surface-soft) !important;
 }
 
 .detail-card,
@@ -970,9 +1131,27 @@ tr.detail-row {
     }
 
     .app-shell-nav {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: auto 1fr auto;
         position: relative;
         top: auto;
+    }
+
+    .app-nav-toggle {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .app-shell-brand {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: start;
+        min-width: 0;
+    }
+
+    .app-nav-side {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
     }
 
     .app-nav-toggle {
@@ -988,6 +1167,12 @@ tr.detail-row {
         justify-content: center;
         min-height: 36px;
         padding: 7px 12px;
+    }
+
+    .app-nav-toggle::before {
+        content: "☰";
+        font-size: 18px;
+        line-height: 1;
     }
 
     .app-nav-panel {
@@ -1006,19 +1191,26 @@ tr.detail-row {
         display: flex;
     }
 
-    .app-nav-links,
-    .app-nav-side {
+    .app-nav-links {
         align-items: stretch;
         display: grid;
         grid-template-columns: 1fr;
     }
 
+    .app-nav-side {
+        display: flex;
+    }
+
     .app-nav-link,
     .app-nav-logout button,
-    .notification-trigger,
-    .app-nav-user {
+    .notification-trigger {
         justify-content: center;
         text-align: center;
         width: 100%;
+    }
+
+    .app-nav-user,
+    .app-nav-logout {
+        display: none;
     }
 }

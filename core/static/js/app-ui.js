@@ -61,6 +61,37 @@
         });
     }
 
+    function enhanceThemeToggle() {
+        var storedTheme = localStorage.getItem('paymentAppTheme');
+        if (storedTheme !== 'dark' && storedTheme !== 'light') {
+            storedTheme = 'light';
+        }
+        document.documentElement.setAttribute('data-theme', storedTheme);
+
+        function syncButtons(theme) {
+            document.querySelectorAll('.app-theme-toggle').forEach(function (button) {
+                var isDark = theme === 'dark';
+                button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+                button.setAttribute('title', isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب');
+                button.setAttribute('aria-label', isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب');
+            });
+        }
+
+        document.querySelectorAll('.app-theme-toggle').forEach(function (button) {
+            if (button.dataset.themeReady === '1') return;
+            button.dataset.themeReady = '1';
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                var currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                var nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', nextTheme);
+                localStorage.setItem('paymentAppTheme', nextTheme);
+                syncButtons(nextTheme);
+            });
+        });
+        syncButtons(storedTheme);
+    }
+
     function enhanceTables() {
         document.querySelectorAll('table').forEach(function (table, index) {
             if (table.closest('.app-table-wrap')) return;
@@ -371,6 +402,7 @@
     });
 
     document.addEventListener('DOMContentLoaded', function () {
+        enhanceThemeToggle();
         enhanceShellNavigation();
         enhanceMenus();
         enhanceTables();

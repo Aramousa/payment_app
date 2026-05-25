@@ -195,79 +195,12 @@
         .dashboard-empty { color: #667085; font-size: 13px; background: #f8fafc; border-radius: 7px; padding: 10px; }
         @media (max-width: 900px) { .customer-dashboard { grid-template-columns: 1fr; } }
 
-        /* Notification Bell Styles */
-        .notification-bell { position: relative; display: inline-block; }
-        .notification-trigger { background: transparent; border: 0; padding: 0; font-size: 20px; cursor: pointer; line-height: 1; }
-        .notification-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #dc3545;
-            color: #fff;
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            font-size: 11px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-        .notification-badge.zero { display: none; }
-        .notification-dropdown {
-            display: none;
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            min-width: 200px;
-            z-index: 1000;
-            margin-top: 8px;
-        }
-        .notification-bell.open .notification-dropdown { display: block; }
-        .notification-item {
-            padding: 10px 14px;
-            border-bottom: 1px solid #eee;
-            font-size: 13px;
-            display: block;
-            color: #333;
-            text-decoration: none;
-        }
-        a.notification-item:hover { background: #f5f9ff; }
-        .notification-item:last-child { border-bottom: none; }
-        .notification-item strong { color: #0d6efd; }
-        .notification-actions { padding: 8px 10px; border-bottom: 1px solid #eee; display: flex; gap: 6px; flex-wrap: wrap; }
-        .notification-actions button { border: 0; border-radius: 5px; background: #0d6efd; color: #fff; padding: 6px 8px; cursor: pointer; font-size: 12px; }
-        .notification-actions button.secondary { background: #6c757d; }
-        .notification-empty { padding: 10px 14px; color: #666; font-size: 13px; }
     </style>
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
     <div class="top-bar">
         <div class="top-actions">
-            <div class="notification-bell" title="اعلان‌ها">
-                <button class="notification-trigger" type="button" aria-label="اعلان‌ها" aria-expanded="false">&#128276;</button>
-                <span class="notification-badge{% if unread_notifications.total == 0 %} zero{% endif %}">{{ unread_notifications.total }}</span>
-                <div class="notification-dropdown">
-                    <div class="notification-actions">
-                        <button type="button" id="enableBrowserNotifications">فعال‌سازی اعلان سیستم</button>
-                        <button type="button" id="markNotificationsRead" class="secondary">خوانده شد</button>
-                    </div>
-                    <div id="notificationList">
-                        {% for item in unread_notifications.items %}
-                            <a class="notification-item" href="{{ item.url }}">
-                                <strong>{{ item.title }}:</strong> {{ item.message }}
-                            </a>
-                        {% empty %}
-                            <div class="notification-empty">اعلان جدیدی وجود ندارد.</div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
             <a href="{% url 'invoices_dashboard' %}" class="button-link">بخش فاکتورها</a>
             <a href="{% url 'price_lists' %}" class="button-link">لیست قیمت</a>
             <a href="{% url 'proformas' %}" class="button-link">پیش فاکتورها</a>
@@ -299,6 +232,7 @@
     </div>
 
     {% if not is_staff_user %}
+        {% if not show_payment_form %}
         <div class="customer-info">
             <div class="customer-info-grid">
                 <div class="customer-info-item"><strong>نام:</strong> {{ customer_info.first_name|default:'-' }}</div>
@@ -308,6 +242,7 @@
                 <div class="customer-info-item"><strong>شماره تلفن:</strong> {{ customer_info.phone|default:'-' }}</div>
             </div>
         </div>
+        {% endif %}
         {% if customer_debt %}
         <div class="debt-summary">
             <div class="debt-summary-grid">
@@ -347,7 +282,7 @@
             برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
         </div>
         {% endif %}
-        {% if customer_home_summary %}
+        {% if customer_home_summary and not show_payment_form %}
         <div class="customer-dashboard">
             <section class="dashboard-panel">
                 <div class="dashboard-head">
@@ -398,7 +333,30 @@
                         <div class="dashboard-empty">هنوز فیشی ثبت نکرده‌اید.</div>
                     {% endfor %}
                 </div>
-                <div class="dashboard-actions"><a class="button-link" href="#payment-form">ثبت فیش جدید</a></div>
+                <div class="dashboard-actions"><a class="button-link" href="{% url 'payment_create' %}">ثبت فیش جدید و مشاهده همه فیش‌ها</a></div>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="dashboard-head">
+                    <h3>برنامه‌های واریز من</h3>
+                    <span class="dashboard-count">{{ customer_home_summary.daily_assignment_count }} مورد</span>
+                </div>
+                <div class="dashboard-list">
+                    {% for assignment in customer_home_summary.daily_assignments %}
+                        <div class="dashboard-row">
+                            <div class="dashboard-row-title">
+                                <span>{{ assignment.plan.deposit_date }}</span>
+                                <span>{{ assignment.expected_amount|thousand_sep }} ریال</span>
+                            </div>
+                            <div class="dashboard-row-meta">
+                                {{ assignment.plan.bank_name|default:'-' }} | {{ assignment.plan.account_number }} | {{ assignment.plan_status_label }}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="dashboard-empty">برنامه واریزی برای شما ثبت نشده است.</div>
+                    {% endfor %}
+                </div>
+                <div class="dashboard-actions"><a class="button-link" href="{% url 'customer_daily_payments' %}">گزارش برنامه‌های واریز</a></div>
             </section>
 
             <section class="dashboard-panel">
@@ -452,7 +410,7 @@
             </section>
         </div>
         {% endif %}
-        {% if not customer_home_summary and active_daily_assignment %}
+        {% if False %}
         <div class="daily-payment-notice">
             لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date }}</strong>
             مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
@@ -462,12 +420,13 @@
             واریز نمایید و فیش‌های مربوطه را بارگذاری نمایید.
             نکته اینکه این شماره حساب صرفا برای امروز مورد تایید می‌باشد.
         </div>
-        {% elif expired_daily_assignment %}
+        {% elif False %}
         <div class="daily-payment-expired">
             برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date }}</strong> بوده و منقضی شده است.
             برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
         </div>
         {% endif %}
+        {% if show_payment_form %}
         <h2>ثبت اطلاعات واریزی</h2>
         <p style="max-width:980px; margin:0 auto 12px auto; color:#333; font-size:14px;">فقط بارگذاری فایل فیش (عکس یا PDF) در این فرم الزامی است. سایر اطلاعات در صورت تمایل می‌توانند خالی بمانند.</p>
         <form id="payment-form" method="post" enctype="multipart/form-data" novalidate>
@@ -521,11 +480,13 @@
         </form>
         {{ source_profiles|json_script:"source-profiles-data" }}
         {{ destination_profiles|json_script:"destination-profiles-data" }}
+        {% endif %}
     {% else %}
         <h2>{% if is_history_mode %}سوابق اسناد{% else %}بررسی اسناد ارسالی{% endif %}</h2>
     {% endif %}
 
-    <h2>{% if is_history_mode %}سوابق واریزی ها{% else %}گزارش واریزی ها{% endif %}{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
+    {% if is_staff_user or show_payment_form or is_history_mode %}
+    <h2>{% if show_payment_form %}لیست فیش‌های واریزی{% elif is_history_mode %}سوابق واریزی ها{% else %}گزارش واریزی ها{% endif %}{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
     {% include "payments/partials/system_messages_popup.html" %}
 
     <div class="filter-box">
@@ -820,6 +781,7 @@
             {% endif %}
         </div>
     {% endif %}
+    {% endif %}
 
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
         <div class="preview-box" id="previewBox">
@@ -1033,153 +995,6 @@
             });
         }
 
-        const notificationBadge = document.querySelector('.notification-badge');
-        const notificationBell = document.querySelector('.notification-bell');
-        const notificationTrigger = document.querySelector('.notification-trigger');
-        const notificationList = document.getElementById('notificationList');
-        const enableNotificationsBtn = document.getElementById('enableBrowserNotifications');
-        const markNotificationsReadBtn = document.getElementById('markNotificationsRead');
-        const notificationFeedUrl = "{% url 'notifications_feed' %}";
-        const notificationReadUrl = "{% url 'notifications_mark_read' %}";
-        const lastSeenStorageKey = 'paymentAppNotificationLastSeen:{{ request.user.id }}';
-        let lastSeenNotificationId = Number(localStorage.getItem(lastSeenStorageKey) || '0');
-        let firstNotificationPoll = true;
-
-        function setNotificationMenuOpen(open) {
-            if (!notificationBell) return;
-            notificationBell.classList.toggle('open', open);
-            if (notificationTrigger) {
-                notificationTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-            }
-        }
-
-        if (notificationTrigger && notificationBell) {
-            notificationTrigger.addEventListener('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                setNotificationMenuOpen(!notificationBell.classList.contains('open'));
-            });
-            notificationBell.addEventListener('click', function (event) {
-                event.stopPropagation();
-            });
-            document.addEventListener('click', function () {
-                setNotificationMenuOpen(false);
-            });
-            document.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape') {
-                    setNotificationMenuOpen(false);
-                }
-            });
-        }
-
-        function getCookie(name) {
-            const value = '; ' + document.cookie;
-            const parts = value.split('; ' + name + '=');
-            if (parts.length === 2) return parts.pop().split(';').shift();
-            return '';
-        }
-
-        function updateNotificationBadge(count) {
-            if (!notificationBadge) return;
-            notificationBadge.textContent = count;
-            notificationBadge.classList.toggle('zero', count === 0);
-        }
-
-        function escapeHtml(value) {
-            return String(value || '').replace(/[&<>"']/g, function (char) {
-                return {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#039;'
-                }[char];
-            });
-        }
-
-        function renderNotificationList(items) {
-            if (!notificationList) return;
-            if (!items.length) {
-                notificationList.innerHTML = '<div class="notification-empty">اعلان جدیدی وجود ندارد.</div>';
-                return;
-            }
-            notificationList.innerHTML = items.map(function (item) {
-                return '<a class="notification-item" href="' + escapeHtml(item.url) + '">' +
-                    '<strong>' + escapeHtml(item.title) + ':</strong> ' + escapeHtml(item.message) +
-                    '</a>';
-            }).join('');
-        }
-
-        function showBrowserNotification(item) {
-            if (!('Notification' in window) || Notification.permission !== 'granted') return;
-            const notification = new Notification(item.title, {
-                body: item.message,
-                tag: 'payment-app-' + item.id
-            });
-            notification.onclick = function () {
-                window.focus();
-                if (item.url) window.location.href = item.url;
-                notification.close();
-            };
-        }
-
-        async function pollNotifications() {
-            try {
-                const response = await fetch(notificationFeedUrl, { credentials: 'same-origin' });
-                if (!response.ok) return;
-                const data = await response.json();
-                const items = data.items || [];
-                updateNotificationBadge(data.unread_count || 0);
-                renderNotificationList(items);
-
-                const sortedItems = items.slice().sort(function (a, b) { return a.id - b.id; });
-                sortedItems.forEach(function (item) {
-                    if (item.id > lastSeenNotificationId && !firstNotificationPoll) {
-                        showBrowserNotification(item);
-                    }
-                    if (item.id > lastSeenNotificationId) {
-                        lastSeenNotificationId = item.id;
-                    }
-                });
-                if (lastSeenNotificationId) {
-                    localStorage.setItem(lastSeenStorageKey, String(lastSeenNotificationId));
-                }
-                firstNotificationPoll = false;
-            } catch (error) {
-                firstNotificationPoll = false;
-            }
-        }
-
-        if (enableNotificationsBtn) {
-            if (!('Notification' in window)) {
-                enableNotificationsBtn.style.display = 'none';
-            } else if (Notification.permission === 'granted') {
-                enableNotificationsBtn.textContent = 'اعلان سیستم فعال است';
-            }
-            enableNotificationsBtn.addEventListener('click', async function () {
-                if (!('Notification' in window)) return;
-                const permission = await Notification.requestPermission();
-                enableNotificationsBtn.textContent = permission === 'granted' ? 'اعلان سیستم فعال است' : 'اجازه اعلان داده نشد';
-            });
-        }
-
-        if (markNotificationsReadBtn) {
-            markNotificationsReadBtn.addEventListener('click', async function () {
-                await fetch(notificationReadUrl, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: ''
-                });
-                await pollNotifications();
-            });
-        }
-
-        pollNotifications();
-        setInterval(pollNotifications, 30000);
     });
     </script>
     <script src="{% static 'js/app-ui.js' %}"></script>

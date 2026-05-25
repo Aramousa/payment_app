@@ -4,6 +4,7 @@ from .views import (
     counterparty_edit,
     counterparties_manage,
     create_payment,
+    customer_daily_payments,
     customer_detail,
     customers_list,
     daily_payment_plan_detail,
@@ -44,6 +45,8 @@ from .views import (
 
 urlpatterns = [
     path('submit/', create_payment, name='submit'),
+    path('submit/new/', create_payment, name='payment_create'),
+    path('my-daily-payments/', customer_daily_payments, name='customer_daily_payments'),
     path('success/', success, name='success'),
     path('api/bank-names/', bank_names_autocomplete, name='bank_names_autocomplete'),
     path('api/notifications/', notifications_feed, name='notifications_feed'),

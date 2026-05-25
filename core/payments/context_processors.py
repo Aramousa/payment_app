@@ -1,11 +1,14 @@
 from django.utils import timezone
 
 from django.urls import reverse
+from django.conf import settings
+from zoneinfo import ZoneInfo
 
 from .models import LoginAdvertisement, PaymentRecord, InvoiceRecord, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
+DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
 
 def _role_for_nav(user):
@@ -46,13 +49,15 @@ def app_navigation(request):
 
     role = _role_for_nav(user)
     is_staff_user = user.is_staff or user.is_superuser or role in STAFF_ROLES or role == 'admin'
-    items = [_nav_item('صفحه اصلی', 'submit', 'submit')]
+    items = [_nav_item('داشبورد', 'submit', 'submit')]
 
     if role == 'customer':
         items.extend([
+            _nav_item('ثبت فیش', 'payment_create', 'payment_create'),
             _nav_item('فاکتورها', 'invoices_dashboard', 'invoices'),
             _nav_item('لیست قیمت', 'price_lists', 'price_lists'),
             _nav_item('پیش فاکتورها', 'proformas', 'proformas'),
+            _nav_item('برنامه واریز من', 'customer_daily_payments', 'customer_daily_payments', 'finance'),
         ])
     else:
         items.extend([
@@ -150,7 +155,7 @@ def unread_notifications(request):
         from django.utils import timezone
         from datetime import timedelta
 
-        today = timezone.now().date()
+        today = timezone.localdate(timezone=DISPLAY_TIME_ZONE)
         tomorrow = today + timedelta(days=1)
 
         # Count recent payments (created today)

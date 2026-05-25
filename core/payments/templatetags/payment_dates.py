@@ -2,9 +2,14 @@ import datetime
 
 import jdatetime
 from django import template
+from django.conf import settings
 from django.utils import timezone
+from zoneinfo import ZoneInfo
 
 register = template.Library()
+
+
+DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
 
 @register.filter
@@ -23,7 +28,7 @@ def _to_jalali(value):
         return value
     if isinstance(value, datetime.datetime):
         if timezone.is_aware(value):
-            value = timezone.localtime(value)
+            value = timezone.localtime(value, DISPLAY_TIME_ZONE)
         return jdatetime.datetime.fromgregorian(datetime=value)
     if isinstance(value, datetime.date):
         return jdatetime.date.fromgregorian(date=value)

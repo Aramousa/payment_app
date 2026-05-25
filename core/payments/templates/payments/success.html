@@ -48,7 +48,7 @@
     {% include "payments/partials/app_navigation.html" %}
     <div class="card">
         <h2>ثبت اطلاعات با موفقیت انجام شد</h2>
-        <a href="/submit/">ثبت واریزی جدید</a>
+        <a href="{% url 'payment_create' %}">ثبت واریزی جدید</a>
         <form class="logout-form" method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button type="submit">خروج از حساب</button>

@@ -343,9 +343,20 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, proforma.title)
         self.assertContains(response, reverse('invoice_detail', args=[invoice.id]))
         self.assertContains(response, reverse('payment_timeline', args=[payment.id]))
+        self.assertContains(response, reverse('payment_create'))
         self.assertContains(response, reverse('price_list_file', args=[price_list.id]))
         self.assertContains(response, 'dashboard-file-preview-link')
         self.assertContains(response, reverse('proforma_detail', args=[proforma.id]))
+
+        response = self.client.get(reverse('payment_create'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="payment-form"')
+        self.assertContains(response, 'name="receipt_images"')
+        self.assertContains(response, 'name="amount"')
+        self.assertContains(response, 'name="tracking_code"')
+        self.assertContains(response, 'name="pay_date"')
+        self.assertContains(response, payment.tracking_code)
+        self.assertContains(response, reverse('payment_timeline', args=[payment.id]))
 
     def test_customer_cannot_access_other_customer_invoice_file(self):
         invoice = InvoiceRecord.objects.create(
@@ -393,6 +404,11 @@ class InvoiceFlowTests(TestCase):
 
         self.client.login(username='customer1', password='pass1234')
         response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, own_payment.tracking_code)
+        self.assertNotContains(response, other_payment.tracking_code)
+
+        response = self.client.get(reverse('payment_create'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, own_payment.tracking_code)
         self.assertNotContains(response, other_payment.tracking_code)
@@ -553,7 +569,7 @@ class InvoiceFlowTests(TestCase):
         )
 
         self.client.login(username='customer1', password='pass1234')
-        response = self.client.get(reverse('submit'))
+        response = self.client.get(reverse('payment_create'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, commercial_payment.tracking_code)
         self.assertContains(response, final_payment.tracking_code)
@@ -621,7 +637,7 @@ class InvoiceFlowTests(TestCase):
         )
 
         self.client.login(username='customer1', password='pass1234')
-        response = self.client.get(reverse('submit'))
+        response = self.client.get(reverse('payment_create'))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'وضعیت بازرگانی')

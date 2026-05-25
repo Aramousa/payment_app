@@ -26,6 +26,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
@@ -35,6 +36,7 @@ import os
 
 STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
 logger = logging.getLogger(__name__)
+DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 STATUS_FLAG_META = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('بررسی بازرگانی', 'flag-blue'),
     PaymentRecord.STATUS_FINANCE_REVIEW: ('رویت مالی', 'flag-orange'),
@@ -383,7 +385,7 @@ def _parse_jalali_date(date_text):
 
 
 def _today_jalali_date():
-    return jdatetime.date.fromgregorian(date=timezone.localdate())
+    return jdatetime.date.fromgregorian(date=timezone.localdate(timezone=DISPLAY_TIME_ZONE))
 
 
 def _format_jalali_date(value):
@@ -396,7 +398,7 @@ def _format_jalali_datetime(value, date_format='%Y/%m/%d %H:%M'):
     if not value:
         return ''
     if timezone.is_aware(value):
-        value = timezone.localtime(value)
+        value = timezone.localtime(value, DISPLAY_TIME_ZONE)
     return jdatetime.datetime.fromgregorian(datetime=value).strftime(date_format)
 
 
@@ -455,7 +457,7 @@ def _timestamped_excel_filename(filename):
     base, extension = os.path.splitext(filename)
     if not extension:
         extension = '.xlsx'
-    now = timezone.localtime()
+    now = timezone.localtime(timezone.now(), DISPLAY_TIME_ZONE)
     timestamp = now.strftime('%Y%m%d_%H%M%S')
     return f'{base}_{timestamp}{extension}'
 
@@ -808,6 +810,10 @@ def _daily_assignments_for_plan(plan):
         .prefetch_related('payments', 'payments__receipts')
         .all()
     )
+    return _enrich_daily_assignments(assignments)
+
+
+def _enrich_daily_assignments(assignments):
     stats = _daily_assignment_stats(assignments)
     for assignment in assignments:
         assignment.report = stats.get(assignment.id, {
@@ -815,6 +821,7 @@ def _daily_assignments_for_plan(plan):
             'payment_count': 0,
             'confirmed_amount': 0,
             'confirmed_count': 0,
+            'latest_payment': None,
         })
         assignment.remaining_amount = assignment.expected_amount - assignment.report['paid_amount']
         assignment.confirmed_remaining_amount = assignment.expected_amount - assignment.report['confirmed_amount']
@@ -834,6 +841,24 @@ def _daily_assignments_for_plan(plan):
             assignment.plan_status_class = 'flag-blue'
         assignment.latest_payment_text = _format_jalali_datetime(assignment.report.get('latest_payment'))
     return assignments
+
+
+def _customer_daily_assignments_for_user(user, request=None):
+    assignments = (
+        DailyPaymentAssignment.objects
+        .select_related('plan', 'customer', 'customer__profile')
+        .prefetch_related('payments', 'payments__receipts')
+        .filter(customer=user)
+        .order_by('-plan__deposit_date', '-id')
+    )
+    if request:
+        start_date = _parse_jalali_date((request.GET.get('start_date') or '').strip())
+        end_date = _parse_jalali_date((request.GET.get('end_date') or '').strip())
+        if start_date:
+            assignments = assignments.filter(plan__deposit_date__gte=start_date)
+        if end_date:
+            assignments = assignments.filter(plan__deposit_date__lte=end_date)
+    return _enrich_daily_assignments(list(assignments))
 
 
 def _log_activity(payment, actor, action, from_status='', to_status='', note=''):
@@ -1328,15 +1353,18 @@ def _customer_home_summary(user):
     payments = _enrich_records(payments)
     price_lists = list(_price_lists_for_user(user)[:3])
     proformas = list(_proformas_for_user(user)[:5])
+    daily_assignments = _customer_daily_assignments_for_user(user)[:5]
     return {
         'invoices': invoices,
         'payments': payments,
         'price_lists': price_lists,
         'proformas': proformas,
+        'daily_assignments': daily_assignments,
         'invoice_count': _invoice_records_for_user(user).count(),
         'payment_count': _records_for_user(user).filter(user=user).count(),
         'price_list_count': _price_lists_for_user(user).count(),
         'proforma_count': _proformas_for_user(user).count(),
+        'daily_assignment_count': DailyPaymentAssignment.objects.filter(customer=user).count(),
     }
 
 
@@ -1733,6 +1761,41 @@ def daily_payment_plan_detail(request, plan_id):
 
 
 @login_required
+def customer_daily_payments(request):
+    if _is_staff_user(request.user):
+        return redirect('daily_payment_plans')
+
+    assignments = _customer_daily_assignments_for_user(request.user, request=request)
+    status_filter = (request.GET.get('status') or '').strip()
+    if status_filter:
+        assignments = [
+            assignment for assignment in assignments
+            if (
+                (status_filter == 'none' and assignment.report['paid_amount'] <= 0) or
+                (status_filter == 'partial' and 0 < assignment.report['paid_amount'] < assignment.expected_amount) or
+                (status_filter == 'complete' and assignment.expected_amount > 0 and assignment.report['paid_amount'] >= assignment.expected_amount)
+            )
+        ]
+
+    page_obj = _paginate_queryset(request, assignments, per_page=10, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    filters = {
+        'start_date': (request.GET.get('start_date') or '').strip(),
+        'end_date': (request.GET.get('end_date') or '').strip(),
+        'status': status_filter,
+    }
+    return render(request, 'payments/customer_daily_payments.html', {
+        'assignments': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'filters': filters,
+        'export_dataset': 'customer_daily_assignments',
+        'export_fields': DAILY_ASSIGNMENT_EXPORT_FIELDS,
+        'user_display_name': request.user.get_full_name().strip() or request.user.username,
+    })
+
+
+@login_required
 def create_payment(request):
     profile = None
     try:
@@ -1742,6 +1805,7 @@ def create_payment(request):
 
     initial_data = _account_initial_data(request.user, profile)
     is_staff_user = _is_staff_user(request.user)
+    show_payment_form = bool(request.resolver_match and request.resolver_match.url_name == 'payment_create')
     staff_role = _user_role(request.user) if is_staff_user else ''
     is_system_admin = request.user.is_superuser
     active_daily_assignment = _active_daily_assignment_for_user(request.user) if not is_staff_user else None
@@ -1758,6 +1822,8 @@ def create_payment(request):
         })
 
     if request.method == 'POST':
+        if not show_payment_form:
+            return redirect('payment_create')
         if is_staff_user:
             return HttpResponseForbidden('کاربران واحدها امکان ثبت سند از این فرم را ندارند.')
         form = PaymentRecordForm(request.POST, request.FILES, initial=form_initial)
@@ -1851,7 +1917,7 @@ def create_payment(request):
         'current_sort_dir': current_sort_dir,
         'sort_base_query': sort_base_query,
         'is_history_mode': False,
-        'records_url_name': 'submit',
+        'records_url_name': 'payment_create' if show_payment_form else 'submit',
         'export_dataset': 'payments',
         'export_fields': PAYMENT_EXPORT_FIELDS,
         'customer_info': initial_data,
@@ -1859,6 +1925,7 @@ def create_payment(request):
         'customer_home_summary': _customer_home_summary(request.user) if not is_staff_user else None,
         'active_daily_assignment': active_daily_assignment,
         'expired_daily_assignment': expired_daily_assignment,
+        'show_payment_form': show_payment_form,
         'unread_notifications': _dashboard_notifications_for_user(request.user),
     })
 
@@ -2961,6 +3028,24 @@ def export_data(request, dataset):
         fields = _selected_export_fields(request, DAILY_ASSIGNMENT_EXPORT_FIELDS)
         records = _export_scope_records(request, _daily_assignments_for_plan(plan), page_param='page')
         return _export_response('daily_assignments.xlsx', 'Assignments', fields, records)
+
+    if dataset == 'customer_daily_assignments':
+        if _is_staff_user(request.user):
+            return HttpResponseForbidden('این خروجی برای پنل مشتری است.')
+        fields = _selected_export_fields(request, DAILY_ASSIGNMENT_EXPORT_FIELDS)
+        records = _customer_daily_assignments_for_user(request.user, request=request)
+        status_filter = (request.GET.get('status') or '').strip()
+        if status_filter:
+            records = [
+                assignment for assignment in records
+                if (
+                    (status_filter == 'none' and assignment.report['paid_amount'] <= 0) or
+                    (status_filter == 'partial' and 0 < assignment.report['paid_amount'] < assignment.expected_amount) or
+                    (status_filter == 'complete' and assignment.expected_amount > 0 and assignment.report['paid_amount'] >= assignment.expected_amount)
+                )
+            ]
+        records = _export_scope_records(request, records, page_param='page')
+        return _export_response('my_daily_payment_assignments.xlsx', 'Daily Assignments', fields, records)
 
     raise Http404
 
