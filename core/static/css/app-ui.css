@@ -225,6 +225,80 @@ h3 {
     background: #8b99a8;
 }
 
+.app-image-zoom-viewport {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    display: flex;
+    height: 70vh;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    touch-action: none;
+    width: 100%;
+}
+
+.preview-box .app-image-zoom-viewport {
+    height: 78vh;
+}
+
+.app-zoomable-image {
+    cursor: grab;
+    display: block;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    transform-origin: center center;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.app-zoomable-image.is-dragging {
+    cursor: grabbing;
+}
+
+.app-image-zoom-toolbar {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow-soft);
+    display: flex;
+    gap: 4px;
+    inset-inline-start: 10px;
+    padding: 5px;
+    position: absolute;
+    top: 10px;
+    z-index: 2;
+}
+
+.app-image-zoom-toolbar button,
+.app-image-zoom-level {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    color: var(--app-text);
+    display: inline-flex;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    height: 30px;
+    justify-content: center;
+    min-width: 34px;
+    padding: 0 8px;
+}
+
+.app-image-zoom-toolbar button {
+    cursor: pointer;
+}
+
+.app-image-zoom-toolbar button:hover {
+    background: #eef6ff;
+    border-color: #cfe1f5;
+}
+
 .notification-dropdown {
     background: #fff;
     border: 1px solid var(--app-border);

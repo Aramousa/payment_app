@@ -2,7 +2,7 @@ from django.contrib import admin
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProfileChangeRequest, SystemActivityLog, UploadSettings, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProfileChangeRequest, SystemActivityLog, UploadSettings, UserProfile
 
 
 def format_jalali_datetime(value):
@@ -34,6 +34,48 @@ class PaymentActivityInline(admin.TabularInline):
         return format_jalali_datetime(obj.created_at)
 
     jalali_created_at.short_description = 'تاریخ ثبت'
+
+
+class CustomerOrderItemInline(admin.TabularInline):
+    model = CustomerOrderItem
+    extra = 0
+
+
+class CustomerOrderLogInline(admin.TabularInline):
+    model = CustomerOrderLog
+    extra = 0
+    readonly_fields = ('actor', 'action', 'from_status', 'to_status', 'note', 'jalali_created_at')
+    can_delete = False
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    jalali_created_at.short_description = 'تاریخ ثبت'
+
+
+@admin.register(CustomerOrder)
+class CustomerOrderAdmin(admin.ModelAdmin):
+    list_display = ('order_number', 'customer', 'sales_expert', 'status', 'jalali_created_at')
+    list_filter = ('status', 'sales_expert', 'created_at')
+    search_fields = ('customer__username', 'customer__first_name', 'customer__last_name', 'customer__profile__organization', 'title', 'items__product_name')
+    inlines = [CustomerOrderItemInline, CustomerOrderLogInline]
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    jalali_created_at.short_description = 'زمان ثبت'
+
+
+@admin.register(CustomerSalesAssignment)
+class CustomerSalesAssignmentAdmin(admin.ModelAdmin):
+    list_display = ('customer', 'sales_user', 'assigned_by', 'jalali_updated_at')
+    list_filter = ('sales_user', 'updated_at')
+    search_fields = ('customer__username', 'customer__first_name', 'customer__last_name', 'sales_user__username')
+
+    def jalali_updated_at(self, obj):
+        return format_jalali_datetime(obj.updated_at)
+
+    jalali_updated_at.short_description = 'آخرین بروزرسانی'
 
 
 @admin.register(PaymentRecord)

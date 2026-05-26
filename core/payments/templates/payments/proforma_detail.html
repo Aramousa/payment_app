@@ -63,7 +63,7 @@
             {% if ".pdf" in file_url %}
                 <iframe src="{% url 'proforma_file' proforma.id %}"></iframe>
             {% else %}
-                <img src="{% url 'proforma_file' proforma.id %}" alt="پیش فاکتور">
+                <img src="{% url 'proforma_file' proforma.id %}" alt="پیش فاکتور" class="app-zoomable-image">
             {% endif %}
         {% endwith %}
     </div>

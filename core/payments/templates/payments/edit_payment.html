@@ -159,7 +159,7 @@
     </div>
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
         <div class="preview-box" id="previewBox">
-            <img id="previewImage" class="preview-image" alt="پیش نمایش سند" style="display:none;">
+            <img id="previewImage" class="preview-image app-zoomable-image" alt="پیش نمایش سند" style="display:none;">
             <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
             <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید ورود را بزنید.</div>
         </div>
@@ -229,9 +229,17 @@
         const flashOverlay = document.getElementById('flashOverlay');
         let pdfBlobUrl = '';
 
+        function setPreviewImageVisible(visible) {
+            const imageViewport = previewImage.closest('.app-image-zoom-viewport');
+            if (imageViewport) {
+                imageViewport.style.display = visible ? 'flex' : 'none';
+            }
+            previewImage.style.display = visible ? 'block' : 'none';
+        }
+
         function closePreview() {
             overlay.classList.remove('open');
-            previewImage.style.display = 'none';
+            setPreviewImageVisible(false);
             previewImage.src = '';
             previewFrame.style.display = 'none';
             previewFrame.src = '';
@@ -261,11 +269,14 @@
                     return;
                 }
                 previewFrame.style.display = 'block';
-                previewImage.style.display = 'none';
+                setPreviewImageVisible(false);
                 previewImage.src = '';
             } else {
                 previewImage.src = url;
-                previewImage.style.display = 'block';
+                setPreviewImageVisible(true);
+                if (window.AppImageZoom) {
+                    window.AppImageZoom.reset(previewImage);
+                }
                 previewFrame.style.display = 'none';
                 previewFrame.src = '';
             }
@@ -281,7 +292,7 @@
         });
 
         overlay.addEventListener('click', function (event) {
-            if (event.target === overlay || event.target === previewImage) {
+            if (event.target === overlay) {
                 closePreview();
             }
         });

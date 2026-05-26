@@ -28,13 +28,14 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from zoneinfo import ZoneInfo
 
-from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
 import os
 
 
-STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
+STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
+MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
 logger = logging.getLogger(__name__)
 DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 STATUS_FLAG_META = {
@@ -82,11 +83,22 @@ def _user_role(user):
 def _staff_role_label(role):
     return {
         'commercial': 'بازرگانی',
+        'commercial_manager': 'مدیر بازرگانی',
         'finance': 'مالی',
+        'finance_manager': 'مدیر مالی',
         'sales': 'فروش',
+        'sales_manager': 'مدیر فروش',
         'data_entry': 'تکمیل اطلاعات فیش',
         'staff': 'کارمندی',
     }.get(role, '')
+
+
+def _department_role(role):
+    return {
+        'commercial_manager': 'commercial',
+        'finance_manager': 'finance',
+        'sales_manager': 'sales',
+    }.get(role, role)
 
 
 def _is_staff_user(user):
@@ -104,6 +116,9 @@ def _can_upload_invoices(user):
     if user.is_superuser:
         return True
     try:
+        role = user.profile.role
+        if role in {'commercial_manager', 'finance_manager'}:
+            return True
         return user.profile.can_upload_invoices
     except UserProfile.DoesNotExist:
         return False
@@ -113,6 +128,9 @@ def _can_view_invoices(user):
     if user.is_superuser:
         return True
     try:
+        role = user.profile.role
+        if role in {'sales', 'sales_manager', 'commercial_manager', 'finance_manager'}:
+            return True
         return user.profile.can_view_invoices
     except UserProfile.DoesNotExist:
         return False
@@ -123,7 +141,7 @@ def _can_upload_price_lists(user):
         return False
     if user.is_superuser:
         return True
-    return _user_role(user) in {'commercial', 'sales', 'finance'}
+    return _user_role(user) in {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}
 
 
 def _can_issue_proformas(user):
@@ -131,7 +149,29 @@ def _can_issue_proformas(user):
         return False
     if user.is_superuser:
         return True
-    return _user_role(user) == 'commercial'
+    return _user_role(user) in {'commercial', 'commercial_manager', 'sales', 'sales_manager'}
+
+
+def _can_view_orders(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) in {'customer', 'sales', 'sales_manager', 'commercial', 'commercial_manager', 'finance', 'finance_manager'}
+
+
+def _can_manage_orders(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) in {'sales', 'sales_manager', 'commercial', 'commercial_manager'}
+
+
+def _can_manage_sales_assignments(user):
+    if not user or not user.is_authenticated:
+        return False
+    return user.is_superuser or _user_role(user) == 'sales_manager'
 
 
 def _can_view_price_list_history(user):
@@ -148,6 +188,26 @@ def _active_customer_profiles():
         user__is_active=True,
         suspended=False,
     ).select_related('user')
+
+
+def _assigned_customer_ids_for_sales(user):
+    if not user or not user.is_authenticated:
+        return []
+    return list(CustomerSalesAssignment.objects.filter(sales_user=user).values_list('customer_id', flat=True))
+
+
+def _customer_limited_queryset_for_user(qs, user, customer_field='customer'):
+    if _user_role(user) != 'sales':
+        return qs
+    assigned_ids = _assigned_customer_ids_for_sales(user)
+    lookup = {f'{customer_field}_id__in': assigned_ids}
+    return qs.filter(**lookup)
+
+
+def _can_staff_access_customer(user, customer_id):
+    if _user_role(user) != 'sales':
+        return True
+    return customer_id in _assigned_customer_ids_for_sales(user)
 
 
 def _can_manage_users(user):
@@ -171,7 +231,7 @@ def _can_access_payment(user, payment):
 
 def _can_access_invoice(user, invoice):
     if _is_staff_user(user):
-        return _can_view_invoices(user)
+        return _can_view_invoices(user) and _can_staff_access_customer(user, invoice.customer_id)
     return invoice.customer_id == user.id
 
 
@@ -255,6 +315,7 @@ def _suggest_five_digit_password():
 
 
 def _staff_status_choices_for_role(role):
+    role = _department_role(role)
     if role == 'commercial':
         return [
             (PaymentRecord.STATUS_APPROVED, 'ثبت بازرگانی'),
@@ -272,6 +333,7 @@ def _staff_status_choices_for_role(role):
 def _can_staff_act_on_payment(role, payment, is_system_admin=False):
     if is_system_admin:
         return True
+    role = _department_role(role)
     if role == 'commercial':
         return payment.status in {
             PaymentRecord.STATUS_PENDING,
@@ -295,7 +357,7 @@ def _active_payment_records_for_user(user):
     if not _is_staff_user(user) or user.is_superuser:
         return records
 
-    role = _user_role(user)
+    role = _department_role(_user_role(user))
     if role == 'commercial':
         return records.filter(status__in=[
             PaymentRecord.STATUS_PENDING,
@@ -330,7 +392,7 @@ def _history_payment_records_for_user(user):
             PaymentRecord.STATUS_REJECTED,
         ])
 
-    role = _user_role(user)
+    role = _department_role(_user_role(user))
     if role == 'commercial':
         return records.filter(status__in=[
             PaymentRecord.STATUS_APPROVED,
@@ -351,7 +413,7 @@ def _history_payment_records_for_user(user):
 
 
 def _mark_commercial_records_seen(records, actor):
-    if not actor.is_authenticated or actor.is_superuser or _user_role(actor) != 'commercial':
+    if not actor.is_authenticated or actor.is_superuser or _department_role(_user_role(actor)) != 'commercial':
         return
 
     pending_records = list(records.filter(status=PaymentRecord.STATUS_PENDING))
@@ -616,6 +678,40 @@ DAILY_ASSIGNMENT_EXPORT_FIELDS = [
     _field('payment_count', 'تعداد فیش', lambda a: a.report['payment_count']),
     _field('latest_payment', 'آخرین فیش', lambda a: a.latest_payment_text),
     _field('note', 'توضیح', lambda a: a.note),
+]
+
+
+ORDER_EXPORT_FIELDS = [
+    _field('order_number', 'شماره سفارش', lambda o: o.order_number),
+    _field('customer_username', 'نام کاربری مشتری', lambda o: o.customer.username),
+    _field('customer_name', 'مشتری', lambda o: o.customer.get_full_name() or o.customer.username),
+    _field('organization', 'مجموعه', lambda o: getattr(o.customer.profile, 'organization', '')),
+    _field('city', 'شهر', lambda o: getattr(o.customer.profile, 'city', '')),
+    _field('province', 'استان', lambda o: getattr(o.customer.profile, 'province', '')),
+    _field('title', 'عنوان سفارش', lambda o: o.title),
+    _field('status', 'وضعیت', lambda o: o.get_status_display()),
+    _field('sales_expert', 'کارشناس فروش', lambda o: o.sales_expert.get_full_name() or o.sales_expert.username if o.sales_expert else ''),
+    _field('requested_sales_expert', 'کارشناس انتخابی مشتری', lambda o: o.requested_sales_expert.get_full_name() or o.requested_sales_expert.username if o.requested_sales_expert else ''),
+    _field('items', 'اقلام', lambda o: ' | '.join(f'{item.product_name} - {item.quantity:g} {item.get_unit_display()}' for item in o.items.all())),
+    _field('item_count', 'تعداد اقلام', lambda o: o.items.count()),
+    _field('proforma_count', 'تعداد پیش فاکتور', lambda o: o.proformas.count()),
+    _field('customer_note', 'توضیح مشتری', lambda o: o.customer_note),
+    _field('staff_note', 'توضیح داخلی فروش', lambda o: o.staff_note),
+    _field('created_at', 'زمان ثبت', lambda o: _format_jalali_datetime(o.created_at)),
+    _field('updated_at', 'آخرین بروزرسانی', lambda o: _format_jalali_datetime(o.updated_at)),
+]
+
+SALES_ASSIGNMENT_EXPORT_FIELDS = [
+    _field('customer_username', 'نام کاربری مشتری', lambda r: r['customer'].username),
+    _field('customer_name', 'مشتری', lambda r: r['customer'].get_full_name() or r['customer'].username),
+    _field('organization', 'مجموعه', lambda r: r['profile'].organization),
+    _field('city', 'شهر', lambda r: r['profile'].city),
+    _field('province', 'استان', lambda r: r['profile'].province),
+    _field('sales_user', 'کارشناس فروش', lambda r: r['sales_user'].get_full_name() or r['sales_user'].username if r['sales_user'] else ''),
+    _field('assigned_by', 'تخصیص دهنده', lambda r: r['assigned_by'].get_full_name() or r['assigned_by'].username if r['assigned_by'] else ''),
+    _field('open_orders', 'سفارش های باز', lambda r: r['open_orders']),
+    _field('updated_at', 'آخرین بروزرسانی', lambda r: _format_jalali_datetime(r['updated_at'])),
+    _field('note', 'توضیح', lambda r: r['note']),
 ]
 
 
@@ -905,7 +1001,14 @@ def _notify_users(users, title, message, url='', category=UserNotification.CATEG
 def _staff_notification_users(roles=None, exclude_user=None):
     role_filter = Q(is_superuser=True)
     if roles:
-        role_filter |= Q(profile__role__in=roles)
+        expanded_roles = set(roles)
+        if 'commercial' in expanded_roles:
+            expanded_roles.add('commercial_manager')
+        if 'finance' in expanded_roles:
+            expanded_roles.add('finance_manager')
+        if 'sales' in expanded_roles:
+            expanded_roles.add('sales_manager')
+        role_filter |= Q(profile__role__in=expanded_roles)
     else:
         role_filter |= Q(profile__role__in=STAFF_ROLES)
     users = User.objects.filter(role_filter, is_active=True).distinct()
@@ -1325,6 +1428,8 @@ def _invoice_records_for_user(user):
         # Staff can see all invoices only if they have permission
         if not _can_view_invoices(user):
             return InvoiceRecord.objects.none()
+        if _user_role(user) == 'sales':
+            return _customer_limited_queryset_for_user(qs, user).order_by('-created_at', '-id')
         return qs.order_by('-created_at', '-id')
     # Customers can always see their own invoices
     return qs.filter(customer=user).order_by('-created_at', '-id')
@@ -1333,6 +1438,8 @@ def _invoice_records_for_user(user):
 def _price_lists_for_user(user):
     qs = PriceList.objects.select_related('customer', 'customer__profile', 'uploaded_by')
     if _can_view_price_list_history(user):
+        if _user_role(user) == 'sales':
+            return _customer_limited_queryset_for_user(qs, user).order_by('-created_at', '-id')
         return qs.order_by('-created_at', '-id')
     latest = qs.filter(customer=user).order_by('-created_at', '-id').first()
     if latest:
@@ -1341,10 +1448,129 @@ def _price_lists_for_user(user):
 
 
 def _proformas_for_user(user):
-    qs = ProformaInvoice.objects.select_related('customer', 'customer__profile', 'issued_by')
+    qs = ProformaInvoice.objects.select_related('customer', 'customer__profile', 'issued_by', 'order')
     if _is_staff_user(user):
+        if _user_role(user) == 'sales':
+            return _customer_limited_queryset_for_user(qs, user).order_by('-created_at', '-id')
         return qs.order_by('-created_at', '-id')
     return qs.filter(customer=user).order_by('-created_at', '-id')
+
+
+def _orders_for_user(user):
+    qs = (
+        CustomerOrder.objects
+        .select_related('customer', 'customer__profile', 'sales_expert', 'requested_sales_expert')
+        .prefetch_related('items', 'proformas')
+        .order_by('-created_at', '-id')
+    )
+    if user.is_superuser or _user_role(user) in {'commercial', 'commercial_manager', 'finance', 'finance_manager', 'sales_manager'}:
+        return qs
+    if _user_role(user) == 'sales':
+        return qs.filter(Q(sales_expert=user) | Q(sales_expert__isnull=True) | Q(requested_sales_expert=user)).distinct()
+    return qs.filter(customer=user)
+
+
+def _apply_order_filters(records, request, is_staff_user=False):
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'status': (request.GET.get('status') or '').strip(),
+        'customer': (request.GET.get('customer') or '').strip(),
+        'sales': (request.GET.get('sales') or '').strip(),
+        'city': (request.GET.get('city') or '').strip(),
+        'province': (request.GET.get('province') or '').strip(),
+    }
+    if filters['q']:
+        records = records.filter(
+            Q(title__icontains=filters['q']) |
+            Q(customer_note__icontains=filters['q']) |
+            Q(staff_note__icontains=filters['q']) |
+            Q(items__product_name__icontains=filters['q']) |
+            Q(items__note__icontains=filters['q'])
+        ).distinct()
+    if filters['status']:
+        records = records.filter(status=filters['status'])
+    if is_staff_user and filters['customer']:
+        records = records.filter(
+            Q(customer__username__icontains=filters['customer']) |
+            Q(customer__first_name__icontains=filters['customer']) |
+            Q(customer__last_name__icontains=filters['customer']) |
+            Q(customer__profile__organization__icontains=filters['customer'])
+        )
+    if is_staff_user and filters['sales']:
+        records = records.filter(
+            Q(sales_expert__username__icontains=filters['sales']) |
+            Q(sales_expert__first_name__icontains=filters['sales']) |
+            Q(sales_expert__last_name__icontains=filters['sales'])
+        )
+    if is_staff_user and filters['city']:
+        records = records.filter(customer__profile__city__icontains=filters['city'])
+    if is_staff_user and filters['province']:
+        records = records.filter(customer__profile__province__icontains=filters['province'])
+    return records, filters
+
+
+def _sales_assignment_rows(request):
+    profiles = _active_customer_profiles().order_by('organization', 'user__last_name', 'user__first_name', 'user__username')
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'sales': (request.GET.get('sales') or '').strip(),
+        'city': (request.GET.get('city') or '').strip(),
+        'province': (request.GET.get('province') or '').strip(),
+        'status': (request.GET.get('status') or '').strip(),
+    }
+    if filters['q']:
+        profiles = profiles.filter(
+            Q(user__username__icontains=filters['q']) |
+            Q(user__first_name__icontains=filters['q']) |
+            Q(user__last_name__icontains=filters['q']) |
+            Q(organization__icontains=filters['q']) |
+            Q(phone__icontains=filters['q']) |
+            Q(mobile__icontains=filters['q'])
+        )
+    if filters['city']:
+        profiles = profiles.filter(city__icontains=filters['city'])
+    if filters['province']:
+        profiles = profiles.filter(province__icontains=filters['province'])
+
+    assignments = {
+        assignment.customer_id: assignment
+        for assignment in CustomerSalesAssignment.objects.select_related('customer', 'sales_user', 'assigned_by')
+    }
+    open_order_counts = {
+        row['customer']: row['count']
+        for row in (
+            CustomerOrder.objects
+            .exclude(status__in=[CustomerOrder.STATUS_COMPLETED, CustomerOrder.STATUS_CANCELLED])
+            .values('customer')
+            .annotate(count=Count('id'))
+        )
+    }
+    rows = []
+    for profile in profiles:
+        assignment = assignments.get(profile.user_id)
+        sales_user = assignment.sales_user if assignment else None
+        if filters['status'] == 'assigned' and not sales_user:
+            continue
+        if filters['status'] == 'unassigned' and sales_user:
+            continue
+        if filters['sales'] and not (
+            sales_user and (
+                filters['sales'].lower() in sales_user.username.lower()
+                or filters['sales'].lower() in sales_user.get_full_name().lower()
+            )
+        ):
+            continue
+        rows.append({
+            'customer': profile.user,
+            'profile': profile,
+            'assignment': assignment,
+            'sales_user': sales_user,
+            'assigned_by': assignment.assigned_by if assignment else None,
+            'updated_at': assignment.updated_at if assignment else None,
+            'note': assignment.note if assignment else '',
+            'open_orders': open_order_counts.get(profile.user_id, 0),
+        })
+    return rows, filters
 
 
 def _customer_home_summary(user):
@@ -1353,23 +1579,26 @@ def _customer_home_summary(user):
     payments = _enrich_records(payments)
     price_lists = list(_price_lists_for_user(user)[:3])
     proformas = list(_proformas_for_user(user)[:5])
+    orders = list(_orders_for_user(user)[:5])
     daily_assignments = _customer_daily_assignments_for_user(user)[:5]
     return {
         'invoices': invoices,
         'payments': payments,
         'price_lists': price_lists,
         'proformas': proformas,
+        'orders': orders,
         'daily_assignments': daily_assignments,
         'invoice_count': _invoice_records_for_user(user).count(),
         'payment_count': _records_for_user(user).filter(user=user).count(),
         'price_list_count': _price_lists_for_user(user).count(),
         'proforma_count': _proformas_for_user(user).count(),
+        'order_count': _orders_for_user(user).count(),
         'daily_assignment_count': DailyPaymentAssignment.objects.filter(customer=user).count(),
     }
 
 
 def _can_access_proforma(user, proforma):
-    return _is_staff_user(user) or proforma.customer_id == user.id
+    return (_is_staff_user(user) and _can_staff_access_customer(user, proforma.customer_id)) or proforma.customer_id == user.id
 
 
 def _log_proforma(proforma, actor, action, note=''):
@@ -1490,7 +1719,7 @@ def _can_manage_daily_payments(user):
         return False
     if user.is_superuser:
         return True
-    return _user_role(user) in {'staff', 'commercial'}
+    return _user_role(user) in {'staff', 'commercial', 'commercial_manager', 'finance_manager'}
 
 
 def _can_view_daily_payments(user):
@@ -1908,7 +2137,7 @@ def create_payment(request):
         'staff_user_role': staff_role,
         'staff_role_label': _staff_role_label(staff_role),
         'can_manage_counterparties': is_system_admin,
-        'can_export_records': (not is_staff_user) or is_system_admin or staff_role in {'finance', 'commercial'},
+        'can_export_records': (not is_staff_user) or is_system_admin or staff_role in {'finance', 'finance_manager', 'commercial', 'commercial_manager'},
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
         'source_profiles': _source_profiles_for_user(request.user) if not is_staff_user else [],
@@ -1962,7 +2191,7 @@ def payment_history(request):
         'staff_user_role': staff_role,
         'staff_role_label': _staff_role_label(staff_role),
         'can_manage_counterparties': is_system_admin,
-        'can_export_records': is_system_admin or staff_role in {'finance', 'commercial'},
+        'can_export_records': is_system_admin or staff_role in {'finance', 'finance_manager', 'commercial', 'commercial_manager'},
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
         'source_profiles': [],
@@ -2192,11 +2421,12 @@ def staff_update_status(request, payment_id):
     from_status = payment.status
     payment.status = target_status
     payment.last_staff_note = note
+    department_role = _department_role(staff_role)
 
     # Finance can hard-lock records on terminal decisions.
     if request.user.is_superuser:
         payment.locked_by_finance = False
-    elif staff_role == 'finance' and target_status in {
+    elif department_role == 'finance' and target_status in {
         PaymentRecord.STATUS_FINAL_APPROVED,
         PaymentRecord.STATUS_REJECTED,
         PaymentRecord.STATUS_INCOMPLETE,
@@ -2204,7 +2434,7 @@ def staff_update_status(request, payment_id):
         payment.locked_by_finance = True
 
     selected_counterparty = form.cleaned_data['counterparty']
-    if selected_counterparty and staff_role in {'commercial', 'staff'}:
+    if selected_counterparty and department_role in {'commercial', 'staff'}:
         payment.counterparty = selected_counterparty
 
     payment.save(update_fields=['status', 'last_staff_note', 'counterparty', 'locked_by_finance'])
@@ -2546,7 +2776,7 @@ def invoices_dashboard(request):
     if request.method == 'POST':
         if not can_upload_invoices:
             return HttpResponseForbidden('شما دسترسی بارگذاری فاکتور مشتری را ندارید.')
-        form = InvoiceUploadForm(request.POST, request.FILES)
+        form = InvoiceUploadForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             invoice = form.save(commit=False)
             invoice.uploaded_by = request.user
@@ -2556,7 +2786,7 @@ def invoices_dashboard(request):
             messages.success(request, 'فاکتور با موفقیت برای مشتری ثبت شد.')
             return redirect('invoices_dashboard')
     else:
-        form = InvoiceUploadForm()
+        form = InvoiceUploadForm(user=request.user)
 
     can_view_invoices = _can_view_invoices(request.user)
     records = _invoice_records_for_user(request.user)
@@ -2634,7 +2864,7 @@ def price_lists_dashboard(request):
     if request.method == 'POST':
         if not can_upload:
             return HttpResponseForbidden('شما دسترسی بارگذاری لیست قیمت را ندارید.')
-        form = PriceListUploadForm(request.POST, request.FILES)
+        form = PriceListUploadForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             batch_id = uuid.uuid4()
             created_price_lists = []
@@ -2669,7 +2899,7 @@ def price_lists_dashboard(request):
             )
             return redirect('price_lists')
     else:
-        form = PriceListUploadForm()
+        form = PriceListUploadForm(user=request.user)
 
     records = _price_lists_for_user(request.user)
     customer_filter = (request.GET.get('customer') or '').strip()
@@ -2717,7 +2947,7 @@ def proformas_dashboard(request):
     if request.method == 'POST':
         if not can_issue:
             return HttpResponseForbidden('شما دسترسی صدور پیش فاکتور را ندارید.')
-        form = ProformaInvoiceForm(request.POST, request.FILES)
+        form = ProformaInvoiceForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             created_proformas = []
             for uploaded_file in form.cleaned_data['files']:
@@ -2751,7 +2981,7 @@ def proformas_dashboard(request):
             )
             return redirect('proformas')
     else:
-        form = ProformaInvoiceForm()
+        form = ProformaInvoiceForm(user=request.user)
 
     records = _proformas_for_user(request.user)
     customer_filter = (request.GET.get('customer') or '').strip()
@@ -2854,6 +3084,9 @@ def invoice_detail(request, invoice_id):
     if is_staff_user and not _can_view_invoices(request.user):
         return HttpResponseForbidden('شما دسترسی مشاهده فاکتور را ندارید.')
 
+    if is_staff_user and not _can_staff_access_customer(request.user, invoice.customer_id):
+        return HttpResponseForbidden('امکان مشاهده فاکتور این مشتری برای شما وجود ندارد.')
+
     # Customers can only see their own invoices
     if not is_staff_user and invoice.customer_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده فاکتورهای خودتان وجود دارد.')
@@ -2892,6 +3125,8 @@ def invoice_detail(request, invoice_id):
 @login_required
 def invoice_file(request, invoice_id):
     invoice = get_object_or_404(InvoiceRecord, id=invoice_id)
+    if not _can_staff_access_customer(request.user, invoice.customer_id):
+        return HttpResponseForbidden('امکان حذف فاکتور این مشتری برای شما وجود ندارد.')
     if not _can_access_invoice(request.user, invoice):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فاکتورهای خودتان وجود دارد.')
     return _file_response(invoice.attachment, as_attachment=request.GET.get('download') == '1')
@@ -2901,6 +3136,8 @@ def invoice_file(request, invoice_id):
 def price_list_file(request, price_list_id):
     price_list = get_object_or_404(PriceList.objects.select_related('customer'), id=price_list_id)
     if _is_staff_user(request.user):
+        if not _can_staff_access_customer(request.user, price_list.customer_id):
+            return HttpResponseForbidden('امکان مشاهده لیست قیمت این مشتری برای شما وجود ندارد.')
         return _file_response(price_list.file, as_attachment=request.GET.get('download') == '1')
 
     latest = PriceList.objects.filter(customer=request.user).order_by('-created_at', '-id').first()
@@ -2950,6 +3187,8 @@ def price_list_delete(request, price_list_id):
     if not _can_delete_customer_documents(request.user):
         return HttpResponseForbidden('شما دسترسی حذف لیست قیمت را ندارید.')
     price_list = get_object_or_404(PriceList, id=price_list_id)
+    if not _can_staff_access_customer(request.user, price_list.customer_id):
+        return HttpResponseForbidden('امکان حذف لیست قیمت این مشتری برای شما وجود ندارد.')
     _delete_file_field(price_list.file)
     price_list.delete()
     messages.success(request, 'لیست قیمت حذف شد.')
@@ -2962,10 +3201,233 @@ def proforma_delete(request, proforma_id):
     if not _can_delete_customer_documents(request.user):
         return HttpResponseForbidden('شما دسترسی حذف پیش فاکتور را ندارید.')
     proforma = get_object_or_404(ProformaInvoice, id=proforma_id)
+    if not _can_staff_access_customer(request.user, proforma.customer_id):
+        return HttpResponseForbidden('امکان حذف پیش فاکتور این مشتری برای شما وجود ندارد.')
     _delete_file_field(proforma.file)
     proforma.delete()
     messages.success(request, 'پیش فاکتور حذف شد.')
     return redirect(_document_delete_redirect(request, 'proformas'))
+
+
+@login_required
+def orders_dashboard(request):
+    if not _can_view_orders(request.user):
+        return HttpResponseForbidden('شما دسترسی مشاهده سفارش ها را ندارید.')
+
+    is_staff_user = _is_staff_user(request.user)
+    order_form = None
+    item_formset = None
+    can_create_order = False
+
+    if not is_staff_user:
+        try:
+            can_create_order = not request.user.profile.suspended
+        except UserProfile.DoesNotExist:
+            can_create_order = False
+        if request.method == 'POST' and not can_create_order:
+            return HttpResponseForbidden('حساب شما غیرفعال است و امکان ثبت سفارش جدید وجود ندارد.')
+        if request.method == 'POST':
+            order_form = CustomerOrderForm(request.POST, customer=request.user)
+            item_formset = CustomerOrderItemFormSet(request.POST)
+            if order_form.is_valid() and item_formset.is_valid():
+                order = order_form.save(commit=False)
+                order.customer = request.user
+                order.requested_sales_expert = order_form.cleaned_data.get('requested_sales_expert')
+                selected_sales = order.requested_sales_expert
+                if not selected_sales:
+                    try:
+                        selected_sales = request.user.sales_assignment.sales_user
+                    except CustomerSalesAssignment.DoesNotExist:
+                        selected_sales = None
+                order.sales_expert = selected_sales
+                order.save()
+                item_formset.instance = order
+                item_formset.save()
+                if selected_sales:
+                    CustomerSalesAssignment.objects.update_or_create(
+                        customer=request.user,
+                        defaults={'sales_user': selected_sales, 'assigned_by': request.user, 'note': 'انتخاب توسط مشتری در زمان ثبت سفارش'},
+                    )
+                CustomerOrderLog.objects.create(order=order, actor=request.user, action=CustomerOrderLog.ACTION_CREATED, to_status=order.status, note=order.customer_note)
+                notify_users = [selected_sales] if selected_sales else list(_staff_notification_users({'sales', 'commercial'}))
+                _notify_users(
+                    notify_users,
+                    'سفارش جدید مشتری',
+                    f'سفارش {order.order_number} توسط {request.user.get_full_name() or request.user.username} ثبت شد.',
+                    reverse('order_detail', args=[order.id]),
+                    category=UserNotification.CATEGORY_SYSTEM,
+                    actor=request.user,
+                )
+                messages.success(request, 'سفارش شما با موفقیت ثبت شد.')
+                return redirect('orders')
+        else:
+            if can_create_order:
+                order_form = CustomerOrderForm(customer=request.user)
+                item_formset = CustomerOrderItemFormSet()
+
+    records = _orders_for_user(request.user)
+    records, filters = _apply_order_filters(records, request, is_staff_user=is_staff_user)
+    status_summary = [
+        {'status': status, 'label': label, 'count': records.filter(status=status).count()}
+        for status, label in CustomerOrder.STATUS_CHOICES
+    ]
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+
+    return render(request, 'payments/orders.html', {
+        'order_form': order_form,
+        'item_formset': item_formset,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'filters': filters,
+        'status_choices': CustomerOrder.STATUS_CHOICES,
+        'status_summary': status_summary,
+        'is_staff_user': is_staff_user,
+        'can_create_order': can_create_order,
+        'can_manage_orders': _can_manage_orders(request.user),
+        'export_dataset': 'orders',
+        'export_fields': ORDER_EXPORT_FIELDS,
+    })
+
+
+@login_required
+def sales_assignments_dashboard(request):
+    if not _can_manage_sales_assignments(request.user):
+        return HttpResponseForbidden('این بخش فقط برای مدیر فروش و مدیر سیستم فعال است.')
+
+    if request.method == 'POST':
+        form = SalesAssignmentBulkForm(request.POST)
+        if form.is_valid():
+            customers = form.cleaned_data['customers']
+            sales_user = form.cleaned_data['sales_user']
+            note = form.cleaned_data.get('note') or ''
+            for customer in customers:
+                CustomerSalesAssignment.objects.update_or_create(
+                    customer=customer,
+                    defaults={'sales_user': sales_user, 'assigned_by': request.user, 'note': note},
+                )
+            if form.cleaned_data.get('transfer_open_orders'):
+                updated_orders = (
+                    CustomerOrder.objects
+                    .filter(customer__in=customers)
+                    .exclude(status__in=[CustomerOrder.STATUS_COMPLETED, CustomerOrder.STATUS_CANCELLED])
+                )
+                for order in updated_orders:
+                    old_sales_id = order.sales_expert_id
+                    order.sales_expert = sales_user
+                    order.save(update_fields=['sales_expert', 'updated_at'])
+                    if old_sales_id != sales_user.id:
+                        CustomerOrderLog.objects.create(
+                            order=order,
+                            actor=request.user,
+                            action=CustomerOrderLog.ACTION_ASSIGNED,
+                            note=f'تفویض توسط مدیر فروش به {sales_user.get_full_name() or sales_user.username}',
+                        )
+            _notify_users(
+                [sales_user],
+                'تخصیص مشتریان',
+                f'{len(customers)} مشتری به شما تخصیص داده شد.',
+                reverse('sales_assignments'),
+                category=UserNotification.CATEGORY_SYSTEM,
+                actor=request.user,
+            )
+            messages.success(request, f'{len(customers)} مشتری به {sales_user.get_full_name() or sales_user.username} تخصیص داده شد.')
+            return redirect('sales_assignments')
+    else:
+        form = SalesAssignmentBulkForm()
+
+    rows, filters = _sales_assignment_rows(request)
+    page_obj = _paginate_queryset(request, rows, per_page=15, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    assigned_count = sum(1 for row in rows if row['sales_user'])
+
+    return render(request, 'payments/sales_assignments.html', {
+        'form': form,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'filters': filters,
+        'assigned_count': assigned_count,
+        'unassigned_count': len(rows) - assigned_count,
+        'export_dataset': 'sales_assignments',
+        'export_fields': SALES_ASSIGNMENT_EXPORT_FIELDS,
+    })
+
+
+@login_required
+def order_detail(request, order_id):
+    order = get_object_or_404(
+        CustomerOrder.objects.select_related('customer', 'customer__profile', 'sales_expert', 'requested_sales_expert').prefetch_related('items', 'logs', 'logs__actor', 'proformas'),
+        id=order_id,
+    )
+    if not _orders_for_user(request.user).filter(id=order.id).exists():
+        return HttpResponseForbidden('امکان مشاهده این سفارش برای شما وجود ندارد.')
+
+    can_manage = _can_manage_orders(request.user)
+    status_form = StaffOrderUpdateForm(instance=order) if can_manage else None
+    proforma_form = OrderProformaUploadForm() if can_manage else None
+
+    if request.method == 'POST':
+        if not can_manage:
+            return HttpResponseForbidden('امکان تغییر سفارش برای نقش شما فعال نیست.')
+        action = request.POST.get('action')
+        if action == 'update_status':
+            old_status = order.status
+            old_sales_id = order.sales_expert_id
+            status_form = StaffOrderUpdateForm(request.POST, instance=order)
+            if status_form.is_valid():
+                updated = status_form.save()
+                if updated.sales_expert_id:
+                    CustomerSalesAssignment.objects.update_or_create(
+                        customer=updated.customer,
+                        defaults={'sales_user': updated.sales_expert, 'assigned_by': request.user, 'note': 'تخصیص از صفحه سفارش'},
+                    )
+                if old_status != updated.status:
+                    CustomerOrderLog.objects.create(order=updated, actor=request.user, action=CustomerOrderLog.ACTION_STATUS_CHANGED, from_status=old_status, to_status=updated.status, note=updated.staff_note)
+                    _notify_users([updated.customer], 'تغییر وضعیت سفارش', f'وضعیت سفارش {updated.order_number} به «{updated.get_status_display()}» تغییر کرد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_SYSTEM, actor=request.user)
+                if old_sales_id != updated.sales_expert_id:
+                    assignee = updated.sales_expert.get_full_name() or updated.sales_expert.username if updated.sales_expert else '-'
+                    CustomerOrderLog.objects.create(order=updated, actor=request.user, action=CustomerOrderLog.ACTION_ASSIGNED, note=f'تخصیص به {assignee}')
+                    if updated.sales_expert_id:
+                        _notify_users([updated.sales_expert], 'تخصیص سفارش', f'سفارش {updated.order_number} به شما تخصیص داده شد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_SYSTEM, actor=request.user)
+                messages.success(request, 'سفارش بروزرسانی شد.')
+                return redirect('order_detail', order_id=updated.id)
+        elif action == 'issue_proforma':
+            proforma_form = OrderProformaUploadForm(request.POST, request.FILES)
+            if proforma_form.is_valid():
+                created = []
+                for uploaded_file in proforma_form.cleaned_data['files']:
+                    proforma = ProformaInvoice(
+                        customer=order.customer,
+                        order=order,
+                        issued_by=request.user,
+                        title=proforma_form.cleaned_data.get('title') or order.title or order.order_number,
+                        valid_until=proforma_form.cleaned_data['valid_until'],
+                        note=proforma_form.cleaned_data.get('note') or '',
+                    )
+                    proforma.file.save(uploaded_file.name, uploaded_file, save=False)
+                    proforma.save()
+                    created.append(proforma)
+                previous_status = order.status
+                order.status = CustomerOrder.STATUS_PROFORMA_SENT
+                if not order.sales_expert_id:
+                    order.sales_expert = request.user
+                order.save(update_fields=['status', 'sales_expert', 'updated_at'])
+                CustomerOrderLog.objects.create(order=order, actor=request.user, action=CustomerOrderLog.ACTION_PROFORMA_CREATED, from_status=previous_status, to_status=order.status, note=f'{len(created)} پیش فاکتور صادر شد.')
+                _notify_users([order.customer], 'پیش فاکتور سفارش صادر شد', f'{len(created)} پیش فاکتور برای سفارش {order.order_number} صادر شد.', reverse('order_detail', args=[order.id]), category=UserNotification.CATEGORY_SYSTEM, actor=request.user)
+                messages.success(request, 'پیش فاکتور سفارش صادر و به مشتری اطلاع رسانی شد.')
+                return redirect('order_detail', order_id=order.id)
+
+    return render(request, 'payments/order_detail.html', {
+        'order': order,
+        'status_form': status_form,
+        'proforma_form': proforma_form,
+        'is_staff_user': _is_staff_user(request.user),
+        'can_manage_orders': can_manage,
+        'return_url': _safe_next_url(request, default=reverse('orders')),
+        'logs': order.logs.all() if _is_staff_user(request.user) else order.logs.exclude(action=CustomerOrderLog.ACTION_ASSIGNED),
+    })
 
 
 @login_required
@@ -3133,6 +3595,23 @@ def export_data(request, dataset):
             ]
         records = _export_scope_records(request, records, page_param='page')
         return _export_response('my_daily_payment_assignments.xlsx', 'Daily Assignments', fields, records)
+
+    if dataset == 'orders':
+        if not _can_view_orders(request.user):
+            return HttpResponseForbidden('خروجی سفارش برای نقش کاربری شما فعال نیست.')
+        records = _orders_for_user(request.user)
+        records, _ = _apply_order_filters(records, request, is_staff_user=_is_staff_user(request.user))
+        records = _export_scope_records(request, records, page_param='page')
+        fields = _selected_export_fields(request, ORDER_EXPORT_FIELDS)
+        return _export_response('orders.xlsx', 'Orders', fields, records)
+
+    if dataset == 'sales_assignments':
+        if not _can_manage_sales_assignments(request.user):
+            return HttpResponseForbidden('خروجی تخصیص مشتریان برای نقش شما فعال نیست.')
+        records, _ = _sales_assignment_rows(request)
+        records = _export_scope_records(request, records, page_param='page')
+        fields = _selected_export_fields(request, SALES_ASSIGNMENT_EXPORT_FIELDS)
+        return _export_response('sales_assignments.xlsx', 'Sales Assignments', fields, records)
 
     raise Http404
 

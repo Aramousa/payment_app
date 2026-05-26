@@ -111,7 +111,7 @@
             {% if '.pdf' in invoice.attachment.name|lower %}
                 <iframe src="{% url 'invoice_file' invoice.id %}" style="width:100%;height:70vh;border:0;"></iframe>
             {% else %}
-                <img src="{% url 'invoice_file' invoice.id %}" alt="فاکتور" style="max-width:100%;height:auto;display:block;margin:0 auto;">
+                <img src="{% url 'invoice_file' invoice.id %}" alt="فاکتور" class="app-zoomable-image">
             {% endif %}
         </div>
 

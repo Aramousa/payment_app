@@ -1,0 +1,167 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>سفارش ها</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
+        .top-bar, .section { max-width: 1180px; margin: 0 auto 16px; }
+        .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .section { background: #fff; border: 1px solid #e4e9f2; border-radius: 8px; padding: 16px; }
+        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; font-family: inherit; }
+        .button-link.alt { background: #6c757d; }
+        .form-grid, .filters, .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; }
+        .items-grid { display: grid; gap: 10px; margin-top: 8px; }
+        .item-row { display: grid; grid-template-columns: 2fr 120px 130px 2fr; gap: 8px; align-items: start; background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
+        label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
+        input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; font-family: inherit; }
+        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 12px; }
+        th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
+        th { background: #1769aa; color: #fff; }
+        .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
+        .status { display: inline-block; padding: 4px 10px; border-radius: 14px; font-size: 12px; color: #fff; }
+        .status.submitted { background: #546e7a; }
+        .status.reviewing { background: #1976d2; }
+        .status.proforma_sent { background: #f57c00; }
+        .status.completed { background: #2e7d32; }
+        .status.cancelled { background: #c62828; }
+        .summary-card { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 12px; }
+        .summary-card strong { display: block; font-size: 18px; }
+        .tiny { color: #66788a; font-size: 12px; }
+        @media (max-width: 760px) { .item-row { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+    <div class="top-bar">
+        <h2>{% if is_staff_user %}سفارش های مشتریان{% else %}سفارش های من{% endif %}</h2>
+        <a href="{% url 'submit' %}" class="button-link alt">بازگشت</a>
+    </div>
+    {% include "payments/partials/system_messages_popup.html" %}
+
+    {% if not is_staff_user and can_create_order %}
+    <div class="section">
+        <h3>ثبت سفارش جدید</h3>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-grid">
+                {% for field in order_form %}
+                    <div>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+            <h4>اقلام سفارش</h4>
+            {{ item_formset.management_form }}
+            <div class="items-grid">
+                {% for form in item_formset %}
+                    <div class="item-row">
+                        {% for field in form.visible_fields %}
+                            <div>
+                                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+            {% for error in item_formset.non_form_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            <div style="margin-top:12px;"><button type="submit" class="button-link">ثبت سفارش</button></div>
+        </form>
+    </div>
+    {% elif not is_staff_user %}
+    <div class="section">
+        <div class="field-error">حساب شما غیرفعال است و امکان ثبت سفارش جدید وجود ندارد، اما سوابق سفارش ها قابل مشاهده است.</div>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <h3>گزارش سریع سفارش ها</h3>
+        <div class="summary-grid">
+            {% for item in status_summary %}
+                <div class="summary-card">
+                    <strong>{{ item.count }}</strong>
+                    <span>{{ item.label }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>جستجو و فیلتر</h3>
+        <form method="get" class="filters">
+            <div>
+                <label for="q">جستجو در کالا و توضیحات</label>
+                <input id="q" type="search" name="q" value="{{ filters.q }}">
+            </div>
+            <div>
+                <label for="status">وضعیت</label>
+                <select id="status" name="status">
+                    <option value="">همه</option>
+                    {% for value,label in status_choices %}
+                        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if is_staff_user %}
+                <div><label for="customer">مشتری</label><input id="customer" type="search" name="customer" value="{{ filters.customer }}"></div>
+                <div><label for="sales">کارشناس فروش</label><input id="sales" type="search" name="sales" value="{{ filters.sales }}"></div>
+                <div><label for="province">استان</label><input id="province" type="search" name="province" value="{{ filters.province }}"></div>
+                <div><label for="city">شهر</label><input id="city" type="search" name="city" value="{{ filters.city }}"></div>
+            {% endif %}
+            <button type="submit" class="button-link">اعمال فیلتر</button>
+            <a href="{% url 'orders' %}" class="button-link alt">حذف فیلتر</a>
+        </form>
+        {% include "payments/partials/export_panel.html" %}
+    </div>
+
+    <div class="section">
+        <h3>لیست سفارش ها</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>شماره</th>
+                    {% if is_staff_user %}<th>مشتری</th>{% endif %}
+                    <th>عنوان</th>
+                    <th>اقلام</th>
+                    <th>کارشناس فروش</th>
+                    <th>وضعیت</th>
+                    <th>زمان ثبت</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in records %}
+                    <tr>
+                        <td>{{ order.order_number }}</td>
+                        {% if is_staff_user %}
+                            <td>{{ order.customer.get_full_name|default:order.customer.username }}<br><span class="tiny">{{ order.customer.profile.organization|default:'-' }}</span></td>
+                        {% endif %}
+                        <td>{{ order.title|default:'-' }}</td>
+                        <td>
+                            {% for item in order.items.all %}
+                                {{ item.product_name }} - {{ item.quantity }} {{ item.get_unit_display }}{% if not forloop.last %}<br>{% endif %}
+                            {% empty %}-{% endfor %}
+                        </td>
+                        <td>{{ order.sales_expert.get_full_name|default:order.sales_expert.username|default:'-' }}</td>
+                        <td><span class="status {{ order.status }}">{{ order.get_status_display }}</span></td>
+                        <td>{{ order.created_at|jalali_datetime }}</td>
+                        <td><a class="button-link" href="{% url 'order_detail' order.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{% if is_staff_user %}8{% else %}7{% endif %}">سفارشی ثبت نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
+    </div>
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

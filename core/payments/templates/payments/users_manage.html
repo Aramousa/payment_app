@@ -115,7 +115,9 @@
     {% if can_manage_user_accounts %}
     <div class="section">
         <h2>{% if editing_user %}ویرایش کاربر{% else %}ایجاد کاربر جدید{% endif %}</h2>
-        <div class="hint-box">رمز پیشنهادی 5 رقمی: <strong id="suggested-password">{{ password_suggestion }}</strong></div>
+        {% if not editing_user %}
+            <div class="hint-box">رمز پیشنهادی 5 رقمی: <strong id="suggested-password">{{ password_suggestion }}</strong></div>
+        {% endif %}
         <form method="post">
             {% csrf_token %}
             <div class="form-grid">
@@ -128,7 +130,9 @@
                 {% endfor %}
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:14px;">
-                <button type="button" class="button-link" id="use-suggested-password">استفاده از رمز پیشنهادی</button>
+                {% if not editing_user %}
+                    <button type="button" class="button-link" id="use-suggested-password">استفاده از رمز پیشنهادی</button>
+                {% endif %}
                 {% if editing_user %}
                     <a href="{% url 'users_manage' %}" class="cancel-link">لغو ویرایش</a>
                 {% endif %}
@@ -152,8 +156,11 @@
                         <option value="">همه نقش‌ها</option>
                         <option value="customer" {% if filters.role == 'customer' %}selected{% endif %}>مشتری</option>
                         <option value="commercial" {% if filters.role == 'commercial' %}selected{% endif %}>بازرگانی</option>
+                        <option value="commercial_manager" {% if filters.role == 'commercial_manager' %}selected{% endif %}>مدیر بازرگانی</option>
                         <option value="finance" {% if filters.role == 'finance' %}selected{% endif %}>مالی</option>
+                        <option value="finance_manager" {% if filters.role == 'finance_manager' %}selected{% endif %}>مدیر مالی</option>
                         <option value="sales" {% if filters.role == 'sales' %}selected{% endif %}>فروش</option>
+                        <option value="sales_manager" {% if filters.role == 'sales_manager' %}selected{% endif %}>مدیر فروش</option>
                         <option value="data_entry" {% if filters.role == 'data_entry' %}selected{% endif %}>تکمیل اطلاعات فیش</option>
                         <option value="staff" {% if filters.role == 'staff' %}selected{% endif %}>کارمند</option>
                     </select>

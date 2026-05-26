@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from .models import LoginAdvertisement, PaymentRecord, InvoiceRecord, UserProfile
 
 
-STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
+STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
 DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
 
@@ -28,6 +28,8 @@ def _can_view_invoices_nav(user):
     if not user.is_authenticated:
         return False
     try:
+        if user.profile.role in {'sales', 'sales_manager', 'commercial_manager', 'finance_manager'}:
+            return True
         return bool(user.profile.can_view_invoices or user.profile.can_upload_invoices)
     except UserProfile.DoesNotExist:
         return False
@@ -56,6 +58,7 @@ def app_navigation(request):
             _nav_item('ثبت فیش', 'payment_create', 'payment_create'),
             _nav_item('فاکتورها', 'invoices_dashboard', 'invoices'),
             _nav_item('لیست قیمت', 'price_lists', 'price_lists'),
+            _nav_item('سفارش ها', 'orders', 'orders'),
             _nav_item('پیش فاکتورها', 'proformas', 'proformas'),
             _nav_item('برنامه واریز من', 'customer_daily_payments', 'customer_daily_payments', 'finance'),
         ])
@@ -67,10 +70,14 @@ def app_navigation(request):
         ])
         if user.is_superuser or _can_view_invoices_nav(user):
             items.append(_nav_item('فاکتورها', 'invoices_dashboard', 'invoices', 'documents'))
-        if user.is_superuser or role in {'commercial', 'sales', 'finance'}:
+        if user.is_superuser or role in {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}:
             items.append(_nav_item('لیست قیمت', 'price_lists', 'price_lists', 'documents'))
-        if user.is_superuser or role in {'commercial', 'sales', 'finance'}:
+        if user.is_superuser or role in {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}:
+            items.append(_nav_item('سفارش ها', 'orders', 'orders', 'documents'))
+        if user.is_superuser or role in {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}:
             items.append(_nav_item('پیش فاکتورها', 'proformas', 'proformas', 'documents'))
+        if user.is_superuser or role == 'sales_manager':
+            items.append(_nav_item('تخصیص مشتریان فروش', 'sales_assignments', 'sales_assignments', 'admin'))
         if is_staff_user:
             items.append(_nav_item('برنامه واریز', 'daily_payment_plans', 'daily_payments', 'finance'))
             if not user.is_superuser:
@@ -90,8 +97,11 @@ def app_navigation(request):
         'admin': 'مدیر سیستم',
         'customer': 'مشتری',
         'finance': 'مالی',
+        'finance_manager': 'مدیر مالی',
         'commercial': 'بازرگانی',
+        'commercial_manager': 'مدیر بازرگانی',
         'sales': 'فروش',
+        'sales_manager': 'مدیر فروش',
         'data_entry': 'تکمیل اطلاعات',
         'staff': 'کارمند',
     }.get(role, 'کاربر')
@@ -151,7 +161,7 @@ def unread_notifications(request):
             customer_seen_at__isnull=True
         ).count()
 
-    elif role in ('finance', 'commercial', 'staff'):
+    elif role in ('finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales_manager', 'staff'):
         # For staff: count documents created today that haven't been seen by anyone
         # Or count documents with recent status changes
         from django.utils import timezone

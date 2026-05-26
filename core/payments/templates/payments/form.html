@@ -338,6 +338,32 @@
 
             <section class="dashboard-panel">
                 <div class="dashboard-head">
+                    <h3>سفارش‌های من</h3>
+                    <span class="dashboard-count">{{ customer_home_summary.order_count }} مورد</span>
+                </div>
+                <div class="dashboard-list">
+                    {% for order in customer_home_summary.orders %}
+                        <div class="dashboard-row">
+                            <div class="dashboard-row-title">
+                                <span>{{ order.order_number }}</span>
+                                <span>{{ order.get_status_display }}</span>
+                            </div>
+                            <div class="dashboard-row-meta">
+                                {{ order.title|default:'بدون عنوان' }} | کارشناس فروش: {{ order.sales_expert.get_full_name|default:order.sales_expert.username|default:'-' }}
+                            </div>
+                            <div class="dashboard-actions">
+                                <a class="button-link" href="{% url 'order_detail' order.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="dashboard-empty">هنوز سفارشی ثبت نکرده‌اید.</div>
+                    {% endfor %}
+                </div>
+                <div class="dashboard-actions"><a class="button-link" href="{% url 'orders' %}">ثبت سفارش و گزارش سفارش‌ها</a></div>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="dashboard-head">
                     <h3>برنامه‌های واریز من</h3>
                     <span class="dashboard-count">{{ customer_home_summary.daily_assignment_count }} مورد</span>
                 </div>
@@ -785,7 +811,7 @@
 
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
         <div class="preview-box" id="previewBox">
-            <img id="previewImage" class="preview-image" alt="پیش نمایش سند" style="display:none;">
+            <img id="previewImage" class="preview-image app-zoomable-image" alt="پیش نمایش سند" style="display:none;">
             <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
             <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید ورود را بزنید.</div>
         </div>
@@ -914,9 +940,17 @@
         const flashOverlay = document.getElementById('flashOverlay');
         let pdfBlobUrl = '';
 
+        function setPreviewImageVisible(visible) {
+            const imageViewport = previewImage.closest('.app-image-zoom-viewport');
+            if (imageViewport) {
+                imageViewport.style.display = visible ? 'flex' : 'none';
+            }
+            previewImage.style.display = visible ? 'block' : 'none';
+        }
+
         function closePreview() {
             overlay.classList.remove('open');
-            previewImage.style.display = 'none';
+            setPreviewImageVisible(false);
             previewImage.src = '';
             previewFrame.style.display = 'none';
             previewFrame.src = '';
@@ -946,11 +980,14 @@
                     return;
                 }
                 previewFrame.style.display = 'block';
-                previewImage.style.display = 'none';
+                setPreviewImageVisible(false);
                 previewImage.src = '';
             } else {
                 previewImage.src = url;
-                previewImage.style.display = 'block';
+                setPreviewImageVisible(true);
+                if (window.AppImageZoom) {
+                    window.AppImageZoom.reset(previewImage);
+                }
                 previewFrame.style.display = 'none';
                 previewFrame.src = '';
             }
@@ -966,7 +1003,7 @@
         });
 
         overlay.addEventListener('click', function (event) {
-            if (event.target === overlay || event.target === previewImage) {
+            if (event.target === overlay) {
                 closePreview();
             }
         });

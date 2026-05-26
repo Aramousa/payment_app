@@ -150,7 +150,7 @@
                                     {% if ".pdf" in file_name %}
                                         <iframe src="{% url 'price_list_file' price_list.id %}" title="نمایش لیست قیمت"></iframe>
                                     {% else %}
-                                        <img src="{% url 'price_list_file' price_list.id %}" alt="لیست قیمت">
+                                        <img src="{% url 'price_list_file' price_list.id %}" alt="لیست قیمت" class="app-zoomable-image">
                                     {% endif %}
                                 {% endwith %}
                             </div>

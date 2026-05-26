@@ -316,8 +316,11 @@ class UserProfile(models.Model):
     ROLE_CHOICES = (
         ('customer', 'مشتری'),
         ('finance', 'واحد مالی'),
+        ('finance_manager', 'مدیر مالی'),
         ('commercial', 'واحد بازرگانی'),
+        ('commercial_manager', 'مدیر بازرگانی'),
         ('sales', 'فروش'),
+        ('sales_manager', 'مدیر فروش'),
         ('data_entry', 'تکمیل اطلاعات فیش'),
         ('staff', 'کارمند'),
     )
@@ -333,7 +336,7 @@ class UserProfile(models.Model):
     province = models.CharField('استان', max_length=50, blank=True)
     address = models.TextField('آدرس', blank=True)
     second_address = models.TextField('آدرس دوم', blank=True)
-    role = models.CharField('نوع کاربر', max_length=10, choices=ROLE_CHOICES, default='customer')
+    role = models.CharField('نوع کاربر', max_length=24, choices=ROLE_CHOICES, default='customer')
     active_from = jmodels.jDateField('تاریخ آغاز فعالیت', null=True, blank=True)
     valid_until = jmodels.jDateField('تاریخ اعتبار', null=True, blank=True)
     force_password_change = models.BooleanField('الزام تعویض رمز', default=True)
@@ -686,6 +689,14 @@ class ProformaInvoice(models.Model):
     ]
 
     customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='proforma_invoices')
+    order = models.ForeignKey(
+        'CustomerOrder',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='proformas',
+        verbose_name='سفارش مرتبط',
+    )
     issued_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -717,6 +728,155 @@ class ProformaInvoice(models.Model):
     @property
     def is_seen_by_customer(self):
         return bool(self.customer_seen_at)
+
+
+class CustomerSalesAssignment(models.Model):
+    customer = models.OneToOneField(User, on_delete=models.CASCADE, related_name='sales_assignment')
+    sales_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_customers',
+        verbose_name='کارشناس فروش',
+    )
+    assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sales_assignments_made',
+        verbose_name='تخصیص دهنده',
+    )
+    note = models.TextField('توضیح', blank=True)
+    created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        ordering = ['customer__username']
+        verbose_name = 'تخصیص کارشناس فروش'
+        verbose_name_plural = 'تخصیص کارشناسان فروش'
+
+    def __str__(self):
+        return f"{self.customer} -> {self.sales_user or '-'}"
+
+
+class CustomerOrder(models.Model):
+    STATUS_SUBMITTED = 'submitted'
+    STATUS_REVIEWING = 'reviewing'
+    STATUS_PROFORMA_SENT = 'proforma_sent'
+    STATUS_COMPLETED = 'completed'
+    STATUS_CANCELLED = 'cancelled'
+
+    STATUS_CHOICES = [
+        (STATUS_SUBMITTED, 'ثبت شده'),
+        (STATUS_REVIEWING, 'در حال بررسی فروش'),
+        (STATUS_PROFORMA_SENT, 'پیش فاکتور صادر شده'),
+        (STATUS_COMPLETED, 'خاتمه یافته'),
+        (STATUS_CANCELLED, 'لغو شده'),
+    ]
+
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='orders', verbose_name='مشتری')
+    sales_expert = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sales_orders',
+        verbose_name='کارشناس فروش',
+    )
+    requested_sales_expert = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='requested_sales_orders',
+        verbose_name='کارشناس فروش انتخابی مشتری',
+    )
+    status = models.CharField('وضعیت', max_length=20, choices=STATUS_CHOICES, default=STATUS_SUBMITTED)
+    title = models.CharField('عنوان سفارش', max_length=160, blank=True)
+    customer_note = models.TextField('توضیح مشتری', blank=True)
+    staff_note = models.TextField('توضیح داخلی فروش', blank=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['customer', '-created_at']),
+            models.Index(fields=['sales_expert', 'status']),
+            models.Index(fields=['status', '-created_at']),
+        ]
+        verbose_name = 'سفارش مشتری'
+        verbose_name_plural = 'سفارش های مشتریان'
+
+    def __str__(self):
+        return f"ORD-{self.id} - {self.customer}"
+
+    @property
+    def order_number(self):
+        return f"ORD-{self.id:05d}"
+
+    @property
+    def item_summary(self):
+        names = [item.product_name for item in self.items.all()[:3]]
+        return '، '.join(names)
+
+
+class CustomerOrderItem(models.Model):
+    UNIT_PIECE = 'piece'
+    UNIT_PACK = 'pack'
+    UNIT_CARTON = 'carton'
+
+    UNIT_CHOICES = [
+        (UNIT_PIECE, 'قطعه'),
+        (UNIT_PACK, 'بسته'),
+        (UNIT_CARTON, 'کارتن'),
+    ]
+
+    order = models.ForeignKey(CustomerOrder, on_delete=models.CASCADE, related_name='items')
+    product_name = models.CharField('نام کالا', max_length=180)
+    quantity = models.DecimalField('تعداد', max_digits=12, decimal_places=2)
+    unit = models.CharField('واحد', max_length=20, choices=UNIT_CHOICES, default=UNIT_PIECE)
+    note = models.CharField('توضیح', max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['id']
+        verbose_name = 'قلم سفارش'
+        verbose_name_plural = 'اقلام سفارش'
+
+    def __str__(self):
+        return f"{self.product_name} - {self.quantity} {self.get_unit_display()}"
+
+
+class CustomerOrderLog(models.Model):
+    ACTION_CREATED = 'created'
+    ACTION_STATUS_CHANGED = 'status_changed'
+    ACTION_ASSIGNED = 'assigned'
+    ACTION_PROFORMA_CREATED = 'proforma_created'
+
+    ACTION_CHOICES = [
+        (ACTION_CREATED, 'ثبت سفارش'),
+        (ACTION_STATUS_CHANGED, 'تغییر وضعیت'),
+        (ACTION_ASSIGNED, 'تخصیص کارشناس'),
+        (ACTION_PROFORMA_CREATED, 'صدور پیش فاکتور'),
+    ]
+
+    order = models.ForeignKey(CustomerOrder, on_delete=models.CASCADE, related_name='logs')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='order_logs')
+    action = models.CharField('عملیات', max_length=30, choices=ACTION_CHOICES)
+    from_status = models.CharField('وضعیت قبلی', max_length=20, blank=True)
+    to_status = models.CharField('وضعیت جدید', max_length=20, blank=True)
+    note = models.TextField('توضیح', blank=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'لاگ سفارش'
+        verbose_name_plural = 'لاگ های سفارش'
+
+    def __str__(self):
+        return f"{self.order} - {self.get_action_display()}"
 
 
 class ProformaInvoiceLog(models.Model):

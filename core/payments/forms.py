@@ -10,14 +10,16 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import Q
+from django.forms import inlineformset_factory
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 from PIL import Image, ImageOps
 
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, UploadSettings, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, UploadSettings, UserProfile
 
-STAFF_ROLES = {'staff', 'finance', 'commercial', 'sales', 'data_entry'}
+STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
+MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
 DEFAULT_RECEIPT_MAX_UPLOAD_SIZE = 1 * 1024 * 1024
 DEFAULT_INVOICE_MAX_UPLOAD_SIZE = 5 * 1024 * 1024
@@ -72,6 +74,33 @@ def _active_customer_profiles():
         user__is_active=True,
         suspended=False,
     ).select_related('user').order_by('user__first_name', 'user__last_name', 'user__username')
+
+
+def _role_for_user(user):
+    if not user or not getattr(user, 'is_authenticated', False):
+        return ''
+    if user.is_superuser:
+        return 'admin'
+    try:
+        return user.profile.role
+    except UserProfile.DoesNotExist:
+        return 'staff' if user.is_staff else ''
+
+
+def _customer_profiles_for_user(user=None):
+    profiles = _active_customer_profiles()
+    if _role_for_user(user) == 'sales':
+        assigned_ids = CustomerSalesAssignment.objects.filter(sales_user=user).values_list('customer_id', flat=True)
+        return profiles.filter(user_id__in=assigned_ids)
+    return profiles
+
+
+def _active_sales_users():
+    return User.objects.filter(
+        is_active=True,
+        profile__role__in=['sales', 'sales_manager'],
+        profile__suspended=False,
+    ).select_related('profile').order_by('first_name', 'last_name', 'username')
 
 
 def _receipt_max_upload_size():
@@ -721,6 +750,7 @@ class InvoiceUploadForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         self.max_upload_size = _invoice_max_upload_size()
         self.fields['attachment'].help_text = (
@@ -735,7 +765,7 @@ class InvoiceUploadForm(forms.ModelForm):
                 except (ValueError, TypeError):
                     pass
 
-        self.fields['customer'].queryset = _active_customer_profiles()
+        self.fields['customer'].queryset = _customer_profiles_for_user(self.user)
         self.fields['customer'].label_from_instance = self._customer_label
         
         # فیلدهای ضروری
@@ -841,8 +871,9 @@ class PriceListUploadForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        self.fields['customers'].queryset = _active_customer_profiles()
+        self.fields['customers'].queryset = _customer_profiles_for_user(self.user)
         self.fields['customers'].label_from_instance = InvoiceUploadForm._customer_label
 
     def clean_files(self):
@@ -901,8 +932,9 @@ class ProformaInvoiceForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        self.fields['customers'].queryset = _active_customer_profiles()
+        self.fields['customers'].queryset = _customer_profiles_for_user(self.user)
         self.fields['customers'].label_from_instance = InvoiceUploadForm._customer_label
 
     def clean_customers(self):
@@ -921,6 +953,179 @@ class ProformaInvoiceForm(forms.ModelForm):
             ext = os.path.splitext(uploaded.name or '')[1].lower()
             if ext not in self.ALLOWED_EXTENSIONS:
                 raise ValidationError('فقط فایل‌های تصویری استاندارد و PDF مجاز است.')
+        return files
+
+
+class CustomerOrderForm(forms.ModelForm):
+    requested_sales_expert = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        label='کارشناس فروش مورد نظر',
+        required=False,
+        empty_label='بدون انتخاب',
+    )
+
+    class Meta:
+        model = CustomerOrder
+        fields = ['title', 'requested_sales_expert', 'customer_note']
+        widgets = {
+            'title': forms.TextInput(attrs={'placeholder': 'مثلا سفارش قطعات اردیبهشت'}),
+            'customer_note': forms.Textarea(attrs={'rows': 3, 'placeholder': 'توضیحات تکمیلی، زمان تحویل یا شرایط مورد نظر'}),
+        }
+        labels = {
+            'title': 'عنوان سفارش',
+            'customer_note': 'توضیحات سفارش',
+        }
+
+    def __init__(self, *args, **kwargs):
+        customer = kwargs.pop('customer', None)
+        super().__init__(*args, **kwargs)
+        self.fields['requested_sales_expert'].queryset = _active_sales_users()
+        self.fields['requested_sales_expert'].label_from_instance = self._sales_label
+        if customer and not self.is_bound:
+            try:
+                assignment = customer.sales_assignment
+                if assignment.sales_user_id:
+                    self.initial['requested_sales_expert'] = assignment.sales_user
+            except Exception:
+                pass
+
+    @staticmethod
+    def _sales_label(user):
+        return user.get_full_name().strip() or user.username
+
+
+class CustomerOrderItemForm(forms.ModelForm):
+    class Meta:
+        model = CustomerOrderItem
+        fields = ['product_name', 'quantity', 'unit', 'note']
+        widgets = {
+            'product_name': forms.TextInput(attrs={'placeholder': 'نام کالا'}),
+            'quantity': forms.NumberInput(attrs={'min': '0.01', 'step': '0.01', 'inputmode': 'decimal'}),
+            'note': forms.TextInput(attrs={'placeholder': 'مدل، رنگ، توضیح یا کد کالا'}),
+        }
+        labels = {
+            'product_name': 'نام کالا',
+            'quantity': 'تعداد',
+            'unit': 'واحد',
+            'note': 'توضیح',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['unit'].required = False
+        self.fields['unit'].initial = ''
+        self.fields['unit'].choices = [('', 'انتخاب واحد')] + list(CustomerOrderItem.UNIT_CHOICES)
+        if not self.instance.pk:
+            self.instance.unit = ''
+        if not self.instance.pk and not self.data:
+            self.initial['unit'] = ''
+
+    def clean_unit(self):
+        return self.cleaned_data.get('unit') or CustomerOrderItem.UNIT_PIECE
+
+
+CustomerOrderItemFormSet = inlineformset_factory(
+    CustomerOrder,
+    CustomerOrderItem,
+    form=CustomerOrderItemForm,
+    extra=3,
+    min_num=1,
+    validate_min=True,
+    can_delete=False,
+)
+
+
+class StaffOrderUpdateForm(forms.ModelForm):
+    sales_expert = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        label='کارشناس فروش',
+        required=False,
+        empty_label='بدون تخصیص',
+    )
+
+    class Meta:
+        model = CustomerOrder
+        fields = ['status', 'sales_expert', 'staff_note']
+        widgets = {
+            'staff_note': forms.Textarea(attrs={'rows': 3}),
+        }
+        labels = {
+            'status': 'وضعیت سفارش',
+            'staff_note': 'توضیح داخلی فروش',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['sales_expert'].queryset = _active_sales_users()
+        self.fields['sales_expert'].label_from_instance = CustomerOrderForm._sales_label
+
+
+class SalesAssignmentBulkForm(forms.Form):
+    customers = forms.ModelMultipleChoiceField(
+        queryset=UserProfile.objects.none(),
+        label='مشتریان',
+        widget=forms.SelectMultiple(attrs={'size': 10, 'data-customer-select': '1'}),
+    )
+    sales_user = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        label='کارشناس فروش',
+        empty_label='انتخاب کارشناس',
+    )
+    transfer_open_orders = forms.BooleanField(
+        label='سفارش های باز این مشتریان نیز به کارشناس جدید منتقل شود',
+        required=False,
+        initial=True,
+    )
+    note = forms.CharField(
+        label='توضیح',
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['customers'].queryset = _active_customer_profiles()
+        self.fields['customers'].label_from_instance = InvoiceUploadForm._customer_label
+        self.fields['sales_user'].queryset = _active_sales_users()
+        self.fields['sales_user'].label_from_instance = CustomerOrderForm._sales_label
+
+    def clean_customers(self):
+        profiles = self.cleaned_data['customers']
+        if not profiles:
+            raise ValidationError('حداقل یک مشتری را انتخاب کنید.')
+        return [profile.user for profile in profiles]
+
+
+class OrderProformaUploadForm(forms.Form):
+    title = forms.CharField(label='عنوان پیش فاکتور', max_length=120, required=False)
+    valid_until = jDateField(
+        label='اعتبار تا',
+        input_formats=['%Y/%m/%d'],
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31')),
+        required=True,
+    )
+    files = MultipleFileField(
+        label='فایل های پیش فاکتور',
+        required=True,
+        widget=MultipleFileInput(attrs={
+            'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
+            'multiple': True,
+        }),
+    )
+    note = forms.CharField(
+        label='توضیح داخلی',
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+    )
+
+    def clean_files(self):
+        files = self.cleaned_data.get('files') or []
+        if not files:
+            raise ValidationError('حداقل یک فایل پیش فاکتور را انتخاب کنید.')
+        for uploaded in files:
+            ext = os.path.splitext(uploaded.name or '')[1].lower()
+            if ext not in ProformaInvoiceForm.ALLOWED_EXTENSIONS:
+                raise ValidationError('فقط فایل های تصویری استاندارد و PDF مجاز است.')
         return files
 
 
@@ -947,8 +1152,11 @@ class UserAccountManagementForm(forms.Form):
     ROLE_CHOICES = (
         ('customer', 'مشتری'),
         ('commercial', 'بازرگانی'),
+        ('commercial_manager', 'مدیر بازرگانی'),
         ('finance', 'مالی'),
+        ('finance_manager', 'مدیر مالی'),
         ('sales', 'فروش'),
+        ('sales_manager', 'مدیر فروش'),
         ('data_entry', 'تکمیل اطلاعات فیش'),
         ('staff', 'کارمند'),
     )
@@ -987,6 +1195,9 @@ class UserAccountManagementForm(forms.Form):
         self.instance = kwargs.pop('instance', None)
         self.password_suggestion = kwargs.pop('password_suggestion', '')
         super().__init__(*args, **kwargs)
+
+        if self.instance:
+            self.fields.pop('password', None)
 
         if self.instance and not self.is_bound:
             profile = getattr(self.instance, 'profile', None)

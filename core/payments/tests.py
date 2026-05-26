@@ -12,7 +12,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from .forms import DailyPaymentAssignmentForm, InvoiceUploadForm, PriceListUploadForm, ProformaInvoiceForm
-from .models import DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
+from .models import CustomerOrder, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -1069,6 +1069,16 @@ class InvoiceFlowTests(TestCase):
             SimpleUploadedFile('price.pdf', b'%PDF-1.4 price', content_type='application/pdf'),
             SimpleUploadedFile('price-2.pdf', b'%PDF-1.4 price 2', content_type='application/pdf'),
         ]
+        CustomerSalesAssignment.objects.create(
+            customer=self.customer_user,
+            sales_user=self.sales_user,
+            assigned_by=self.commercial_user,
+        )
+        CustomerSalesAssignment.objects.create(
+            customer=self.other_customer,
+            sales_user=self.sales_user,
+            assigned_by=self.commercial_user,
+        )
 
         self.client.login(username='sales1', password='pass1234')
         response = self.client.post(
@@ -1353,6 +1363,56 @@ class UserManagementTests(TestCase):
         self.assertEqual(created_user.profile.mobile, '09121111111')
         self.assertEqual(created_user.profile.role, 'customer')
 
+    def test_user_edit_hides_and_ignores_password_field(self):
+        target = User.objects.create_user(
+            username='09122222222',
+            password='Old123',
+            email='customer-edit@example.com',
+            first_name='Old',
+            last_name='User',
+        )
+        target.profile.phone = '02122222222'
+        target.profile.mobile = '09122222222'
+        target.profile.province = 'Tehran'
+        target.profile.city = 'Tehran'
+        target.profile.organization = 'Old Org'
+        target.profile.role = 'customer'
+        target.profile.save()
+        old_password_hash = target.password
+
+        self.client.login(username='admin1', password='pass1234')
+        response = self.client.get(reverse('user_edit', args=[target.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="password"')
+        self.assertNotContains(response, 'id="use-suggested-password"')
+
+        response = self.client.post(
+            reverse('user_edit', args=[target.id]),
+            {
+                'first_name': 'New',
+                'last_name': 'User',
+                'email': 'customer-edit-new@example.com',
+                'phone': '02122222222',
+                'mobile': '09122222222',
+                'province': 'Tehran',
+                'city': 'Tehran',
+                'address': 'Address',
+                'organization': 'New Org',
+                'password': 'New123',
+                'role': 'customer',
+                'active_from': '1405/02/08',
+                'valid_until': '1405/12/29',
+                'is_active': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        target.refresh_from_db()
+        self.assertEqual(target.password, old_password_hash)
+        self.assertTrue(target.check_password('Old123'))
+        self.assertEqual(target.first_name, 'New')
+
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_password_reset_emails_password_logs_without_storing_password_and_forces_change(self):
         target = User.objects.create_user(
@@ -1434,3 +1494,95 @@ class UserManagementTests(TestCase):
         log = SystemActivityLog.objects.get(target_user=target, action=SystemActivityLog.ACTION_PASSWORD_RESET)
         self.assertNotIn(temp_password, log.description)
         self.assertIn('ارسال ایمیل انجام نشد', log.description)
+
+
+class CustomerOrderTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(
+            username='customer-order',
+            password='pass1234',
+            first_name='Customer',
+            last_name='One',
+        )
+        self.customer.profile.role = 'customer'
+        self.customer.profile.organization = 'Customer Org'
+        self.customer.profile.city = 'Tehran'
+        self.customer.profile.province = 'Tehran'
+        self.customer.profile.force_password_change = False
+        self.customer.profile.save()
+
+        self.sales = User.objects.create_user(
+            username='sales-order',
+            password='pass1234',
+            first_name='Sales',
+            last_name='One',
+        )
+        self.sales.profile.role = 'sales'
+        self.sales.profile.force_password_change = False
+        self.sales.profile.save()
+
+    def test_customer_can_create_order_with_items_and_sales_expert(self):
+        self.client.login(username='customer-order', password='pass1234')
+        response = self.client.get(reverse('orders'))
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(
+            reverse('orders'),
+            {
+                'title': 'Spring order',
+                'requested_sales_expert': str(self.sales.id),
+                'customer_note': 'Please prepare proforma.',
+                'items-TOTAL_FORMS': '3',
+                'items-INITIAL_FORMS': '0',
+                'items-MIN_NUM_FORMS': '1',
+                'items-MAX_NUM_FORMS': '1000',
+                'items-0-product_name': 'Product A',
+                'items-0-quantity': '2',
+                'items-0-unit': 'carton',
+                'items-0-note': 'Blue',
+                'items-1-product_name': '',
+                'items-1-quantity': '',
+                'items-1-unit': '',
+                'items-1-note': '',
+                'items-2-product_name': '',
+                'items-2-quantity': '',
+                'items-2-unit': '',
+                'items-2-note': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        order = CustomerOrder.objects.get(customer=self.customer)
+        self.assertEqual(order.sales_expert, self.sales)
+        self.assertEqual(order.items.count(), 1)
+        self.assertEqual(order.items.first().product_name, 'Product A')
+        self.assertEqual(CustomerSalesAssignment.objects.get(customer=self.customer).sales_user, self.sales)
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_sales_can_issue_order_proforma_for_single_order_customer(self):
+        order = CustomerOrder.objects.create(
+            customer=self.customer,
+            sales_expert=self.sales,
+            title='Order for proforma',
+        )
+        order.items.create(product_name='Product A', quantity='1', unit='piece')
+
+        self.client.login(username='sales-order', password='pass1234')
+        response = self.client.post(
+            reverse('order_detail', args=[order.id]),
+            {
+                'action': 'issue_proforma',
+                'title': 'Order proforma',
+                'valid_until': '1405/12/29',
+                'note': 'Internal note',
+                'files': SimpleUploadedFile('proforma.pdf', b'%PDF-1.4 sample', content_type='application/pdf'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.status, CustomerOrder.STATUS_PROFORMA_SENT)
+        proforma = ProformaInvoice.objects.get(order=order)
+        self.assertEqual(proforma.customer, self.customer)
+        self.assertEqual(proforma.issued_by, self.sales)

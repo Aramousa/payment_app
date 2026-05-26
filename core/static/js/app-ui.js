@@ -152,6 +152,130 @@
         });
     }
 
+    function enhanceZoomableImages() {
+        var registry = new WeakMap();
+
+        function clamp(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function enhanceImage(img) {
+            if (!img || img.dataset.zoomReady === '1') return;
+            img.dataset.zoomReady = '1';
+            img.classList.add('app-zoomable-image');
+
+            var viewport = document.createElement('div');
+            viewport.className = 'app-image-zoom-viewport';
+            img.parentNode.insertBefore(viewport, img);
+            viewport.appendChild(img);
+
+            var toolbar = document.createElement('div');
+            toolbar.className = 'app-image-zoom-toolbar';
+            toolbar.innerHTML =
+                '<button type="button" data-zoom="in" title="بزرگنمایی">+</button>' +
+                '<button type="button" data-zoom="out" title="کوچکنمایی">-</button>' +
+                '<button type="button" data-zoom="reset" title="نمایش عادی">100%</button>' +
+                '<span class="app-image-zoom-level">100%</span>';
+            viewport.appendChild(toolbar);
+
+            var level = toolbar.querySelector('.app-image-zoom-level');
+            var state = { scale: 1, x: 0, y: 0, dragging: false, startX: 0, startY: 0, baseX: 0, baseY: 0 };
+
+            function render() {
+                if (state.scale <= 1) {
+                    state.x = 0;
+                    state.y = 0;
+                }
+                img.style.transform = 'translate(' + state.x + 'px, ' + state.y + 'px) scale(' + state.scale + ')';
+                img.style.cursor = state.scale > 1 ? 'grab' : 'zoom-in';
+                if (level) level.textContent = Math.round(state.scale * 100) + '%';
+            }
+
+            function setScale(nextScale) {
+                state.scale = clamp(nextScale, 1, 6);
+                render();
+            }
+
+            function reset() {
+                state.scale = 1;
+                state.x = 0;
+                state.y = 0;
+                render();
+            }
+
+            toolbar.addEventListener('click', function (event) {
+                var button = event.target.closest('button[data-zoom]');
+                if (!button) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (button.dataset.zoom === 'in') setScale(state.scale + 0.25);
+                if (button.dataset.zoom === 'out') setScale(state.scale - 0.25);
+                if (button.dataset.zoom === 'reset') reset();
+            });
+
+            viewport.addEventListener('wheel', function (event) {
+                event.preventDefault();
+                setScale(state.scale + (event.deltaY < 0 ? 0.18 : -0.18));
+            }, { passive: false });
+
+            viewport.addEventListener('dblclick', function (event) {
+                if (event.target.closest('.app-image-zoom-toolbar')) return;
+                event.preventDefault();
+                if (state.scale > 1) reset();
+                else setScale(2);
+            });
+
+            viewport.addEventListener('pointerdown', function (event) {
+                if (event.target.closest('.app-image-zoom-toolbar')) return;
+                if (state.scale <= 1) {
+                    setScale(2);
+                    return;
+                }
+                state.dragging = true;
+                state.startX = event.clientX;
+                state.startY = event.clientY;
+                state.baseX = state.x;
+                state.baseY = state.y;
+                img.classList.add('is-dragging');
+                viewport.setPointerCapture(event.pointerId);
+            });
+
+            viewport.addEventListener('pointermove', function (event) {
+                if (!state.dragging) return;
+                state.x = state.baseX + event.clientX - state.startX;
+                state.y = state.baseY + event.clientY - state.startY;
+                render();
+            });
+
+            function stopDrag(event) {
+                if (!state.dragging) return;
+                state.dragging = false;
+                img.classList.remove('is-dragging');
+                try {
+                    viewport.releasePointerCapture(event.pointerId);
+                } catch (e) {}
+            }
+
+            viewport.addEventListener('pointerup', stopDrag);
+            viewport.addEventListener('pointercancel', stopDrag);
+            img.addEventListener('load', reset);
+
+            registry.set(img, { reset: reset });
+            reset();
+        }
+
+        document.querySelectorAll('img.app-zoomable-image, img[data-zoomable-image="1"]').forEach(enhanceImage);
+
+        window.AppImageZoom = {
+            enhance: enhanceImage,
+            reset: function (img) {
+                var item = registry.get(img);
+                if (item) item.reset();
+                else enhanceImage(img);
+            }
+        };
+    }
+
     function getCookie(name) {
         var value = '; ' + document.cookie;
         var parts = value.split('; ' + name + '=');
@@ -332,5 +456,6 @@
         enhanceCustomerSelects();
         disableDateAutocomplete();
         enhanceNotifications();
+        enhanceZoomableImages();
     });
 }());

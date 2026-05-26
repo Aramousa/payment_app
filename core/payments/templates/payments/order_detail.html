@@ -1,0 +1,161 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>جزئیات سفارش</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/persian-date.min.js' %}"></script>
+    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
+        .box { max-width: 1040px; margin: 0 auto 16px; background: #fff; border: 1px solid #e4e9f2; border-radius: 8px; padding: 16px; }
+        .top-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; font-family: inherit; }
+        .button-link.alt { background: #6c757d; }
+        .button-link.success { background: #198754; }
+        .meta-grid, .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+        .meta-item { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
+        .label { color: #66788a; font-size: 12px; display: block; margin-bottom: 4px; }
+        input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; font-family: inherit; }
+        label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border-bottom: 1px solid #e6e6e6; padding: 9px; text-align: right; }
+        th { background: #1769aa; color: #fff; }
+        .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
+        .status { display: inline-block; padding: 4px 10px; border-radius: 14px; color: #fff; font-size: 12px; }
+        .status.submitted { background: #546e7a; }
+        .status.reviewing { background: #1976d2; }
+        .status.proforma_sent { background: #f57c00; }
+        .status.completed { background: #2e7d32; }
+        .status.cancelled { background: #c62828; }
+        .log-list { margin: 0; padding-right: 18px; }
+        .log-list li { margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+    {% include "payments/partials/system_messages_popup.html" %}
+
+    <div class="box">
+        <div class="top-actions">
+            <h2>سفارش {{ order.order_number }}</h2>
+            <a class="button-link alt" href="{{ return_url }}">بازگشت</a>
+        </div>
+        <div class="meta-grid">
+            <div class="meta-item"><span class="label">مشتری</span>{{ order.customer.get_full_name|default:order.customer.username }}</div>
+            <div class="meta-item"><span class="label">مجموعه</span>{{ order.customer.profile.organization|default:'-' }}</div>
+            <div class="meta-item"><span class="label">کارشناس فروش</span>{{ order.sales_expert.get_full_name|default:order.sales_expert.username|default:'-' }}</div>
+            <div class="meta-item"><span class="label">انتخاب مشتری</span>{{ order.requested_sales_expert.get_full_name|default:order.requested_sales_expert.username|default:'-' }}</div>
+            <div class="meta-item"><span class="label">وضعیت</span><span class="status {{ order.status }}">{{ order.get_status_display }}</span></div>
+            <div class="meta-item"><span class="label">زمان ثبت</span>{{ order.created_at|jalali_datetime }}</div>
+        </div>
+        {% if order.customer_note %}
+            <p><strong>توضیح مشتری:</strong><br>{{ order.customer_note|linebreaksbr }}</p>
+        {% endif %}
+    </div>
+
+    <div class="box">
+        <h3>اقلام سفارش</h3>
+        <table>
+            <thead><tr><th>نام کالا</th><th>تعداد</th><th>واحد</th><th>توضیح</th></tr></thead>
+            <tbody>
+                {% for item in order.items.all %}
+                    <tr>
+                        <td>{{ item.product_name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ item.get_unit_display }}</td>
+                        <td>{{ item.note|default:'-' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if can_manage_orders %}
+    <div class="box">
+        <h3>مدیریت سفارش</h3>
+        <form method="post" class="form-grid">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_status">
+            {% for field in status_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            <div><button type="submit" class="button-link">ذخیره تغییرات</button></div>
+        </form>
+    </div>
+
+    <div class="box">
+        <h3>صدور پیش فاکتور برای همین سفارش</h3>
+        <form method="post" enctype="multipart/form-data" class="form-grid">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="issue_proforma">
+            {% for field in proforma_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            <div><button type="submit" class="button-link success">ارسال پیش فاکتور</button></div>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="box">
+        <h3>پیش فاکتورهای مرتبط</h3>
+        <table>
+            <thead><tr><th>عنوان</th><th>اعتبار تا</th><th>وضعیت</th><th>مشاهده</th></tr></thead>
+            <tbody>
+                {% for proforma in order.proformas.all %}
+                    <tr>
+                        <td>{{ proforma.title|default:'-' }}</td>
+                        <td>{{ proforma.valid_until }}</td>
+                        <td>{{ proforma.get_status_display }}</td>
+                        <td><a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4">پیش فاکتوری برای این سفارش صادر نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="box">
+        <h3>روند سفارش</h3>
+        <ul class="log-list">
+            {% for log in logs %}
+                <li>
+                    {{ log.created_at|jalali_datetime }} - {{ log.get_action_display }}
+                    {% if log.to_status %} - {{ log.to_status }}{% endif %}
+                    {% if is_staff_user and log.actor %} - {{ log.actor.get_full_name|default:log.actor.username }}{% endif %}
+                    {% if log.note %}<br><small>{{ log.note }}</small>{% endif %}
+                </li>
+            {% empty %}
+                <li>رویدادی ثبت نشده است.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <script>
+    $(document).ready(function () {
+        $('.jalali-date').persianDatepicker({
+            format: 'YYYY/MM/DD',
+            observer: true,
+            initialValue: false,
+            initialValueType: 'persian',
+            toolbox: { calendarSwitch: { enabled: false } }
+        });
+    });
+    </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>
