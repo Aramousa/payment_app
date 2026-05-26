@@ -30,7 +30,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
+from .models import Counterparty, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -2027,16 +2027,37 @@ def _log_system_activity(actor, target_user, action, description=''):
     )
 
 
+def _can_review_profile_change(user):
+    if user.is_superuser:
+        return True
+    return _user_role(user) in STAFF_ROLES
+
+
 @login_required
 def profile_edit(request):
     profile = get_object_or_404(UserProfile, user=request.user)
+    pending_change = (
+        ProfileChangeRequest.objects
+        .filter(user=request.user, status=ProfileChangeRequest.STATUS_PENDING)
+        .order_by('-created_at', '-id')
+        .first()
+    )
 
     if request.method == 'POST':
         form = CustomerProfileUpdateForm(request.POST, instance=profile, user=request.user)
         if form.is_valid():
             changes = form.changed_profile_fields()
-            form.save()
             if changes:
+                if pending_change:
+                    pending_change.changes = form.changes_payload()
+                    pending_change.requested_by = request.user
+                    pending_change.save(update_fields=['changes', 'requested_by'])
+                else:
+                    pending_change = ProfileChangeRequest.objects.create(
+                        user=request.user,
+                        requested_by=request.user,
+                        changes=form.changes_payload(),
+                    )
                 change_text = '؛ '.join(
                     f"{item['field']}: از «{item['old']}» به «{item['new']}»"
                     for item in changes
@@ -2045,9 +2066,11 @@ def profile_edit(request):
                     request.user,
                     request.user,
                     SystemActivityLog.ACTION_PROFILE_UPDATED,
-                    f'مشخصات کاربر توسط خودش ویرایش شد. {change_text}',
+                    f'درخواست تغییر مشخصات کاربر ثبت شد و در انتظار تایید است. {change_text}',
                 )
-            messages.success(request, 'مشخصات شما با موفقیت ذخیره شد.')
+                messages.success(request, 'درخواست تغییر مشخصات ثبت شد و تا زمان تایید، به صورت تایید نشده نمایش داده می‌شود.')
+            else:
+                messages.info(request, 'تغییری برای ثبت وجود نداشت.')
             return redirect('profile_edit')
         messages.error(request, 'ذخیره مشخصات انجام نشد. لطفا خطاها را بررسی کنید.')
     else:
@@ -2056,7 +2079,50 @@ def profile_edit(request):
     return render(request, 'payments/profile_edit.html', {
         'form': form,
         'username': request.user.username,
+        'pending_change': pending_change,
     })
+
+
+@login_required
+@require_POST
+def profile_change_request_review(request, request_id):
+    if not _can_review_profile_change(request.user):
+        return HttpResponseForbidden('شما دسترسی تایید تغییرات مشخصات را ندارید.')
+    change_request = get_object_or_404(
+        ProfileChangeRequest.objects.select_related('user', 'user__profile', 'requested_by'),
+        id=request_id,
+        status=ProfileChangeRequest.STATUS_PENDING,
+    )
+    action = request.POST.get('action')
+    if action == 'approve':
+        change_request.apply_changes(request.user)
+        change_text = '؛ '.join(
+            f"{item['label']}: از «{item['old']}» به «{item['new']}»"
+            for item in change_request.change_items
+        )
+        _log_system_activity(
+            request.user,
+            change_request.user,
+            SystemActivityLog.ACTION_PROFILE_UPDATED,
+            f'درخواست تغییر مشخصات تایید شد. {change_text}',
+        )
+        messages.success(request, 'درخواست تغییر مشخصات تایید و روی پروفایل اعمال شد.')
+    elif action == 'reject':
+        change_request.status = ProfileChangeRequest.STATUS_REJECTED
+        change_request.reviewed_by = request.user
+        change_request.reviewed_at = timezone.now()
+        change_request.review_note = (request.POST.get('review_note') or '').strip()
+        change_request.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'review_note'])
+        _log_system_activity(
+            request.user,
+            change_request.user,
+            SystemActivityLog.ACTION_PROFILE_UPDATED,
+            'درخواست تغییر مشخصات رد شد.',
+        )
+        messages.warning(request, 'درخواست تغییر مشخصات رد شد.')
+    else:
+        messages.error(request, 'عملیات نامعتبر است.')
+    return redirect(request.POST.get('next') or 'users_manage')
 
 
 def _send_temporary_password_email(user, temp_password):
@@ -2358,7 +2424,9 @@ def counterparty_edit(request, counterparty_id):
 
 @login_required
 def users_manage(request):
-    if not _can_manage_users(request.user):
+    can_manage_user_accounts = _can_manage_users(request.user)
+    can_review_profile_changes = _can_review_profile_change(request.user)
+    if not (can_manage_user_accounts or can_review_profile_changes):
         return HttpResponseForbidden('شما دسترسی مدیریت کاربران را ندارید.')
 
     password_suggestion = _suggest_five_digit_password()
@@ -2367,6 +2435,9 @@ def users_manage(request):
         'role': (request.GET.get('role') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
     }
+    if request.method == 'POST' and not can_manage_user_accounts:
+        return HttpResponseForbidden('شما دسترسی ایجاد یا ویرایش کاربران را ندارید.')
+
     if request.method == 'POST':
         form = UserAccountManagementForm(request.POST, password_suggestion=password_suggestion)
         if form.is_valid():
@@ -2385,9 +2456,16 @@ def users_manage(request):
             password_suggestion=password_suggestion,
         )
 
+    pending_profile_changes = (
+        ProfileChangeRequest.objects
+        .filter(status=ProfileChangeRequest.STATUS_PENDING)
+        .select_related('user', 'user__profile', 'requested_by')
+        .order_by('-created_at', '-id')
+    )
+    users_source = _managed_users(query=filters['q'], role=filters['role'], status=filters['status']) if can_manage_user_accounts else User.objects.none()
     users_page = _paginate_queryset(
         request,
-        _managed_users(query=filters['q'], role=filters['role'], status=filters['status']),
+        users_source,
         per_page=10,
         page_param='page',
     )
@@ -2402,6 +2480,9 @@ def users_manage(request):
         'filters': filters,
         'export_dataset': 'users',
         'export_fields': USER_EXPORT_FIELDS,
+        'pending_profile_changes': pending_profile_changes,
+        'can_manage_user_accounts': can_manage_user_accounts,
+        'can_review_profile_changes': can_review_profile_changes,
     })
 
 
@@ -2638,30 +2719,36 @@ def proformas_dashboard(request):
             return HttpResponseForbidden('شما دسترسی صدور پیش فاکتور را ندارید.')
         form = ProformaInvoiceForm(request.POST, request.FILES)
         if form.is_valid():
-            uploaded_file = form.cleaned_data['file']
-            file_bytes = uploaded_file.read()
-            uploaded_file.seek(0)
             created_proformas = []
-            for customer in form.cleaned_data['customers']:
-                proforma = ProformaInvoice(
-                    customer=customer,
-                    issued_by=request.user,
-                    title=form.cleaned_data.get('title') or '',
-                    valid_until=form.cleaned_data['valid_until'],
-                    note=form.cleaned_data.get('note') or '',
-                )
-                proforma.file.save(uploaded_file.name, ContentFile(file_bytes), save=False)
-                proforma.save()
-                created_proformas.append(proforma)
+            for uploaded_file in form.cleaned_data['files']:
+                file_bytes = uploaded_file.read()
+                uploaded_file.seek(0)
+                for customer in form.cleaned_data['customers']:
+                    proforma = ProformaInvoice(
+                        customer=customer,
+                        issued_by=request.user,
+                        title=form.cleaned_data.get('title') or '',
+                        valid_until=form.cleaned_data['valid_until'],
+                        note=form.cleaned_data.get('note') or '',
+                    )
+                    proforma.file.save(uploaded_file.name, ContentFile(file_bytes), save=False)
+                    proforma.save()
+                    created_proformas.append(proforma)
+            notified_customers = sorted({proforma.customer for proforma in created_proformas}, key=lambda user: user.id)
+            for customer in notified_customers:
+                first_proforma = next(proforma for proforma in created_proformas if proforma.customer_id == customer.id)
                 _notify_users(
-                    [proforma.customer],
+                    [customer],
                     'پیش فاکتور جدید',
-                    'یک پیش فاکتور جدید برای شما صادر شد.',
-                    reverse('proforma_detail', args=[proforma.id]),
+                    f'{len(form.cleaned_data["files"])} پیش فاکتور جدید برای شما صادر شد.',
+                    reverse('proforma_detail', args=[first_proforma.id]),
                     category=UserNotification.CATEGORY_SYSTEM,
                     actor=request.user,
                 )
-            messages.success(request, f'پیش فاکتور با موفقیت برای {len(created_proformas)} مشتری صادر شد.')
+            messages.success(
+                request,
+                f'{len(form.cleaned_data["files"])} فایل پیش فاکتور برای {len(notified_customers)} مشتری صادر شد.'
+            )
             return redirect('proformas')
     else:
         form = ProformaInvoiceForm()

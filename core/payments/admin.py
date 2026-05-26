@@ -2,7 +2,7 @@ from django.contrib import admin
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, SystemActivityLog, UploadSettings, UserProfile
+from .models import Counterparty, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProfileChangeRequest, SystemActivityLog, UploadSettings, UserProfile
 
 
 def format_jalali_datetime(value):
@@ -193,6 +193,20 @@ class UserProfileAdmin(admin.ModelAdmin):
             from django.http import Http403Forbidden
             raise Http403Forbidden("شما دسترسی به مدیریت کاربران ندارید.")
         return super().changelist_view(request, extra_context)
+
+
+@admin.register(ProfileChangeRequest)
+class ProfileChangeRequestAdmin(admin.ModelAdmin):
+    list_display = ('user', 'status', 'requested_by', 'reviewed_by', 'created_at', 'reviewed_at')
+    list_filter = ('status', 'created_at', 'reviewed_at')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'requested_by__username')
+    readonly_fields = ('user', 'requested_by', 'reviewed_by', 'changes', 'status', 'review_note', 'created_at', 'reviewed_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Counterparty)

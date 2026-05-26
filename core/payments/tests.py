@@ -1,4 +1,5 @@
 import jdatetime
+import os
 import uuid
 from io import BytesIO
 from unittest.mock import patch
@@ -11,7 +12,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from .forms import DailyPaymentAssignmentForm, InvoiceUploadForm, PriceListUploadForm, ProformaInvoiceForm
-from .models import DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
+from .models import DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -419,6 +420,30 @@ class InvoiceFlowTests(TestCase):
         response = self.client.get(reverse('receipt_file', args=[other_receipt.id]))
         self.assertEqual(response.status_code, 403)
 
+    def test_uploaded_receipt_filename_is_server_generated_ascii(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='UNIQUE-FILE',
+        )
+        receipt = PaymentReceipt.objects.create(
+            payment=payment,
+            image=SimpleUploadedFile('فیش واریزی.pdf', b'%PDF-1.4 receipt', content_type='application/pdf'),
+            file_hash='unique-file-hash',
+        )
+
+        basename = os.path.basename(receipt.image.name)
+        self.assertTrue(receipt.image.name.startswith('receipts/paymentreceipt_user'))
+        self.assertTrue(basename.endswith('.pdf'))
+        self.assertNotIn('فیش', basename)
+        basename.encode('ascii')
+
     def test_payment_workflow_active_queue_history_and_logs(self):
         payment = PaymentRecord.objects.create(
             user=self.customer_user,
@@ -643,7 +668,7 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, 'وضعیت بازرگانی')
         self.assertContains(response, 'وضعیت مالی')
         self.assertContains(response, 'ثبت بازرگانی')
-        self.assertContains(response, 'در انتظار تایید مالی')
+        self.assertContains(response, 'در انتظار ثبت مالی')
 
     def test_staff_status_choices_for_commercial_role(self):
         choices = _staff_status_choices_for_role('commercial')
@@ -1122,7 +1147,7 @@ class InvoiceFlowTests(TestCase):
                 'customers': [str(self.customer_profile.id)],
                 'title': 'PF-1',
                 'valid_until': '1405/12/29',
-                'file': SimpleUploadedFile('pf.pdf', b'%PDF-1.4 proforma', content_type='application/pdf'),
+                'files': [SimpleUploadedFile('pf.pdf', b'%PDF-1.4 proforma', content_type='application/pdf')],
                 'note': 'internal',
             },
         )
@@ -1159,6 +1184,29 @@ class InvoiceFlowTests(TestCase):
             UserNotification.objects.filter(user=self.commercial_user, title='تایید پیش فاکتور').exists()
         )
 
+    def test_commercial_can_issue_multiple_proforma_files_for_selected_customers(self):
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.post(
+            reverse('proformas'),
+            {
+                'customers': [str(self.customer_profile.id), str(self.other_customer.profile.id)],
+                'title': 'PF-BATCH',
+                'valid_until': '1405/12/29',
+                'files': [
+                    SimpleUploadedFile('pf-1.pdf', b'%PDF-1.4 proforma 1', content_type='application/pdf'),
+                    SimpleUploadedFile('pf-2.pdf', b'%PDF-1.4 proforma 2', content_type='application/pdf'),
+                ],
+                'note': 'batch',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(ProformaInvoice.objects.filter(title='PF-BATCH').count(), 4)
+        self.assertEqual(ProformaInvoice.objects.filter(customer=self.customer_user, title='PF-BATCH').count(), 2)
+        self.assertEqual(ProformaInvoice.objects.filter(customer=self.other_customer, title='PF-BATCH').count(), 2)
+        self.assertTrue(UserNotification.objects.filter(user=self.customer_user, title='پیش فاکتور جدید').exists())
+        self.assertTrue(UserNotification.objects.filter(user=self.other_customer, title='پیش فاکتور جدید').exists())
+
     def test_customer_cannot_access_other_or_expired_proforma_approval(self):
         expired = ProformaInvoice.objects.create(
             customer=self.customer_user,
@@ -1182,33 +1230,54 @@ class InvoiceFlowTests(TestCase):
         expired.refresh_from_db()
         self.assertEqual(expired.status, ProformaInvoice.STATUS_PENDING)
 
-    def test_customer_can_edit_optional_profile_fields_and_change_is_logged(self):
+    def test_customer_profile_changes_wait_for_staff_approval(self):
         self.client.login(username='customer1', password='pass1234')
         response = self.client.post(
             reverse('profile_edit'),
             {
                 'email': 'customer1@example.com',
                 'phone': '02122222222',
-                'mobile': '09123333333',
                 'second_mobile': '09124444444',
                 'address': 'آدرس اصلی مشتری',
                 'second_address': 'آدرس دوم مشتری',
+                'organization': 'مجموعه جدید',
             },
         )
 
         self.assertEqual(response.status_code, 302)
         self.customer_user.refresh_from_db()
         self.customer_profile.refresh_from_db()
-        self.assertEqual(self.customer_user.email, 'customer1@example.com')
-        self.assertEqual(self.customer_profile.phone, '02122222222')
-        self.assertEqual(self.customer_profile.second_mobile, '09124444444')
-        self.assertEqual(self.customer_profile.second_address, 'آدرس دوم مشتری')
+        self.assertEqual(self.customer_user.email, '')
+        self.assertEqual(self.customer_profile.phone, '09120000002')
+        self.assertEqual(self.customer_profile.second_mobile, '')
+        self.assertEqual(self.customer_profile.organization, 'شرکت آلفا')
+
+        change = ProfileChangeRequest.objects.get(user=self.customer_user)
+        self.assertEqual(change.status, ProfileChangeRequest.STATUS_PENDING)
+        self.assertEqual(change.changes['email']['new'], 'customer1@example.com')
+        self.assertEqual(change.changes['organization']['new'], 'مجموعه جدید')
 
         log = SystemActivityLog.objects.get(action=SystemActivityLog.ACTION_PROFILE_UPDATED)
         self.assertEqual(log.actor, self.customer_user)
         self.assertEqual(log.target_user, self.customer_user)
         self.assertIn('شماره همراه دوم', log.description)
         self.assertIn('آدرس دوم', log.description)
+
+        self.client.logout()
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.post(
+            reverse('profile_change_request_review', args=[change.id]),
+            {'action': 'approve'},
+        )
+        self.assertEqual(response.status_code, 302)
+        change.refresh_from_db()
+        self.customer_user.refresh_from_db()
+        self.customer_profile.refresh_from_db()
+        self.assertEqual(change.status, ProfileChangeRequest.STATUS_APPROVED)
+        self.assertEqual(self.customer_user.email, 'customer1@example.com')
+        self.assertEqual(self.customer_profile.phone, '02122222222')
+        self.assertEqual(self.customer_profile.second_mobile, '09124444444')
+        self.assertEqual(self.customer_profile.organization, 'مجموعه جدید')
 
     def test_customer_profile_optional_fields_can_be_empty(self):
         self.customer_user.email = 'old@example.com'
@@ -1226,8 +1295,8 @@ class InvoiceFlowTests(TestCase):
             {
                 'email': '',
                 'phone': '',
-                'mobile': '',
                 'second_mobile': '',
+                'organization': '',
                 'address': '',
                 'second_address': '',
             },
@@ -1236,12 +1305,12 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.customer_user.refresh_from_db()
         self.customer_profile.refresh_from_db()
-        self.assertEqual(self.customer_user.email, '')
-        self.assertEqual(self.customer_profile.phone, '')
-        self.assertEqual(self.customer_profile.mobile, '')
-        self.assertEqual(self.customer_profile.second_mobile, '')
-        self.assertEqual(self.customer_profile.address, '')
-        self.assertEqual(self.customer_profile.second_address, '')
+        self.assertEqual(self.customer_user.email, 'old@example.com')
+        self.assertEqual(self.customer_profile.phone, '02122222222')
+        self.assertEqual(self.customer_profile.mobile, '09123333333')
+        change = ProfileChangeRequest.objects.get(user=self.customer_user)
+        self.assertEqual(change.changes['email']['new'], '')
+        self.assertEqual(change.changes['second_mobile']['new'], '')
 
 
 class UserManagementTests(TestCase):

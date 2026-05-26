@@ -73,6 +73,8 @@ def app_navigation(request):
             items.append(_nav_item('پیش فاکتورها', 'proformas', 'proformas', 'documents'))
         if is_staff_user:
             items.append(_nav_item('برنامه واریز', 'daily_payment_plans', 'daily_payments', 'finance'))
+            if not user.is_superuser:
+                items.append(_nav_item('تایید مشخصات', 'users_manage', 'profile_changes', 'admin'))
         if user.is_superuser:
             items.extend([
                 _nav_item('مدیریت کاربران', 'users_manage', 'users', 'admin'),

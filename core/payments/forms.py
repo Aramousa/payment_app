@@ -208,18 +208,17 @@ class CustomerProfileUpdateForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ['phone', 'mobile', 'second_mobile', 'address', 'second_address']
+        fields = ['phone', 'second_mobile', 'organization', 'address', 'second_address']
         widgets = {
             'phone': forms.TextInput(attrs={'inputmode': 'tel'}),
-            'mobile': forms.TextInput(attrs={'inputmode': 'tel'}),
             'second_mobile': forms.TextInput(attrs={'inputmode': 'tel'}),
             'address': forms.Textarea(attrs={'rows': 3}),
             'second_address': forms.Textarea(attrs={'rows': 3}),
         }
         labels = {
             'phone': 'شماره تلفن',
-            'mobile': 'شماره همراه',
             'second_mobile': 'شماره همراه دوم',
+            'organization': 'نام مجموعه',
             'address': 'آدرس',
             'second_address': 'آدرس دوم',
         }
@@ -227,8 +226,7 @@ class CustomerProfileUpdateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user')
         super().__init__(*args, **kwargs)
-        if not self.is_bound:
-            self.initial['email'] = self.user.email
+        self.initial['email'] = self.user.email
         for field in self.fields.values():
             field.required = False
 
@@ -239,8 +237,8 @@ class CustomerProfileUpdateForm(forms.ModelForm):
         labels = {
             'email': 'ایمیل',
             'phone': 'شماره تلفن',
-            'mobile': 'شماره همراه',
             'second_mobile': 'شماره همراه دوم',
+            'organization': 'نام مجموعه',
             'address': 'آدرس',
             'second_address': 'آدرس دوم',
         }
@@ -254,19 +252,21 @@ class CustomerProfileUpdateForm(forms.ModelForm):
                 old_value = getattr(self.instance, field_name, '') or ''
             new_value = self.cleaned_data.get(field_name) or ''
             changes.append({
+                'name': field_name,
                 'field': labels[field_name],
                 'old': old_value or '-',
                 'new': new_value or '-',
             })
         return changes
 
-    def save(self, commit=True):
-        profile = super().save(commit=False)
-        self.user.email = self.cleaned_data.get('email', '').strip()
-        if commit:
-            self.user.save(update_fields=['email'])
-            profile.save(update_fields=['phone', 'mobile', 'second_mobile', 'address', 'second_address'])
-        return profile
+    def changes_payload(self):
+        return {
+            item['name']: {
+                'old': '' if item['old'] == '-' else item['old'],
+                'new': '' if item['new'] == '-' else item['new'],
+            }
+            for item in self.changed_profile_fields()
+        }
 
 
 class MultiFileInput(forms.ClearableFileInput):
@@ -879,20 +879,24 @@ class ProformaInvoiceForm(forms.ModelForm):
         widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31')),
         required=True,
     )
+    files = MultipleFileField(
+        label='فایل‌های پیش فاکتور',
+        required=True,
+        widget=MultipleFileInput(attrs={
+            'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
+            'multiple': True,
+        }),
+    )
 
     class Meta:
         model = ProformaInvoice
-        fields = ['customers', 'title', 'valid_until', 'file', 'note']
+        fields = ['customers', 'title', 'valid_until', 'files', 'note']
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'مثلا پیش فاکتور اردیبهشت'}),
-            'file': forms.ClearableFileInput(attrs={
-                'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
-            }),
             'note': forms.Textarea(attrs={'rows': 3, 'placeholder': 'فقط برای کارکنان شرکت'}),
         }
         labels = {
             'title': 'عنوان',
-            'file': 'عکس یا فایل PDF پیش فاکتور',
             'note': 'توضیحات داخلی',
         }
 
@@ -900,7 +904,6 @@ class ProformaInvoiceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['customers'].queryset = _active_customer_profiles()
         self.fields['customers'].label_from_instance = InvoiceUploadForm._customer_label
-        self.fields['file'].required = True
 
     def clean_customers(self):
         profiles = self.cleaned_data['customers']
@@ -910,14 +913,15 @@ class ProformaInvoiceForm(forms.ModelForm):
             raise ValidationError('فقط کاربران مشتری قابل انتخاب هستند.')
         return [profile.user for profile in profiles]
 
-    def clean_file(self):
-        uploaded = self.cleaned_data.get('file')
-        if not uploaded:
-            return uploaded
-        ext = os.path.splitext(uploaded.name or '')[1].lower()
-        if ext not in self.ALLOWED_EXTENSIONS:
-            raise ValidationError('فقط فایل‌های تصویری استاندارد و PDF مجاز است.')
-        return uploaded
+    def clean_files(self):
+        files = self.cleaned_data.get('files') or []
+        if not files:
+            raise ValidationError('حداقل یک فایل پیش فاکتور را انتخاب کنید.')
+        for uploaded in files:
+            ext = os.path.splitext(uploaded.name or '')[1].lower()
+            if ext not in self.ALLOWED_EXTENSIONS:
+                raise ValidationError('فقط فایل‌های تصویری استاندارد و PDF مجاز است.')
+        return files
 
 
 class InvoiceCustomerNoteForm(forms.ModelForm):

@@ -23,6 +23,7 @@ from .views import (
     notifications_feed,
     notifications_mark_read,
     profile_edit,
+    profile_change_request_review,
     profile_password_cancel,
     profile_password_change,
     payment_timeline,
@@ -84,6 +85,7 @@ urlpatterns = [
     path('export-records/', export_records, name='export_records'),
     path('export/<str:dataset>/', export_data, name='export_data'),
     path('profile/', profile_edit, name='profile_edit'),
+    path('profile-change-requests/<int:request_id>/review/', profile_change_request_review, name='profile_change_request_review'),
     path('profile/password/', profile_password_change, name='profile_password_change'),
     path('profile/password/cancel/', profile_password_cancel, name='profile_password_cancel'),
 ]

@@ -31,6 +31,17 @@
     <div class="box">
         <h2>ویرایش مشخصات شخصی</h2>
         <div class="note">نام کاربری: <strong>{{ username }}</strong></div>
+        <div class="note">نام، نام خانوادگی، شماره همراه، شهر و استان در این فرم قابل تغییر نیستند. سایر تغییرات پس از تایید کارکنان مجاز یا مالی اعمال می‌شوند.</div>
+        {% if pending_change %}
+            <div class="note" style="background:#fff8e6; border:1px solid #f0d083; color:#704b00;">
+                <strong>تغییرات تایید نشده:</strong>
+                <ul style="margin:8px 0 0; padding-right:18px;">
+                    {% for item in pending_change.change_items %}
+                        <li>{{ item.label }}: «{{ item.old }}» به «{{ item.new }}»</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
 
         {% include "payments/partials/system_messages_popup.html" %}
 

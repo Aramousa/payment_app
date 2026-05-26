@@ -1,10 +1,67 @@
 import uuid
+import os
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 from django_jalali.db import models as jmodels
+
+
+def _safe_upload_extension(filename):
+    ext = os.path.splitext(filename or '')[1].lower()
+    safe_ext = ''.join(ch for ch in ext if ch in '.abcdefghijklmnopqrstuvwxyz0123456789')
+    if safe_ext == '.' or len(safe_ext) > 16:
+        return ''
+    return safe_ext
+
+
+def _upload_actor_id(instance):
+    for attr in ('user', 'customer', 'uploaded_by', 'issued_by', 'requested_by'):
+        value = getattr(instance, f'{attr}_id', None)
+        if value:
+            return value
+    payment = getattr(instance, 'payment', None)
+    if payment:
+        return getattr(payment, 'user_id', None) or getattr(payment, 'id', None)
+    return 'system'
+
+
+def _unique_upload_path(instance, filename, folder, model_name):
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+    actor_id = _upload_actor_id(instance)
+    token = uuid.uuid4().hex[:12]
+    ext = _safe_upload_extension(filename)
+    return f'{folder}/{model_name}_user{actor_id}_{timestamp}_{token}{ext}'
+
+
+def login_ad_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'login_ads', 'loginadvertisement')
+
+
+def payment_record_receipt_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'receipts', 'paymentrecord')
+
+
+def payment_receipt_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'receipts', 'paymentreceipt')
+
+
+def invoice_attachment_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'invoices', 'invoicerecord')
+
+
+def invoice_extraction_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'invoice_extractions', 'invoiceextractionjob')
+
+
+def price_list_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'price_lists', 'pricelist')
+
+
+def proforma_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'proformas', 'proformainvoice')
 
 
 class Counterparty(models.Model):
@@ -38,7 +95,7 @@ class LoginAdvertisement(models.Model):
     slot = models.PositiveSmallIntegerField('جایگاه', choices=SLOT_CHOICES, unique=True)
     title = models.CharField('عنوان آگهی', max_length=120)
     description = models.TextField('متن آگهی', blank=True)
-    image = models.ImageField('تصویر بنر', upload_to='login_ads/', blank=True, null=True)
+    image = models.ImageField('تصویر بنر', upload_to=login_ad_upload_to, blank=True, null=True)
     link_url = models.URLField('لینک مقصد', blank=True)
     start_date = models.DateField('تاریخ شروع')
     end_date = models.DateField('تاریخ خاتمه')
@@ -114,7 +171,7 @@ class PaymentRecord(models.Model):
     STATUS_CHOICES = [
         (STATUS_PENDING, 'در حال بررسی'),
         (STATUS_COMMERCIAL_REVIEW, 'بررسی بازرگانی'),
-        (STATUS_FINANCE_REVIEW, 'تایید مالی'),
+        (STATUS_FINANCE_REVIEW, 'ثبت مالی'),
         (STATUS_APPROVED, 'ثبت بازرگانی'),
         (STATUS_FINAL_APPROVED, 'تایید نهایی'),
         (STATUS_REJECTED, 'رد شده'),
@@ -149,7 +206,7 @@ class PaymentRecord(models.Model):
     beneficiary_bank_name = models.CharField(max_length=64, blank=True, default='')
     beneficiary_account_number = models.CharField(max_length=64, blank=True, default='')
     beneficiary_account_owner = models.CharField(max_length=128, blank=True, default='')
-    receipt_image = models.ImageField(upload_to='receipts/', blank=True, null=True)
+    receipt_image = models.ImageField(upload_to=payment_record_receipt_upload_to, blank=True, null=True)
     daily_assignment = models.ForeignKey('DailyPaymentAssignment', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     locked_by_finance = models.BooleanField(default=False)
@@ -203,7 +260,7 @@ class PaymentRecord(models.Model):
         if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
             return 'عودت به بازرگانی'
         if self.status == self.STATUS_APPROVED:
-            return 'در انتظار تایید مالی'
+            return 'در انتظار ثبت مالی'
         if self.status == self.STATUS_FINAL_APPROVED:
             return 'تایید نهایی'
         if self.status == self.STATUS_REJECTED:
@@ -289,9 +346,78 @@ class UserProfile(models.Model):
         return self.user.username
 
 
+class ProfileChangeRequest(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'در انتظار تایید'),
+        (STATUS_APPROVED, 'تایید شده'),
+        (STATUS_REJECTED, 'رد شده'),
+    ]
+
+    FIELD_LABELS = {
+        'email': 'ایمیل',
+        'phone': 'شماره تلفن',
+        'second_mobile': 'شماره همراه دوم',
+        'organization': 'نام مجموعه',
+        'address': 'آدرس',
+        'second_address': 'آدرس دوم',
+    }
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profile_change_requests')
+    requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='requested_profile_changes')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_profile_changes')
+    changes = models.JSONField(default=dict)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    review_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_status_display()}"
+
+    @property
+    def change_items(self):
+        items = []
+        for field_name, values in (self.changes or {}).items():
+            items.append({
+                'field': field_name,
+                'label': self.FIELD_LABELS.get(field_name, field_name),
+                'old': (values or {}).get('old') or '-',
+                'new': (values or {}).get('new') or '-',
+            })
+        return items
+
+    def apply_changes(self, reviewer):
+        profile = self.user.profile
+        update_profile_fields = []
+        update_user_fields = []
+        for field_name, values in (self.changes or {}).items():
+            new_value = (values or {}).get('new') or ''
+            if field_name == 'email':
+                self.user.email = new_value
+                update_user_fields.append('email')
+            elif hasattr(profile, field_name):
+                setattr(profile, field_name, new_value)
+                update_profile_fields.append(field_name)
+        if update_user_fields:
+            self.user.save(update_fields=sorted(set(update_user_fields)))
+        if update_profile_fields:
+            profile.save(update_fields=sorted(set(update_profile_fields)))
+        self.status = self.STATUS_APPROVED
+        self.reviewed_by = reviewer
+        self.reviewed_at = timezone.now()
+        self.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
+
+
 class PaymentReceipt(models.Model):
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='receipts')
-    image = models.FileField(upload_to='receipts/')
+    image = models.FileField(upload_to=payment_receipt_upload_to)
     file_hash = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -441,7 +567,7 @@ class InvoiceRecord(models.Model):
     invoice_date = jmodels.jDateField('تاریخ فاکتور', null=True, blank=True)
     invoice_number = models.CharField('شماره فاکتور', max_length=80, blank=True)
     reference_number = models.CharField('شماره حواله', max_length=80, blank=True)
-    attachment = models.FileField('فایل فاکتور', upload_to='invoices/')
+    attachment = models.FileField('فایل فاکتور', upload_to=invoice_attachment_upload_to)
     customer_visible_note = models.TextField('توضیحات قابل مشاهده برای مشتری', blank=True)
     internal_note = models.TextField('توضیحات داخلی', blank=True)
     customer_note = models.TextField('یادداشت مشتری', blank=True)
@@ -499,7 +625,7 @@ class InvoiceExtractionJob(models.Model):
         related_name='invoice_extraction_jobs',
     )
     source = models.CharField('منبع', max_length=20, choices=SOURCE_CHOICES, default=SOURCE_PREVIEW)
-    file = models.FileField('فایل پردازش', upload_to='invoice_extractions/')
+    file = models.FileField('فایل پردازش', upload_to=invoice_extraction_upload_to)
     original_filename = models.CharField('نام فایل اصلی', max_length=255, blank=True)
     file_kind = models.CharField('نوع فایل', max_length=30, blank=True)
     text_source = models.CharField('منبع متن', max_length=30, blank=True)
@@ -531,7 +657,7 @@ class PriceList(models.Model):
         related_name='uploaded_price_lists',
     )
     title = models.CharField('عنوان', max_length=120, blank=True)
-    file = models.FileField('فایل لیست قیمت', upload_to='price_lists/')
+    file = models.FileField('فایل لیست قیمت', upload_to=price_list_upload_to)
     batch_id = models.UUIDField('شناسه بسته ارسال', default=uuid.uuid4, db_index=True)
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
     note = models.TextField('توضیحات داخلی', blank=True)
@@ -569,7 +695,7 @@ class ProformaInvoice(models.Model):
     )
     title = models.CharField('عنوان', max_length=120, blank=True)
     valid_until = jmodels.jDateField('اعتبار تا')
-    file = models.FileField('فایل پیش فاکتور', upload_to='proformas/')
+    file = models.FileField('فایل پیش فاکتور', upload_to=proforma_upload_to)
     note = models.TextField('توضیحات داخلی', blank=True)
     status = models.CharField('وضعیت', max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
