@@ -157,6 +157,11 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+PADDLEOCR_MODEL_DIR = Path(os.getenv('PADDLEOCR_MODEL_DIR', BASE_DIR / 'offline_packages' / 'paddleocr-models'))
+PADDLEOCR_DET_MODEL_DIR = Path(os.getenv('PADDLEOCR_DET_MODEL_DIR', PADDLEOCR_MODEL_DIR / 'det'))
+PADDLEOCR_REC_MODEL_DIR = Path(os.getenv('PADDLEOCR_REC_MODEL_DIR', PADDLEOCR_MODEL_DIR / 'rec'))
+PADDLEOCR_CLS_MODEL_DIR = Path(os.getenv('PADDLEOCR_CLS_MODEL_DIR', PADDLEOCR_MODEL_DIR / 'cls'))
+
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(

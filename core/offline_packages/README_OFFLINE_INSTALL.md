@@ -1,60 +1,62 @@
-# نصب آفلاین وابستگی‌ها
+# نصب آفلاین روی Ubuntu 22.04
 
-این پوشه برای نصب آفلاین امکانات برنامه آماده شده است.
+این بسته برای اجرای عملیاتی بدون اینترنت آماده می‌شود. هیچ نصب runtime نباید از اینترنت انجام شود.
 
-## نصب پکیج‌های Python
+## نصب وابستگی‌های اصلی
 
-از ریشه پروژه اجرا کنید:
+از ریشه پروژه:
 
-```powershell
-.\offline_packages\install_offline.ps1
+```bash
+cd /var/www/visiunapp/core
+source ../venv/bin/activate
+bash offline_packages/install_offline_linux.sh
 ```
 
-یا به‌صورت دستی:
+اگر سرور با Python پیش‌فرض Ubuntu 22.04 یعنی Python 3.10 اجرا می‌شود:
 
-```powershell
-.\venv\Scripts\python.exe -m pip install --no-index --find-links .\offline_packages\python-wheels -r .\requirements.txt
+```bash
+pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements.txt
 ```
 
-## فعال‌سازی OCR عکس فاکتور
+اگر عمدا Python 3.12 یا 3.13 روی سرور نصب شده است:
 
-برای خواندن متن از عکس، فقط `pytesseract` کافی نیست و خود Tesseract OCR هم باید روی ویندوز نصب باشد.
+```bash
+pip install --no-index --find-links=vendor/wheels-linux -r requirements.txt
+```
 
-فایل نصب داخل این مسیر قرار دارد:
+## OCR
+
+OCR اختیاری است و فقط روی سرور/worker مخصوص OCR نصب شود.
+
+```bash
+INCLUDE_OCR=1 bash offline_packages/install_offline_linux.sh
+```
+
+بسته فعلی OCR برای Linux Python 3.12 آماده شده است. اگر سرور Ubuntu 22.04 با Python 3.10 اجرا می‌شود، باید wheelهای `offline_packages/ocr-wheels` برای cp310 ساخته شوند.
+
+## مدل‌های PaddleOCR
+
+PaddleOCR علاوه بر wheelهای Python به مدل‌های محلی نیاز دارد. این مدل‌ها باید قبل از انتقال به سرور آفلاین داخل مسیر زیر قرار بگیرند:
 
 ```text
-offline_packages\tesseract\tesseract-ocr-w64-setup-5.5.0.20241111.exe
+offline_packages/paddleocr-models/det
+offline_packages/paddleocr-models/rec
+offline_packages/paddleocr-models/cls
 ```
 
-بعد از نصب Tesseract، فایل‌های زبان را از این مسیر:
+پوشه‌های `det` و `rec` الزامی هستند. پوشه `cls` اختیاری است. برنامه در صورت نبود مدل‌ها تلاش اینترنتی برای دانلود انجام نمی‌دهد و فقط پیام هشدار نمایش می‌دهد.
+
+## Tesseract
+
+اگر از Tesseract هم استفاده شود، باید بسته سیستم‌عاملی Ubuntu به‌صورت آفلاین از مخزن داخلی یا بسته‌های `.deb` نصب شود. فایل‌های زبان فارسی و انگلیسی در این مسیر موجود هستند:
 
 ```text
-offline_packages\tesseract\tessdata
+offline_packages/tesseract/tessdata
 ```
 
-به مسیر `tessdata` نصب Tesseract کپی کنید. مسیر معمول ویندوز:
-
-```text
-C:\Program Files\Tesseract-OCR\tessdata
-```
-
-حداقل این دو فایل لازم است:
+فایل‌های لازم:
 
 ```text
 fas.traineddata
 eng.traineddata
 ```
-
-بعد از نصب، اگر `tesseract.exe` در PATH نبود، مسیر زیر را به PATH ویندوز اضافه کنید:
-
-```text
-C:\Program Files\Tesseract-OCR
-```
-
-## تست نصب OCR
-
-```powershell
-tesseract --list-langs
-```
-
-باید `fas` و `eng` در خروجی دیده شوند.

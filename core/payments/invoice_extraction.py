@@ -3,6 +3,7 @@ import re
 import tempfile
 from pathlib import Path
 
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
@@ -247,8 +248,47 @@ def get_paddle_ocr():
     if _PADDLE_OCR is None:
         from paddleocr import PaddleOCR
 
-        _PADDLE_OCR = PaddleOCR(use_angle_cls=True, lang='fa', show_log=False)
+        model_dirs = _paddle_ocr_model_dirs()
+        if not model_dirs:
+            raise RuntimeError(
+                'PaddleOCR local model directories are not configured. '
+                'Set PADDLEOCR_DET_MODEL_DIR and PADDLEOCR_REC_MODEL_DIR, '
+                'or put models under offline_packages/paddleocr-models/det and rec.'
+            )
+
+        kwargs = {
+            'lang': 'fa',
+            'show_log': False,
+            'det_model_dir': str(model_dirs['det']),
+            'rec_model_dir': str(model_dirs['rec']),
+            'use_angle_cls': bool(model_dirs.get('cls')),
+        }
+        if model_dirs.get('cls'):
+            kwargs['cls_model_dir'] = str(model_dirs['cls'])
+        _PADDLE_OCR = PaddleOCR(**kwargs)
     return _PADDLE_OCR
+
+
+def _paddle_ocr_model_dirs():
+    base_dir = Path(getattr(settings, 'PADDLEOCR_MODEL_DIR', '') or '')
+    det_dir = Path(getattr(settings, 'PADDLEOCR_DET_MODEL_DIR', '') or (base_dir / 'det' if base_dir else ''))
+    rec_dir = Path(getattr(settings, 'PADDLEOCR_REC_MODEL_DIR', '') or (base_dir / 'rec' if base_dir else ''))
+    cls_dir = Path(getattr(settings, 'PADDLEOCR_CLS_MODEL_DIR', '') or (base_dir / 'cls' if base_dir else ''))
+
+    if not _model_dir_ready(det_dir) or not _model_dir_ready(rec_dir):
+        return None
+
+    model_dirs = {'det': det_dir, 'rec': rec_dir}
+    if _model_dir_ready(cls_dir):
+        model_dirs['cls'] = cls_dir
+    return model_dirs
+
+
+def _model_dir_ready(path):
+    try:
+        return path.exists() and path.is_dir() and any(path.iterdir())
+    except OSError:
+        return False
 
 
 def _line_after_label(text, labels):

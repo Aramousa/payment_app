@@ -1,4 +1,4 @@
-# Payment App
+﻿# Payment App
 
 این پروژه یک سامانه ثبت و بررسی فیش‌های واریزی با استفاده از جنگو است. برنامه برای اجرا در محیط آفلاین و بدون دسترسی به اینترنت طراحی شده است و تمامی وابستگی‌های لازم در خود پروژه قرار دارند.
 
@@ -20,22 +20,19 @@
 ## بسته‌های آفلاین
 
 پوشه‌های `vendor/` شامل wheelهای آماده نصب هستند:
-- `vendor/wheels/` : بسته کامل‌تر عمومی برای نصب آفلاین؛ شامل wheelهای ویندوز و لینوکس مورد نیاز
-- `vendor/wheels-linux/` : بسته‌های لینوکس برای Python 3.13+ و `requirements.txt`
+- `vendor/wheels-linux/` : بسته‌های لینوکس برای Python 3.12/3.13 و `requirements.txt`
 - `vendor/wheels-linux-py310-django52/` : بسته‌های لینوکس برای Python 3.10 و همان `requirements.txt`
+- `offline_packages/ocr-wheels/` : بسته‌های OCR سنگین مانند PyMuPDF، OpenCV، PaddleOCR و PaddlePaddle
+- `offline_packages/tesseract/` : فایل‌های زبان فارسی/انگلیسی برای Tesseract
+- `offline_packages/paddleocr-models/` : محل مدل‌های محلی PaddleOCR برای اجرای کاملا آفلاین OCR
 
 > اگر از سرور آفلاین استفاده می‌کنید، حتما باید از گزینه `--no-index --find-links=...` استفاده کنید و به اینترنت متصل نباشید.
 > در بسته انتشار عملیاتی باید کل پوشه `vendor/` همراه پروژه کپی شود. اگر این پوشه روی سرور وجود نداشته باشد، نصب آفلاین با خطای پیدا نشدن بسته‌هایی مثل `asgiref`، `Django` یا `gunicorn` متوقف می‌شود.
+> برای OCR تصویر و PDF اسکن‌شده، علاوه بر wheelها، مدل‌های PaddleOCR نیز باید داخل `offline_packages/paddleocr-models` قرار بگیرند؛ برنامه بدون مدل محلی، تلاش اینترنتی برای دانلود انجام نمی‌دهد.
 
 ## نصب آفلاین
 
-### ویندوز
-
-```powershell
-python -m pip install --no-index --find-links=vendor/wheels -r requirements.txt
-```
-
-### لینوکس با Python 3.13+
+### لینوکس با Python 3.12/3.13
 
 ```bash
 python3.13 -m pip install --no-index --find-links=vendor/wheels-linux -r requirements.txt
@@ -45,12 +42,6 @@ python3.13 -m pip install --no-index --find-links=vendor/wheels-linux -r require
 
 ```bash
 python3.10 -m pip install --no-index --find-links=vendor/wheels-linux-py310-django52 -r requirements.txt
-```
-
-اگر در سرور عملیاتی فقط مسیر `vendor/wheels` را در دستور نصب استفاده می‌کنید، این مسیر هم شامل wheelهای لینوکس Python 3.10 است و می‌توانید این دستور را اجرا کنید:
-
-```bash
-python3.10 -m pip install --no-index --find-links=vendor/wheels -r requirements.txt
 ```
 
 ## تنظیم محیط
@@ -140,9 +131,7 @@ python manage.py runserver
    - اگر فقط نیازمندید در محیط آفلاین همان مجموعه فعلی را نصب کنید، همین فایل‌ها کافی هستند.
 
 2. **به‌روزرسانی wheelهای آفلاین**
-   - در یک ماشین توسعه با اینترنت، wheelهای مورد نیاز را از PyPI دانلود کنید.
-   - برای Windows را در `vendor/wheels/` قرار دهید.
-   - برای لینوکس Python 3.13+ را در `vendor/wheels-linux/` قرار دهید.
+   - در یک ماشین توسعه با اینترنت، wheelهای مورد نیاز را از PyPI دانلود کنید.`r`n   - برای لینوکس Python 3.12/3.13 را در `vendor/wheels-linux/` قرار دهید.
    - برای لینوکس Python 3.10 را در `vendor/wheels-linux-py310-django52/` قرار دهید.
 
 3. **اطمینان از تطابق نسخه‌ها**
@@ -259,3 +248,6 @@ python manage.py runserver
 - برای OCR، پشته پیشنهادی شامل PaddleOCR و OpenCV است.
 - خروجی استخراج به JSON تبدیل می‌شود تا مقدارهای فرم قابل استفاده باشند.
 - Redis/RQ فعلا پیاده‌سازی نشده و پردازش به‌صورت مستقیم انجام می‌شود؛ در مرحله عملیاتی می‌توان worker queue اضافه کرد.
+
+
+
