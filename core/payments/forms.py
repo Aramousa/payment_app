@@ -3,6 +3,7 @@ from io import BytesIO
 import os
 import random
 import re
+import time as _time
 
 from django import forms
 from django.contrib.auth.forms import PasswordChangeForm
@@ -16,7 +17,7 @@ from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 from PIL import Image, ImageOps
 
-from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, UploadSettings, UserProfile
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, UploadSettings, UserProfile
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
 MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
@@ -106,6 +107,41 @@ def _active_sales_users():
 def _receipt_max_upload_size():
     settings = _upload_settings()
     return settings.receipt_max_upload_size_bytes if settings else DEFAULT_RECEIPT_MAX_UPLOAD_SIZE
+
+
+# کش تنظیمات اجباری بودن فیلدها — هر ۶۰ ثانیه از دیتابیس می‌خواند
+_frc_cache: dict = {}
+_frc_cache_ts: dict = {}
+_FRC_TTL = 60
+
+
+def _apply_field_config(form_instance, form_name: str) -> None:
+    """
+    اگر ادمین override تنظیم کرده (is_required != None) آن را اعمال می‌کند.
+    اگر is_required=None باشد، پیشفرض کد دست‌نخورده می‌ماند.
+    """
+    for field_name, override in _get_field_required_config(form_name).items():
+        if override is not None and field_name in form_instance.fields and not form_instance.fields[field_name].disabled:
+            form_instance.fields[field_name].required = override
+
+
+def _get_field_required_config(form_name: str) -> dict:
+    """
+    Returns {field_name: is_required_or_None} for the given form, cached for 60s.
+    None means 'use code default' (no override from admin).
+    """
+    now = _time.monotonic()
+    if form_name not in _frc_cache or now - _frc_cache_ts.get(form_name, 0) > _FRC_TTL:
+        try:
+            from .models import FieldRequirementConfig
+            _frc_cache[form_name] = {
+                c.field_name: c.is_required  # None = use code default
+                for c in FieldRequirementConfig.objects.filter(form_name=form_name)
+            }
+        except Exception:
+            _frc_cache[form_name] = {}
+        _frc_cache_ts[form_name] = now
+    return _frc_cache[form_name]
 
 
 def _invoice_max_upload_size():
@@ -258,6 +294,7 @@ class CustomerProfileUpdateForm(forms.ModelForm):
         self.initial['email'] = self.user.email
         for field in self.fields.values():
             field.required = False
+        _apply_field_config(self, 'profile')
 
     def clean_email(self):
         return (self.cleaned_data.get('email') or '').strip()
@@ -342,11 +379,10 @@ class PaymentRecordForm(forms.ModelForm):
     receipt_images = MultiFileField(
         required=False,
         widget=MultiFileInput(attrs={
-            'multiple': True,
             'accept': '.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf',
         }),
-        label='فایل های فیش',
-        help_text='فقط فایل های تصویر استاندارد و PDF مجاز است. حداکثر حجم هر فایل: ۱ مگابایت.',
+        label='فایل فیش',
+        help_text='یک فایل تصویر یا PDF انتخاب کنید. حداکثر حجم: ۱ مگابایت.',
     )
 
     pay_date = jDateField(
@@ -383,6 +419,12 @@ class PaymentRecordForm(forms.ModelForm):
 
         has_existing_files = bool(self.instance and self.instance.pk and self.instance.receipts.exists())
         self.fields['receipt_images'].required = not has_existing_files
+
+        # اعمال تنظیمات اجباری بودن فیلدها از دیتابیس
+        field_config = _get_field_required_config('payment')
+        for field_name, is_req in field_config.items():
+            if field_name in self.fields and not self.fields[field_name].disabled:
+                self.fields[field_name].required = is_req
 
         for field_name in self.ACCOUNT_FIELDS:
             field = self.fields[field_name]
@@ -467,6 +509,8 @@ class PaymentRecordForm(forms.ModelForm):
         has_existing_files = bool(self.instance.pk and self.instance.receipts.exists())
         if not files and not has_existing_files:
             raise ValidationError('حداقل یک فایل فیش لازم است.')
+        if len(files) > 1:
+            raise ValidationError('فقط یک فایل در هر بار ثبت مجاز است.')
 
         existing_hashes = set()
         if self.instance.pk:
@@ -557,6 +601,7 @@ class StaffPaymentDetailsForm(forms.ModelForm):
             self.fields[bank_field].widget.attrs['class'] = (css_class + ' bank-autocomplete-input').strip()
             self.fields[bank_field].widget.attrs['data-bank-type'] = 'payer' if bank_field == 'payer_bank_name' else 'beneficiary'
             self.fields[bank_field].widget.attrs['autocomplete'] = 'off'
+        _apply_field_config(self, 'payment_staff')
 
     def clean_amount(self):
         amount = self.cleaned_data.get('amount')
@@ -696,6 +741,111 @@ class CounterpartyForm(forms.ModelForm):
             'name': 'طرف حساب',
             'description': 'توضیحات',
         }
+
+
+class CounterpartyManagementForm(forms.ModelForm):
+    """فرم کامل ایجاد/ویرایش طرف حساب از پنل مدیریت کاربران."""
+
+    password = forms.CharField(
+        label='کلمه عبور',
+        required=False,
+        widget=forms.TextInput(attrs={'dir': 'ltr', 'inputmode': 'latin'}),
+        help_text='فقط در صورت ایجاد حساب کاربری جدید پر کنید.',
+    )
+    username = forms.CharField(
+        label='نام کاربری (شماره موبایل)',
+        required=False,
+        widget=forms.TextInput(attrs={'dir': 'ltr'}),
+        help_text='اگر پر شود، یک حساب کاربری برای ورود ایجاد می‌شود.',
+    )
+
+    class Meta:
+        model = Counterparty
+        fields = ['name', 'first_name', 'last_name', 'phone', 'description', 'status']
+        labels = {
+            'name': 'نام سازمان / شرکت',
+            'first_name': 'نام',
+            'last_name': 'نام خانوادگی',
+            'phone': 'شماره تماس',
+            'description': 'توضیحات',
+            'status': 'وضعیت',
+        }
+        widgets = {
+            'phone': forms.TextInput(attrs={'inputmode': 'tel', 'dir': 'ltr'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_field_config(self, 'counterparty')
+        # نمایش نام کاربری فعلی اگر حساب دارد
+        if self.instance and self.instance.pk and self.instance.user_id:
+            self.initial['username'] = self.instance.user.username
+            self.fields['password'].help_text = 'در صورت خالی بودن، رمز تغییر نمی‌کند.'
+
+    def save(self, commit=True):
+        cp = super().save(commit=False)
+        username = (self.cleaned_data.get('username') or '').strip()
+        password = (self.cleaned_data.get('password') or '').strip()
+
+        if username:
+            if cp.user_id:
+                # به‌روزرسانی حساب موجود
+                u = cp.user
+                u.username = username
+                if password:
+                    u.set_password(password)
+                u.first_name = cp.first_name
+                u.last_name = cp.last_name
+                u.save()
+            else:
+                # ایجاد حساب جدید
+                u = User(username=username, first_name=cp.first_name, last_name=cp.last_name, is_active=True)
+                if password:
+                    u.set_password(password)
+                else:
+                    u.set_unusable_password()
+                u.save()
+                cp.user = u
+
+        if commit:
+            cp.save()
+        return cp
+
+
+class CounterpartyBankAccountForm(forms.ModelForm):
+    class Meta:
+        model = CounterpartyBankAccount
+        fields = ['bank_name', 'city', 'branch', 'account_number', 'account_owner', 'iban', 'is_primary']
+        labels = {
+            'bank_name': 'نام بانک',
+            'city': 'شهر',
+            'branch': 'شعبه',
+            'account_number': 'شماره حساب',
+            'account_owner': 'نام صاحب حساب',
+            'iban': 'شماره شبا',
+            'is_primary': 'حساب اصلی',
+        }
+        widgets = {
+            'bank_name': forms.TextInput(attrs={'class': 'bank-autocomplete-input', 'data-bank-type': 'beneficiary', 'autocomplete': 'off'}),
+            'account_number': forms.TextInput(attrs={'dir': 'ltr'}),
+            'iban': forms.TextInput(attrs={'dir': 'ltr', 'placeholder': 'IR000000000000000000000000'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_field_config(self, 'counterparty_bank')
+        for field in self.fields.values():
+            if field.label != 'حساب اصلی':
+                field.required = False
+
+
+CounterpartyBankAccountFormSet = inlineformset_factory(
+    Counterparty,
+    CounterpartyBankAccount,
+    form=CounterpartyBankAccountForm,
+    extra=1,
+    can_delete=True,
+)
 
 
 class InvoiceUploadForm(forms.ModelForm):
@@ -957,16 +1107,9 @@ class ProformaInvoiceForm(forms.ModelForm):
 
 
 class CustomerOrderForm(forms.ModelForm):
-    requested_sales_expert = forms.ModelChoiceField(
-        queryset=User.objects.none(),
-        label='کارشناس فروش مورد نظر',
-        required=False,
-        empty_label='بدون انتخاب',
-    )
-
     class Meta:
         model = CustomerOrder
-        fields = ['title', 'requested_sales_expert', 'customer_note']
+        fields = ['title', 'customer_note']
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'مثلا سفارش قطعات اردیبهشت'}),
             'customer_note': forms.Textarea(attrs={'rows': 3, 'placeholder': 'توضیحات تکمیلی، زمان تحویل یا شرایط مورد نظر'}),
@@ -977,17 +1120,9 @@ class CustomerOrderForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        customer = kwargs.pop('customer', None)
+        kwargs.pop('customer', None)
         super().__init__(*args, **kwargs)
-        self.fields['requested_sales_expert'].queryset = _active_sales_users()
-        self.fields['requested_sales_expert'].label_from_instance = self._sales_label
-        if customer and not self.is_bound:
-            try:
-                assignment = customer.sales_assignment
-                if assignment.sales_user_id:
-                    self.initial['requested_sales_expert'] = assignment.sales_user
-            except Exception:
-                pass
+        _apply_field_config(self, 'order')
 
     @staticmethod
     def _sales_label(user):
@@ -999,39 +1134,37 @@ class CustomerOrderItemForm(forms.ModelForm):
         model = CustomerOrderItem
         fields = ['product_name', 'quantity', 'unit', 'note']
         widgets = {
-            'product_name': forms.TextInput(attrs={'placeholder': 'نام کالا'}),
+            'product_name': forms.TextInput(attrs={
+                'placeholder': 'نام کالا',
+                'class': 'product-name-input',
+                'autocomplete': 'off',
+            }),
             'quantity': forms.NumberInput(attrs={'min': '0.01', 'step': '0.01', 'inputmode': 'decimal'}),
-            'note': forms.TextInput(attrs={'placeholder': 'مدل، رنگ، توضیح یا کد کالا'}),
+            'unit': forms.TextInput(attrs={'placeholder': 'واحد (مثلاً: عدد، کارتن)'}),
+            'note': forms.TextInput(attrs={'placeholder': 'کد کالا، مدل، رنگ یا توضیح'}),
         }
         labels = {
             'product_name': 'نام کالا',
             'quantity': 'تعداد',
             'unit': 'واحد',
-            'note': 'توضیح',
+            'note': 'توضیح / کد کالا',
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['unit'].required = False
-        self.fields['unit'].initial = ''
-        self.fields['unit'].choices = [('', 'انتخاب واحد')] + list(CustomerOrderItem.UNIT_CHOICES)
-        if not self.instance.pk:
-            self.instance.unit = ''
-        if not self.instance.pk and not self.data:
-            self.initial['unit'] = ''
-
-    def clean_unit(self):
-        return self.cleaned_data.get('unit') or CustomerOrderItem.UNIT_PIECE
+        self.fields['quantity'].required = False
+        _apply_field_config(self, 'order_item')
 
 
 CustomerOrderItemFormSet = inlineformset_factory(
     CustomerOrder,
     CustomerOrderItem,
     form=CustomerOrderItemForm,
-    extra=3,
+    extra=1,
     min_num=1,
     validate_min=True,
-    can_delete=False,
+    can_delete=True,
 )
 
 
@@ -1118,6 +1251,10 @@ class OrderProformaUploadForm(forms.Form):
         widget=forms.Textarea(attrs={'rows': 2}),
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_field_config(self, 'order_proforma')
+
     def clean_files(self):
         files = self.cleaned_data.get('files') or []
         if not files:
@@ -1190,6 +1327,7 @@ class UserAccountManagementForm(forms.Form):
     can_upload_invoices = forms.BooleanField(label='دسترسی بارگذاری فاکتورها', required=False)
     can_edit_payment_details = forms.BooleanField(label='دسترسی تکمیل اطلاعات فیش‌ها', required=False)
     is_active = forms.BooleanField(label='فعال', required=False, initial=True)
+    accounting_code = forms.CharField(label='کد تفضیلی (حسابداری)', max_length=50, required=False)
 
     def __init__(self, *args, **kwargs):
         self.instance = kwargs.pop('instance', None)
@@ -1198,6 +1336,9 @@ class UserAccountManagementForm(forms.Form):
 
         if self.instance:
             self.fields.pop('password', None)
+            # در حالت ویرایش، تاریخ‌ها اجباری نیستند — اگر خالی بمانند مقدار قبلی حفظ می‌شود
+            self.fields['active_from'].required = False
+            self.fields['valid_until'].required = False
 
         if self.instance and not self.is_bound:
             profile = getattr(self.instance, 'profile', None)
@@ -1219,6 +1360,7 @@ class UserAccountManagementForm(forms.Form):
                 'can_view_invoices': getattr(profile, 'can_view_invoices', False),
                 'can_upload_invoices': getattr(profile, 'can_upload_invoices', False),
                 'can_edit_payment_details': getattr(profile, 'can_edit_payment_details', False),
+                'accounting_code': getattr(profile, 'accounting_code', ''),
             })
 
         for name, field in self.fields.items():
@@ -1261,10 +1403,10 @@ class UserAccountManagementForm(forms.Form):
         if not city:
             self.add_error('city', 'شهر الزامی است.')
 
-        if not active_from:
+        if not active_from and not self.instance:
             self.add_error('active_from', 'تاریخ آغاز فعالیت الزامی است.')
 
-        if not valid_until:
+        if not valid_until and not self.instance:
             self.add_error('valid_until', 'تاریخ اعتبار الزامی است.')
 
         if not password and not self.instance:
@@ -1332,12 +1474,15 @@ class UserAccountManagementForm(forms.Form):
         profile.address = (self.cleaned_data.get('address') or '').strip()
         profile.organization = (self.cleaned_data.get('organization') or '').strip()
         profile.role = self.cleaned_data['role']
-        profile.active_from = self.cleaned_data.get('active_from')
-        profile.valid_until = self.cleaned_data.get('valid_until')
+        if self.cleaned_data.get('active_from') is not None:
+            profile.active_from = self.cleaned_data['active_from']
+        if self.cleaned_data.get('valid_until') is not None:
+            profile.valid_until = self.cleaned_data['valid_until']
         profile.force_password_change = self.cleaned_data.get('force_password_change', False)
         profile.suspended = self.cleaned_data.get('suspended', False)
         profile.can_view_invoices = self.cleaned_data.get('can_view_invoices', False)
         profile.can_upload_invoices = self.cleaned_data.get('can_upload_invoices', False)
         profile.can_edit_payment_details = self.cleaned_data.get('can_edit_payment_details', False)
+        profile.accounting_code = (self.cleaned_data.get('accounting_code') or '').strip()
         profile.save()
         return instance

@@ -88,7 +88,7 @@
                 {% for assignment in assignments %}
                 <tr>
                     <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
-                    <td>{{ assignment.plan.deposit_date }}</td>
+                    <td>{{ assignment.plan.deposit_date|jalali_date }}</td>
                     <td>{{ assignment.plan.bank_name|default:'-' }}</td>
                     <td class="money">{{ assignment.plan.account_number }}</td>
                     <td>{{ assignment.plan.account_owner|default:'-' }}</td>

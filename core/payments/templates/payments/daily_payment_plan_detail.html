@@ -50,7 +50,7 @@
 
     <div class="panel">
         <div class="info-grid">
-            <div class="info-item"><strong>تاریخ معتبر</strong><div>{{ plan.deposit_date }}</div></div>
+            <div class="info-item"><strong>تاریخ معتبر</strong><div>{{ plan.deposit_date|jalali_date }}</div></div>
             <div class="info-item"><strong>بانک</strong><div>{{ plan.bank_name|default:'-' }}</div></div>
             <div class="info-item"><strong>شماره حساب</strong><div class="value">{{ plan.account_number }}</div></div>
             <div class="info-item"><strong>صاحب حساب</strong><div>{{ plan.account_owner|default:'-' }}</div></div>

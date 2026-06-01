@@ -30,7 +30,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import Counterparty, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -190,6 +190,18 @@ def _active_customer_profiles():
     ).select_related('user')
 
 
+def _is_counterparty_user(user):
+    """بررسی می‌کند که آیا کاربر یک طرف حساب است."""
+    if not user or not user.is_authenticated:
+        return False
+    return bool(getattr(user, 'counterparty_account', None))
+
+
+def _get_user_counterparty(user):
+    """طرف حساب مرتبط با کاربر را برمی‌گرداند."""
+    return getattr(user, 'counterparty_account', None)
+
+
 def _assigned_customer_ids_for_sales(user):
     if not user or not user.is_authenticated:
         return []
@@ -226,7 +238,15 @@ def _can_edit_payment_details(user):
 
 
 def _can_access_payment(user, payment):
-    return _is_staff_user(user) or payment.user_id == user.id
+    if _is_staff_user(user):
+        return True
+    if payment.user_id == user.id:
+        return True
+    # طرف حساب فقط به فیش‌هایی که به خودش اختصاص دارند دسترسی دارد
+    if _is_counterparty_user(user):
+        cp = _get_user_counterparty(user)
+        return cp is not None and payment.counterparty_id == cp.id
+    return False
 
 
 def _can_access_invoice(user, invoice):
@@ -283,6 +303,13 @@ def safe_logout(request):
 
 class SafeLoginView(LoginView):
     template_name = 'registration/login.html'
+
+    def get_success_url(self):
+        # طرف حساب → داشبورد اختصاصی
+        user = self.request.user
+        if _is_counterparty_user(user):
+            return reverse('counterparty_dashboard')
+        return super().get_success_url()
 
     def form_valid(self, form):
         try:
@@ -372,11 +399,18 @@ def _active_payment_records_for_user(user):
             PaymentRecord.STATUS_APPROVED,
             PaymentRecord.STATUS_INCOMPLETE,
         ])
-    if role in {'data_entry', 'sales'}:
+    if role == 'data_entry':
         return records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_REJECTED,
         ])
+    if role == 'sales':
+        # کارشناس فروش فقط فیش‌های مشتریان خودش را می‌بیند
+        filtered = records.exclude(status__in=[
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+        ])
+        return _customer_limited_queryset_for_user(filtered, user, customer_field='user')
     return records.none()
 
 
@@ -562,6 +596,7 @@ def _export_scope_records(request, records, page_param='page'):
 
 PAYMENT_EXPORT_FIELDS = [
     _field('id', 'ID', lambda p: p.id),
+    _field('accounting_code', 'کد تفضیلی', lambda p: getattr(getattr(p.user, 'profile', None), 'accounting_code', '') if p.user else ''),
     _field('username', 'نام کاربری', lambda p: p.user.username if p.user else ''),
     _field('customer_name', 'نام مشتری', lambda p: p.user.get_full_name() if p.user else ''),
     _field('first_name', 'نام', lambda p: p.first_name),
@@ -576,7 +611,7 @@ PAYMENT_EXPORT_FIELDS = [
     _field('beneficiary_account_number', 'شماره حساب مقصد', lambda p: p.beneficiary_account_number),
     _field('beneficiary_account_owner', 'صاحب حساب مقصد', lambda p: p.beneficiary_account_owner),
     _field('amount', 'مبلغ', lambda p: p.amount),
-    _field('pay_date', 'تاریخ واریز', lambda p: str(p.pay_date or '')),
+    _field('pay_date', 'تاریخ واریز', lambda p: _format_jalali_date(p.pay_date)),
     _field('tracking_code', 'کد پیگیری', lambda p: p.tracking_code or ''),
     _field('status', 'وضعیت', lambda p: p.get_status_display()),
     _field('counterparty', 'طرف حساب', lambda p: p.counterparty.name if p.counterparty else ''),
@@ -588,11 +623,12 @@ PAYMENT_EXPORT_FIELDS = [
 
 INVOICE_EXPORT_FIELDS = [
     _field('id', 'ID', lambda i: i.id),
+    _field('accounting_code', 'کد تفضیلی', lambda i: getattr(i.customer.profile, 'accounting_code', '')),
     _field('customer_username', 'نام کاربری مشتری', lambda i: i.customer.username),
     _field('customer_name', 'نام مشتری', lambda i: i.customer.get_full_name() or i.customer.username),
     _field('organization', 'مجموعه', lambda i: getattr(i.customer.profile, 'organization', '')),
     _field('invoice_number', 'شماره فاکتور', lambda i: i.invoice_number),
-    _field('invoice_date', 'تاریخ فاکتور', lambda i: str(i.invoice_date or '')),
+    _field('invoice_date', 'تاریخ فاکتور', lambda i: _format_jalali_date(i.invoice_date)),
     _field('amount', 'مبلغ', lambda i: i.amount),
     _field('reference_number', 'شماره حواله', lambda i: i.reference_number),
     _field('uploaded_by', 'بارگذاری کننده', lambda i: i.uploaded_by.get_full_name() if i.uploaded_by else ''),
@@ -604,6 +640,7 @@ INVOICE_EXPORT_FIELDS = [
 ]
 
 CUSTOMER_EXPORT_FIELDS = [
+    _field('accounting_code', 'کد تفضیلی', lambda c: c['profile'].accounting_code),
     _field('username', 'نام کاربری', lambda c: c['user'].username),
     _field('full_name', 'نام و نام خانوادگی', lambda c: f"{c['profile'].first_name or c['user'].first_name} {c['profile'].last_name or c['user'].last_name}".strip()),
     _field('organization', 'مجموعه', lambda c: c['profile'].organization),
@@ -623,6 +660,7 @@ CUSTOMER_EXPORT_FIELDS = [
 ]
 
 USER_EXPORT_FIELDS = [
+    _field('accounting_code', 'کد تفضیلی', lambda u: getattr(u.profile, 'accounting_code', '')),
     _field('username', 'نام کاربری', lambda u: u.username),
     _field('first_name', 'نام', lambda u: u.first_name),
     _field('last_name', 'نام خانوادگی', lambda u: u.last_name),
@@ -634,8 +672,8 @@ USER_EXPORT_FIELDS = [
     _field('organization', 'مجموعه', lambda u: u.profile.organization),
     _field('city', 'شهر', lambda u: u.profile.city),
     _field('province', 'استان', lambda u: u.profile.province),
-    _field('active_from', 'تاریخ آغاز', lambda u: str(u.profile.active_from or '')),
-    _field('valid_until', 'تاریخ اعتبار', lambda u: str(u.profile.valid_until or '')),
+    _field('active_from', 'تاریخ آغاز', lambda u: _format_jalali_date(u.profile.active_from)),
+    _field('valid_until', 'تاریخ اعتبار', lambda u: _format_jalali_date(u.profile.valid_until)),
     _field('is_active', 'فعال', lambda u: 'بله' if u.is_active else 'خیر'),
     _field('suspended', 'معلق', lambda u: 'بله' if u.profile.suspended else 'خیر'),
     _field('can_edit_payment_details', 'دسترسی تکمیل اطلاعات فیش‌ها', lambda u: 'بله' if u.profile.can_edit_payment_details else 'خیر'),
@@ -651,7 +689,7 @@ COUNTERPARTY_EXPORT_FIELDS = [
 
 DAILY_PLAN_EXPORT_FIELDS = [
     _field('id', 'ID', lambda p: p.id),
-    _field('deposit_date', 'تاریخ', lambda p: str(p.deposit_date or '')),
+    _field('deposit_date', 'تاریخ', lambda p: _format_jalali_date(p.deposit_date)),
     _field('bank_name', 'بانک', lambda p: p.bank_name),
     _field('account_number', 'شماره حساب', lambda p: p.account_number),
     _field('account_owner', 'صاحب حساب', lambda p: p.account_owner),
@@ -692,7 +730,7 @@ ORDER_EXPORT_FIELDS = [
     _field('status', 'وضعیت', lambda o: o.get_status_display()),
     _field('sales_expert', 'کارشناس فروش', lambda o: o.sales_expert.get_full_name() or o.sales_expert.username if o.sales_expert else ''),
     _field('requested_sales_expert', 'کارشناس انتخابی مشتری', lambda o: o.requested_sales_expert.get_full_name() or o.requested_sales_expert.username if o.requested_sales_expert else ''),
-    _field('items', 'اقلام', lambda o: ' | '.join(f'{item.product_name} - {item.quantity:g} {item.get_unit_display()}' for item in o.items.all())),
+    _field('items', 'اقلام', lambda o: ' | '.join(f'{item.product_name} - {item.quantity:g} {item.unit}'.strip() for item in o.items.all())),
     _field('item_count', 'تعداد اقلام', lambda o: o.items.count()),
     _field('proforma_count', 'تعداد پیش فاکتور', lambda o: o.proformas.count()),
     _field('customer_note', 'توضیح مشتری', lambda o: o.customer_note),
@@ -1125,6 +1163,8 @@ def _log_text(log):
         status_labels = dict(PaymentRecord.STATUS_CHOICES)
         status_text = status_labels.get(log.to_status, log.to_status)
         return f"{role} ({actor}) وضعیت سند را به «{status_text}» تغییر داد."
+    if log.action == PaymentActivityLog.ACTION_CUSTOMER_NOTE:
+        return f"مشتری ({actor}) توضیح اضافه کرد."
     return f"{role} ({actor}) عملیاتی انجام داد."
 
 
@@ -1147,6 +1187,16 @@ def _customer_visible_logs(logs):
     visible = []
     seen_keys = set()
     for log in logs:
+        # توضیحات مشتری همیشه نمایش داده می‌شود (بدون dedup)
+        if log.action == PaymentActivityLog.ACTION_CUSTOMER_NOTE:
+            visible.append({
+                'text': '💬 توضیح شما:',
+                'note': log.note,
+                'time': _format_jalali_datetime(log.created_at),
+                'is_customer_note': True,
+            })
+            continue
+
         text = _customer_log_text(log)
         if not text:
             continue
@@ -1158,6 +1208,7 @@ def _customer_visible_logs(logs):
             'text': text,
             'note': log.note if log.to_status in {PaymentRecord.STATUS_INCOMPLETE, PaymentRecord.STATUS_REJECTED} else '',
             'time': _format_jalali_datetime(log.created_at),
+            'is_customer_note': False,
         })
     return visible
 
@@ -1466,7 +1517,10 @@ def _orders_for_user(user):
     if user.is_superuser or _user_role(user) in {'commercial', 'commercial_manager', 'finance', 'finance_manager', 'sales_manager'}:
         return qs
     if _user_role(user) == 'sales':
-        return qs.filter(Q(sales_expert=user) | Q(sales_expert__isnull=True) | Q(requested_sales_expert=user)).distinct()
+        # فقط سفارش‌های مشتریانی که به این کارشناس اختصاص دارند + سفارش‌هایی که مستقیم به او ارجاع شده
+        return qs.filter(
+            Q(sales_expert=user) | Q(customer__sales_assignment__sales_user=user)
+        ).distinct()
     return qs.filter(customer=user)
 
 
@@ -2219,7 +2273,7 @@ def success(request):
 @login_required
 def profile_password_change(request):
     profile = getattr(request.user, 'profile', None)
-    is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
+    is_force_change = bool(profile and profile.force_password_change)
     show_initial_password_change_note = bool(
         is_force_change and request.session.get('show_initial_password_change_note')
     )
@@ -2229,7 +2283,7 @@ def profile_password_change(request):
         if form.is_valid():
             user = form.save()
             update_session_auth_hash(request, user)
-            if profile and profile.role == 'customer' and profile.force_password_change:
+            if profile and profile.force_password_change:
                 profile.force_password_change = False
                 profile.save(update_fields=['force_password_change'])
             request.session.pop('show_initial_password_change_note', None)
@@ -2377,7 +2431,7 @@ def _send_temporary_password_email(user, temp_password):
 @login_required
 def profile_password_cancel(request):
     profile = getattr(request.user, 'profile', None)
-    is_force_change = bool(profile and profile.role == 'customer' and profile.force_password_change)
+    is_force_change = bool(profile and profile.force_password_change)
     request.session.pop('show_initial_password_change_note', None)
     if is_force_change:
         auth_logout(request)
@@ -2536,12 +2590,46 @@ def payment_timeline(request, payment_id):
             for row in _customer_visible_logs(raw_logs)
         ]
 
+    can_add_note = (
+        not is_staff_user
+        and payment.user_id == request.user.id
+        and payment.status != PaymentRecord.STATUS_FINAL_APPROVED
+    )
     return render(request, 'payments/timeline.html', {
         'payment': payment,
         'logs': logs,
         'is_staff_user': is_staff_user,
+        'can_add_note': can_add_note,
         'return_url': _safe_next_url(request),
     })
+
+
+@login_required
+@require_POST
+def add_payment_note(request, payment_id):
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    return_url = _safe_next_url(request)
+    timeline_url = reverse('payment_timeline', args=[payment_id])
+    if return_url:
+        timeline_url += f'?next={return_url}'
+
+    if payment.user_id != request.user.id:
+        return HttpResponseForbidden('فقط صاحب فیش می‌تواند توضیح اضافه کند.')
+
+    if payment.status == PaymentRecord.STATUS_FINAL_APPROVED:
+        messages.error(request, 'فیش تایید نهایی شده و امکان افزودن توضیح وجود ندارد.')
+        return redirect(timeline_url)
+
+    note_text = (request.POST.get('note') or '').strip()
+    if not note_text:
+        messages.error(request, 'متن توضیح نمی‌تواند خالی باشد.')
+    elif len(note_text) > 1000:
+        messages.error(request, 'توضیح حداکثر ۱۰۰۰ کاراکتر می‌تواند باشد.')
+    else:
+        _log_activity(payment, request.user, PaymentActivityLog.ACTION_CUSTOMER_NOTE, note=note_text)
+        messages.success(request, 'توضیح شما با موفقیت در روال فیش ثبت شد.')
+
+    return redirect(timeline_url)
 
 
 @login_required
@@ -2765,6 +2853,9 @@ def user_edit(request, user_id):
         'filters': filters,
         'export_dataset': 'users',
         'export_fields': USER_EXPORT_FIELDS,
+        'can_manage_user_accounts': True,
+        'can_review_profile_changes': _can_review_profile_change(request.user),
+        'pending_profile_changes': [],
     })
 
 
@@ -3038,16 +3129,35 @@ def proforma_detail(request, proforma_id):
         proforma.approved_at = timezone.now()
         proforma.save(update_fields=['status', 'approved_at'])
         _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_APPROVED)
+
+        # اطلاع‌رسانی به صادرکننده پیش‌فاکتور
+        notify_targets = []
         if proforma.issued_by_id:
-            _notify_users(
-                [proforma.issued_by],
-                'تایید پیش فاکتور',
-                f'پیش فاکتور «{proforma.title or proforma.id}» توسط مشتری تایید شد.',
-                reverse('proforma_detail', args=[proforma.id]),
-                category=UserNotification.CATEGORY_SYSTEM,
+            notify_targets.append(proforma.issued_by)
+
+        # اگر پیش‌فاکتور به سفارشی متصل است
+        if proforma.order_id:
+            order_ref = proforma.order
+            # لاگ تایید در تاریخچه سفارش
+            CustomerOrderLog.objects.create(
+                order=order_ref,
                 actor=request.user,
+                action=CustomerOrderLog.ACTION_PROFORMA_APPROVED,
+                note=f'پیش فاکتور «{proforma.title or "بدون عنوان"}» توسط مشتری تایید شد.',
             )
-        messages.success(request, 'پیش فاکتور تایید شد.')
+            # اطلاع‌رسانی به کارشناس فروش سفارش (اگر متفاوت از صادرکننده است)
+            if order_ref.sales_expert_id and order_ref.sales_expert_id != proforma.issued_by_id:
+                notify_targets.append(order_ref.sales_expert)
+
+        _notify_users(
+            notify_targets,
+            'تایید پیش فاکتور',
+            f'پیش فاکتور «{proforma.title or proforma.id}» توسط مشتری تایید شد.',
+            reverse('proforma_detail', args=[proforma.id]),
+            category=UserNotification.CATEGORY_SYSTEM,
+            actor=request.user,
+        )
+        messages.success(request, 'پیش فاکتور با موفقیت تایید شد.')
         return redirect('proforma_detail', proforma_id=proforma.id)
 
     logs = [
@@ -3226,30 +3336,25 @@ def orders_dashboard(request):
             can_create_order = False
         if request.method == 'POST' and not can_create_order:
             return HttpResponseForbidden('حساب شما غیرفعال است و امکان ثبت سفارش جدید وجود ندارد.')
+        assigned_sales_expert = None
+        try:
+            assigned_sales_expert = request.user.sales_assignment.sales_user
+        except (CustomerSalesAssignment.DoesNotExist, AttributeError):
+            pass
+
         if request.method == 'POST':
-            order_form = CustomerOrderForm(request.POST, customer=request.user)
+            order_form = CustomerOrderForm(request.POST)
             item_formset = CustomerOrderItemFormSet(request.POST)
             if order_form.is_valid() and item_formset.is_valid():
                 order = order_form.save(commit=False)
                 order.customer = request.user
-                order.requested_sales_expert = order_form.cleaned_data.get('requested_sales_expert')
-                selected_sales = order.requested_sales_expert
-                if not selected_sales:
-                    try:
-                        selected_sales = request.user.sales_assignment.sales_user
-                    except CustomerSalesAssignment.DoesNotExist:
-                        selected_sales = None
-                order.sales_expert = selected_sales
+                order.requested_sales_expert = assigned_sales_expert
+                order.sales_expert = assigned_sales_expert
                 order.save()
                 item_formset.instance = order
                 item_formset.save()
-                if selected_sales:
-                    CustomerSalesAssignment.objects.update_or_create(
-                        customer=request.user,
-                        defaults={'sales_user': selected_sales, 'assigned_by': request.user, 'note': 'انتخاب توسط مشتری در زمان ثبت سفارش'},
-                    )
                 CustomerOrderLog.objects.create(order=order, actor=request.user, action=CustomerOrderLog.ACTION_CREATED, to_status=order.status, note=order.customer_note)
-                notify_users = [selected_sales] if selected_sales else list(_staff_notification_users({'sales', 'commercial'}))
+                notify_users = [assigned_sales_expert] if assigned_sales_expert else list(_staff_notification_users({'sales', 'commercial'}))
                 _notify_users(
                     notify_users,
                     'سفارش جدید مشتری',
@@ -3262,7 +3367,7 @@ def orders_dashboard(request):
                 return redirect('orders')
         else:
             if can_create_order:
-                order_form = CustomerOrderForm(customer=request.user)
+                order_form = CustomerOrderForm()
                 item_formset = CustomerOrderItemFormSet()
 
     records = _orders_for_user(request.user)
@@ -3273,6 +3378,13 @@ def orders_dashboard(request):
     ]
     page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
+
+    assigned_sales_expert_ctx = None
+    if not is_staff_user:
+        try:
+            assigned_sales_expert_ctx = request.user.sales_assignment.sales_user
+        except (CustomerSalesAssignment.DoesNotExist, AttributeError):
+            pass
 
     return render(request, 'payments/orders.html', {
         'order_form': order_form,
@@ -3286,8 +3398,82 @@ def orders_dashboard(request):
         'is_staff_user': is_staff_user,
         'can_create_order': can_create_order,
         'can_manage_orders': _can_manage_orders(request.user),
+        'assigned_sales_expert': assigned_sales_expert_ctx,
         'export_dataset': 'orders',
         'export_fields': ORDER_EXPORT_FIELDS,
+    })
+
+
+@login_required
+def sales_expert_dashboard(request):
+    role = _user_role(request.user)
+    if role not in {'sales', 'sales_manager'} and not request.user.is_superuser:
+        return HttpResponseForbidden('این بخش فقط برای کارشناسان و مدیر فروش فعال است.')
+
+    is_manager = request.user.is_superuser or role == 'sales_manager'
+
+    # مشتریان تخصیص‌یافته به این کارشناس (یا همه برای مدیر)
+    if is_manager:
+        assignments = (
+            CustomerSalesAssignment.objects
+            .select_related('customer', 'customer__profile', 'sales_user')
+            .filter(sales_user__isnull=False)
+            .order_by('sales_user__first_name', 'customer__username')
+        )
+    else:
+        assignments = (
+            CustomerSalesAssignment.objects
+            .select_related('customer', 'customer__profile')
+            .filter(sales_user=request.user)
+            .order_by('customer__username')
+        )
+
+    assigned_ids = [a.customer_id for a in assignments]
+    open_statuses = [CustomerOrder.STATUS_SUBMITTED, CustomerOrder.STATUS_REVIEWING, CustomerOrder.STATUS_PROFORMA_SENT]
+
+    open_orders_qs = (
+        CustomerOrder.objects
+        .filter(customer_id__in=assigned_ids, status__in=open_statuses)
+        .select_related('customer', 'customer__profile', 'sales_expert')
+        .order_by('-created_at')
+    )
+
+    # آمار سریع
+    open_order_counts = {
+        row['customer']: row['cnt']
+        for row in CustomerOrder.objects
+            .filter(customer_id__in=assigned_ids, status__in=open_statuses)
+            .values('customer')
+            .annotate(cnt=Count('id'))
+    }
+    last_order_dates = {
+        row['customer']: row['last']
+        for row in CustomerOrder.objects
+            .filter(customer_id__in=assigned_ids)
+            .values('customer')
+            .annotate(last=Max('created_at'))
+    }
+
+    # ترکیب داده مشتریان
+    customer_rows = []
+    for a in assignments:
+        uid = a.customer_id
+        customer_rows.append({
+            'customer': a.customer,
+            'profile': a.customer.profile if hasattr(a.customer, 'profile') else None,
+            'sales_user': a.sales_user if is_manager else None,
+            'open_orders': open_order_counts.get(uid, 0),
+            'last_order': last_order_dates.get(uid),
+        })
+    customer_rows.sort(key=lambda r: -(r['open_orders']))
+
+    return render(request, 'payments/sales_expert_dashboard.html', {
+        'is_manager': is_manager,
+        'assigned_count': len(assigned_ids),
+        'open_orders_count': sum(open_order_counts.values()),
+        'open_orders': open_orders_qs[:15],
+        'customer_rows': customer_rows,
+        'is_staff_user': True,
     })
 
 
@@ -3302,6 +3488,15 @@ def sales_assignments_dashboard(request):
             customers = form.cleaned_data['customers']
             sales_user = form.cleaned_data['sales_user']
             note = form.cleaned_data.get('note') or ''
+
+            # جمع‌آوری کارشناسان قدیمی برای اطلاع‌رسانی
+            old_experts_map = {
+                ca.customer_id: ca.sales_user
+                for ca in CustomerSalesAssignment.objects
+                    .filter(customer__in=customers, sales_user__isnull=False)
+                    .select_related('sales_user')
+            }
+
             for customer in customers:
                 CustomerSalesAssignment.objects.update_or_create(
                     customer=customer,
@@ -3324,14 +3519,34 @@ def sales_assignments_dashboard(request):
                             action=CustomerOrderLog.ACTION_ASSIGNED,
                             note=f'تفویض توسط مدیر فروش به {sales_user.get_full_name() or sales_user.username}',
                         )
+
+            # اطلاع‌رسانی به کارشناس جدید
             _notify_users(
                 [sales_user],
                 'تخصیص مشتریان',
                 f'{len(customers)} مشتری به شما تخصیص داده شد.',
-                reverse('sales_assignments'),
+                reverse('sales_expert_dashboard'),
                 category=UserNotification.CATEGORY_SYSTEM,
                 actor=request.user,
             )
+
+            # اطلاع‌رسانی به کارشناسان قدیمی که مشتریانشان منتقل شد
+            displaced_experts = {}
+            for customer in customers:
+                old_exp = old_experts_map.get(customer.id)
+                if old_exp and old_exp.id != sales_user.id:
+                    displaced_experts.setdefault(old_exp.id, {'user': old_exp, 'count': 0})
+                    displaced_experts[old_exp.id]['count'] += 1
+            for entry in displaced_experts.values():
+                _notify_users(
+                    [entry['user']],
+                    'انتقال مشتریان',
+                    f'{entry["count"]} مشتری از لیست شما به {sales_user.get_full_name() or sales_user.username} منتقل شد.',
+                    reverse('sales_expert_dashboard'),
+                    category=UserNotification.CATEGORY_SYSTEM,
+                    actor=request.user,
+                )
+
             messages.success(request, f'{len(customers)} مشتری به {sales_user.get_full_name() or sales_user.username} تخصیص داده شد.')
             return redirect('sales_assignments')
     else:
@@ -3342,6 +3557,18 @@ def sales_assignments_dashboard(request):
     page_base_query = _build_query_string(request, remove_keys=['page'])
     assigned_count = sum(1 for row in rows if row['sales_user'])
 
+    # آمار تجمیعی به تفکیک کارشناس فروش
+    expert_stats_map = {}
+    for row in rows:
+        su = row['sales_user']
+        if not su:
+            continue
+        if su.id not in expert_stats_map:
+            expert_stats_map[su.id] = {'user': su, 'customers': 0, 'open_orders': 0}
+        expert_stats_map[su.id]['customers'] += 1
+        expert_stats_map[su.id]['open_orders'] += row['open_orders']
+    expert_stats = sorted(expert_stats_map.values(), key=lambda x: -x['customers'])
+
     return render(request, 'payments/sales_assignments.html', {
         'form': form,
         'records': page_obj,
@@ -3350,6 +3577,7 @@ def sales_assignments_dashboard(request):
         'filters': filters,
         'assigned_count': assigned_count,
         'unassigned_count': len(rows) - assigned_count,
+        'expert_stats': expert_stats,
         'export_dataset': 'sales_assignments',
         'export_fields': SALES_ASSIGNMENT_EXPORT_FIELDS,
     })
@@ -3419,14 +3647,36 @@ def order_detail(request, order_id):
                 messages.success(request, 'پیش فاکتور سفارش صادر و به مشتری اطلاع رسانی شد.')
                 return redirect('order_detail', order_id=order.id)
 
+    is_staff = _is_staff_user(request.user)
+    proformas = list(order.proformas.all())
+    has_approved_proforma = any(p.is_approved for p in proformas)
+    all_proformas_approved = bool(proformas) and all(p.is_approved for p in proformas)
+    pending_proformas = [p for p in proformas if not p.is_approved]
+    today = _today_jalali_date()
+    expired_proformas = [p for p in proformas if not p.is_approved and p.valid_until < today]
+
+    # پیشنهاد تکمیل سفارش برای کارمند وقتی پیش‌فاکتور تایید شده اما سفارش هنوز تکمیل نشده
+    suggest_completion = (
+        is_staff and can_manage
+        and has_approved_proforma
+        and order.status not in [CustomerOrder.STATUS_COMPLETED, CustomerOrder.STATUS_CANCELLED]
+    )
+
     return render(request, 'payments/order_detail.html', {
         'order': order,
         'status_form': status_form,
         'proforma_form': proforma_form,
-        'is_staff_user': _is_staff_user(request.user),
+        'is_staff_user': is_staff,
         'can_manage_orders': can_manage,
         'return_url': _safe_next_url(request, default=reverse('orders')),
-        'logs': order.logs.all() if _is_staff_user(request.user) else order.logs.exclude(action=CustomerOrderLog.ACTION_ASSIGNED),
+        'logs': order.logs.all() if is_staff else order.logs.exclude(action=CustomerOrderLog.ACTION_ASSIGNED),
+        'proformas': proformas,
+        'has_approved_proforma': has_approved_proforma,
+        'all_proformas_approved': all_proformas_approved,
+        'pending_proformas_count': len(pending_proformas),
+        'expired_proformas_count': len(expired_proformas),
+        'suggest_completion': suggest_completion,
+        'today': today,
     })
 
 
@@ -3440,12 +3690,307 @@ def receipt_file(request, receipt_id):
 
 
 @login_required
+@require_POST
+def rotate_receipt(request, receipt_id):
+    if not _is_staff_user(request.user):
+        return JsonResponse({'error': 'دسترسی ممنوع'}, status=403)
+
+    receipt = get_object_or_404(PaymentReceipt.objects.select_related('payment'), id=receipt_id)
+    if not _can_access_payment(request.user, receipt.payment):
+        return JsonResponse({'error': 'دسترسی ممنوع'}, status=403)
+
+    try:
+        degrees = float(request.POST.get('degrees', 0))
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'مقدار درجه نامعتبر است'}, status=400)
+
+    if degrees == 0:
+        return JsonResponse({'success': True})
+    if not (-360 < degrees < 360):
+        return JsonResponse({'error': 'درجه چرخش باید بین ‎-359 تا 359 باشد'}, status=400)
+
+    ext = os.path.splitext(receipt.image.name)[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.bmp'):
+        return JsonResponse({'error': 'این نوع فایل قابل چرخش نیست'}, status=400)
+
+    try:
+        from PIL import Image, ImageOps
+        path = receipt.image.path
+        img = Image.open(path)
+        img = ImageOps.exif_transpose(img)
+
+        if ext in ('.jpg', '.jpeg') and img.mode in ('RGBA', 'P', 'LA'):
+            img = img.convert('RGB')
+
+        # degrees مثبت = راست (CW) از دید کاربر → در Pillow (CCW) باید نگیت شود
+        pil_angle = -degrees
+        fill = (255, 255, 255, 0) if img.mode == 'RGBA' else (255, 255, 255) if img.mode in ('RGB', 'L') else None
+        img = img.rotate(pil_angle, expand=True, fillcolor=fill)
+
+        fmt = 'JPEG' if ext in ('.jpg', '.jpeg') else (img.format or 'PNG')
+        save_kwargs = {'quality': 90, 'optimize': True, 'exif': b''} if fmt == 'JPEG' else {}
+        img.save(path, format=fmt, **save_kwargs)
+
+        direction_label = 'راست' if degrees > 0 else 'چپ'
+        _log_activity(receipt.payment, request.user, PaymentActivityLog.ACTION_EDITED,
+                      note=f'چرخش تصویر {abs(degrees):.1f}° {direction_label}')
+        return JsonResponse({'success': True})
+
+    except Exception:
+        logger.exception('Failed to rotate receipt %s', receipt_id)
+        return JsonResponse({'error': 'خطا در چرخش تصویر'}, status=500)
+
+
+@login_required
 def legacy_payment_receipt_file(request, payment_id):
     payment = get_object_or_404(PaymentRecord, id=payment_id)
     if not _can_access_payment(request.user, payment):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فیش‌های خودتان وجود دارد.')
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده فایل فیش')
     return _file_response(payment.receipt_image)
+
+
+@login_required
+def product_catalog_search(request):
+    q = (request.GET.get('q') or '').strip()
+    if len(q) < 1:
+        return JsonResponse({'results': []})
+    results = list(
+        ProductCatalog.objects
+        .filter(is_active=True)
+        .filter(Q(product_name__icontains=q) | Q(product_code__icontains=q))
+        .values('product_name', 'product_code', 'unit', 'coefficient')[:20]
+    )
+    for r in results:
+        r['coefficient'] = str(r['coefficient']) if r['coefficient'] is not None else ''
+    return JsonResponse({'results': results})
+
+
+@login_required
+def import_product_catalog(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('فقط مدیران سیستم امکان ایمپورت دارند.')
+    if request.method != 'POST':
+        return redirect('admin:payments_productcatalog_changelist')
+
+    file = request.FILES.get('file')
+    if not file:
+        messages.error(request, 'فایلی انتخاب نشده است.')
+        return redirect('admin:payments_productcatalog_changelist')
+
+    try:
+        import openpyxl
+        from decimal import Decimal, InvalidOperation
+
+        wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            messages.error(request, 'فایل خالی است.')
+            return redirect('admin:payments_productcatalog_changelist')
+
+        headers = [str(c or '').strip() for c in rows[0]]
+
+        def _col(candidates):
+            for name in candidates:
+                for i, h in enumerate(headers):
+                    if h.lower() == name.lower():
+                        return i
+            return None
+
+        name_col  = _col(['نام کالا', 'product_name', 'نام'])
+        code_col  = _col(['کد کالا', 'product_code', 'کد'])
+        unit_col  = _col(['واحد', 'unit'])
+        coeff_col = _col(['ضریب', 'coefficient', 'ضريب'])
+
+        if name_col is None:
+            messages.error(request, 'ستون «نام کالا» در فایل یافت نشد.')
+            return redirect('admin:payments_productcatalog_changelist')
+
+        added = 0
+        for row in rows[1:]:
+            def cell(idx):
+                return str(row[idx] or '').strip() if idx is not None and idx < len(row) else ''
+
+            name = cell(name_col)
+            if not name:
+                continue
+            coeff = None
+            if coeff_col is not None and coeff_col < len(row) and row[coeff_col] is not None:
+                try:
+                    coeff = Decimal(str(row[coeff_col]))
+                except InvalidOperation:
+                    pass
+
+            ProductCatalog.objects.create(
+                product_name=name,
+                product_code=cell(code_col),
+                unit=cell(unit_col),
+                coefficient=coeff,
+            )
+            added += 1
+
+        messages.success(request, f'{added} کالا با موفقیت به کاتالوگ اضافه شد.')
+
+    except Exception:
+        logger.exception('Product catalog import failed')
+        messages.error(request, 'خطا در پردازش فایل اکسل.')
+
+    return redirect('admin:payments_productcatalog_changelist')
+
+
+@login_required
+def counterparty_dashboard(request):
+    cp = _get_user_counterparty(request.user)
+    if not cp:
+        return HttpResponseForbidden('این بخش فقط برای طرف حساب‌های ثبت‌شده فعال است.')
+
+    payments = (
+        PaymentRecord.objects
+        .filter(counterparty=cp)
+        .select_related('user', 'user__profile')
+        .prefetch_related('receipts')
+        .order_by('-created_at', '-id')
+    )
+
+    # فیلترها
+    status_filter = (request.GET.get('status') or '').strip()
+    approved_filter = (request.GET.get('approved') or '').strip()
+    if status_filter:
+        payments = payments.filter(status=status_filter)
+    if approved_filter == 'yes':
+        payments = payments.filter(counterparty_approved_at__isnull=False)
+    elif approved_filter == 'no':
+        payments = payments.filter(counterparty_approved_at__isnull=True)
+
+    # خروجی اکسل
+    if request.GET.get('export') == 'excel':
+        _log_counterparty_action(cp, request.user, 'دریافت خروجی اکسل')
+        fields = [
+            _field('id', 'شماره فیش', lambda p: p.id),
+            _field('customer', 'مشتری', lambda p: f"{p.first_name} {p.last_name}".strip() or (p.user.get_full_name() if p.user else '')),
+            _field('organization', 'مجموعه', lambda p: p.organization),
+            _field('amount', 'مبلغ (ریال)', lambda p: p.amount),
+            _field('pay_date', 'تاریخ واریز', lambda p: _format_jalali_date(p.pay_date)),
+            _field('tracking_code', 'کد پیگیری', lambda p: p.tracking_code or ''),
+            _field('payer_full_name', 'نام واریز کننده', lambda p: p.payer_full_name),
+            _field('payer_account_number', 'شماره حساب واریز کننده', lambda p: p.payer_account_number),
+            _field('payer_bank_name', 'بانک واریز کننده', lambda p: p.payer_bank_name),
+            _field('beneficiary_account_number', 'شماره حساب مقصد', lambda p: p.beneficiary_account_number),
+            _field('status', 'وضعیت', lambda p: p.get_status_display()),
+            _field('cp_approved', 'تایید طرف حساب', lambda p: _format_jalali_datetime(p.counterparty_approved_at) if p.counterparty_approved_at else 'تایید نشده'),
+            _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime(p.created_at)),
+        ]
+        return _export_response(
+            _timestamped_excel_filename('counterparty_payments.xlsx'),
+            'فیش‌های طرف حساب',
+            fields,
+            list(payments),
+        )
+
+    page_obj = _paginate_queryset(request, payments, per_page=20)
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+
+    total = payments.count()
+    approved_count = payments.filter(counterparty_approved_at__isnull=False).count()
+
+    # ثبت مشاهده داشبورد
+    _log_counterparty_action(cp, request.user, 'مشاهده داشبورد')
+
+    return render(request, 'payments/counterparty_dashboard.html', {
+        'cp': cp,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'total': total,
+        'approved_count': approved_count,
+        'pending_count': total - approved_count,
+        'status_choices': PaymentRecord.STATUS_CHOICES,
+        'filters': {'status': status_filter, 'approved': approved_filter},
+        'can_operate': cp.can_operate,
+        'cp_status': cp.status,
+    })
+
+
+@login_required
+@require_POST
+def counterparty_approve_payment(request, payment_id):
+    """طرف حساب یک فیش را تایید می‌کند."""
+    cp = _get_user_counterparty(request.user)
+    if not cp:
+        return HttpResponseForbidden('دسترسی ممنوع.')
+
+    payment = get_object_or_404(
+        PaymentRecord.objects.select_related('counterparty'),
+        id=payment_id, counterparty=cp,
+    )
+
+    if not cp.can_operate:
+        messages.error(request, 'حساب شما غیرفعال است و امکان تایید فیش وجود ندارد.')
+        return redirect('counterparty_dashboard')
+
+    if payment.is_counterparty_approved:
+        messages.error(request, 'این فیش قبلاً توسط طرف حساب تایید شده است.')
+        return redirect('counterparty_dashboard')
+
+    payment.counterparty_approved_at = timezone.now()
+    payment.counterparty_approved_by = request.user
+    payment.save(update_fields=['counterparty_approved_at', 'counterparty_approved_by'])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_CP_APPROVED,
+                  note=f'تایید توسط طرف حساب: {cp.name}')
+
+    # ثبت در لاگ عملیات طرف حساب
+    _log_counterparty_action(cp, request.user, f'تایید فیش #{payment_id}')
+
+    # اطلاع‌رسانی به بازرگانی
+    commercial_users = list(_staff_notification_users({'commercial', 'commercial_manager'}))
+    _notify_users(
+        commercial_users,
+        'تایید فیش توسط طرف حساب',
+        f'فیش #{payment_id} توسط طرف حساب «{cp.name}» تایید شد.',
+        reverse('counterparty_dashboard'),
+        category=UserNotification.CATEGORY_SYSTEM,
+        actor=request.user,
+    )
+
+    messages.success(request, f'فیش #{payment_id} با موفقیت تایید شد.')
+    return redirect('counterparty_dashboard')
+
+
+@login_required
+@require_POST
+def counterparty_return_payment(request, payment_id):
+    """بازرگانی فیش را از حالت تایید طرف حساب خارج می‌کند."""
+    if not _is_staff_user(request.user) or _user_role(request.user) not in {'commercial', 'commercial_manager'} and not request.user.is_superuser:
+        return HttpResponseForbidden('فقط بازرگانی یا مدیر سیستم می‌تواند این عملیات را انجام دهد.')
+
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+
+    if not payment.is_counterparty_approved:
+        messages.error(request, 'این فیش تایید طرف حساب ندارد.')
+        return redirect(_safe_next_url(request) or 'submit')
+
+    note = (request.POST.get('note') or '').strip()
+    payment.counterparty_approved_at = None
+    payment.counterparty_approved_by = None
+    payment.save(update_fields=['counterparty_approved_at', 'counterparty_approved_by'])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_CP_RETURNED,
+                  note=note or 'بازگشت از تایید طرف حساب توسط بازرگانی')
+
+    messages.success(request, f'فیش #{payment_id} به صف بررسی طرف حساب بازگشت داده شد.')
+    return redirect(_safe_next_url(request) or 'submit')
+
+
+def _log_counterparty_action(cp, user, description):
+    """ثبت عملیات طرف حساب در لاگ سیستم."""
+    SystemActivityLog.objects.create(
+        actor=user,
+        target_user=None,
+        action='counterparty_action',
+        description=f'طرف حساب «{cp.name}»: {description}',
+    )
 
 
 def login_ad_image(request, ad_id):
@@ -3717,8 +4262,10 @@ def customers_list(request):
     if not is_staff_user:
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدها قابل دسترسی است.')
 
-    # Get all customer profiles
+    # Get all customer profiles — کارشناس فروش فقط مشتریان خود را می‌بیند
     customers = UserProfile.objects.filter(role='customer').select_related('user').order_by('user__username')
+    if _user_role(request.user) == 'sales' and not request.user.is_superuser:
+        customers = customers.filter(user__sales_assignment__sales_user=request.user)
     filters = {
         'q': (request.GET.get('q') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),

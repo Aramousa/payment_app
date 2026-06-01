@@ -65,8 +65,31 @@ def proforma_upload_to(instance, filename):
 
 
 class Counterparty(models.Model):
-    name = models.CharField('طرف حساب', max_length=120, unique=True)
+    STATUS_ACTIVE    = 'active'
+    STATUS_INACTIVE  = 'inactive'
+    STATUS_SUSPENDED = 'suspended'
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE,    'فعال — ورود و عملیات مجاز'),
+        (STATUS_INACTIVE,  'غیرفعال — ورود مجاز، عملیات ممنوع'),
+        (STATUS_SUSPENDED, 'معلق — ورود ممنوع'),
+    ]
+
+    name = models.CharField('نام سازمان / طرف حساب', max_length=120, unique=True)
     description = models.CharField('توضیحات', max_length=255, blank=True)
+    first_name = models.CharField('نام', max_length=60, blank=True)
+    last_name = models.CharField('نام خانوادگی', max_length=60, blank=True)
+    phone = models.CharField('شماره تماس', max_length=20, blank=True)
+    user = models.OneToOneField(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='counterparty_account',
+        verbose_name='حساب کاربری ورود',
+        help_text='کاربری که به نام این طرف حساب وارد سیستم می‌شود',
+    )
+    status = models.CharField(
+        'وضعیت', max_length=20,
+        choices=STATUS_CHOICES, default=STATUS_ACTIVE,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -76,8 +99,57 @@ class Counterparty(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        # اگر وضعیت «معلق» شد → حساب کاربری را غیرفعال کن
+        # در غیر این صورت → فعال نگه‌دار
+        if self.user_id:
+            should_be_active = (self.status != self.STATUS_SUSPENDED)
+            if self.user.is_active != should_be_active:
+                self.user.is_active = should_be_active
+                self.user.save(update_fields=['is_active'])
+        super().save(*args, **kwargs)
+
     def delete(self, *args, **kwargs):
         raise ValidationError('رکوردهای طرف حساب دائمی هستند و امکان حذف آن‌ها وجود ندارد.')
+
+    @property
+    def can_operate(self):
+        """آیا طرف حساب می‌تواند عملیات (تایید) انجام دهد؟"""
+        return self.status == self.STATUS_ACTIVE
+
+
+class CounterpartyBankAccount(models.Model):
+    counterparty = models.ForeignKey(
+        Counterparty, on_delete=models.CASCADE,
+        related_name='bank_accounts',
+        verbose_name='طرف حساب',
+    )
+    bank_name = models.CharField('نام بانک', max_length=80, blank=True)
+    city = models.CharField('شهر', max_length=60, blank=True)
+    branch = models.CharField('شعبه', max_length=100, blank=True)
+    account_number = models.CharField('شماره حساب', max_length=30, blank=True)
+    account_owner = models.CharField('نام صاحب حساب', max_length=120, blank=True)
+    iban = models.CharField('شماره شبا', max_length=30, blank=True,
+                            help_text='IR + 24 رقم')
+    is_primary = models.BooleanField('حساب اصلی', default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-is_primary', 'bank_name']
+        verbose_name = 'حساب بانکی طرف حساب'
+        verbose_name_plural = 'حساب‌های بانکی طرف حساب'
+
+    def __str__(self):
+        parts = [self.bank_name or '', self.account_number or '']
+        return ' — '.join(p for p in parts if p)
+
+    def save(self, *args, **kwargs):
+        # اگر این حساب را اصلی کردیم، بقیه را غیراصلی کن
+        if self.is_primary:
+            CounterpartyBankAccount.objects.filter(
+                counterparty=self.counterparty
+            ).exclude(pk=self.pk).update(is_primary=False)
+        super().save(*args, **kwargs)
 
 
 class LoginAdvertisement(models.Model):
@@ -115,6 +187,54 @@ class LoginAdvertisement(models.Model):
         super().clean()
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValidationError({'end_date': 'تاریخ خاتمه باید بعد از تاریخ شروع باشد.'})
+
+
+class FieldRequirementConfig(models.Model):
+    FORM_PAYMENT          = 'payment'
+    FORM_ORDER            = 'order'
+    FORM_ORDER_ITEM       = 'order_item'
+    FORM_PROFILE          = 'profile'
+    FORM_PAYMENT_STAFF    = 'payment_staff'
+    FORM_PROFORMA         = 'order_proforma'
+    FORM_COUNTERPARTY     = 'counterparty'
+    FORM_COUNTERPARTY_BANK = 'counterparty_bank'
+
+    FORM_CHOICES = [
+        (FORM_PAYMENT,           'فرم ثبت فیش واریزی'),
+        (FORM_ORDER,             'فرم ثبت سفارش'),
+        (FORM_ORDER_ITEM,        'فرم اقلام سفارش'),
+        (FORM_PROFILE,           'فرم ویرایش مشخصات مشتری'),
+        (FORM_PAYMENT_STAFF,     'فرم تکمیل اطلاعات فیش (کارمند)'),
+        (FORM_PROFORMA,          'فرم صدور پیش فاکتور'),
+        (FORM_COUNTERPARTY,      'فرم طرف حساب'),
+        (FORM_COUNTERPARTY_BANK, 'فرم حساب بانکی طرف حساب'),
+    ]
+
+    form_name       = models.CharField('فرم', max_length=50, choices=FORM_CHOICES)
+    field_name      = models.CharField('نام فنی فیلد', max_length=100)
+    field_label     = models.CharField('نام نمایشی فیلد', max_length=200)
+    default_required = models.BooleanField('پیشفرض کد', default=False, editable=False,
+                                           help_text='مقدار پیشفرض تعریف‌شده در کد — فقط‌خواندنی')
+    is_required     = models.BooleanField(
+        'تنظیم ادمین',
+        null=True, blank=True,
+        help_text='خالی = استفاده از پیشفرض | بله = اجباری | خیر = اختیاری',
+    )
+
+    @property
+    def effective_required(self) -> bool:
+        """مقدار واقعی اعمال‌شده: پیشفرض کد اگر ادمین override نکرده."""
+        return self.default_required if self.is_required is None else self.is_required
+
+    class Meta:
+        unique_together = [('form_name', 'field_name')]
+        ordering = ['form_name', 'field_name']
+        verbose_name = 'تنظیم اجباری بودن فیلد'
+        verbose_name_plural = 'تنظیمات اجباری بودن فیلدها'
+
+    def __str__(self):
+        status = 'اجباری' if self.is_required else 'اختیاری'
+        return f"{self.get_form_name_display()} — {self.field_label} ({status})"
 
 
 class UploadSettings(models.Model):
@@ -214,6 +334,19 @@ class PaymentRecord(models.Model):
     customer_notes = models.TextField('توضیحات مشتری', blank=True, help_text='توضیحات یا نکات مشتری در مورد این واریزی')
     created_at = models.DateTimeField(auto_now_add=True)
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
+
+    # تایید طرف حساب
+    counterparty_approved_at = models.DateTimeField('زمان تایید طرف حساب', null=True, blank=True, db_index=True)
+    counterparty_approved_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='counterparty_approvals',
+        verbose_name='تایید شده توسط طرف حساب',
+    )
+
+    @property
+    def is_counterparty_approved(self):
+        return self.counterparty_approved_at is not None
 
     class Meta:
         ordering = ['-id']
@@ -344,6 +477,7 @@ class UserProfile(models.Model):
     can_view_invoices = models.BooleanField('دسترسی مشاهده فاکتورها', default=False)
     can_upload_invoices = models.BooleanField('دسترسی بارگذاری فاکتورها', default=False)
     can_edit_payment_details = models.BooleanField('دسترسی تکمیل اطلاعات فیش‌ها', default=False)
+    accounting_code = models.CharField('کد تفضیلی', max_length=50, blank=True)
 
     def __str__(self):
         return self.user.username
@@ -471,16 +605,22 @@ class DailyPaymentAssignment(models.Model):
 
 
 class PaymentActivityLog(models.Model):
-    ACTION_CREATED = 'created'
-    ACTION_EDITED = 'edited'
-    ACTION_STATUS_CHANGED = 'status_changed'
-    ACTION_VIEWED = 'viewed'
+    ACTION_CREATED              = 'created'
+    ACTION_EDITED               = 'edited'
+    ACTION_STATUS_CHANGED       = 'status_changed'
+    ACTION_VIEWED               = 'viewed'
+    ACTION_CUSTOMER_NOTE        = 'customer_note'
+    ACTION_CP_APPROVED          = 'cp_approved'
+    ACTION_CP_RETURNED          = 'cp_returned'
 
     ACTION_CHOICES = [
-        (ACTION_CREATED, 'ایجاد'),
-        (ACTION_EDITED, 'ویرایش'),
-        (ACTION_STATUS_CHANGED, 'تغییر وضعیت'),
-        (ACTION_VIEWED, 'رویت'),
+        (ACTION_CREATED,          'ایجاد'),
+        (ACTION_EDITED,           'ویرایش'),
+        (ACTION_STATUS_CHANGED,   'تغییر وضعیت'),
+        (ACTION_VIEWED,           'رویت'),
+        (ACTION_CUSTOMER_NOTE,    'توضیح مشتری'),
+        (ACTION_CP_APPROVED,      'تایید طرف حساب'),
+        (ACTION_CP_RETURNED,      'بازگشت از طرف حساب'),
     ]
 
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')
@@ -823,21 +963,28 @@ class CustomerOrder(models.Model):
         return '، '.join(names)
 
 
+class ProductCatalog(models.Model):
+    product_name = models.CharField('نام کالا', max_length=200)
+    product_code = models.CharField('کد کالا', max_length=50, blank=True)
+    unit = models.CharField('واحد', max_length=50, blank=True)
+    coefficient = models.DecimalField('ضریب', max_digits=12, decimal_places=4, null=True, blank=True)
+    is_active = models.BooleanField('فعال', default=True)
+    created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
+
+    class Meta:
+        ordering = ['product_name']
+        verbose_name = 'کالا'
+        verbose_name_plural = 'کاتالوگ کالاها'
+
+    def __str__(self):
+        return f"{self.product_name} ({self.product_code})" if self.product_code else self.product_name
+
+
 class CustomerOrderItem(models.Model):
-    UNIT_PIECE = 'piece'
-    UNIT_PACK = 'pack'
-    UNIT_CARTON = 'carton'
-
-    UNIT_CHOICES = [
-        (UNIT_PIECE, 'قطعه'),
-        (UNIT_PACK, 'بسته'),
-        (UNIT_CARTON, 'کارتن'),
-    ]
-
     order = models.ForeignKey(CustomerOrder, on_delete=models.CASCADE, related_name='items')
     product_name = models.CharField('نام کالا', max_length=180)
     quantity = models.DecimalField('تعداد', max_digits=12, decimal_places=2)
-    unit = models.CharField('واحد', max_length=20, choices=UNIT_CHOICES, default=UNIT_PIECE)
+    unit = models.CharField('واحد', max_length=50, blank=True, default='')
     note = models.CharField('توضیح', max_length=255, blank=True)
 
     class Meta:
@@ -846,7 +993,7 @@ class CustomerOrderItem(models.Model):
         verbose_name_plural = 'اقلام سفارش'
 
     def __str__(self):
-        return f"{self.product_name} - {self.quantity} {self.get_unit_display()}"
+        return f"{self.product_name} - {self.quantity} {self.unit}".strip()
 
 
 class CustomerOrderLog(models.Model):
@@ -854,12 +1001,14 @@ class CustomerOrderLog(models.Model):
     ACTION_STATUS_CHANGED = 'status_changed'
     ACTION_ASSIGNED = 'assigned'
     ACTION_PROFORMA_CREATED = 'proforma_created'
+    ACTION_PROFORMA_APPROVED = 'proforma_approved'
 
     ACTION_CHOICES = [
         (ACTION_CREATED, 'ثبت سفارش'),
         (ACTION_STATUS_CHANGED, 'تغییر وضعیت'),
         (ACTION_ASSIGNED, 'تخصیص کارشناس'),
         (ACTION_PROFORMA_CREATED, 'صدور پیش فاکتور'),
+        (ACTION_PROFORMA_APPROVED, 'تایید پیش فاکتور توسط مشتری'),
     ]
 
     order = models.ForeignKey(CustomerOrder, on_delete=models.CASCADE, related_name='logs')
@@ -900,3 +1049,121 @@ class ProformaInvoiceLog(models.Model):
         ordering = ['-created_at', '-id']
         verbose_name = 'لاگ پیش فاکتور'
         verbose_name_plural = 'لاگ‌های پیش فاکتور'
+
+
+class UserSession(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='active_session',
+        verbose_name='کاربر',
+    )
+    session_key = models.CharField('کلید نشست', max_length=40, db_index=True)
+    created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین به‌روزرسانی', auto_now=True)
+
+    class Meta:
+        verbose_name = 'نشست فعال'
+        verbose_name_plural = 'نشست‌های فعال'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.session_key[:8]}…"
+
+
+class LoginRecord(models.Model):
+    LOGOUT_MANUAL = 'manual'
+    LOGOUT_INACTIVITY = 'inactivity'
+    LOGOUT_FORCED = 'forced'
+    LOGOUT_CHOICES = [
+        (LOGOUT_MANUAL, 'خروج دستی'),
+        (LOGOUT_INACTIVITY, 'انقضای بی‌فعالیت'),
+        (LOGOUT_FORCED, 'ورود از دستگاه دیگر'),
+    ]
+
+    DEVICE_DESKTOP = 'desktop'
+    DEVICE_MOBILE = 'mobile'
+    DEVICE_TABLET = 'tablet'
+    DEVICE_BOT = 'bot'
+    DEVICE_CHOICES = [
+        (DEVICE_DESKTOP, 'رایانه'),
+        (DEVICE_MOBILE, 'موبایل'),
+        (DEVICE_TABLET, 'تبلت'),
+        (DEVICE_BOT, 'ربات'),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='login_records', verbose_name='کاربر',
+    )
+    session_key = models.CharField('کلید نشست', max_length=40, db_index=True)
+
+    # آدرس IP
+    ip_address = models.GenericIPAddressField('آدرس IP', null=True, blank=True)
+    x_forwarded_for = models.TextField(
+        'زنجیره X-Forwarded-For', blank=True,
+        help_text='ممکن است شامل آدرس‌های شبکه داخلی باشد',
+    )
+
+    # اطلاعات مرورگر
+    user_agent_raw = models.TextField('User-Agent خام', blank=True)
+    browser_family = models.CharField('مرورگر', max_length=100, blank=True)
+    browser_version = models.CharField('نسخه مرورگر', max_length=50, blank=True)
+
+    # اطلاعات سیستم‌عامل
+    os_family = models.CharField('سیستم‌عامل', max_length=100, blank=True)
+    os_version = models.CharField('نسخه سیستم‌عامل', max_length=50, blank=True)
+
+    # نوع دستگاه
+    device_type = models.CharField(
+        'نوع دستگاه', max_length=10,
+        choices=DEVICE_CHOICES, default=DEVICE_DESKTOP, blank=True,
+    )
+    device_brand = models.CharField('برند دستگاه', max_length=100, blank=True)
+    device_model = models.CharField('مدل دستگاه', max_length=100, blank=True)
+
+    # سایر هدرها
+    accept_language = models.CharField('زبان مرورگر', max_length=200, blank=True)
+
+    # زمان‌ها
+    login_at = models.DateTimeField('زمان ورود', auto_now_add=True)
+    logout_at = models.DateTimeField('زمان خروج', null=True, blank=True)
+    logout_reason = models.CharField(
+        'دلیل خروج', max_length=20,
+        choices=LOGOUT_CHOICES, blank=True,
+    )
+
+    class Meta:
+        ordering = ['-login_at']
+        verbose_name = 'سابقه ورود'
+        verbose_name_plural = 'سوابق ورود'
+
+    def __str__(self):
+        return f"{self.user.username} — {self.ip_address} — {self.login_at:%Y/%m/%d %H:%M}"
+
+
+class SystemSettings(models.Model):
+    session_inactivity_timeout = models.PositiveIntegerField(
+        'مدت بی‌فعالیت (دقیقه)',
+        default=30,
+        help_text='پس از این مدت بی‌فعالیت، کاربر به‌صورت خودکار خارج می‌شود.',
+    )
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        verbose_name = 'تنظیمات سیستم'
+        verbose_name_plural = 'تنظیمات سیستم'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('تنظیمات سیستم قابل حذف نیست.')
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return 'تنظیمات سیستم'

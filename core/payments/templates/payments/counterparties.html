@@ -55,7 +55,7 @@
             <tbody>
                 {% for cp in counterparties %}
                 <tr>
-                    <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                    <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ cp.id }}</span></td>
                     <td>{{ cp.name }}</td>
                     <td>{{ cp.description|default:'-' }}</td>
                     <td><a href="{% url 'counterparty_edit' cp.id %}">ویرایش</a></td>

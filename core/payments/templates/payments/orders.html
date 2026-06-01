@@ -46,35 +46,65 @@
     {% if not is_staff_user and can_create_order %}
     <div class="section">
         <h3>ثبت سفارش جدید</h3>
-        <form method="post">
+        <form method="post" id="order-form">
             {% csrf_token %}
             <div class="form-grid">
                 {% for field in order_form %}
                     <div>
-                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
                         {{ field }}
                         {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
                     </div>
                 {% endfor %}
+                <div>
+                    <label>کارشناس فروش</label>
+                    {% if assigned_sales_expert %}
+                        <div style="background:#eef6ff;border:1px solid #c7d2fe;border-radius:6px;padding:9px 12px;font-size:13px;color:#1e40af;font-weight:600;">
+                            {{ assigned_sales_expert.get_full_name|default:assigned_sales_expert.username }}
+                        </div>
+                    {% else %}
+                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:9px 12px;font-size:13px;color:#94a3b8;">
+                            هنوز کارشناس فروشی به شما اختصاص نیافته است
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <h4>اقلام سفارش</h4>
+            <h4 style="margin-top:16px;">اقلام سفارش</h4>
             {{ item_formset.management_form }}
-            <div class="items-grid">
+            <div class="items-grid" id="items-container">
                 {% for form in item_formset %}
-                    <div class="item-row">
+                    {% if not form.instance.pk and forloop.last and forloop.first %}
+                    {# قالب خالی برای clone — همیشه مخفی #}
+                    <div class="item-row" id="empty-form-template" style="display:none;" aria-hidden="true">
                         {% for field in form.visible_fields %}
-                            <div>
-                                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="item-field-wrap">
+                                <label>{{ field.label }}</label>
+                                {{ field }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="item-row item-entry">
+                        {% for field in form.visible_fields %}
+                            <div class="item-field-wrap" style="position:relative;">
+                                <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
                                 {{ field }}
                                 {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
                             </div>
                         {% endfor %}
+                        <div class="item-field-wrap" style="display:flex;align-items:flex-end;">
+                            <button type="button" class="remove-row-btn" style="background:#dc3545;color:#fff;border:none;border-radius:6px;padding:9px 12px;cursor:pointer;font-size:13px;" title="حذف ردیف">✕</button>
+                        </div>
                     </div>
                 {% endfor %}
             </div>
             {% for error in item_formset.non_form_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-            <div style="margin-top:12px;"><button type="submit" class="button-link">ثبت سفارش</button></div>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+                <button type="button" id="add-row-btn" class="button-link" style="background:#198754;">+ افزودن ردیف</button>
+                <button type="submit" class="button-link">ثبت سفارش</button>
+            </div>
         </form>
+        <div id="product-dropdown" style="position:absolute;background:#fff;border:1px solid #ccd3dd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:9999;min-width:260px;max-height:240px;overflow-y:auto;display:none;"></div>
     </div>
     {% elif not is_staff_user %}
     <div class="section">
@@ -140,17 +170,17 @@
             <tbody>
                 {% for order in records %}
                     <tr>
-                        <td>{{ order.order_number }}</td>
+                        <td>{{ order.order_number }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ order.id }}</span></td>
                         {% if is_staff_user %}
                             <td>{{ order.customer.get_full_name|default:order.customer.username }}<br><span class="tiny">{{ order.customer.profile.organization|default:'-' }}</span></td>
                         {% endif %}
                         <td>{{ order.title|default:'-' }}</td>
                         <td>
                             {% for item in order.items.all %}
-                                {{ item.product_name }} - {{ item.quantity }} {{ item.get_unit_display }}{% if not forloop.last %}<br>{% endif %}
+                                {{ item.product_name }} - {{ item.quantity }} {{ item.unit }}{% if not forloop.last %}<br>{% endif %}
                             {% empty %}-{% endfor %}
                         </td>
-                        <td>{{ order.sales_expert.get_full_name|default:order.sales_expert.username|default:'-' }}</td>
+                        <td>{% if order.sales_expert %}{{ order.sales_expert.get_full_name|default:order.sales_expert.username }}{% else %}-{% endif %}</td>
                         <td><span class="status {{ order.status }}">{{ order.get_status_display }}</span></td>
                         <td>{{ order.created_at|jalali_datetime }}</td>
                         <td><a class="button-link" href="{% url 'order_detail' order.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
@@ -163,5 +193,168 @@
         {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
     </div>
     <script src="{% static 'js/app-ui.js' %}"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        /* ---------- Formset dynamic rows ---------- */
+        const container   = document.getElementById('items-container');
+        const addBtn      = document.getElementById('add-row-btn');
+        const totalInput  = document.getElementById('id_items-TOTAL_FORMS');
+        if (!container || !addBtn || !totalInput) return;
+
+        function getFormCount() { return parseInt(totalInput.value, 10); }
+
+        function updateIndices(row, idx) {
+            row.querySelectorAll('input, select, textarea, label').forEach(function (el) {
+                ['id', 'name', 'for', 'htmlFor'].forEach(function (attr) {
+                    const val = el.getAttribute(attr) || el[attr] || '';
+                    if (val) {
+                        const updated = val.replace(/items-(\d+|__prefix__)-/g, 'items-' + idx + '-');
+                        if (attr === 'for' || attr === 'htmlFor') {
+                            el.setAttribute('for', updated);
+                        } else {
+                            el.setAttribute(attr, updated);
+                        }
+                    }
+                });
+                el.value = el.tagName === 'INPUT' && el.type !== 'hidden' ? '' : (el.value || '');
+            });
+        }
+
+        function attachRemove(row) {
+            const btn = row.querySelector('.remove-row-btn');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                const allRows = container.querySelectorAll('.item-entry');
+                if (allRows.length <= 1) return;  // حداقل یک ردیف بماند
+                // اگر Django DELETE چک‌باکس داره، تیک بزن
+                const delChk = row.querySelector('input[type=checkbox][name*="DELETE"]');
+                if (delChk) { delChk.checked = true; row.style.display = 'none'; }
+                else row.remove();
+            });
+        }
+
+        // attach to existing rows
+        container.querySelectorAll('.item-entry').forEach(attachRemove);
+
+        addBtn.addEventListener('click', function () {
+            const template = document.getElementById('empty-form-template');
+            if (!template) return;
+            const idx = getFormCount();
+            const newRow = template.cloneNode(true);
+            newRow.id = '';
+            newRow.style.display = '';
+            newRow.classList.add('item-entry');
+            newRow.removeAttribute('aria-hidden');
+
+            // اضافه کردن دکمه حذف
+            const delWrap = document.createElement('div');
+            delWrap.className = 'item-field-wrap';
+            delWrap.style.cssText = 'display:flex;align-items:flex-end;';
+            delWrap.innerHTML = '<button type="button" class="remove-row-btn" style="background:#dc3545;color:#fff;border:none;border-radius:6px;padding:9px 12px;cursor:pointer;font-size:13px;" title="حذف ردیف">✕</button>';
+            newRow.appendChild(delWrap);
+
+            updateIndices(newRow, idx);
+            container.appendChild(newRow);
+            totalInput.value = idx + 1;
+            attachRemove(newRow);
+            attachAutocomplete(newRow.querySelector('.product-name-input'));
+            newRow.querySelector('.product-name-input')?.focus();
+        });
+
+        /* ---------- Product autocomplete ---------- */
+        const dropdown = document.getElementById('product-dropdown');
+        let activeInput = null;
+
+        function attachAutocomplete(input) {
+            if (!input) return;
+            let timer = null;
+
+            input.addEventListener('input', function () {
+                clearTimeout(timer);
+                const q = input.value.trim();
+                if (q.length < 1) { hideDropdown(); return; }
+                timer = setTimeout(function () { fetchProducts(q, input); }, 250);
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') hideDropdown();
+                if (e.key === 'ArrowDown' && dropdown.style.display !== 'none') {
+                    e.preventDefault();
+                    dropdown.querySelector('div')?.focus();
+                }
+            });
+        }
+
+        function fetchProducts(q, input) {
+            fetch('/products/search/?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) { showDropdown(data.results, input); })
+                .catch(function () { hideDropdown(); });
+        }
+
+        function showDropdown(results, input) {
+            if (!results.length) { hideDropdown(); return; }
+            activeInput = input;
+            dropdown.innerHTML = '';
+            results.forEach(function (p) {
+                const item = document.createElement('div');
+                item.tabIndex = 0;
+                item.style.cssText = 'padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:13px;';
+                item.innerHTML = '<strong>' + _esc(p.product_name) + '</strong>'
+                    + (p.product_code ? ' <span style="color:#666;font-size:11px;">(' + _esc(p.product_code) + ')</span>' : '')
+                    + (p.unit ? ' · ' + _esc(p.unit) : '')
+                    + (p.coefficient ? ' <span style="color:#888;font-size:11px;">ضریب: ' + _esc(p.coefficient) + '</span>' : '');
+                item.addEventListener('mousedown', function (e) { e.preventDefault(); });
+                item.addEventListener('click', function () { selectProduct(p, input); });
+                item.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') selectProduct(p, input);
+                    if (e.key === 'Escape') { hideDropdown(); input.focus(); }
+                    if (e.key === 'ArrowDown') { item.nextSibling?.focus(); }
+                    if (e.key === 'ArrowUp') { item.previousSibling ? item.previousSibling.focus() : input.focus(); }
+                });
+                item.addEventListener('mouseover', function () { item.style.background = '#e8f4ff'; });
+                item.addEventListener('mouseout',  function () { item.style.background = ''; });
+                dropdown.appendChild(item);
+            });
+
+            const rect = input.getBoundingClientRect();
+            dropdown.style.top  = (window.scrollY + rect.bottom + 2) + 'px';
+            dropdown.style.left = (window.scrollX + rect.left) + 'px';
+            dropdown.style.width = rect.width + 'px';
+            dropdown.style.display = 'block';
+        }
+
+        function selectProduct(p, input) {
+            input.value = p.product_name;
+            const row = input.closest('.item-row');
+            if (row) {
+                const unitInput = row.querySelector('input[name*="-unit"]');
+                const noteInput = row.querySelector('input[name*="-note"]');
+                if (unitInput && p.unit) unitInput.value = p.unit;
+                if (noteInput && p.product_code && !noteInput.value) noteInput.value = p.product_code;
+            }
+            hideDropdown();
+            input.focus();
+        }
+
+        function hideDropdown() {
+            dropdown.style.display = 'none';
+            activeInput = null;
+        }
+
+        function _esc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!dropdown.contains(e.target) && e.target !== activeInput) hideDropdown();
+        });
+
+        // attach autocomplete to all existing product-name inputs
+        document.querySelectorAll('.product-name-input').forEach(attachAutocomplete);
+    })();
+    </script>
 </body>
 </html>

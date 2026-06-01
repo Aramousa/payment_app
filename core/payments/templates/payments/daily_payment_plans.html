@@ -114,8 +114,8 @@
             <tbody>
                 {% for plan in plans %}
                 <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ plan.deposit_date }}</td>
+                    <td>{{ forloop.counter }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ plan.id }}</span></td>
+                    <td>{{ plan.deposit_date|jalali_date }}</td>
                     <td>{{ plan.bank_name|default:'-' }}<br>{{ plan.account_number }}</td>
                     <td class="money">{{ plan.total_expected_amount|thousand_sep }}</td>
                     <td class="money">{{ plan.assigned_expected_total|thousand_sep }}</td>

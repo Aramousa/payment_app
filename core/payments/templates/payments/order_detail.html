@@ -4,7 +4,7 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>جزئیات سفارش</title>
+    <title>جزئیات سفارش {{ order.order_number }}</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
@@ -12,138 +12,332 @@
     <script src="{% static 'js/persian-date.min.js' %}"></script>
     <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
     <style>
-        body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
-        .box { max-width: 1040px; margin: 0 auto 16px; background: #fff; border: 1px solid #e4e9f2; border-radius: 8px; padding: 16px; }
-        .top-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; font-family: inherit; }
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f5f7fb; padding: 20px; }
+        .wrap { max-width: 1060px; margin: 0 auto; }
+        .box { background: #fff; border: 1px solid #e4e9f2; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+        .box h3 { margin: 0 0 14px; font-size: 16px; color: #1e293b; }
+        .top-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; font-family: inherit; font-size: 13px; }
         .button-link.alt { background: #6c757d; }
         .button-link.success { background: #198754; }
+        .button-link.warning { background: #f59e0b; }
         .meta-grid, .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
         .meta-item { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
-        .label { color: #66788a; font-size: 12px; display: block; margin-bottom: 4px; }
+        .lbl { color: #64748b; font-size: 11px; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .3px; }
+        .val { font-size: 13px; color: #1e293b; font-weight: 500; }
         input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; font-family: inherit; }
         label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border-bottom: 1px solid #e6e6e6; padding: 9px; text-align: right; }
-        th { background: #1769aa; color: #fff; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #eef0f5; padding: 9px 12px; text-align: right; font-size: 13px; }
+        th { background: #1769aa; color: #fff; font-weight: 600; }
+        tr:last-child td { border-bottom: 0; }
         .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
-        .status { display: inline-block; padding: 4px 10px; border-radius: 14px; color: #fff; font-size: 12px; }
-        .status.submitted { background: #546e7a; }
-        .status.reviewing { background: #1976d2; }
-        .status.proforma_sent { background: #f57c00; }
-        .status.completed { background: #2e7d32; }
-        .status.cancelled { background: #c62828; }
-        .log-list { margin: 0; padding-right: 18px; }
-        .log-list li { margin-bottom: 6px; }
+
+        /* نوار پیشرفت */
+        .progress-bar { display: flex; align-items: center; gap: 0; margin-bottom: 4px; }
+        .step { display: flex; flex-direction: column; align-items: center; flex: 1; }
+        .step-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; border: 2px solid #e2e8f0; background: #f8fafc; color: #94a3b8; position: relative; z-index: 1; }
+        .step-circle.done { background: #16a34a; border-color: #16a34a; color: #fff; }
+        .step-circle.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+        .step-circle.cancelled { background: #dc2626; border-color: #dc2626; color: #fff; }
+        .step-label { font-size: 10px; color: #64748b; margin-top: 4px; text-align: center; }
+        .step-label.done { color: #16a34a; font-weight: 600; }
+        .step-label.active { color: #2563eb; font-weight: 600; }
+        .step-connector { flex: 1; height: 2px; background: #e2e8f0; margin: 0 -2px; position: relative; top: -10px; }
+        .step-connector.done { background: #16a34a; }
+
+        /* بج وضعیت */
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; color: #fff; }
+        .badge-green   { background: #16a34a; }
+        .badge-orange  { background: #f59e0b; }
+        .badge-red     { background: #dc2626; }
+        .badge-blue    { background: #2563eb; }
+        .badge-gray    { background: #64748b; }
+
+        /* بنر */
+        .banner { border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .banner-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+        .banner-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+        .banner-info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+
+        /* لاگ */
+        .log-list { margin: 0; padding: 0; list-style: none; }
+        .log-item { padding: 8px 0; border-bottom: 1px solid #f1f5f9; display: flex; gap: 10px; align-items: flex-start; font-size: 13px; }
+        .log-item:last-child { border-bottom: 0; }
+        .log-icon { font-size: 16px; flex-shrink: 0; }
+        .log-meta { color: #64748b; font-size: 11px; margin-top: 2px; }
     </style>
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
     {% include "payments/partials/system_messages_popup.html" %}
 
-    <div class="box">
-        <div class="top-actions">
-            <h2>سفارش {{ order.order_number }}</h2>
-            <a class="button-link alt" href="{{ return_url }}">بازگشت</a>
-        </div>
-        <div class="meta-grid">
-            <div class="meta-item"><span class="label">مشتری</span>{{ order.customer.get_full_name|default:order.customer.username }}</div>
-            <div class="meta-item"><span class="label">مجموعه</span>{{ order.customer.profile.organization|default:'-' }}</div>
-            <div class="meta-item"><span class="label">کارشناس فروش</span>{{ order.sales_expert.get_full_name|default:order.sales_expert.username|default:'-' }}</div>
-            <div class="meta-item"><span class="label">انتخاب مشتری</span>{{ order.requested_sales_expert.get_full_name|default:order.requested_sales_expert.username|default:'-' }}</div>
-            <div class="meta-item"><span class="label">وضعیت</span><span class="status {{ order.status }}">{{ order.get_status_display }}</span></div>
-            <div class="meta-item"><span class="label">زمان ثبت</span>{{ order.created_at|jalali_datetime }}</div>
-        </div>
-        {% if order.customer_note %}
-            <p><strong>توضیح مشتری:</strong><br>{{ order.customer_note|linebreaksbr }}</p>
-        {% endif %}
-    </div>
+    <div class="wrap">
 
-    <div class="box">
-        <h3>اقلام سفارش</h3>
-        <table>
-            <thead><tr><th>نام کالا</th><th>تعداد</th><th>واحد</th><th>توضیح</th></tr></thead>
-            <tbody>
-                {% for item in order.items.all %}
+        <!-- هدر -->
+        <div class="top-actions">
+            <h2 style="margin:0;">سفارش {{ order.order_number }}</h2>
+            <a class="button-link alt" href="{{ return_url }}">← بازگشت</a>
+        </div>
+
+        <!-- نوار پیشرفت -->
+        {% if order.status != 'cancelled' %}
+        <div class="box" style="padding:14px 20px;">
+            <div class="progress-bar">
+                {% with s=order.status %}
+                <!-- ثبت -->
+                <div class="step">
+                    <div class="step-circle done">✓</div>
+                    <div class="step-label done">ثبت سفارش</div>
+                </div>
+                <div class="step-connector {% if s != 'submitted' %}done{% endif %}"></div>
+
+                <!-- بررسی -->
+                <div class="step">
+                    <div class="step-circle {% if s == 'submitted' %}active{% else %}done{% endif %}">{% if s == 'submitted' %}2{% else %}✓{% endif %}</div>
+                    <div class="step-label {% if s == 'submitted' %}active{% else %}done{% endif %}">بررسی فروش</div>
+                </div>
+                <div class="step-connector {% if s in 'proforma_sent,completed' %}done{% elif s == 'reviewing' %}{% endif %}"></div>
+
+                <!-- پیش‌فاکتور -->
+                <div class="step">
+                    <div class="step-circle {% if s == 'reviewing' %}active{% elif s in 'proforma_sent,completed' %}done{% endif %}">{% if s in 'proforma_sent,completed' %}✓{% else %}3{% endif %}</div>
+                    <div class="step-label {% if s == 'reviewing' %}active{% elif s in 'proforma_sent,completed' %}done{% endif %}">پیش فاکتور</div>
+                </div>
+                <div class="step-connector {% if has_approved_proforma %}done{% endif %}"></div>
+
+                <!-- تایید مشتری -->
+                <div class="step">
+                    <div class="step-circle {% if s == 'proforma_sent' and not has_approved_proforma %}active{% elif has_approved_proforma %}done{% endif %}">{% if has_approved_proforma %}✓{% else %}4{% endif %}</div>
+                    <div class="step-label {% if s == 'proforma_sent' and not has_approved_proforma %}active{% elif has_approved_proforma %}done{% endif %}">تایید مشتری</div>
+                </div>
+                <div class="step-connector {% if s == 'completed' %}done{% endif %}"></div>
+
+                <!-- تکمیل -->
+                <div class="step">
+                    <div class="step-circle {% if s == 'completed' %}done{% elif has_approved_proforma %}active{% endif %}">{% if s == 'completed' %}✓{% else %}5{% endif %}</div>
+                    <div class="step-label {% if s == 'completed' %}done{% elif has_approved_proforma %}active{% endif %}">تکمیل</div>
+                </div>
+                {% endwith %}
+            </div>
+        </div>
+        {% else %}
+        <div class="banner banner-warning">
+            <span>⛔</span>
+            <span>این سفارش لغو شده است.</span>
+        </div>
+        {% endif %}
+
+        <!-- بنر پیشنهاد تکمیل برای کارمند -->
+        {% if suggest_completion %}
+        <div class="banner banner-success">
+            <span style="font-size:20px;">✅</span>
+            <div style="flex:1;">
+                <strong>پیش فاکتور توسط مشتری تایید شده است.</strong>
+                {% if pending_proformas_count > 0 %}
+                    ({{ pending_proformas_count }} پیش فاکتور هنوز در انتظار تایید است)
+                {% endif %}
+                <div style="font-size:12px;margin-top:4px;">پس از آماده‌شدن فاکتور، وضعیت سفارش را به «تکمیل شده» تغییر دهید.</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- منقضی شده بدون تایید -->
+        {% if expired_proformas_count > 0 and not has_approved_proforma and not is_staff_user %}
+        <div class="banner banner-warning">
+            <span>⏰</span>
+            <span>{{ expired_proformas_count }} پیش فاکتور شما منقضی شده است. لطفاً با کارشناس فروش تماس بگیرید.</span>
+        </div>
+        {% endif %}
+
+        <!-- اطلاعات اصلی سفارش -->
+        <div class="box">
+            <h3>اطلاعات سفارش</h3>
+            <div class="meta-grid">
+                <div class="meta-item">
+                    <span class="lbl">مشتری</span>
+                    <span class="val">{{ order.customer.get_full_name|default:order.customer.username }}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="lbl">مجموعه</span>
+                    <span class="val">{{ order.customer.profile.organization|default:'-' }}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="lbl">کارشناس فروش</span>
+                    <span class="val">{% if order.sales_expert %}{{ order.sales_expert.get_full_name|default:order.sales_expert.username }}{% else %}-{% endif %}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="lbl">وضعیت</span>
+                    <span class="val">
+                        <span class="badge
+                            {% if order.status == 'completed' %}badge-green
+                            {% elif order.status == 'cancelled' %}badge-red
+                            {% elif order.status == 'proforma_sent' %}badge-orange
+                            {% elif order.status == 'reviewing' %}badge-blue
+                            {% else %}badge-gray{% endif %}">
+                            {{ order.get_status_display }}
+                        </span>
+                    </span>
+                </div>
+                <div class="meta-item">
+                    <span class="lbl">زمان ثبت</span>
+                    <span class="val">{{ order.created_at|jalali_datetime }}</span>
+                </div>
+                {% if order.title %}
+                <div class="meta-item">
+                    <span class="lbl">عنوان</span>
+                    <span class="val">{{ order.title }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% if order.customer_note %}
+            <div style="margin-top:12px;background:#f8fbff;border:1px solid #e3efff;border-radius:8px;padding:10px;">
+                <span class="lbl">توضیح مشتری</span>
+                <div style="font-size:13px;margin-top:4px;">{{ order.customer_note|linebreaksbr }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- اقلام سفارش -->
+        <div class="box">
+            <h3>اقلام سفارش</h3>
+            <table>
+                <thead><tr><th>نام کالا</th><th>تعداد</th><th>واحد</th><th>توضیح / کد کالا</th></tr></thead>
+                <tbody>
+                    {% for item in order.items.all %}
                     <tr>
-                        <td>{{ item.product_name }}</td>
+                        <td><strong>{{ item.product_name }}</strong></td>
                         <td>{{ item.quantity }}</td>
-                        <td>{{ item.get_unit_display }}</td>
+                        <td>{{ item.unit|default:'-' }}</td>
                         <td>{{ item.note|default:'-' }}</td>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                    {% empty %}
+                    <tr><td colspan="4" style="color:#94a3b8;text-align:center;">قلمی ثبت نشده است.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-    {% if can_manage_orders %}
-    <div class="box">
-        <h3>مدیریت سفارش</h3>
-        <form method="post" class="form-grid">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_status">
-            {% for field in status_form %}
-                <div>
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-                </div>
-            {% endfor %}
-            <div><button type="submit" class="button-link">ذخیره تغییرات</button></div>
-        </form>
-    </div>
-
-    <div class="box">
-        <h3>صدور پیش فاکتور برای همین سفارش</h3>
-        <form method="post" enctype="multipart/form-data" class="form-grid">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="issue_proforma">
-            {% for field in proforma_form %}
-                <div>
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-                </div>
-            {% endfor %}
-            <div><button type="submit" class="button-link success">ارسال پیش فاکتور</button></div>
-        </form>
-    </div>
-    {% endif %}
-
-    <div class="box">
-        <h3>پیش فاکتورهای مرتبط</h3>
-        <table>
-            <thead><tr><th>عنوان</th><th>اعتبار تا</th><th>وضعیت</th><th>مشاهده</th></tr></thead>
-            <tbody>
-                {% for proforma in order.proformas.all %}
+        <!-- پیش‌فاکتورها -->
+        <div class="box">
+            <h3>پیش فاکتورها</h3>
+            {% if proformas %}
+            <table>
+                <thead><tr><th>عنوان</th><th>اعتبار تا</th><th>وضعیت</th><th>مشاهده</th></tr></thead>
+                <tbody>
+                    {% for p in proformas %}
                     <tr>
-                        <td>{{ proforma.title|default:'-' }}</td>
-                        <td>{{ proforma.valid_until }}</td>
-                        <td>{{ proforma.get_status_display }}</td>
-                        <td><a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>
+                        <td>{{ p.title|default:'پیش فاکتور' }}</td>
+                        <td>{{ p.valid_until|jalali_date }}</td>
+                        <td>
+                            {% if p.is_approved %}
+                                <span class="badge badge-green">✓ تایید شده</span>
+                                {% if p.approved_at %}
+                                <div style="font-size:11px;color:#64748b;margin-top:3px;">{{ p.approved_at|jalali_datetime }}</div>
+                                {% endif %}
+                            {% elif p.valid_until < today %}
+                                <span class="badge badge-red">⚠ منقضی</span>
+                            {% else %}
+                                <span class="badge badge-orange">⏳ در انتظار تایید</span>
+                            {% endif %}
+                        </td>
+                        <td><a class="button-link" href="{% url 'proforma_detail' p.id %}?next={{ request.get_full_path|urlencode }}" style="padding:5px 10px;font-size:12px;">مشاهده</a></td>
                     </tr>
-                {% empty %}
-                    <tr><td colspan="4">پیش فاکتوری برای این سفارش صادر نشده است.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="color:#94a3b8;font-size:13px;padding:10px 0;">
+                {% if is_staff_user %}
+                    پیش فاکتوری برای این سفارش صادر نشده است. از فرم زیر پیش فاکتور صادر کنید.
+                {% else %}
+                    پیش فاکتوری برای این سفارش هنوز صادر نشده است.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
 
-    <div class="box">
-        <h3>روند سفارش</h3>
-        <ul class="log-list">
-            {% for log in logs %}
-                <li>
-                    {{ log.created_at|jalali_datetime }} - {{ log.get_action_display }}
-                    {% if log.to_status %} - {{ log.to_status }}{% endif %}
-                    {% if is_staff_user and log.actor %} - {{ log.actor.get_full_name|default:log.actor.username }}{% endif %}
-                    {% if log.note %}<br><small>{{ log.note }}</small>{% endif %}
+        {% if can_manage_orders %}
+        <!-- مدیریت وضعیت -->
+        <div class="box">
+            <h3>مدیریت سفارش</h3>
+            <form method="post" class="form-grid">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_status">
+                {% for field in status_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <div style="display:flex;align-items:flex-end;">
+                    <button type="submit" class="button-link">ذخیره تغییرات</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- صدور پیش فاکتور -->
+        <div class="box">
+            <h3>صدور پیش فاکتور جدید</h3>
+            <form method="post" enctype="multipart/form-data" class="form-grid">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="issue_proforma">
+                {% for field in proforma_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <div style="display:flex;align-items:flex-end;">
+                    <button type="submit" class="button-link success">ارسال پیش فاکتور به مشتری</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- روند و تاریخچه -->
+        <div class="box">
+            <h3>تاریخچه سفارش</h3>
+            <ul class="log-list">
+                {% for log in logs %}
+                <li class="log-item">
+                    <span class="log-icon">
+                        {% if log.action == 'created' %}📋
+                        {% elif log.action == 'status_changed' %}🔄
+                        {% elif log.action == 'assigned' %}👤
+                        {% elif log.action == 'proforma_created' %}📄
+                        {% elif log.action == 'proforma_approved' %}✅
+                        {% else %}•{% endif %}
+                    </span>
+                    <div>
+                        <div>
+                            <strong>{{ log.get_action_display }}</strong>
+                            {% if log.to_status %}
+                                ← <span class="badge
+                                    {% if log.to_status == 'completed' %}badge-green
+                                    {% elif log.to_status == 'cancelled' %}badge-red
+                                    {% elif log.to_status == 'proforma_sent' %}badge-orange
+                                    {% else %}badge-blue{% endif %}">
+                                    {{ log.to_status }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        <div class="log-meta">
+                            {{ log.created_at|jalali_datetime }}
+                            {% if is_staff_user and log.actor %} — {{ log.actor.get_full_name|default:log.actor.username }}{% endif %}
+                        </div>
+                        {% if log.note %}<div style="font-size:12px;color:#475569;margin-top:2px;">{{ log.note }}</div>{% endif %}
+                    </div>
                 </li>
-            {% empty %}
-                <li>رویدادی ثبت نشده است.</li>
-            {% endfor %}
-        </ul>
-    </div>
+                {% empty %}
+                <li style="color:#94a3b8;font-size:13px;">رویدادی ثبت نشده است.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+    </div><!-- /.wrap -->
 
     <script>
     $(document).ready(function () {

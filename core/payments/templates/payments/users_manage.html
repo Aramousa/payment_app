@@ -1,4 +1,5 @@
 {% load static %}
+{% load payment_dates %}
 <!DOCTYPE html>
 <html lang="fa">
 <head>
@@ -55,10 +56,6 @@
             <a href="{% url 'submit' %}" class="button-link">بخش فیش ها</a>
             <a href="{% url 'invoices_dashboard' %}" class="button-link">بخش فاکتورها</a>
         </div>
-        <form method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button type="submit" class="logout-btn">خروج از حساب</button>
-        </form>
     </div>
 
     {% include "payments/partials/system_messages_popup.html" %}
@@ -85,7 +82,7 @@
                                     <div>{{ item.label }}: «{{ item.old }}» به «{{ item.new }}»</div>
                                 {% endfor %}
                             </td>
-                            <td>{{ change.created_at }}</td>
+                            <td>{{ change.created_at|jalali_datetime }}</td>
                             <td>
                                 <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
                                     <form method="post" action="{% url 'profile_change_request_review' change.id %}">
@@ -205,6 +202,7 @@
             <thead>
                 <tr>
                     <th>ردیف</th>
+                    <th>کد تفضیلی</th>
                     <th>نام کاربر</th>
                     <th>نام و نام خانوادگی</th>
                     <th>نقش</th>
@@ -221,7 +219,8 @@
             <tbody>
                 {% for item in users %}
                     <tr>
-                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ item.id }}</span></td>
+                        <td>{{ item.profile.accounting_code|default:'-' }}</td>
                         <td>{{ item.username }}</td>
                         <td>{{ item.first_name }} {{ item.last_name }}</td>
                         <td>{{ item.profile.get_role_display }}</td>
@@ -229,8 +228,8 @@
                         <td>{{ item.profile.mobile|default:'-' }}</td>
                         <td>{{ item.profile.organization|default:'-' }}</td>
                         <td>{{ item.profile.city|default:'-' }} / {{ item.profile.province|default:'-' }}</td>
-                        <td>{{ item.profile.active_from|default:'-' }}</td>
-                        <td>{{ item.profile.valid_until|default:'-' }}</td>
+                        <td>{{ item.profile.active_from|jalali_date|default:'-' }}</td>
+                        <td>{{ item.profile.valid_until|jalali_date|default:'-' }}</td>
                         <td>{% if item.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
                         <td>
                             <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:center;">

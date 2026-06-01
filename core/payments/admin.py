@@ -1,8 +1,10 @@
 from django.contrib import admin
+from django.urls import path, reverse
+from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProfileChangeRequest, SystemActivityLog, UploadSettings, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, SystemActivityLog, SystemSettings, UploadSettings, UserProfile
 
 
 def format_jalali_datetime(value):
@@ -181,7 +183,7 @@ class UploadSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'organization', 'city', 'province', 'role', 'active_from', 'valid_until', 'force_password_change', 'suspended')
+    list_display = ('user', 'accounting_code', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'organization', 'city', 'province', 'role', 'active_from', 'valid_until', 'force_password_change', 'suspended')
     list_filter = ('role', 'city', 'province', 'force_password_change', 'suspended')
     search_fields = ('user__username', 'user__email', 'phone', 'mobile', 'second_mobile', 'organization', 'first_name', 'last_name')
     readonly_fields = ('user',)
@@ -193,7 +195,7 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': ('city', 'province', 'address', 'second_address')
         }),
         ('اطلاعات حساب', {
-            'fields': ('role', 'active_from', 'valid_until', 'force_password_change', 'suspended')
+            'fields': ('role', 'active_from', 'valid_until', 'force_password_change', 'suspended', 'accounting_code')
         }),
     )
 
@@ -253,8 +255,49 @@ class ProfileChangeRequestAdmin(admin.ModelAdmin):
 
 @admin.register(Counterparty)
 class CounterpartyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'jalali_created_at', 'jalali_updated_at')
-    search_fields = ('name',)
+    list_display = ('name', 'get_status_badge', 'get_linked_user', 'description', 'jalali_updated_at')
+    list_filter = ('status',)
+    search_fields = ('name', 'user__username', 'user__first_name', 'user__last_name')
+    raw_id_fields = ('user',)
+    fieldsets = (
+        ('اطلاعات طرف حساب', {'fields': ('name', 'description')}),
+        ('حساب کاربری و وضعیت', {
+            'fields': ('user', 'status'),
+            'description': (
+                '⚠ تنظیم وضعیت: '
+                'فعال = ورود و عملیات مجاز | '
+                'غیرفعال = ورود مجاز، تایید ممنوع | '
+                'معلق = ورود ممنوع (حساب کاربری به‌صورت خودکار غیرفعال می‌شود)'
+            ),
+        }),
+    )
+
+    def get_status_badge(self, obj):
+        colors = {
+            'active':    '#16a34a',
+            'inactive':  '#d97706',
+            'suspended': '#dc2626',
+        }
+        labels = {
+            'active':    '✅ فعال',
+            'inactive':  '⚠ غیرفعال',
+            'suspended': '🔴 معلق',
+        }
+        color = colors.get(obj.status, '#64748b')
+        label = labels.get(obj.status, obj.status)
+        from django.utils.html import format_html
+        return format_html(
+            '<span style="color:{};font-weight:700;">{}</span>',
+            color, label,
+        )
+    get_status_badge.short_description = 'وضعیت'
+
+    def get_linked_user(self, obj):
+        if obj.user:
+            active = '✓' if obj.user.is_active else '✗'
+            return f'{active} {obj.user.get_full_name() or obj.user.username} ({obj.user.username})'
+        return '—'
+    get_linked_user.short_description = 'حساب کاربری'
 
     def jalali_created_at(self, obj):
         return format_jalali_datetime(obj.created_at)
@@ -358,6 +401,129 @@ class InvoiceExtractionJobAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(LoginRecord)
+class LoginRecordAdmin(admin.ModelAdmin):
+    list_display = (
+        'jalali_login_at', 'user', 'ip_address',
+        'browser_family', 'browser_version',
+        'os_family', 'os_version',
+        'device_type', 'device_brand',
+        'accept_language',
+        'jalali_logout_at', 'logout_reason',
+    )
+    list_filter = ('device_type', 'logout_reason', 'login_at', 'os_family', 'browser_family')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'ip_address', 'x_forwarded_for')
+    readonly_fields = (
+        'user', 'session_key', 'ip_address', 'x_forwarded_for',
+        'user_agent_raw', 'browser_family', 'browser_version',
+        'os_family', 'os_version', 'device_type', 'device_brand', 'device_model',
+        'accept_language', 'jalali_login_at', 'jalali_logout_at', 'logout_reason',
+    )
+    date_hierarchy = 'login_at'
+    ordering = ('-login_at',)
+
+    def jalali_login_at(self, obj):
+        return format_jalali_datetime(obj.login_at)
+
+    def jalali_logout_at(self, obj):
+        return format_jalali_datetime(obj.logout_at) if obj.logout_at else '-'
+
+    jalali_login_at.short_description = 'زمان ورود'
+    jalali_logout_at.short_description = 'زمان خروج'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+@admin.register(FieldRequirementConfig)
+class FieldRequirementConfigAdmin(admin.ModelAdmin):
+    list_display = (
+        'get_form_display', 'field_label', 'field_name',
+        'get_default_display', 'get_override_display', 'get_effective_display',
+    )
+    list_filter = ('form_name', 'is_required', 'default_required')
+    ordering = ('form_name', 'field_label')
+    readonly_fields = ('form_name', 'field_name', 'field_label', 'default_required')
+    fields = ('form_name', 'field_name', 'field_label', 'default_required', 'is_required')
+
+    def get_form_display(self, obj):
+        return obj.get_form_name_display()
+    get_form_display.short_description = 'فرم'
+
+    def get_default_display(self, obj):
+        return '✅ اجباری' if obj.default_required else '⬜ اختیاری'
+    get_default_display.short_description = 'پیشفرض کد'
+
+    def get_override_display(self, obj):
+        if obj.is_required is None:
+            return '— (پیشفرض)'
+        return '✅ اجباری' if obj.is_required else '⬜ اختیاری'
+    get_override_display.short_description = 'تنظیم ادمین'
+
+    def get_effective_display(self, obj):
+        eff = obj.effective_required
+        return ('✅ اجباری' if eff else '⬜ اختیاری')
+    get_effective_display.short_description = 'مقدار فعلی'
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SystemSettings)
+class SystemSettingsAdmin(admin.ModelAdmin):
+    list_display = ('session_inactivity_timeout', 'jalali_updated_at')
+    fieldsets = (
+        ('تنظیمات نشست', {
+            'fields': ('session_inactivity_timeout',),
+            'description': 'مقادیر زیر حداکثر ۶۰ ثانیه پس از ذخیره اعمال می‌شوند.',
+        }),
+    )
+
+    def jalali_updated_at(self, obj):
+        return format_jalali_datetime(obj.updated_at)
+
+    jalali_updated_at.short_description = 'آخرین بروزرسانی'
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser and not SystemSettings.objects.exists()
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(SystemActivityLog)
 class SystemActivityLogAdmin(admin.ModelAdmin):
     list_display = ('jalali_created_at', 'actor', 'target_user', 'action', 'description')
@@ -381,6 +547,44 @@ class SystemActivityLogAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+@admin.register(ProductCatalog)
+class ProductCatalogAdmin(admin.ModelAdmin):
+    list_display = ('product_name', 'product_code', 'unit', 'coefficient', 'is_active', 'jalali_created_at')
+    list_filter = ('is_active',)
+    list_editable = ('is_active',)
+    search_fields = ('product_name', 'product_code')
+    change_list_template = 'admin/payments/productcatalog/change_list.html'
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+    jalali_created_at.short_description = 'زمان ثبت'
+
+    def get_urls(self):
+        custom = [
+            path('import-excel/', self.admin_site.admin_view(self._import_excel), name='productcatalog_import_excel'),
+        ]
+        return custom + super().get_urls()
+
+    def _import_excel(self, request):
+        from django.urls import reverse as _rev
+        return HttpResponseRedirect(_rev('import_product_catalog'))
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser

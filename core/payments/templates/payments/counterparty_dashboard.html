@@ -1,0 +1,261 @@
+{% load static %}
+{% load humanize %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>داشبورد طرف حساب — {{ cp.name }}</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f0f4f8; padding: 20px; }
+        .wrap { max-width: 1280px; margin: 0 auto; }
+        .page-header { display: flex; justify-content: space-between; align-items: center;
+                       flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+        .page-header h2 { margin: 0; font-size: 20px; color: #0f4e49; }
+
+        /* کارت‌های آماری */
+        .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 14px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 10px; padding: 16px; text-align: center;
+                     box-shadow: 0 2px 8px rgba(0,0,0,.07); border-top: 3px solid #0d9488; }
+        .stat-card .num { font-size: 30px; font-weight: 800; color: #0d9488; }
+        .stat-card .lbl { font-size: 12px; color: #64748b; margin-top: 4px; }
+        .stat-card.warn { border-top-color: #f59e0b; }
+        .stat-card.warn .num { color: #f59e0b; }
+        .stat-card.ok { border-top-color: #22c55e; }
+        .stat-card.ok .num { color: #22c55e; }
+
+        /* فیلتر */
+        .filter-section { background: #fff; border-radius: 10px; padding: 14px 16px;
+                          box-shadow: 0 2px 8px rgba(0,0,0,.07); margin-bottom: 16px;
+                          display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+        .filter-section label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+        .filter-section select, .filter-section input {
+            border: 1.5px solid #b2e0da; border-radius: 7px; padding: 7px 10px;
+            font-family: Vazir, sans-serif; background: #f7fffe; }
+        .filter-section button, .filter-section a {
+            border: none; border-radius: 7px; padding: 8px 14px; cursor: pointer;
+            font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700;
+            text-decoration: none; display: inline-block; }
+        .btn-apply { background: #0d9488; color: #fff; }
+        .btn-clear  { background: #64748b; color: #fff; }
+        .btn-export { background: #1a7044; color: #fff; }
+
+        /* جدول */
+        .table-wrap { background: #fff; border-radius: 10px; overflow: hidden;
+                      box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: linear-gradient(135deg,#042f2e,#0f766e); color: #fff;
+             padding: 11px 12px; text-align: right; font-size: 12px; font-weight: 700;
+             letter-spacing: .3px; text-transform: uppercase; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eef0f5; font-size: 13px;
+             color: #374151; vertical-align: middle; }
+        tr:last-child td { border-bottom: 0; }
+        tr:hover td { background: #f0fdfa; }
+        tr.approved-row td { background: #f0fdf4; }
+
+        /* بج‌ها */
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+                 border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .badge-approved { background: #dcfce7; color: #15803d; }
+        .badge-pending  { background: #fef9c3; color: #854d0e; }
+        .badge-locked   { background: #f1f5f9; color: #64748b; }
+
+        /* دکمه تایید */
+        .approve-btn { background: linear-gradient(135deg,#0d9488,#0f766e); color: #fff;
+                       border: none; border-radius: 7px; padding: 7px 14px; cursor: pointer;
+                       font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700;
+                       box-shadow: 0 2px 8px rgba(13,148,136,.3);
+                       transition: transform .1s, box-shadow .15s; }
+        .approve-btn:hover { box-shadow: 0 4px 14px rgba(13,148,136,.4); }
+        .approve-btn:active { transform: translateY(1px); }
+
+        /* pagination */
+        .pagination { display: flex; gap: 6px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+        .pagination a, .pagination span {
+            padding: 6px 12px; border-radius: 6px; font-size: 13px; text-decoration: none;
+            border: 1px solid #b2e0da; background: #fff; color: #0f766e; font-weight: 600; }
+        .pagination a:hover { background: #f0fdfa; }
+        .pagination .current { background: #0d9488; color: #fff; border-color: #0d9488; }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+    {% include "payments/partials/system_messages_popup.html" %}
+
+    <div class="wrap">
+        <div class="page-header">
+            <div>
+                <h2>📊 داشبورد طرف حساب: {{ cp.name }}</h2>
+                {# نمایش وضعیت حساب #}
+                {% if cp_status == 'active' %}
+                    <span style="background:#dcfce7;color:#15803d;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;">✅ حساب فعال</span>
+                {% elif cp_status == 'inactive' %}
+                    <span style="background:#fef9c3;color:#854d0e;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;">⚠ حساب غیرفعال — فقط مشاهده</span>
+                {% endif %}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}export=excel" class="filter-section btn-export" style="padding:8px 14px;">
+                    ⬇ خروجی اکسل
+                </a>
+            </div>
+        </div>
+
+        {# بنر اطلاع‌رسانی وضعیت غیرفعال #}
+        {% if not can_operate %}
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;margin-bottom:16px;color:#92400e;font-size:13px;display:flex;gap:10px;align-items:center;">
+            <span style="font-size:20px;">⚠</span>
+            <div>
+                <strong>حساب شما در وضعیت «غیرفعال» است.</strong><br>
+                می‌توانید فیش‌ها را مشاهده و خروجی اکسل بگیرید، اما امکان تایید فیش وجود ندارد.
+                برای فعال‌سازی با مدیر سیستم تماس بگیرید.
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- آمار -->
+        <div class="stat-row">
+            <div class="stat-card">
+                <div class="num">{{ total }}</div>
+                <div class="lbl">کل فیش‌ها</div>
+            </div>
+            <div class="stat-card ok">
+                <div class="num">{{ approved_count }}</div>
+                <div class="lbl">تایید شده توسط شما</div>
+            </div>
+            <div class="stat-card warn">
+                <div class="num">{{ pending_count }}</div>
+                <div class="lbl">در انتظار تایید</div>
+            </div>
+        </div>
+
+        <!-- فیلتر -->
+        <form method="get" class="filter-section">
+            <div>
+                <label>وضعیت فیش</label>
+                <select name="status">
+                    <option value="">همه وضعیت‌ها</option>
+                    {% for val, lbl in status_choices %}
+                        <option value="{{ val }}" {% if filters.status == val %}selected{% endif %}>{{ lbl }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>تایید طرف حساب</label>
+                <select name="approved">
+                    <option value="">همه</option>
+                    <option value="no"  {% if filters.approved == 'no' %}selected{% endif %}>در انتظار تایید</option>
+                    <option value="yes" {% if filters.approved == 'yes' %}selected{% endif %}>تایید شده</option>
+                </select>
+            </div>
+            <div>
+                <button type="submit" class="btn-apply">اعمال فیلتر</button>
+                <a href="{% url 'counterparty_dashboard' %}" class="btn-clear" style="margin-right:6px;">حذف فیلتر</a>
+            </div>
+        </form>
+
+        <!-- جدول فیش‌ها -->
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>شماره فیش</th>
+                        <th>مشتری / مجموعه</th>
+                        <th>مبلغ (ریال)</th>
+                        <th>تاریخ واریز</th>
+                        <th>کد پیگیری</th>
+                        <th>نام واریز کننده</th>
+                        <th>شماره حساب واریز کننده</th>
+                        <th>شماره حساب مقصد</th>
+                        <th>وضعیت</th>
+                        <th>تایید طرف حساب</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in records %}
+                    <tr class="{% if payment.is_counterparty_approved %}approved-row{% endif %}">
+                        <td>
+                            <strong>#{{ payment.id }}</strong>
+                            <div style="font-size:11px;color:#94a3b8;">{{ payment.created_at|jalali_date }}</div>
+                        </td>
+                        <td>
+                            {{ payment.first_name }} {{ payment.last_name }}
+                            {% if payment.organization %}
+                            <div style="font-size:11px;color:#64748b;">{{ payment.organization }}</div>
+                            {% endif %}
+                        </td>
+                        <td style="font-weight:700;direction:ltr;text-align:right;">
+                            {{ payment.amount|default:0|intcomma }}
+                        </td>
+                        <td>{{ payment.pay_date|jalali_date|default:'-' }}</td>
+                        <td>{{ payment.tracking_code|default:'-' }}</td>
+                        <td>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</td>
+                        <td style="direction:ltr;text-align:right;">{{ payment.payer_account_number|default:'-' }}</td>
+                        <td style="direction:ltr;text-align:right;">{{ payment.beneficiary_account_number|default:'-' }}</td>
+                        <td>
+                            <span class="badge" style="background:#e0f2fe;color:#075985;">
+                                {{ payment.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if payment.is_counterparty_approved %}
+                                <span class="badge badge-approved">✓ تایید شده</span>
+                                <div style="font-size:11px;color:#64748b;margin-top:3px;">
+                                    {{ payment.counterparty_approved_at|jalali_datetime }}
+                                </div>
+                            {% else %}
+                                <span class="badge badge-pending">⏳ در انتظار</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not payment.is_counterparty_approved %}
+                                {% if can_operate %}
+                                <form method="post" action="{% url 'counterparty_approve_payment' payment.id %}"
+                                      onsubmit="return confirm('آیا این فیش را تایید می‌کنید؟ پس از تایید غیرقابل برگشت است.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="approve-btn">✓ تایید</button>
+                                </form>
+                                {% else %}
+                                <span class="badge" style="background:#fef9c3;color:#854d0e;" title="حساب غیرفعال">⛔ غیرمجاز</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="badge badge-locked">🔒 قفل شده</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" style="text-align:center;color:#94a3b8;padding:30px;">
+                            هیچ فیشی با این معیارها یافت نشد.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}">« قبلی</a>
+            {% endif %}
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <span class="current">{{ num }}</span>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ num }}">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if page_obj.has_next %}
+                <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}">بعدی »</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

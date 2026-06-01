@@ -107,15 +107,6 @@
             {% if request.user.is_superuser %}
                 <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
             {% endif %}
-            <a href="{% url 'profile_edit' %}" class="button-link">ویرایش مشخصات</a>
-            <a href="{% url 'profile_password_change' %}" class="button-link">تغییر رمز عبور</a>
-        </div>
-        <div class="logout-wrap">
-            <div class="user-chip">{{ user_display_name }}</div>
-            <form class="logout-form" method="post" action="{% url 'logout' %}">
-                {% csrf_token %}
-                <button type="submit" class="logout-btn">خروج از حساب</button>
-            </form>
         </div>
     </div>
 
@@ -309,13 +300,13 @@
             <tbody>
                 {% for invoice in records %}
                     <tr class="summary-row {% if not invoice.is_seen_by_customer %}unseen-row{% endif %}" data-row="{{ invoice.id }}">
-                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ invoice.id }}</span></td>
                         {% if is_staff_user %}
                             <td>{{ invoice.customer.get_full_name|default:invoice.customer.username }}</td>
                             <td>{{ invoice.customer.profile.organization|default:'-' }}</td>
                         {% endif %}
                         <td>{{ invoice.invoice_number }}</td>
-                        <td>{{ invoice.invoice_date }}</td>
+                        <td>{{ invoice.invoice_date|jalali_date }}</td>
                         <td>{{ invoice.amount|thousand_sep }}</td>
                         <td>{{ invoice.reference_number }}</td>
                         <td>{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</td>
@@ -342,7 +333,7 @@
                             <div class="detail-grid">
                                 <div class="detail-card">
                                     <div class="label">اطلاعات فاکتور</div>
-                                    <div class="value">تاریخ فاکتور: {{ invoice.invoice_date }}</div>
+                                    <div class="value">تاریخ فاکتور: {{ invoice.invoice_date|jalali_date }}</div>
                                     <div class="value">مبلغ: {{ invoice.amount|thousand_sep }} ریال</div>
                                     <div class="value">شماره حواله: {{ invoice.reference_number }}</div>
                                     <div class="value">بارگذاری کننده: {{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</div>

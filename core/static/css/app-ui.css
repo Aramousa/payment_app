@@ -6,15 +6,24 @@
     --app-border-strong: #c5d1dd;
     --app-text: #1f2933;
     --app-muted: #66788a;
-    --app-primary: #1769aa;
-    --app-primary-dark: #0f4f84;
-    --app-success: #237a57;
+    --app-primary: #0d9488;
+    --app-primary-dark: #0f766e;
+    --app-primary-light: #f0fdfa;
+    --app-success: #1a7044;
+    --app-success-dark: #145a38;
     --app-warning: #a86405;
     --app-danger: #b42318;
+    --app-danger-dark: #8f1c14;
+    --app-orange: #c2500a;
+    --app-orange-dark: #9e4109;
+    --app-secondary: #52606d;
+    --app-secondary-dark: #3d4e5c;
     --app-radius: 8px;
+    --app-radius-sm: 6px;
     --app-shadow: 0 10px 28px rgba(31, 41, 51, 0.08);
     --app-shadow-soft: 0 4px 14px rgba(31, 41, 51, 0.06);
     --app-shadow-menu: 0 18px 45px rgba(31, 41, 51, 0.18);
+    --app-transition: 0.16s ease;
 }
 
 * {
@@ -84,21 +93,18 @@ h3 {
 }
 
 .app-nav-user {
-    background: #eef6ff;
+    align-items: center;
+    background: var(--app-primary-light);
     border: 1px solid #cfe1f5;
     border-radius: var(--app-radius);
     color: #174463;
-    font-size: 12px;
-    padding: 4px 8px;
-    white-space: nowrap;
-}
-
-.app-nav-user {
-    align-items: center;
     display: inline-flex;
     flex-direction: column;
+    font-size: 12px;
     line-height: 1.5;
-    min-width: 130px;
+    min-width: 120px;
+    padding: 4px 8px;
+    white-space: nowrap;
 }
 
 .app-nav-user-name {
@@ -172,9 +178,17 @@ h3 {
 }
 
 .app-nav-logout button {
-    background: var(--app-danger) !important;
+    background: var(--app-danger);
+    border-radius: var(--app-radius-sm);
     color: #fff;
-    padding: 6px 10px !important;
+    font-size: 12px;
+    font-weight: 700;
+    min-height: 32px;
+    padding: 5px 10px;
+}
+
+.app-nav-logout button:hover {
+    background: var(--app-danger-dark);
 }
 
 .notification-bell {
@@ -326,14 +340,25 @@ h3 {
 }
 
 .notification-actions button {
-    background: var(--app-primary) !important;
+    background: var(--app-primary);
+    border-radius: var(--app-radius-sm);
     color: #fff;
     font-size: 12px;
-    padding: 6px 8px !important;
+    font-weight: 700;
+    min-height: 30px;
+    padding: 5px 8px;
+}
+
+.notification-actions button:hover {
+    background: var(--app-primary-dark);
 }
 
 .notification-actions button.secondary {
-    background: #52606d !important;
+    background: var(--app-secondary);
+}
+
+.notification-actions button.secondary:hover {
+    background: var(--app-secondary-dark);
 }
 
 .notification-item,
@@ -384,33 +409,62 @@ h3 {
     align-items: center;
 }
 
+/* ─── Base button reset ──────────────────────────────────────── */
 .button-link,
 .back-link,
+.clear-btn,
+.logout-btn,
+.edit-link,
+.cancel-link,
 .customer-link,
 .detail-link,
 .track-link,
 .expand-btn,
 .apply-btn,
 .submit-btn,
+.rot-btn,
 .staff-quick button,
 .staff-action button,
 button[type="submit"] {
-    border: 1px solid transparent !important;
-    border-radius: var(--app-radius) !important;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--app-radius-sm);
+    box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 0 rgba(255,255,255,.15) inset;
+    cursor: pointer;
+    display: inline-flex;
     font-family: Vazir, sans-serif;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
+    gap: 5px;
+    justify-content: center;
     min-height: 36px;
+    padding: 6px 14px;
+    text-decoration: none;
+    transition: background-color var(--app-transition),
+                box-shadow var(--app-transition),
+                border-color var(--app-transition),
+                transform 80ms ease;
+    white-space: nowrap;
 }
 
+.button-link:active,
+.back-link:active,
+.edit-link:active,
+.submit-btn:active,
+.staff-quick button:active,
+button[type="submit"]:active {
+    transform: translateY(1px);
+}
+
+/* ─── Primary (آبی — پیش‌فرض) ────────────────────────────────── */
 .button-link,
 .customer-link,
 .detail-link,
 .track-link,
 .expand-btn,
 .apply-btn {
-    background: var(--app-primary) !important;
-    color: #fff !important;
+    background: var(--app-primary);
+    color: #fff;
 }
 
 .button-link:hover,
@@ -419,25 +473,101 @@ button[type="submit"] {
 .track-link:hover,
 .expand-btn:hover,
 .apply-btn:hover {
-    background: var(--app-primary-dark) !important;
-    box-shadow: 0 8px 18px rgba(23, 105, 170, 0.18);
+    background: var(--app-primary-dark);
+    box-shadow: 0 4px 12px rgba(23,105,170,.25);
+    color: #fff;
 }
 
+/* ─── Success (سبز — تایید / ثبت) ───────────────────────────── */
 .button-link.alt,
+.button-link.success,
 .submit-btn,
 .staff-quick button,
 .staff-action button {
-    background: var(--app-success) !important;
+    background: var(--app-success);
+    color: #fff;
 }
 
+.button-link.alt:hover,
+.button-link.success:hover,
+.submit-btn:hover,
+.staff-quick button:hover,
+.staff-action button:hover {
+    background: var(--app-success-dark);
+    box-shadow: 0 4px 12px rgba(26,112,68,.25);
+    color: #fff;
+}
+
+/* ─── Secondary / خاکستری (بازگشت / لغو) ────────────────────── */
 .back-link,
+.cancel-link,
 .clear-btn {
-    background: #52606d !important;
-    color: #fff !important;
+    background: var(--app-secondary);
+    color: #fff;
 }
 
+.back-link:hover,
+.cancel-link:hover,
+.clear-btn:hover {
+    background: var(--app-secondary-dark);
+    box-shadow: 0 4px 12px rgba(82,96,109,.2);
+    color: #fff;
+}
+
+/* ─── Danger / قرمز (خروج / حذف) ────────────────────────────── */
 .logout-btn {
-    background: var(--app-danger) !important;
+    background: var(--app-danger);
+    color: #fff;
+}
+
+.logout-btn:hover {
+    background: var(--app-danger-dark);
+    box-shadow: 0 4px 12px rgba(180,35,24,.25);
+    color: #fff;
+}
+
+/* ─── Orange / نارنجی (ویرایش) ───────────────────────────────── */
+.edit-link {
+    background: var(--app-orange);
+    color: #fff;
+}
+
+.edit-link:hover {
+    background: var(--app-orange-dark);
+    box-shadow: 0 4px 12px rgba(194,80,10,.25);
+    color: #fff;
+}
+
+/* ─── Outlined / حاشیه‌دار ────────────────────────────────────── */
+.button-link.outline {
+    background: transparent;
+    border-color: var(--app-primary);
+    color: var(--app-primary);
+    box-shadow: none;
+}
+
+.button-link.outline:hover {
+    background: var(--app-primary-light);
+    box-shadow: none;
+}
+
+/* ─── Small buttons ───────────────────────────────────────────── */
+.button-link.sm,
+.back-link.sm,
+.edit-link.sm {
+    font-size: 12px;
+    min-height: 30px;
+    padding: 4px 10px;
+}
+
+/* ─── Disabled ───────────────────────────────────────────────── */
+.button-link:disabled,
+.back-link:disabled,
+.edit-link:disabled,
+button:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+    pointer-events: none;
 }
 
 .user-chip {
@@ -1112,5 +1242,196 @@ tr.detail-row {
     .app-nav-user,
     .app-nav-logout {
         display: none;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VISUAL ENHANCEMENT LAYER — تغییرات بصری
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Navigation — فیروزه‌ای ─────────────────────────────────── */
+.app-shell-nav {
+    background: linear-gradient(135deg, #042f2e 0%, #0f4e49 60%, #134e4a 100%) !important;
+    border-color: rgba(255,255,255,.08) !important;
+    box-shadow: 0 4px 28px rgba(13,148,136,.30) !important;
+}
+
+/* لوگو — پس‌زمینه سفید تا در هر رنگ nav خوانا باشد */
+.app-shell-brand {
+    background: rgba(255,255,255,.96) !important;
+    border-radius: 8px !important;
+    padding: 4px 10px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.15) !important;
+}
+
+.app-nav-link {
+    color: rgba(255,255,255,.85) !important;
+    border-color: transparent !important;
+    font-size: 13px;
+}
+
+.app-nav-link:hover {
+    background: rgba(20,184,166,.22) !important;
+    border-color: rgba(94,234,212,.35) !important;
+    color: #99f6e4 !important;
+}
+
+.app-nav-documents { color: #99f6e4 !important; }
+.app-nav-finance   { color: #fcd88a !important; }
+.app-nav-admin     { color: #c4b5fd !important; }
+.app-nav-account   { color: rgba(255,255,255,.6) !important; }
+
+.app-nav-user {
+    background: rgba(20,184,166,.18) !important;
+    border-color: rgba(94,234,212,.3) !important;
+    color: #99f6e4 !important;
+}
+
+.app-nav-user-name  { color: #fff !important; }
+.app-nav-user-role  { color: #99f6e4 !important; }
+
+.app-nav-logout button {
+    background: rgba(255,255,255,.1) !important;
+    border: 1px solid rgba(255,255,255,.2) !important;
+    color: rgba(255,255,255,.9) !important;
+}
+
+.app-nav-logout button:hover {
+    background: #0d9488 !important;
+    border-color: #0d9488 !important;
+    color: #fff !important;
+}
+
+.notification-trigger {
+    background: rgba(20,184,166,.15) !important;
+    border-color: rgba(94,234,212,.3) !important;
+    color: #99f6e4 !important;
+}
+
+.notification-trigger:hover {
+    background: rgba(20,184,166,.28) !important;
+    color: #fff !important;
+}
+
+/* ─── Table header — فیروزه‌ای تیره ─────────────────────────── */
+th {
+    background: linear-gradient(135deg, #042f2e 0%, #0f766e 100%) !important;
+    border-bottom: none !important;
+    font-size: 12px;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+}
+
+tbody tr:nth-child(even):not(.detail-row) {
+    background: #f0fdfa !important;
+}
+
+tbody tr:hover:not(.detail-row) {
+    background: #ccfbf1 !important;
+    box-shadow: inset 3px 0 0 var(--app-primary);
+}
+
+/* ─── Cards / Section ────────────────────────────────────────── */
+.section,
+.box,
+.filter-box {
+    border-left: 3px solid var(--app-primary) !important;
+    border-radius: var(--app-radius) !important;
+    box-shadow: 0 2px 12px rgba(13,148,136,.07) !important;
+}
+
+.summary-card {
+    border-top: 3px solid var(--app-primary) !important;
+    border-left: none !important;
+    transition: transform var(--app-transition), box-shadow var(--app-transition);
+}
+
+.summary-card:hover {
+    box-shadow: 0 6px 20px rgba(13,148,136,.18) !important;
+    transform: translateY(-2px);
+}
+
+/* ─── Status pills بهبود یافته ───────────────────────────────── */
+.status-pill,
+.status-badge,
+.flag-chip,
+.badge,
+.status {
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: .3px;
+    padding: 3px 9px !important;
+    text-transform: uppercase;
+}
+
+/* ─── Form inputs ────────────────────────────────────────────── */
+input:not([type=checkbox]):not([type=radio]),
+select,
+textarea {
+    background: #f7fffe !important;
+    border: 1.5px solid #b2e0da !important;
+    border-radius: var(--app-radius-sm) !important;
+    font-size: 13px;
+    padding: 9px 12px !important;
+    transition: border-color var(--app-transition), box-shadow var(--app-transition), background var(--app-transition);
+}
+
+input:not([type=checkbox]):not([type=radio]):focus,
+select:focus,
+textarea:focus {
+    background: #fff !important;
+    border-color: var(--app-primary) !important;
+    box-shadow: 0 0 0 3px rgba(13,148,136,.14) !important;
+    outline: none;
+}
+
+/* ─── Page heading ───────────────────────────────────────────── */
+h2 {
+    border-bottom: 2px solid var(--app-primary);
+    display: block;
+    margin-bottom: 18px;
+    padding-bottom: 8px;
+    text-align: center;
+}
+
+/* ─── Pagination ─────────────────────────────────────────────── */
+.app-pagination {
+    border-top: 3px solid var(--app-primary) !important;
+}
+
+.app-pagination-page.is-current {
+    background: var(--app-primary) !important;
+    border-color: var(--app-primary) !important;
+}
+
+.app-pagination-page:hover {
+    border-color: var(--app-primary) !important;
+    color: var(--app-primary-dark) !important;
+}
+
+/* ─── Export panel ───────────────────────────────────────────── */
+.app-export-panel {
+    border-left: 3px solid var(--app-success) !important;
+}
+
+.app-export-panel summary {
+    color: var(--app-success) !important;
+}
+
+/* ─── Mobile nav ──────────────────────────────────────────────── */
+@media (max-width: 760px) {
+    .app-shell-nav {
+        top: 0 !important;
+        border-radius: 0 !important;
+        margin: 0 0 12px !important;
+    }
+
+    .app-nav-panel {
+        background: linear-gradient(135deg, #042f2e, #0f4e49) !important;
+    }
+
+    .app-nav-link:hover {
+        background: rgba(20,184,166,.18) !important;
     }
 }

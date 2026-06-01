@@ -18,30 +18,32 @@
     <script src="{% static 'js/bank-autocomplete.js' %}?v=3"></script>
 
     <style>
-        body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
+        body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f0f4f8; padding: 20px; }
         h2 { text-align: center; margin-bottom: 20px; }
         .top-bar { max-width: 1100px; margin: 0 auto 16px auto; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .top-actions { display: flex; gap: 8px; }
         .user-chip {
-            background: #ffffff;
-            border: 1px solid #d9d9d9;
-            color: #222;
-            border-radius: 6px;
-            padding: 6px 10px;
+            background: #f0f4ff;
+            border: 1px solid #c7d2fe;
+            color: #3730a3;
+            border-radius: 8px;
+            padding: 6px 12px;
             font-size: 13px;
+            font-weight: 700;
             margin-bottom: 6px;
             text-align: center;
         }
         .logout-wrap { display: flex; flex-direction: column; align-items: flex-end; }
 
-        .button-link, .logout-btn { border: none; border-radius: 5px; padding: 8px 14px; cursor: pointer; text-decoration: none; color: #fff; display: inline-block; }
-        .logout-btn { background-color: #dc3545; }
-        .button-link { background: #0d6efd; }
+        .button-link, .logout-btn { border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; text-decoration: none; color: #fff; display: inline-block; font-weight: 700; }
+        .logout-btn { background: linear-gradient(135deg, #dc3545, #b02a37); }
+        .button-link { background: linear-gradient(135deg, #0d9488, #0f766e); box-shadow: 0 2px 8px rgba(13,148,136,.25); }
+        .button-link:hover { box-shadow: 0 4px 14px rgba(13,148,136,.4); }
         .logout-form { margin: 0; }
 
-        #payment-form { max-width: 980px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 10px 14px; }
+        #payment-form { max-width: 980px; margin: auto; background: #fff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.08); border-top: 3px solid #0d9488; display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 12px 16px; }
         #payment-form > p { margin: 0; }
-        #payment-form button { background-color: #007bff; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 4px; grid-column: 1 / -1; }
+        #payment-form button { background: linear-gradient(135deg, #0d9488, #0f766e); color: #fff; padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer; margin-top: 6px; grid-column: 1 / -1; font-weight: 800; font-size: 15px; box-shadow: 0 4px 14px rgba(13,148,136,.35); }
         #payment-form .helptext { display: block; font-size: 12px; color: #6c757d; margin-top: -10px; margin-bottom: 12px; }
         #payment-form .full-row { grid-column: 1 / -1; }
         #payment-form p:has(textarea[name="customer_notes"]) { grid-column: 1 / -1; }
@@ -166,6 +168,57 @@
         .preview-frame { width: 100%; height: 78vh; border: 0; }
         .preview-image { max-width: 100%; max-height: 78vh; display: block; margin: 0 auto; }
         .preview-hint { font-size: 12px; color: #666; text-align: center; margin-top: 8px; }
+        .rot-btn { color:#fff;border:none;border-radius:5px;padding:5px 11px;cursor:pointer;font-family:Vazir,sans-serif;font-size:13px; }
+        .rot-btn:disabled { opacity:.5;cursor:not-allowed; }
+
+        /* ─── پیش‌نمایش فیش ─── */
+        #receipt-preview-wrap {
+            display: none;
+            grid-column: 1 / -1;
+            border: 2px dashed #0d9488;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f0fdfa, #e6fffc);
+            padding: 16px;
+            text-align: center;
+            margin-top: 4px;
+            animation: fadeIn .3s ease;
+        }
+        #receipt-preview-wrap.show { display: block; }
+        #receipt-preview-img {
+            max-width: 100%;
+            max-height: 320px;
+            border-radius: 10px;
+            box-shadow: 0 4px 18px rgba(0,0,0,.15);
+            object-fit: contain;
+        }
+        #receipt-preview-info {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #0f766e;
+            font-weight: 600;
+        }
+        #receipt-preview-pdf-icon { font-size: 56px; }
+        #payment-form button[type=submit]:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none !important;
+        }
+        #receipt-file-label {
+            display: block;
+            cursor: pointer;
+            border: 2px dashed #b2e0da;
+            border-radius: 10px;
+            padding: 18px;
+            background: #f7fffe;
+            text-align: center;
+            transition: border-color .2s, background .2s;
+        }
+        #receipt-file-label:hover { border-color: #0d9488; background: #edfaf8; }
+        #receipt-file-label.has-file { border-color: #0d9488; background: #e6fffc; }
+        #receipt-file-input { display: none; }
+        .upload-icon { font-size: 32px; display: block; margin-bottom: 6px; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .flash-title { margin: 0 0 10px; font-size: 16px; }
         .system-message-list { margin: 0; padding-right: 18px; text-align: right; }
         .system-message { color: #c62828; }
@@ -199,6 +252,7 @@
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
+    {% if not is_staff_user %}
     <div class="top-bar">
         <div class="top-actions">
             <a href="{% url 'invoices_dashboard' %}" class="button-link">بخش فاکتورها</a>
@@ -216,20 +270,12 @@
             {% if request.user.is_superuser %}
                 <a href="{% url 'users_manage' %}" class="button-link">مدیریت کاربران</a>
             {% endif %}
-            <a href="{% url 'profile_edit' %}" class="button-link">ویرایش مشخصات</a>
-            <a href="{% url 'profile_password_change' %}" class="button-link">تغییر رمز عبور</a>
             {% if can_manage_counterparties %}
                 <a href="{% url 'counterparties_manage' %}" class="button-link">مدیریت طرف حساب</a>
             {% endif %}
         </div>
-        <div class="logout-wrap">
-            <div class="user-chip">{{ user_display_name }}</div>
-            <form class="logout-form" method="post" action="{% url 'logout' %}">
-                {% csrf_token %}
-                <button type="submit" class="logout-btn">خروج از حساب</button>
-            </form>
-        </div>
     </div>
+    {% endif %}
 
     {% if not is_staff_user %}
         {% if not show_payment_form %}
@@ -268,7 +314,7 @@
         {% endif %}
         {% if active_daily_assignment %}
         <div class="daily-payment-notice">
-            لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date }}</strong>
+            لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date|jalali_date }}</strong>
             مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
             را به حساب <strong>{{ active_daily_assignment.plan.account_number }}</strong>
             {% if active_daily_assignment.plan.bank_name %}بانک <strong>{{ active_daily_assignment.plan.bank_name }}</strong>{% endif %}
@@ -278,7 +324,7 @@
         </div>
         {% elif expired_daily_assignment %}
         <div class="daily-payment-expired">
-            برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date }}</strong> بوده و منقضی شده است.
+            برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date|jalali_date }}</strong> بوده و منقضی شده است.
             برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
         </div>
         {% endif %}
@@ -349,7 +395,7 @@
                                 <span>{{ order.get_status_display }}</span>
                             </div>
                             <div class="dashboard-row-meta">
-                                {{ order.title|default:'بدون عنوان' }} | کارشناس فروش: {{ order.sales_expert.get_full_name|default:order.sales_expert.username|default:'-' }}
+                                {{ order.title|default:'بدون عنوان' }} | کارشناس فروش: {% if order.sales_expert %}{{ order.sales_expert.get_full_name|default:order.sales_expert.username }}{% else %}-{% endif %}
                             </div>
                             <div class="dashboard-actions">
                                 <a class="button-link" href="{% url 'order_detail' order.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a>
@@ -371,7 +417,7 @@
                     {% for assignment in customer_home_summary.daily_assignments %}
                         <div class="dashboard-row">
                             <div class="dashboard-row-title">
-                                <span>{{ assignment.plan.deposit_date }}</span>
+                                <span>{{ assignment.plan.deposit_date|jalali_date }}</span>
                                 <span>{{ assignment.expected_amount|thousand_sep }} ریال</span>
                             </div>
                             <div class="dashboard-row-meta">
@@ -397,7 +443,7 @@
                                 <span>{{ price_list.title|default:'آخرین لیست قیمت' }}</span>
                                 <span>{{ price_list.created_at|jalali_date }}</span>
                             </div>
-                            <div class="dashboard-row-meta">بارگذاری کننده: {{ price_list.uploaded_by.get_full_name|default:price_list.uploaded_by.username|default:'-' }}</div>
+                            <div class="dashboard-row-meta">بارگذاری کننده: {% if price_list.uploaded_by %}{{ price_list.uploaded_by.get_full_name|default:price_list.uploaded_by.username }}{% else %}-{% endif %}</div>
                             <div class="dashboard-actions">
                                 <a class="button-link dashboard-file-preview-link" href="{% url 'price_list_file' price_list.id %}" data-file-name="{{ price_list.file.name }}">مشاهده فایل</a>
                                 <a class="button-link" href="{% url 'price_list_file' price_list.id %}?download=1" download>دانلود</a>
@@ -422,7 +468,7 @@
                                 <span>{{ proforma.title|default:'پیش‌فاکتور' }}</span>
                                 <span>{{ proforma.get_status_display }}</span>
                             </div>
-                            <div class="dashboard-row-meta">اعتبار تا: {{ proforma.valid_until }} | صادرکننده: {{ proforma.issued_by.get_full_name|default:proforma.issued_by.username|default:'-' }}</div>
+                            <div class="dashboard-row-meta">اعتبار تا: {{ proforma.valid_until|jalali_date }} | صادرکننده: {% if proforma.issued_by %}{{ proforma.issued_by.get_full_name|default:proforma.issued_by.username }}{% else %}-{% endif %}</div>
                             <div class="dashboard-actions">
                                 <a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">مشاهده و عملیات</a>
                                 <a class="button-link" href="{% url 'proforma_file' proforma.id %}?download=1" download>دانلود</a>
@@ -438,7 +484,7 @@
         {% endif %}
         {% if False %}
         <div class="daily-payment-notice">
-            لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date }}</strong>
+            لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date|jalali_date }}</strong>
             مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
             را به حساب <strong>{{ active_daily_assignment.plan.account_number }}</strong>
             {% if active_daily_assignment.plan.bank_name %}بانک <strong>{{ active_daily_assignment.plan.bank_name }}</strong>{% endif %}
@@ -448,22 +494,51 @@
         </div>
         {% elif False %}
         <div class="daily-payment-expired">
-            برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date }}</strong> بوده و منقضی شده است.
+            برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date|jalali_date }}</strong> بوده و منقضی شده است.
             برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
         </div>
         {% endif %}
         {% if show_payment_form %}
         <h2>ثبت اطلاعات واریزی</h2>
-        <p style="max-width:980px; margin:0 auto 12px auto; color:#333; font-size:14px;">فقط بارگذاری فایل فیش (عکس یا PDF) در این فرم الزامی است. سایر اطلاعات در صورت تمایل می‌توانند خالی بمانند.</p>
+        <p style="max-width:980px; margin:0 auto 12px auto; color:#333; font-size:14px;">
+            فیلدهای دارای <span style="color:#c00;font-weight:700;">*</span> اجباری هستند. سایر اطلاعات اختیاری است.
+        </p>
         <form id="payment-form" method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             {% for hidden in form.hidden_fields %}
                 {{ hidden }}
             {% endfor %}
             {% for field in form.visible_fields %}
-                {% if field.name != 'customer_notes' %}
+                {% if field.name == 'receipt_images' %}
+                {# ─── آپلود فیش با پیش‌نمایش ─── #}
+                <p class="full-row">
+                    <label>{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
+                    <label id="receipt-file-label" for="receipt-file-input">
+                        <span class="upload-icon">📎</span>
+                        <span id="receipt-label-text">انتخاب فایل فیش (تصویر یا PDF)</span>
+                        <br><small style="color:#64748b;">{{ field.help_text }}</small>
+                        <input id="receipt-file-input" type="file" name="receipt_images"
+                               accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf">
+                    </label>
+                    {{ field.errors }}
+                </p>
+                {# پیش‌نمایش #}
+                <div id="receipt-preview-wrap">
+                    <img id="receipt-preview-img" src="" alt="پیش‌نمایش فیش" style="display:none;">
+                    <div id="receipt-preview-pdf" style="display:none;">
+                        <div id="receipt-preview-pdf-icon">📄</div>
+                    </div>
+                    <div id="receipt-preview-info"></div>
+                    <button type="button" id="receipt-remove-btn"
+                            style="margin-top:10px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-family:Vazir,sans-serif;">
+                        ✕ حذف و انتخاب مجدد
+                    </button>
+                </div>
+                {% elif field.name != 'customer_notes' %}
                     <p>
-                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <label for="{{ field.id_for_label }}">
+                            {{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}
+                        </label>
                         {{ field }}
                         {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
                         {{ field.errors }}
@@ -502,7 +577,9 @@
                 {% if form.customer_notes.help_text %}<span class="helptext">{{ form.customer_notes.help_text }}</span>{% endif %}
                 {{ form.customer_notes.errors }}
             </p>
-            <button type="submit">ثبت</button>
+            <button type="submit" id="payment-submit-btn" disabled>
+                ثبت واریزی
+            </button>
         </form>
         {{ source_profiles|json_script:"source-profiles-data" }}
         {{ destination_profiles|json_script:"destination-profiles-data" }}
@@ -623,7 +700,7 @@
         <tbody>
             {% for payment in records %}
             <tr class="summary-row" data-row="{{ payment.id }}">
-                <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ payment.id }}</span></td>
                 {% if is_staff_user %}
                 <td>{{ payment.first_name }} {{ payment.last_name }}</td>
                 <td>{{ payment.organization|default:'-' }}</td>
@@ -637,7 +714,7 @@
                 </td>
                 {% endif %}
                 <td>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</td>
-                <td>{{ payment.pay_date }}</td>
+                <td>{{ payment.pay_date|jalali_date }}</td>
                 <td>{{ payment.tracking_code|default:'-' }}</td>
                 <td>{{ payment.amount|thousand_sep }}</td>
                 <td>{% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</td>
@@ -710,7 +787,7 @@
                                 {% with receipts=payment.receipts.all %}
                                     {% if receipts %}
                                         {% for receipt in receipts %}
-                                            <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                                            <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
                                         {% endfor %}
                                     {% elif payment.receipt_image %}
                                         <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" class="receipt-preview-link">مشاهده</a>
@@ -813,6 +890,29 @@
         <div class="preview-box" id="previewBox">
             <img id="previewImage" class="preview-image app-zoomable-image" alt="پیش نمایش سند" style="display:none;">
             <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
+            {% if is_staff_user %}
+            <div id="rotateControls" style="display:none;margin-top:10px;font-family:Vazir,sans-serif;">
+                <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;">
+                    <button type="button" class="rot-btn button-link" data-deg="-90">↺ 90°</button>
+                    <button type="button" class="rot-btn back-link"   data-deg="-15">-15°</button>
+                    <button type="button" class="rot-btn back-link"   data-deg="-10">-10°</button>
+                    <button type="button" class="rot-btn back-link"   data-deg="-5">-5°</button>
+                    <button type="button" class="rot-btn back-link"   data-deg="5">+5°</button>
+                    <button type="button" class="rot-btn back-link"   data-deg="10">+10°</button>
+                    <button type="button" class="rot-btn back-link"   data-deg="15">+15°</button>
+                    <button type="button" class="rot-btn button-link" data-deg="90">↻ 90°</button>
+                </div>
+                <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
+                    <label style="font-size:12px;color:#555;">درجه دلخواه:</label>
+                    <input id="rotateCustomDeg" type="number" min="-359" max="359" step="1"
+                           placeholder="مثلاً 20" style="width:80px;text-align:center;direction:ltr;">
+                    <button type="button" id="rotateCustomBtn" class="button-link alt sm">اعمال</button>
+                </div>
+                <div style="text-align:center;margin-top:5px;">
+                    <span id="rotateStatus" style="font-size:12px;color:#666;"></span>
+                </div>
+            </div>
+            {% endif %}
             <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید ورود را بزنید.</div>
         </div>
     </div>
@@ -834,9 +934,12 @@
 
         const paymentForm = document.querySelector('#payment-form');
         if (paymentForm) {
-            // Ensure only receipt_images stays required on the client side.
+            // فیلدهایی که اجباری هستند (بر اساس تنظیمات سرور) حفظ می‌شوند
+            const serverRequiredFields = new Set([
+                {% for field in form.visible_fields %}{% if field.field.required %}'{{ field.html_name }}',{% endif %}{% endfor %}
+            ]);
             paymentForm.querySelectorAll('input, select, textarea').forEach(function (el) {
-                if (el.name !== 'receipt_images') {
+                if (!serverRequiredFields.has(el.name)) {
                     el.removeAttribute('required');
                     el.removeAttribute('aria-required');
                 }
@@ -848,6 +951,107 @@
                 });
             });
         }
+
+        // ─── پیش‌نمایش فیش ──────────────────────────────────────────
+        (function () {
+            const fileInput    = document.getElementById('receipt-file-input');
+            const fileLabel    = document.getElementById('receipt-file-label');
+            const labelText    = document.getElementById('receipt-label-text');
+            const previewWrap  = document.getElementById('receipt-preview-wrap');
+            const previewImg   = document.getElementById('receipt-preview-img');
+            const previewPdf   = document.getElementById('receipt-preview-pdf');
+            const previewInfo  = document.getElementById('receipt-preview-info');
+            const removeBtn    = document.getElementById('receipt-remove-btn');
+            const submitBtn    = document.getElementById('payment-submit-btn');
+            if (!fileInput) return;
+
+            function fmtSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+
+            function showPreview(file) {
+                const isPdf = file.type === 'application/pdf' ||
+                              /\.pdf$/i.test(file.name);
+                previewImg.style.display  = 'none';
+                previewPdf.style.display  = 'none';
+
+                if (isPdf) {
+                    previewPdf.style.display = 'block';
+                    previewInfo.innerHTML =
+                        '<strong>' + file.name + '</strong><br>' +
+                        'حجم: ' + fmtSize(file.size);
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        previewImg.src = e.target.result;
+                        previewImg.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                    previewInfo.innerHTML =
+                        '<strong>' + file.name + '</strong> — ' + fmtSize(file.size);
+                }
+
+                previewWrap.classList.add('show');
+                fileLabel.classList.add('has-file');
+                labelText.textContent = 'فایل انتخاب شده:';
+                if (submitBtn) submitBtn.disabled = false;
+            }
+
+            function clearPreview() {
+                fileInput.value = '';
+                previewImg.src  = '';
+                previewImg.style.display = 'none';
+                previewPdf.style.display = 'none';
+                previewInfo.innerHTML = '';
+                previewWrap.classList.remove('show');
+                fileLabel.classList.remove('has-file');
+                labelText.textContent = 'انتخاب فایل فیش (تصویر یا PDF)';
+                if (submitBtn) submitBtn.disabled = true;
+            }
+
+            fileInput.addEventListener('change', function () {
+                const files = this.files;
+                if (!files || files.length === 0) { clearPreview(); return; }
+                if (files.length > 1) {
+                    alert('فقط یک فایل مجاز است. لطفاً یک فایل انتخاب کنید.');
+                    clearPreview();
+                    return;
+                }
+                showPreview(files[0]);
+            });
+
+            if (removeBtn) {
+                removeBtn.addEventListener('click', clearPreview);
+            }
+
+            // drag & drop روی label
+            fileLabel.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                fileLabel.style.borderColor = '#0d9488';
+            });
+            fileLabel.addEventListener('dragleave', function () {
+                if (!fileLabel.classList.contains('has-file'))
+                    fileLabel.style.borderColor = '';
+            });
+            fileLabel.addEventListener('drop', function (e) {
+                e.preventDefault();
+                fileLabel.style.borderColor = '';
+                const dropped = e.dataTransfer.files;
+                if (dropped.length > 1) {
+                    alert('فقط یک فایل مجاز است.');
+                    return;
+                }
+                if (dropped.length === 1) {
+                    // تنظیم دستی files روی input
+                    const dt = new DataTransfer();
+                    dt.items.add(dropped[0]);
+                    fileInput.files = dt.files;
+                    showPreview(dropped[0]);
+                }
+            });
+        })();
 
         const sourcePicker = document.getElementById('source_profile_picker');
         const sourceDataEl = document.getElementById('source-profiles-data');
@@ -938,7 +1142,11 @@
         const previewImage = document.getElementById('previewImage');
         const previewFrame = document.getElementById('previewFrame');
         const flashOverlay = document.getElementById('flashOverlay');
+        const rotateControls = document.getElementById('rotateControls');
+        const rotateStatus = document.getElementById('rotateStatus');
         let pdfBlobUrl = '';
+        let activeReceiptId = null;
+        let activePreviewUrl = null;
 
         function setPreviewImageVisible(visible) {
             const imageViewport = previewImage.closest('.app-image-zoom-viewport');
@@ -958,9 +1166,14 @@
                 URL.revokeObjectURL(pdfBlobUrl);
                 pdfBlobUrl = '';
             }
+            if (rotateControls) rotateControls.style.display = 'none';
+            activeReceiptId = null;
+            activePreviewUrl = null;
         }
 
-        async function openPreview(url, fileName) {
+        async function openPreview(url, fileName, receiptId) {
+            activePreviewUrl = url;
+            activeReceiptId = receiptId || null;
             let isPdf = false;
             try {
                 const parsed = new URL(fileName || url, window.location.origin);
@@ -982,6 +1195,7 @@
                 previewFrame.style.display = 'block';
                 setPreviewImageVisible(false);
                 previewImage.src = '';
+                if (rotateControls) rotateControls.style.display = 'none';
             } else {
                 previewImage.src = url;
                 setPreviewImageVisible(true);
@@ -990,15 +1204,80 @@
                 }
                 previewFrame.style.display = 'none';
                 previewFrame.src = '';
+                if (rotateControls && activeReceiptId) {
+                    rotateControls.style.display = 'flex';
+                    if (rotateStatus) rotateStatus.textContent = '';
+                }
             }
             overlay.classList.add('open');
             overlay.focus();
         }
 
+        async function doRotate(degrees) {
+            if (!activeReceiptId || !degrees) return;
+            const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (!csrf) return;
+
+            // غیرفعال کردن همه دکمه‌های چرخش
+            const allRotBtns = document.querySelectorAll('.rot-btn, #rotateCustomBtn');
+            allRotBtns.forEach(function(b) { b.disabled = true; });
+            if (rotateStatus) rotateStatus.textContent = 'در حال چرخش…';
+
+            try {
+                const resp = await fetch('/receipts/' + activeReceiptId + '/rotate/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRFToken': csrf.value, 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'degrees=' + encodeURIComponent(degrees),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    previewImage.src = activePreviewUrl + '?t=' + Date.now();
+                    const dir = degrees > 0 ? 'راست' : 'چپ';
+                    if (rotateStatus) rotateStatus.textContent = Math.abs(degrees) + '° ' + dir + ' ✓';
+                } else {
+                    if (rotateStatus) rotateStatus.textContent = data.error || 'خطا در چرخش';
+                }
+            } catch (e) {
+                if (rotateStatus) rotateStatus.textContent = 'خطای شبکه';
+            } finally {
+                allRotBtns.forEach(function(b) { b.disabled = false; });
+            }
+        }
+
+        // دکمه‌های ثابت
+        document.querySelectorAll('.rot-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                doRotate(parseFloat(btn.getAttribute('data-deg')));
+            });
+        });
+
+        // دکمه درجه دلخواه
+        const rotateCustomBtn = document.getElementById('rotateCustomBtn');
+        const rotateCustomDeg = document.getElementById('rotateCustomDeg');
+        if (rotateCustomBtn && rotateCustomDeg) {
+            rotateCustomBtn.addEventListener('click', function() {
+                const val = parseFloat(rotateCustomDeg.value);
+                if (isNaN(val) || val === 0) {
+                    if (rotateStatus) rotateStatus.textContent = 'یک عدد وارد کنید';
+                    return;
+                }
+                if (val <= -360 || val >= 360) {
+                    if (rotateStatus) rotateStatus.textContent = 'درجه باید بین 359- و 359 باشد';
+                    return;
+                }
+                doRotate(val);
+            });
+            rotateCustomDeg.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') rotateCustomBtn.click();
+            });
+        }
+
         document.querySelectorAll('.receipt-preview-link, .dashboard-file-preview-link').forEach(function (link) {
             link.addEventListener('click', async function (event) {
                 event.preventDefault();
-                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'));
+                const receiptId = link.getAttribute('data-receipt-id') || null;
+                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId);
             });
         });
 

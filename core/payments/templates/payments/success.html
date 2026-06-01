@@ -47,12 +47,11 @@
 <body>
     {% include "payments/partials/app_navigation.html" %}
     <div class="card">
-        <h2>ثبت اطلاعات با موفقیت انجام شد</h2>
-        <a href="{% url 'payment_create' %}">ثبت واریزی جدید</a>
-        <form class="logout-form" method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button type="submit">خروج از حساب</button>
-        </form>
+        <div style="font-size:48px;margin-bottom:12px;">✅</div>
+        <h2>واریزی با موفقیت ثبت شد</h2>
+        <p style="color:#64748b;font-size:14px;margin:0 0 20px;">اطلاعات واریزی شما دریافت شد و در صف بررسی قرار گرفت.</p>
+        <a href="{% url 'submit' %}" class="button-link">بازگشت به داشبورد</a>
+        <a href="{% url 'payment_create' %}" class="button-link" style="margin-right:8px;">ثبت واریزی جدید</a>
     </div>
     <script src="{% static 'js/app-ui.js' %}"></script>
 </body>

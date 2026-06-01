@@ -100,6 +100,7 @@
                     <th>ردیف</th>
                     <th>نام کاربری</th>
                     <th>نام و نام خانوادگی</th>
+                    <th>کارشناس فروش</th>
                     <th>نام مجموعه</th>
                     <th>شهر</th>
                     <th>شماره تماس</th>
@@ -117,9 +118,10 @@
             <tbody id="customerTableBody">
                 {% for customer in customer_data %}
                     <tr class="customer-row" data-search="{{ customer.user.username }} {{ customer.profile.first_name|default:'' }} {{ customer.profile.last_name|default:'' }} {{ customer.profile.organization|default:'' }} {{ customer.profile.city|default:'' }} {{ customer.profile.phone|default:'' }} {{ customer.profile.mobile|default:'' }}">
-                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ customer.user.id }}</span></td>
                         <td>{{ customer.user.username }}</td>
                         <td>{{ customer.profile.first_name|default:'-' }} {{ customer.profile.last_name|default:'' }}</td>
+                        <td>{% with sa=customer.user.sales_assignment %}{% if sa and sa.sales_user %}{{ sa.sales_user.get_full_name|default:sa.sales_user.username }}{% else %}-{% endif %}{% endwith %}</td>
                         <td>{{ customer.profile.organization|default:'-' }}</td>
                         <td>{{ customer.profile.city|default:'-' }}</td>
                         <td>{{ customer.profile.phone|default:'-' }}</td>

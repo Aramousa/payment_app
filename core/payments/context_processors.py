@@ -51,6 +51,23 @@ def app_navigation(request):
 
     role = _role_for_nav(user)
     is_staff_user = user.is_staff or user.is_superuser or role in STAFF_ROLES or role == 'admin'
+
+    # طرف حساب — منوی اختصاصی
+    cp = getattr(user, 'counterparty_account', None)
+    if cp and not is_staff_user:
+        cp_items = [
+            _nav_item('داشبورد طرف حساب', 'counterparty_dashboard', 'cp_dashboard'),
+            _nav_item('ویرایش مشخصات', 'profile_edit', 'profile', 'account'),
+            _nav_item('تغییر رمز عبور', 'profile_password_change', 'password', 'account'),
+        ]
+        role_label = f'طرف حساب: {cp.name}'
+        user_display = user.get_full_name().strip() or user.username
+        return {
+            'app_nav_items': cp_items,
+            'app_nav_role_label': role_label,
+            'app_nav_user_display': user_display,
+        }
+
     items = [_nav_item('داشبورد', 'submit', 'submit')]
 
     if role == 'customer':
@@ -76,6 +93,8 @@ def app_navigation(request):
             items.append(_nav_item('سفارش ها', 'orders', 'orders', 'documents'))
         if user.is_superuser or role in {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}:
             items.append(_nav_item('پیش فاکتورها', 'proformas', 'proformas', 'documents'))
+        if user.is_superuser or role in {'sales', 'sales_manager'}:
+            items.append(_nav_item('داشبورد فروش', 'sales_expert_dashboard', 'sales_dashboard', 'documents'))
         if user.is_superuser or role == 'sales_manager':
             items.append(_nav_item('تخصیص مشتریان فروش', 'sales_assignments', 'sales_assignments', 'admin'))
         if is_staff_user:

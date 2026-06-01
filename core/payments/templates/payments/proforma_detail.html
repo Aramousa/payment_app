@@ -28,7 +28,7 @@
         <h2>{{ proforma.title|default:'پیش فاکتور' }}</h2>
         <div class="meta">
             <div class="meta-item"><strong>مشتری:</strong> {{ proforma.customer.get_full_name|default:proforma.customer.username }}</div>
-            <div class="meta-item"><strong>اعتبار تا:</strong> {{ proforma.valid_until }}</div>
+            <div class="meta-item"><strong>اعتبار تا:</strong> {{ proforma.valid_until|jalali_date }}</div>
             <div class="meta-item"><strong>وضعیت:</strong> {{ proforma.get_status_display }}</div>
             <div class="meta-item"><strong>وضعیت مشاهده:</strong> {% if proforma.is_seen_by_customer %}دیده شده - {{ proforma.customer_seen_at|jalali_datetime }}{% else %}دیده نشده{% endif %}</div>
             <div class="meta-item"><strong>زمان صدور:</strong> {{ proforma.created_at|jalali_datetime }}</div>

@@ -5,6 +5,32 @@ from django.core.exceptions import ImproperlyConfigured
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load local environment files for development.
+def _load_local_env_file(path):
+    try:
+        lines = Path(path).read_text(encoding='utf-8-sig').splitlines()
+    except FileNotFoundError:
+        return
+
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip()
+
+        if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
+            value = value[1:-1]
+
+        os.environ.setdefault(key, value)
+
+
+_load_local_env_file(BASE_DIR / '.env')
+_load_local_env_file(BASE_DIR / '.env.postgres.dev')
+
+
 
 def load_env_file(env_path: Path) -> None:
     if not env_path.exists():
@@ -68,9 +94,13 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'payments.middleware.SingleSessionMiddleware',
     'payments.middleware.EnforceCustomerPasswordChangeMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# مدت بی‌فعالیت مجاز قبل از خروج خودکار (ثانیه). پیش‌فرض ۳۰ دقیقه.
+SESSION_INACTIVITY_TIMEOUT = int(os.getenv('SESSION_INACTIVITY_TIMEOUT', str(30 * 60)))
 
 ROOT_URLCONF = 'core.urls'
 
@@ -101,10 +131,19 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('VISIUNAPP_DB_NAME', 'visiunapp_dev_db'),
+        'USER': os.getenv('VISIUNAPP_DB_USER', 'visiunapp_dev_user'),
+        'PASSWORD': os.getenv('VISIUNAPP_DB_PASSWORD'),
+        'HOST': os.getenv('VISIUNAPP_DB_HOST', '127.0.0.1'),
+        'PORT': os.getenv('VISIUNAPP_DB_PORT', '5432'),
+        'CONN_MAX_AGE': int(os.getenv('VISIUNAPP_DB_CONN_MAX_AGE', '60')),
     }
 }
+
+if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql' and not DATABASES['default']['PASSWORD']:
+    raise ImproperlyConfigured('VISIUNAPP_DB_PASSWORD environment variable is required.')
+
 
 # Authentication backends
 # Custom backend for date-based access control

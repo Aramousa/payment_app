@@ -67,8 +67,7 @@
     <div class="top-bar">
         <h2>اطلاعات مشتری: {{ customer_user.username }}</h2>
         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'customers_list' %}{% endif %}" class="back-link">بازگشت به لیست مشتریان</a>
-            <a href="{% url 'submit' %}" class="back-link">بازگشت به صفحه اصلی</a>
+            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'customers_list' %}{% endif %}" class="back-link">← بازگشت به لیست مشتریان</a>
         </div>
     </div>
     
@@ -125,11 +124,11 @@
             </div>
             <div class="customer-header-item">
                 <strong>تاریخ آغاز فعالیت:</strong>
-                {{ customer_profile.active_from|default:'-' }}
+                {{ customer_profile.active_from|jalali_date|default:'-' }}
             </div>
             <div class="customer-header-item">
                 <strong>تاریخ اعتبار:</strong>
-                {{ customer_profile.valid_until|default:'-' }}
+                {{ customer_profile.valid_until|jalali_date|default:'-' }}
             </div>
             <div class="customer-header-item">
                 <strong>وضعیت:</strong>
@@ -210,7 +209,7 @@
                     <tr class="summary-row" onclick="toggleDetail('payment-{{ payment.id }}')">
                         <td>{{ payments_page_obj.start_index|add:forloop.counter0 }}</td>
                         <td>{{ payment.amount|thousand_sep }}</td>
-                        <td>{{ payment.pay_date }}</td>
+                        <td>{{ payment.pay_date|jalali_date }}</td>
                         <td>{{ payment.tracking_code|default:'-' }}</td>
                         <td>{{ payment.beneficiary_bank_name|default:'-' }}</td>
                         <td>{{ payment.beneficiary_account_number|default:'-' }}</td>
@@ -363,7 +362,7 @@
                         <td>{{ invoice.invoice_number }}</td>
                         <td>{{ invoice.reference_number }}</td>
                         <td>{{ invoice.amount|thousand_sep }}</td>
-                        <td>{{ invoice.invoice_date }}</td>
+                        <td>{{ invoice.invoice_date|jalali_date }}</td>
                         <td>{{ invoice.uploaded_by|default:'-' }}</td>
                         <td>{{ invoice.created_at|jalali_datetime }}</td>
                         <td>
