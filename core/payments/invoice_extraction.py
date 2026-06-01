@@ -325,7 +325,12 @@ def _extract_number_from(text):
 # ─── استخراج شماره فاکتور ──────────────────────────────────────────────────
 
 def _extract_invoice_number(text):
-    """استخراج دقیق مقدار شماره فاکتور."""
+    """
+    استخراج شماره فاکتور با سه استراتژی:
+    ۱. لیبل + مقدار در همان خط
+    ۲. لیبل + مقدار در خط بلافاصله بعد
+    ۳. لیبل + مقدار در پنجره ۳۰۰ کاراکتری (رایج در PyMuPDF که لیبل‌ها و مقادیر را جداگانه استخراج می‌کند)
+    """
     invoice_labels = [
         r'شماره\s*فاکتور',
         r'شماره\s*صورت\s*حساب',
@@ -339,10 +344,11 @@ def _extract_invoice_number(text):
         r'سریال\s*فاکتور',
         r'شماره\s*رسید',
         r'No\s*فاکتور',
-        r'شماره\s*:',    # "شماره:" به‌تنهایی (رایج در فاکتورهای فارسی)
+        r'شماره\s*:',
     ]
+
     for label in invoice_labels:
-        # همان خط: لیبل + عدد/کد
+        # ── استراتژی ۱: همان خط ──────────────────────────────────────
         pattern = rf'(?:{label})\s*[:：\-#]?\s*([A-Za-z0-9][A-Za-z0-9\-/]{{0,20}})'
         m = re.search(pattern, text, flags=re.IGNORECASE)
         if m:
@@ -350,16 +356,38 @@ def _extract_invoice_number(text):
             if re.search(r'\d', val):
                 return _clean_short_value(re.split(r'\s{2,}|\t|\n', val)[0].strip())
 
-        # خط بعدی: لیبل در یک خط، عدد در خط بعد
+        # ── استراتژی ۲: خط بلافاصله بعد ──────────────────────────────
         pattern2 = rf'(?:{label})\s*[:：\-#]?\s*\n\s*([A-Za-z0-9][A-Za-z0-9\-/\s]{{0,25}})'
         m2 = re.search(pattern2, text, flags=re.IGNORECASE)
         if m2:
             val2 = m2.group(1).strip()
             if re.search(r'\d', val2):
-                # فقط اولین کلمه/عدد
                 first_token = re.split(r'\s+', val2)[0].strip()
                 if first_token:
                     return _clean_short_value(first_token)
+
+        # ── استراتژی ۳: پنجره ۳۰۰ کاراکتری بعد از لیبل ───────────────
+        # کاربرد: PyMuPDF گاهی لیبل‌ها و مقادیر را در ستون‌های جداگانه استخراج می‌کند
+        # مثال: "شماره:\nتاریخ:\n722\n1405/02/30"
+        lbl_m = re.search(rf'(?:{label})\s*[:：\-#]?', text, flags=re.IGNORECASE)
+        if lbl_m:
+            window = text[lbl_m.end(): lbl_m.end() + 300]
+            # اولین عدد کوتاه (۱ تا ۱۰ رقم) در پنجره که:
+            # - یک کد/شماره معتبر باشد (نه قسمتی از تاریخ یا شماره تلفن)
+            # - کمتر از ۱۱ رقم داشته باشد
+            for num_m in re.finditer(r'(?<![0-9/\-])([A-Za-z0-9][A-Za-z0-9\-/]{0,9})(?![0-9/\-])', window):
+                candidate = num_m.group(1).strip()
+                # باید رقم داشته باشد
+                if not re.search(r'\d', candidate):
+                    continue
+                pure_digits = re.sub(r'\D', '', candidate)
+                # رد کردن شماره تلفن (۱۱ رقم با ۰) و تاریخ
+                if len(pure_digits) >= 10:
+                    continue
+                # رد کردن مقادیری که شبیه تاریخ هستند (YYYY/MM/DD)
+                if re.fullmatch(r'\d{4}/\d{1,2}/\d{1,2}', candidate):
+                    continue
+                return _clean_short_value(candidate)
 
     # الگوهای کلاسیک
     for pat in [r'\b(?:INV|FA|FACT|FTR|FAK)[\-/]?[A-Z0-9\-/]{2,15}\b']:
