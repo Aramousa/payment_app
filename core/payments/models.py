@@ -310,6 +310,34 @@ class PaymentRecord(models.Model):
         STATUS_INCOMPLETE: 'ناقص',
     }
 
+    # ─── فلگ مالی — مستقل از فلگ بازرگانی ──────────────────────────────────
+    FINANCE_STATUS_PENDING  = None           # در انتظار ثبت مالی
+    FINANCE_STATUS_APPROVED = 'finance_ok'   # ثبت مالی
+
+    finance_status = models.CharField(
+        'وضعیت مالی', max_length=20,
+        null=True, blank=True, db_index=True,
+    )
+    finance_registered_at = models.DateTimeField('زمان ثبت مالی', null=True, blank=True)
+    finance_registered_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='finance_registrations',
+        verbose_name='ثبت‌کننده مالی',
+    )
+
+    @property
+    def is_finance_registered(self):
+        return self.finance_status == self.FINANCE_STATUS_APPROVED
+
+    @property
+    def ready_for_final_approval(self):
+        """تأیید نهایی فقط وقتی هر دو فلگ در وضعیت تکمیل‌شده باشند."""
+        return (
+            self.status == self.STATUS_APPROVED
+            and self.is_finance_registered
+        )
+
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     counterparty = models.ForeignKey(Counterparty, on_delete=models.PROTECT, null=True, blank=True, related_name='payments')
     first_name = models.CharField(max_length=50, blank=True, default='')
@@ -392,14 +420,19 @@ class PaymentRecord(models.Model):
     def customer_status_label(self):
         return self.CUSTOMER_VISIBLE_LABELS.get(self.status, 'در حال بررسی')
 
+    # ─── فلگ بازرگانی / فروش ────────────────────────────────────────────────
+
     @property
     def commercial_status_label(self):
-        if self.status == self.STATUS_PENDING:
-            return 'در حال بررسی'
+        """عنوان فلگ بازرگانی / فروش بر اساس وضعیت سند."""
+        if self.status in {self.STATUS_PENDING, self.STATUS_FINANCE_REVIEW}:
+            return 'بررسی بازرگانی'
         if self.status == self.STATUS_COMMERCIAL_REVIEW:
             return 'بررسی بازرگانی'
-        if self.status in {self.STATUS_APPROVED, self.STATUS_FINAL_APPROVED}:
+        if self.status == self.STATUS_APPROVED:
             return 'ثبت بازرگانی'
+        if self.status == self.STATUS_FINAL_APPROVED:
+            return 'تأیید نهایی'
         if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
             return 'عودت به بازرگانی'
         if self.status == self.STATUS_REJECTED:
@@ -410,41 +443,50 @@ class PaymentRecord(models.Model):
 
     @property
     def commercial_flag_class(self):
+        """رنگ فلگ بازرگانی / فروش."""
+        if self.status in {self.STATUS_PENDING, self.STATUS_FINANCE_REVIEW}:
+            return 'flag-gray'      # خاکستری — بررسی اولیه
         if self.status == self.STATUS_COMMERCIAL_REVIEW:
-            return 'flag-blue'
-        if self.status in {self.STATUS_APPROVED, self.STATUS_FINAL_APPROVED}:
-            return 'flag-orange'
+            return 'flag-blue'      # آبی — در حال بررسی
+        if self.status == self.STATUS_APPROVED:
+            return 'flag-orange'    # نارنجی — ثبت بازرگانی
+        if self.status == self.STATUS_FINAL_APPROVED:
+            return 'flag-green'     # سبز — تأیید نهایی
+        if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
+            return 'flag-purple'    # بنفش کم‌رنگ — عودت
         if self.status == self.STATUS_REJECTED:
-            return 'flag-red'
+            return 'flag-red'       # قرمز
         if self.status == self.STATUS_INCOMPLETE:
-            return 'flag-yellow'
+            return 'flag-yellow'    # زرد
         return 'flag-gray'
+
+    # ─── فلگ مالی — مستقل ──────────────────────────────────────────────────
 
     @property
     def finance_status_label(self):
-        if self.status in {self.STATUS_PENDING, self.STATUS_COMMERCIAL_REVIEW, self.STATUS_INCOMPLETE}:
-            return 'در انتظار بازرگانی'
-        if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
-            return 'عودت به بازرگانی'
-        if self.status == self.STATUS_APPROVED:
-            return 'در انتظار ثبت مالی'
+        """عنوان فلگ مالی — مستقل از فلگ بازرگانی."""
         if self.status == self.STATUS_FINAL_APPROVED:
-            return 'تایید نهایی'
-        if self.status == self.STATUS_REJECTED:
+            return 'تأیید نهایی'
+        if self.status in {self.STATUS_REJECTED}:
             return 'رد شده'
-        return self.get_status_display()
+        if self.status == self.STATUS_INCOMPLETE:
+            return 'ناقص — قفل'
+        if self.is_finance_registered:
+            return 'ثبت مالی'
+        return 'در انتظار ثبت مالی'
 
     @property
     def finance_flag_class(self):
-        if self.status == self.STATUS_APPROVED:
-            return 'flag-orange'
+        """رنگ فلگ مالی."""
         if self.status == self.STATUS_FINAL_APPROVED:
-            return 'flag-green'
+            return 'flag-green'     # سبز — تأیید نهایی
         if self.status == self.STATUS_REJECTED:
             return 'flag-red'
         if self.status == self.STATUS_INCOMPLETE:
             return 'flag-yellow'
-        return 'flag-gray'
+        if self.is_finance_registered:
+            return 'flag-purple'    # بنفش — ثبت مالی
+        return 'flag-gray'          # خاکستری — در انتظار
 
     @property
     def status_flag_class(self):
@@ -648,16 +690,20 @@ class PaymentActivityLog(models.Model):
     ACTION_STATUS_CHANGED       = 'status_changed'
     ACTION_VIEWED               = 'viewed'
     ACTION_CUSTOMER_NOTE        = 'customer_note'
+    ACTION_FINANCE_REGISTERED   = 'finance_reg'
+    ACTION_FINAL_APPROVED       = 'final_approved'
     ACTION_CP_APPROVED          = 'cp_approved'
     ACTION_CP_RETURNED          = 'cp_returned'
     ACTION_CP_REJECTED          = 'cp_rejected'
 
     ACTION_CHOICES = [
-        (ACTION_CREATED,          'ایجاد'),
-        (ACTION_EDITED,           'ویرایش'),
-        (ACTION_STATUS_CHANGED,   'تغییر وضعیت'),
-        (ACTION_VIEWED,           'رویت'),
+        (ACTION_CREATED,          'ثبت سند'),
+        (ACTION_EDITED,           'ویرایش سند'),
+        (ACTION_STATUS_CHANGED,   'تغییر وضعیت بازرگانی'),
+        (ACTION_VIEWED,           'مشاهده'),
         (ACTION_CUSTOMER_NOTE,    'توضیح مشتری'),
+        (ACTION_FINANCE_REGISTERED,'ثبت مالی'),
+        (ACTION_FINAL_APPROVED,   'تأیید نهایی'),
         (ACTION_CP_APPROVED,      'تایید طرف حساب'),
         (ACTION_CP_RETURNED,      'عودت/ناقص از طرف حساب'),
         (ACTION_CP_REJECTED,      'رد/ابطال توسط طرف حساب'),

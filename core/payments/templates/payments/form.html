@@ -605,7 +605,9 @@
 
     <div class="filter-box">
         <form method="get" class="filter-grid">
+            <div><label for="serial_filter">سریال سند</label><input id="serial_filter" type="number" name="serial" value="{{ filters.serial }}" placeholder="#" dir="ltr" style="font-family:monospace;font-weight:700;"></div>
             {% if is_staff_user %}
+                <div><label for="accounting_code_filter">کد تفضیلی</label><input id="accounting_code_filter" type="text" name="accounting_code" value="{{ filters.accounting_code }}" placeholder="کد تفضیلی مشتری" dir="ltr" style="font-family:monospace;"></div>
                 <div><label for="first_name">نام</label><input id="first_name" type="text" name="first_name" value="{{ filters.first_name }}"></div>
                 <div><label for="last_name">نام خانوادگی</label><input id="last_name" type="text" name="last_name" value="{{ filters.last_name }}"></div>
                 <div><label for="phone">شماره تلفن</label><input id="phone" type="text" name="phone" value="{{ filters.phone }}"></div>
@@ -714,8 +716,8 @@
                         نام بانک{% if current_sort == 'payer_bank_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
-                <th>وضعیت بازرگانی</th>
-                <th>وضعیت مالی</th>
+                <th>🏬 بازرگانی / فروش</th>
+                <th>💰 مالی</th>
                 {% if is_staff_user %}<th>طرف حساب</th>{% endif %}
                 <th>اقدام سریع</th>
             </tr>
@@ -724,7 +726,7 @@
             {% for payment in records %}
             <tr class="summary-row{% if payment.cp_needs_act %} cp-returned-row{% endif %}" data-row="{{ payment.id }}"
                 {% if payment.cp_needs_act %}style="background:#fffbeb;"{% endif %}>
-                <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ payment.id }}</span></td>
+                <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:800;margin-top:3px;letter-spacing:0.5px;font-family:monospace;">#{{ payment.id }}</span></td>
                 {% if is_staff_user %}
                 <td>{{ payment.first_name }} {{ payment.last_name }}</td>
                 <td>{{ payment.organization|default:'-' }}</td>
@@ -763,6 +765,9 @@
                         {% endif %}
                         <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
                     {% else %}
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+
+                        {# ─── فلگ بازرگانی: اقدام بازرگانی/فروش ─── #}
                         {% if payment.staff_can_act %}
                             <form class="staff-quick" method="post" action="{% url 'staff_update_status' payment.id %}">
                                 {% csrf_token %}
@@ -772,7 +777,7 @@
                                         <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
                                     {% endfor %}
                                 </select>
-                                <input type="text" name="note" placeholder="توضیح (برای رد/ناقص الزامی)">
+                                <input type="text" name="note" placeholder="توضیح">
                                 {% if staff_user_role == 'commercial' or staff_user_role == 'staff' %}
                                     <select name="counterparty">
                                         <option value="">بدون طرف حساب</option>
@@ -781,15 +786,41 @@
                                         {% endfor %}
                                     </select>
                                 {% endif %}
-                                <button type="submit">ثبت</button>
+                                <button type="submit" style="background:#0d6efd;">🏬 ثبت بازرگانی</button>
                             </form>
-                        {% elif staff_user_role != 'data_entry' %}
-                            <span title="قفل">🔒</span>
                         {% endif %}
+
+                        {# ─── فلگ مالی: ثبت مالی مستقل ─── #}
+                        {% if payment.can_finance_register %}
+                            <form class="staff-quick" method="post" action="{% url 'finance_register_payment' payment.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <input type="text" name="note" placeholder="توضیح (اختیاری)">
+                                <button type="submit" style="background:#7c3aed;">💰 ثبت مالی</button>
+                            </form>
+                        {% endif %}
+
+                        {# ─── تأیید نهایی — فقط مدیر مالی + هر دو فلگ تکمیل ─── #}
+                        {% if payment.can_final_approve %}
+                            <form class="staff-quick" method="post" action="{% url 'finance_final_approve' payment.id %}"
+                                  onsubmit="return confirm('آیا از تأیید نهایی این سند مطمئنید؟');">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <input type="text" name="note" placeholder="توضیح (اختیاری)">
+                                <button type="submit" style="background:#16a34a;font-weight:800;">✅ تأیید نهایی</button>
+                            </form>
+                        {% endif %}
+
+                        {% if not payment.staff_can_act and not payment.can_finance_register and not payment.can_final_approve and staff_user_role != 'data_entry' %}
+                            <span title="این سند در وضعیت قفل است" style="color:#94a3b8;font-size:12px;">🔒 قفل</span>
+                        {% endif %}
+
                         {% if payment.can_edit_details %}
-                            <a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل اطلاعات</a>
+                            <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل اطلاعات</a>
                         {% endif %}
-                        <button type="button" class="expand-btn" data-row="{{ payment.id }}">نمایش جزئیات</button>
+                        <button type="button" class="expand-btn" data-row="{{ payment.id }}">جزئیات</button>
+
+                        </div>
                     {% endif %}
                 </td>
             </tr>
@@ -798,6 +829,15 @@
                     <div class="detail-grid">
                         <div class="detail-card">
                             <strong>اطلاعات رکورد</strong>
+                            {% if is_staff_user and payment.user %}
+                            <div>کد تفضیلی:
+                                {% with ac=payment.user.profile.accounting_code %}
+                                {% if ac %}
+                                <span style="display:inline-block;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:4px;padding:1px 7px;font-size:12px;font-weight:700;font-family:monospace;">{{ ac }}</span>
+                                {% else %}<span style="color:#94a3b8;">—</span>{% endif %}
+                                {% endwith %}
+                            </div>
+                            {% endif %}
                             <div>مجموعه: {{ payment.organization }}</div>
                             <div>شهر: {{ payment.city }}</div>
                             <div>شماره تلفن: {{ payment.phone }}</div>

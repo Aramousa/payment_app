@@ -347,33 +347,64 @@ def _suggest_five_digit_password():
 
 
 def _staff_status_choices_for_role(role):
+    """انتخاب‌های وضعیت برای فلگ بازرگانی (مالی فلگ مستقل دارد)."""
     role = _department_role(role)
     if role == 'commercial':
         return [
+            (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'شروع بررسی بازرگانی'),
             (PaymentRecord.STATUS_APPROVED, 'ثبت بازرگانی'),
             (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
             (PaymentRecord.STATUS_REJECTED, 'رد شده'),
         ]
     if role == 'finance':
+        # مالی تنها کار روی فلگ مستقل finance_status دارد (نه status اصلی)
+        # تأیید نهایی و عودت به بازرگانی از طریق دکمه‌های جداگانه انجام می‌شود
         return [
-            (PaymentRecord.STATUS_FINAL_APPROVED, 'تایید نهایی'),
             (PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
         ]
     return PaymentRecord.STATUS_CHOICES
 
 
 def _can_staff_act_on_payment(role, payment, is_system_admin=False):
+    """بازرگانی و مالی مستقل از هم می‌توانند روی سند اقدام کنند."""
     if is_system_admin:
         return True
     role = _department_role(role)
     if role == 'commercial':
+        # بازرگانی روی فلگ اصلی status اقدام می‌کند
         return payment.status in {
             PaymentRecord.STATUS_PENDING,
             PaymentRecord.STATUS_COMMERCIAL_REVIEW,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
         }
     if role == 'finance':
+        # مالی می‌تواند عودت به بازرگانی کند (وقتی بازرگانی ثبت کرده)
         return payment.status == PaymentRecord.STATUS_APPROVED
+    return False
+
+
+def _can_finance_register(role, payment, is_system_admin=False):
+    """آیا مالی می‌تواند ثبت مالی انجام دهد؟ — فلگ مستقل."""
+    if is_system_admin:
+        return True
+    role = _department_role(role)
+    if role != 'finance':
+        return False
+    # مالی می‌تواند ثبت کند مگر اینکه سند رد شده یا تأیید نهایی شده یا قبلاً ثبت مالی شده
+    return (
+        payment.status not in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_FINAL_APPROVED}
+        and not payment.is_finance_registered
+    )
+
+
+def _can_final_approve(role, payment, is_system_admin=False):
+    """آیا تأیید نهایی مجاز است؟ — فقط مدیر مالی + هر دو فلگ تکمیل شده."""
+    if is_system_admin:
+        return payment.ready_for_final_approval
+    role_raw = role
+    if role_raw in {'finance_manager'} or _department_role(role_raw) == 'finance':
+        if role_raw == 'finance_manager':
+            return payment.ready_for_final_approval
     return False
 
 
@@ -1156,64 +1187,126 @@ def _display_name(user):
 
 
 def _log_text(log):
+    """متن کامل رویداد برای کارکنان — با نام، نقش و جزئیات."""
     actor = _display_name(log.actor)
     role = _role_title(log.actor)
-    if log.action == PaymentActivityLog.ACTION_VIEWED:
-        return f"{role} ({actor}) سند را مشاهده کرد."
+    status_labels = dict(PaymentRecord.STATUS_CHOICES)
+
     if log.action == PaymentActivityLog.ACTION_CREATED:
-        return f"{role} ({actor}) سند را بارگذاری کرد."
+        return f"📄 {role} ({actor}) سند را بارگذاری کرد."
+
     if log.action == PaymentActivityLog.ACTION_EDITED:
-        return f"{role} ({actor}) سند را ویرایش کرد."
+        from_text = status_labels.get(log.from_status, '') if log.from_status else ''
+        return f"✏️ {role} ({actor}) سند را ویرایش و مجدد ارسال کرد." + (f" (از وضعیت «{from_text}»)" if from_text else "")
+
     if log.action == PaymentActivityLog.ACTION_STATUS_CHANGED:
-        status_labels = dict(PaymentRecord.STATUS_CHOICES)
-        status_text = status_labels.get(log.to_status, log.to_status)
-        return f"{role} ({actor}) وضعیت سند را به «{status_text}» تغییر داد."
+        from_text = status_labels.get(log.from_status, log.from_status or '')
+        to_text   = status_labels.get(log.to_status,   log.to_status or '')
+        icon = {
+            PaymentRecord.STATUS_APPROVED:   '🏬',
+            PaymentRecord.STATUS_REJECTED:   '🚫',
+            PaymentRecord.STATUS_INCOMPLETE: '⚠',
+            PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: '↩',
+            PaymentRecord.STATUS_COMMERCIAL_REVIEW: '🔍',
+        }.get(log.to_status, '🔄')
+        base = f"{icon} {role} ({actor}) فلگ بازرگانی را"
+        if from_text and to_text:
+            return f"{base} از «{from_text}» به «{to_text}» تغییر داد."
+        return f"{base} به «{to_text}» تغییر داد."
+
+    if log.action == PaymentActivityLog.ACTION_FINANCE_REGISTERED:
+        return f"💰 {role} ({actor}) ثبت مالی انجام داد."
+
+    if log.action == PaymentActivityLog.ACTION_FINAL_APPROVED:
+        return f"✅ {role} ({actor}) سند را تأیید نهایی کرد."
+
     if log.action == PaymentActivityLog.ACTION_CUSTOMER_NOTE:
-        return f"مشتری ({actor}) توضیح اضافه کرد."
-    return f"{role} ({actor}) عملیاتی انجام داد."
+        return f"💬 مشتری ({actor}) توضیح اضافه کرد."
+
+    if log.action == PaymentActivityLog.ACTION_VIEWED:
+        return f"👁 {role} ({actor}) سند را مشاهده کرد."
+
+    if log.action == PaymentActivityLog.ACTION_CP_APPROVED:
+        return f"✅ طرف حساب ({actor}) فیش را تایید کرد."
+    if log.action == PaymentActivityLog.ACTION_CP_RETURNED:
+        return f"⚠ طرف حساب ({actor}) فیش را عودت داد."
+    if log.action == PaymentActivityLog.ACTION_CP_REJECTED:
+        return f"🚫 طرف حساب ({actor}) فیش را رد کرد."
+
+    return f"🔄 {role} ({actor}) عملیاتی انجام داد."
 
 
 def _customer_log_text(log):
+    """متن ساده‌شده رویداد برای مشتری — بدون نام کارکنان و جزئیات."""
     if log.action == PaymentActivityLog.ACTION_CREATED:
-        return 'فیش توسط مشتری ثبت شد.'
-    if log.action == PaymentActivityLog.ACTION_VIEWED:
-        return 'سند مشاهده شد.'
+        return 'فیش شما با موفقیت ثبت شد.'
+    if log.action == PaymentActivityLog.ACTION_EDITED:
+        return 'فیش شما ویرایش و مجدد ارسال شد.'
     if log.action == PaymentActivityLog.ACTION_STATUS_CHANGED:
-        if log.to_status == PaymentRecord.STATUS_FINAL_APPROVED:
-            return 'سند تایید نهایی شد.'
         if log.to_status == PaymentRecord.STATUS_INCOMPLETE:
-            return 'نقص مدارک ثبت شد.'
+            return 'فیش نیاز به تکمیل مدارک دارد.'
         if log.to_status == PaymentRecord.STATUS_REJECTED:
-            return 'سند رد شد.'
+            return 'فیش رد شد.'
+        # سایر تغییرات وضعیت داخلی برای مشتری نمایش نمی‌یابد
+        return ''
+    if log.action == PaymentActivityLog.ACTION_FINAL_APPROVED:
+        return 'فیش تأیید نهایی شد.'
+    # ثبت مالی و بررسی‌های داخلی نشان داده نمی‌شود
     return ''
 
 
 def _customer_visible_logs(logs):
+    """
+    فیلتر و فرمت لاگ‌ها برای مشتری:
+    - وضعیت‌های مهم (ثبت، ناقص، رد، تأیید نهایی)
+    - توضیحات خود مشتری
+    - بدون نام کارکنان یا جزئیات داخلی
+    """
     visible = []
     seen_keys = set()
     for log in logs:
-        # توضیحات مشتری همیشه نمایش داده می‌شود (بدون dedup)
+        # توضیحات مشتری — همه نشان داده می‌شوند
         if log.action == PaymentActivityLog.ACTION_CUSTOMER_NOTE:
             visible.append({
                 'text': '💬 توضیح شما:',
                 'note': log.note,
                 'time': _format_jalali_datetime(log.created_at),
                 'is_customer_note': True,
+                'icon': '💬',
             })
             continue
 
         text = _customer_log_text(log)
         if not text:
             continue
+
+        # dedup: یک نوع رویداد یک بار نشان داده می‌شود
         key = (log.action, log.to_status or text)
         if key in seen_keys:
             continue
         seen_keys.add(key)
+
+        # یادداشت کارشناس فقط برای ناقص یا رد
+        customer_note = ''
+        if log.to_status in {PaymentRecord.STATUS_INCOMPLETE, PaymentRecord.STATUS_REJECTED} and log.note:
+            customer_note = log.note
+
+        icon = {
+            PaymentActivityLog.ACTION_CREATED:        '📄',
+            PaymentActivityLog.ACTION_EDITED:         '✏️',
+            PaymentActivityLog.ACTION_FINAL_APPROVED: '✅',
+        }.get(log.action, '🔄')
+        if log.to_status == PaymentRecord.STATUS_INCOMPLETE:
+            icon = '⚠'
+        elif log.to_status == PaymentRecord.STATUS_REJECTED:
+            icon = '🚫'
+
         visible.append({
             'text': text,
-            'note': log.note if log.to_status in {PaymentRecord.STATUS_INCOMPLETE, PaymentRecord.STATUS_REJECTED} else '',
+            'note': customer_note,
             'time': _format_jalali_datetime(log.created_at),
             'is_customer_note': False,
+            'icon': icon,
         })
     return visible
 
@@ -1259,12 +1352,18 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         else:
             payment.timeline_lines = _customer_visible_logs(payment.activity_logs.all())[:5]
         payment.staff_can_act = _can_staff_act_on_payment(
-            staff_role,
-            payment,
-            is_system_admin=is_system_admin,
+            staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
         payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
         payment.can_edit_details = bool(can_edit_payment_details)
+
+        # فلگ‌های مستقل مالی
+        payment.can_finance_register = _can_finance_register(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
+        payment.can_final_approve = _can_final_approve(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
 
         # وضعیت طرف حساب
         cs = payment.counterparty_status
@@ -1307,11 +1406,15 @@ def _apply_record_filters(records, request, is_staff_user):
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
         'pay_date': (request.GET.get('pay_date') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
-        'counterparty': (request.GET.get('counterparty') or '').strip(),
-        'cp_status':    (request.GET.get('cp_status') or '').strip(),
+        'counterparty':    (request.GET.get('counterparty') or '').strip(),
+        'cp_status':       (request.GET.get('cp_status') or '').strip(),
+        'serial':          (request.GET.get('serial') or '').strip(),
+        'accounting_code': (request.GET.get('accounting_code') or '').strip(),
     }
 
     if is_staff_user:
+        if filters['accounting_code']:
+            records = records.filter(user__profile__accounting_code__icontains=filters['accounting_code'])
         if filters['first_name']:
             records = records.filter(first_name__icontains=filters['first_name'])
         if filters['last_name']:
@@ -1368,6 +1471,11 @@ def _apply_record_filters(records, request, is_staff_user):
         }
         if filters['status'] in customer_status_map:
             records = records.filter(status__in=customer_status_map[filters['status']])
+
+    # فیلتر سریال سند (ID)
+    serial_f = filters.get('serial', '')
+    if serial_f.isdigit():
+        records = records.filter(id=int(serial_f))
 
     # فیلتر وضعیت طرف حساب
     cp_f = filters.get('cp_status', '')
@@ -2489,6 +2597,76 @@ def profile_password_cancel(request):
 
 @login_required
 @require_POST
+def finance_register_payment(request, payment_id):
+    """ثبت مالی — فلگ مستقل مالی. هر زمانی قابل انجام است (مگر رد/تأیید نهایی)."""
+    redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or reverse('submit'))
+    role = _user_role(request.user)
+    if not _can_finance_register(role, PaymentRecord.objects.get(id=payment_id), request.user.is_superuser):
+        messages.error(request, 'شما مجاز به ثبت مالی این سند نیستید.')
+        return redirect(redirect_target)
+
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    note = (request.POST.get('note') or '').strip()
+
+    payment.finance_status = PaymentRecord.FINANCE_STATUS_APPROVED
+    payment.finance_registered_at = timezone.now()
+    payment.finance_registered_by = request.user
+    payment.save(update_fields=['finance_status', 'finance_registered_at', 'finance_registered_by'])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_REGISTERED,
+                  note=note or '')
+
+    # اگر هر دو فلگ آماده شد، به مدیر مالی اطلاع بده
+    if payment.ready_for_final_approval:
+        _notify_users(
+            list(_staff_notification_users({'finance_manager'})),
+            '✅ سند آماده تأیید نهایی',
+            f'سند #{payment_id} هم ثبت بازرگانی و هم ثبت مالی دارد و آماده تأیید نهایی است.',
+            reverse('submit'),
+            category=UserNotification.CATEGORY_SYSTEM,
+            actor=request.user,
+        )
+
+    messages.success(request, f'ثبت مالی سند #{payment_id} با موفقیت انجام شد.')
+    return redirect(redirect_target)
+
+
+@login_required
+@require_POST
+def finance_final_approve(request, payment_id):
+    """تأیید نهایی — فقط مدیر مالی، فقط وقتی هر دو فلگ تکمیل شده."""
+    redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or reverse('submit'))
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    role = _user_role(request.user)
+
+    if not _can_final_approve(role, payment, request.user.is_superuser):
+        messages.error(request, 'تأیید نهایی فقط توسط مدیر مالی و در صورت تکمیل هر دو فلگ مجاز است.')
+        return redirect(redirect_target)
+
+    note = (request.POST.get('note') or '').strip()
+    old_status = payment.status
+    payment.status = PaymentRecord.STATUS_FINAL_APPROVED
+    payment.save(update_fields=['status', 'updated_at'] if hasattr(PaymentRecord, 'updated_at') else ['status'])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINAL_APPROVED,
+                  from_status=old_status, to_status=payment.status,
+                  note=note or '')
+
+    _notify_users(
+        [payment.user] if payment.user else [],
+        'تأیید نهایی سند',
+        f'سند #{payment_id} توسط مدیر مالی تأیید نهایی شد.',
+        reverse('submit'),
+        category=UserNotification.CATEGORY_SYSTEM,
+        actor=request.user,
+    )
+
+    messages.success(request, f'سند #{payment_id} با موفقیت تأیید نهایی شد.')
+    return redirect(redirect_target)
+
+
+@login_required
+@require_POST
 def staff_update_status(request, payment_id):
     redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or '')
     if not redirect_target:
@@ -2617,23 +2795,34 @@ def payment_timeline(request, payment_id):
         return HttpResponseForbidden('فقط امکان مشاهده تاریخچه اسناد خودتان وجود دارد.')
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده تاریخچه')
-    raw_logs = payment.activity_logs.select_related('actor').all()
+    raw_logs = payment.activity_logs.select_related('actor', 'actor__profile').all()
+
     if is_staff_user:
-        logs = [
-            {
-                'log': log,
-                'text': _log_text(log),
-                'note': log.note,
+        # کارکنان: جزئیات کامل
+        logs = []
+        for log in raw_logs:
+            if log.action == PaymentActivityLog.ACTION_VIEWED:
+                continue  # مشاهده را در تاریخچه کارکنان نشان نمی‌دهیم (حجم بالا)
+            logs.append({
+                'text':        _log_text(log),
+                'note':        log.note,
                 'jalali_time': _format_jalali_datetime(log.created_at),
-            }
-            for log in raw_logs
-        ]
+                'action':      log.action,
+                'actor_name':  _display_name(log.actor),
+                'actor_role':  _role_title(log.actor),
+                'from_status': dict(PaymentRecord.STATUS_CHOICES).get(log.from_status, log.from_status or ''),
+                'to_status':   dict(PaymentRecord.STATUS_CHOICES).get(log.to_status, log.to_status or ''),
+                'is_customer_note': log.action == PaymentActivityLog.ACTION_CUSTOMER_NOTE,
+            })
     else:
+        # مشتری: وضعیت‌های کلیدی بدون جزئیات کارکنان
         logs = [
             {
-                'text': row['text'],
-                'note': row['note'],
-                'jalali_time': row['time'],
+                'text':             row['text'],
+                'note':             row['note'],
+                'jalali_time':      row['time'],
+                'is_customer_note': row.get('is_customer_note', False),
+                'icon':             row.get('icon', '🔄'),
             }
             for row in _customer_visible_logs(raw_logs)
         ]
@@ -4477,8 +4666,9 @@ def customers_list(request):
     if _user_role(request.user) == 'sales' and not request.user.is_superuser:
         customers = customers.filter(user__sales_assignment__sales_user=request.user)
     filters = {
-        'q': (request.GET.get('q') or '').strip(),
-        'status': (request.GET.get('status') or '').strip(),
+        'q':               (request.GET.get('q') or '').strip(),
+        'status':          (request.GET.get('status') or '').strip(),
+        'accounting_code': (request.GET.get('accounting_code') or '').strip(),
     }
     if filters['q']:
         customers = customers.filter(
@@ -4491,8 +4681,11 @@ def customers_list(request):
             Q(city__icontains=filters['q']) |
             Q(province__icontains=filters['q']) |
             Q(phone__icontains=filters['q']) |
-            Q(mobile__icontains=filters['q'])
+            Q(mobile__icontains=filters['q']) |
+            Q(accounting_code__icontains=filters['q'])
         )
+    if filters['accounting_code']:
+        customers = customers.filter(accounting_code__icontains=filters['accounting_code'])
     if filters['status'] == 'active':
         customers = customers.filter(suspended=False, user__is_active=True)
     elif filters['status'] == 'suspended':

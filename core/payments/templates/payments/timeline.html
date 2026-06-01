@@ -9,56 +9,84 @@
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f0f4f8; padding: 20px; }
-        .wrap { max-width: 720px; margin: 0 auto; }
+        .wrap { max-width: {% if is_staff_user %}860px{% else %}680px{% endif %}; margin: 0 auto; }
         .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px;
-                box-shadow: 0 2px 12px rgba(0,0,0,.07); border-right: 4px solid #0d9488; }
+                box-shadow: 0 2px 12px rgba(0,0,0,.07); }
         .card-header { display: flex; justify-content: space-between; align-items: center;
                        flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-        .card-header h3 { margin: 0; font-size: 16px; color: #0f4e49; }
-        .status-chip { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
-                       color: #fff; background: #0d9488; }
+        .card-header h3 { margin: 0; font-size: 16px; }
+        .status-chip { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fff; background: #0d9488; }
 
-        /* Timeline */
-        .timeline { position: relative; padding-right: 24px; }
-        .timeline::before { content: ''; position: absolute; right: 7px; top: 0; bottom: 0;
-                            width: 2px; background: #e2e8f0; }
-        .tl-item { position: relative; margin-bottom: 18px; }
-        .tl-dot { position: absolute; right: -24px; top: 4px; width: 14px; height: 14px;
-                  border-radius: 50%; background: #cbd5e1; border: 2px solid #fff;
-                  box-shadow: 0 0 0 2px #cbd5e1; }
-        .tl-dot.note { background: #0d9488; box-shadow: 0 0 0 2px #0d9488; }
-        .tl-dot.status { background: #3b82f6; box-shadow: 0 0 0 2px #3b82f6; }
-        .tl-dot.reject { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
-        .tl-dot.approved { background: #22c55e; box-shadow: 0 0 0 2px #22c55e; }
+        /* دو فلگ */
+        .flags-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+        .flag-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .flag-label { font-size: 11px; color: #64748b; }
 
-        .tl-body { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; }
-        .tl-body.is-note { background: #f0fdfa; border-color: #99f6e4; }
-        .tl-text { font-size: 13px; color: #374151; font-weight: 600; }
-        .tl-note { margin-top: 6px; font-size: 13px; color: #1e293b; line-height: 1.7;
-                   background: #fff; border-right: 3px solid #0d9488; padding: 8px 10px;
-                   border-radius: 0 6px 6px 0; }
-        .tl-note.staff-note { border-color: #ef4444; background: #fff5f5; color: #7f1d1d; }
-        .tl-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+        /* ─── Timeline کارکنان ─── */
+        .staff-timeline { position: relative; padding-right: 28px; }
+        .staff-timeline::before { content: ''; position: absolute; right: 10px; top: 0;
+                                   bottom: 0; width: 2px; background: #e2e8f0; }
+        .staff-tl-item { position: relative; margin-bottom: 16px; }
+        .staff-tl-dot { position: absolute; right: -28px; top: 6px; width: 18px; height: 18px;
+                        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                        font-size: 11px; border: 2px solid #fff; box-shadow: 0 0 0 2px #e2e8f0; background: #cbd5e1; }
+        .staff-tl-dot.created   { background: #0d9488; box-shadow: 0 0 0 2px #0d9488; }
+        .staff-tl-dot.edited    { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
+        .staff-tl-dot.commercial{ background: #3b82f6; box-shadow: 0 0 0 2px #3b82f6; }
+        .staff-tl-dot.finance   { background: #7c3aed; box-shadow: 0 0 0 2px #7c3aed; }
+        .staff-tl-dot.approved  { background: #16a34a; box-shadow: 0 0 0 2px #16a34a; }
+        .staff-tl-dot.rejected  { background: #dc2626; box-shadow: 0 0 0 2px #dc2626; }
+        .staff-tl-dot.incomplete{ background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
+        .staff-tl-dot.customer  { background: #0d9488; box-shadow: 0 0 0 2px #0d9488; }
+        .staff-tl-dot.cp        { background: #0369a1; box-shadow: 0 0 0 2px #0369a1; }
 
-        /* فرم افزودن توضیح */
+        .staff-tl-body { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; }
+        .staff-tl-body.is-note  { background: #f0fdfa; border-color: #99f6e4; }
+        .staff-tl-body.is-final { background: #f0fdf4; border-color: #86efac; }
+        .staff-tl-body.is-reject{ background: #fff5f5; border-color: #fca5a5; }
+        .staff-tl-body.is-incomplete { background: #fffbeb; border-color: #fde68a; }
+        .staff-tl-body.is-finance { background: #f5f3ff; border-color: #ddd6fe; }
+
+        .tl-text  { font-size: 13px; font-weight: 600; color: #1e293b; }
+        .tl-actors { font-size: 11px; color: #64748b; margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .tl-actor-badge { background: #f1f5f9; border-radius: 4px; padding: 1px 6px; }
+        .tl-note  { margin-top: 6px; font-size: 13px; color: #374151; line-height: 1.7;
+                    background: #fff; border-right: 3px solid #94a3b8; padding: 6px 9px; border-radius: 0 6px 6px 0; }
+        .tl-note.note-red   { border-color: #ef4444; background: #fff5f5; color: #7f1d1d; }
+        .tl-note.note-teal  { border-color: #0d9488; background: #f0fdfa; }
+        .tl-note.note-purple{ border-color: #7c3aed; background: #f5f3ff; }
+        .tl-time  { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+        /* ─── Timeline مشتری ─── */
+        .customer-timeline { display: flex; flex-direction: column; gap: 12px; }
+        .cust-item { display: flex; gap: 12px; align-items: flex-start; }
+        .cust-icon { font-size: 20px; flex-shrink: 0; width: 36px; text-align: center; }
+        .cust-body { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+                     padding: 10px 14px; flex: 1; }
+        .cust-body.final-ok  { background: #f0fdf4; border-color: #86efac; }
+        .cust-body.rejected  { background: #fff5f5; border-color: #fca5a5; }
+        .cust-body.incomplete{ background: #fffbeb; border-color: #fde68a; }
+        .cust-body.my-note   { background: #f0fdfa; border-color: #99f6e4; }
+        .cust-text { font-size: 14px; font-weight: 600; color: #1e293b; }
+        .cust-note { margin-top: 6px; font-size: 13px; background: #fff;
+                     border-right: 3px solid #ef4444; padding: 6px 9px; border-radius: 0 6px 6px 0;
+                     color: #7f1d1d; }
+        .cust-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+        /* فرم توضیح */
         .note-form-card { background: #fff; border-radius: 12px; padding: 20px;
                           box-shadow: 0 2px 12px rgba(0,0,0,.07); border-right: 4px solid #0d9488; }
         .note-form-card h4 { margin: 0 0 12px; font-size: 14px; color: #0f4e49; }
-        .note-form-card textarea { width: 100%; box-sizing: border-box; min-height: 90px;
+        .note-form-card textarea { width: 100%; box-sizing: border-box; min-height: 80px;
                                    border: 1.5px solid #b2e0da; border-radius: 8px; padding: 10px 12px;
-                                   font-family: Vazir, sans-serif; font-size: 13px; resize: vertical;
-                                   background: #f7fffe; transition: border-color .2s; }
+                                   font-family: Vazir, sans-serif; font-size: 13px; resize: vertical; }
         .note-form-card textarea:focus { outline: none; border-color: #0d9488;
                                          box-shadow: 0 0 0 3px rgba(13,148,136,.12); }
         .char-count { font-size: 11px; color: #94a3b8; text-align: left; margin-top: 4px; }
         .char-count.warn { color: #ef4444; }
         .note-submit-btn { margin-top: 10px; background: linear-gradient(135deg, #0d9488, #0f766e);
                            color: #fff; border: none; border-radius: 8px; padding: 10px 20px;
-                           font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700;
-                           cursor: pointer; box-shadow: 0 3px 10px rgba(13,148,136,.3);
-                           transition: transform .1s, box-shadow .15s; }
-        .note-submit-btn:hover { box-shadow: 0 5px 16px rgba(13,148,136,.4); }
-        .note-submit-btn:active { transform: translateY(1px); }
+                           font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; }
         .locked-notice { background: #fef9c3; border: 1px solid #fde047; border-radius: 8px;
                          padding: 10px 14px; font-size: 13px; color: #713f12; }
     </style>
@@ -74,42 +102,142 @@
                 <h3>روال فیش #{{ payment.id }}</h3>
                 <span class="status-chip">{{ payment.get_status_display }}</span>
             </div>
+
+            <!-- دو فلگ مستقل برای کارکنان -->
+            {% if is_staff_user %}
+            <div class="flags-row">
+                <div class="flag-item">
+                    <div class="flag-label">🏬 فلگ بازرگانی</div>
+                    <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:12px;">
+                        {{ payment.commercial_status_label }}
+                    </span>
+                </div>
+                <div class="flag-item">
+                    <div class="flag-label">💰 فلگ مالی</div>
+                    <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:12px;">
+                        {{ payment.finance_status_label }}
+                    </span>
+                </div>
+                {% if payment.counterparty %}
+                <div class="flag-item">
+                    <div class="flag-label">🏢 طرف حساب</div>
+                    <span class="status-pill {% if payment.cp_class %}{{ payment.cp_class }}{% else %}flag-gray{% endif %}" style="font-size:12px;">
+                        {{ payment.cp_label|default:'در انتظار' }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
             <div style="font-size:13px;color:#475569;line-height:2;">
                 <strong>مبلغ:</strong> {{ payment.amount|floatformat:0 }} ریال
-                {% if payment.pay_date %} &nbsp;|&nbsp; <strong>تاریخ واریز:</strong> {{ payment.pay_date|jalali_date }}{% endif %}
+                {% if payment.pay_date %} &nbsp;|&nbsp; <strong>تاریخ:</strong> {{ payment.pay_date|jalali_date }}{% endif %}
                 {% if payment.tracking_code %} &nbsp;|&nbsp; <strong>کد پیگیری:</strong> {{ payment.tracking_code }}{% endif %}
             </div>
         </div>
 
-        <!-- روال تاریخچه -->
-        <div class="card" style="border-right-color:#64748b;">
-            <h3 style="margin:0 0 16px;font-size:15px;color:#374151;">🕐 تاریخچه عملیات</h3>
-            <div class="timeline">
+        <!-- تاریخچه -->
+        <div class="card" style="border-right: 4px solid #64748b;">
+            {% if is_staff_user %}
+            {# ─── نمای کارکنان: کامل با جزئیات ─── #}
+            <h3 style="margin:0 0 18px;font-size:15px;">📋 تاریخچه کامل عملیات</h3>
+            <div class="staff-timeline">
                 {% for log in logs %}
-                <div class="tl-item">
-                    <div class="tl-dot {% if log.is_customer_note %}note{% endif %}"></div>
-                    <div class="tl-body {% if log.is_customer_note %}is-note{% endif %}">
+                <div class="staff-tl-item">
+                    {# تعیین رنگ dot #}
+                    {% if log.action == 'created' %}
+                        <div class="staff-tl-dot created">📄</div>
+                    {% elif log.action == 'edited' %}
+                        <div class="staff-tl-dot edited">✏</div>
+                    {% elif log.action == 'status_changed' %}
+                        <div class="staff-tl-dot commercial">🏬</div>
+                    {% elif log.action == 'finance_reg' %}
+                        <div class="staff-tl-dot finance">💰</div>
+                    {% elif log.action == 'final_approved' %}
+                        <div class="staff-tl-dot approved">✅</div>
+                    {% elif log.action == 'customer_note' %}
+                        <div class="staff-tl-dot customer">💬</div>
+                    {% elif log.action in 'cp_approved,cp_returned,cp_rejected' %}
+                        <div class="staff-tl-dot cp">🏢</div>
+                    {% else %}
+                        <div class="staff-tl-dot">•</div>
+                    {% endif %}
+
+                    {# body با رنگ متناسب #}
+                    <div class="staff-tl-body
+                        {% if log.is_customer_note %}is-note
+                        {% elif log.action == 'final_approved' %}is-final
+                        {% elif log.to_status == 'rejected' %}is-reject
+                        {% elif log.to_status == 'incomplete' %}is-incomplete
+                        {% elif log.action == 'finance_reg' %}is-finance
+                        {% endif %}">
+
                         <div class="tl-text">{{ log.text }}</div>
+
+                        {# جزئیات کامل برای کارکنان #}
+                        <div class="tl-actors">
+                            {% if log.actor_name and log.actor_name != 'سیستم' %}
+                            <span class="tl-actor-badge">👤 {{ log.actor_name }}</span>
+                            {% if log.actor_role %}<span class="tl-actor-badge">{{ log.actor_role }}</span>{% endif %}
+                            {% endif %}
+                            {% if log.from_status and log.to_status %}
+                            <span>{{ log.from_status }} ← {{ log.to_status }}</span>
+                            {% elif log.to_status %}
+                            <span>→ {{ log.to_status }}</span>
+                            {% endif %}
+                        </div>
+
                         {% if log.note %}
-                            <div class="tl-note {% if not log.is_customer_note %}staff-note{% endif %}">
-                                {{ log.note|linebreaksbr }}
-                            </div>
+                        <div class="tl-note
+                            {% if log.action == 'customer_note' %}note-teal
+                            {% elif log.action == 'finance_reg' %}note-purple
+                            {% elif log.to_status == 'rejected' or log.action == 'cp_rejected' %}note-red
+                            {% endif %}">
+                            {{ log.note|linebreaksbr }}
+                        </div>
                         {% endif %}
+
                         <div class="tl-time">{{ log.jalali_time }}</div>
                     </div>
                 </div>
                 {% empty %}
-                <div style="color:#94a3b8;font-size:13px;">تاریخچه‌ای ثبت نشده است.</div>
+                <div style="color:#94a3b8;font-size:13px;">رویدادی ثبت نشده است.</div>
                 {% endfor %}
             </div>
+
+            {% else %}
+            {# ─── نمای مشتری: ساده و وضعیت‌محور ─── #}
+            <h3 style="margin:0 0 16px;font-size:15px;">وضعیت فیش شما</h3>
+            <div class="customer-timeline">
+                {% for log in logs %}
+                <div class="cust-item">
+                    <div class="cust-icon">{{ log.icon }}</div>
+                    <div class="cust-body
+                        {% if log.is_customer_note %}my-note
+                        {% elif log.action == 'final_approved' or log.to_status == 'final_approved' %}final-ok
+                        {% elif log.to_status == 'rejected' %}rejected
+                        {% elif log.to_status == 'incomplete' %}incomplete
+                        {% endif %}">
+                        <div class="cust-text">{{ log.text }}</div>
+                        {% if log.note %}
+                            <div class="cust-note">{{ log.note|linebreaksbr }}</div>
+                        {% endif %}
+                        <div class="cust-time">{{ log.jalali_time }}</div>
+                    </div>
+                </div>
+                {% empty %}
+                <div style="color:#94a3b8;font-size:13px;">هنوز رویدادی ثبت نشده است.</div>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
-        <!-- فرم افزودن توضیح (فقط مشتری، تا قبل از تایید نهایی) -->
+        <!-- فرم افزودن توضیح (فقط مشتری) -->
         {% if can_add_note %}
         <div class="note-form-card">
             <h4>💬 افزودن توضیح به روال فیش</h4>
             <p style="font-size:12px;color:#64748b;margin:0 0 12px;">
-                توضیح شما در تاریخچه این فیش ثبت می‌شود و توضیحات قبلی دست‌نخورده می‌مانند.
+                توضیح شما ثبت می‌شود و توضیحات قبلی دست‌نخورده می‌مانند.
             </p>
             <form method="post" action="{% url 'add_payment_note' payment.id %}">
                 {% csrf_token %}
@@ -122,7 +250,7 @@
         </div>
         {% elif not is_staff_user %}
         <div class="locked-notice">
-            🔒 این فیش تایید نهایی شده است و امکان افزودن توضیح جدید وجود ندارد.
+            🔒 این فیش تأیید نهایی شده است و امکان افزودن توضیح وجود ندارد.
         </div>
         {% endif %}
 
@@ -133,12 +261,10 @@
 
     <script>
     (function () {
-        const textarea  = document.getElementById('note-input');
-        const counter   = document.getElementById('char-count');
+        const textarea = document.getElementById('note-input');
+        const counter  = document.getElementById('char-count');
         const persianDigits = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
-        function toPersian(n) {
-            return String(n).replace(/\d/g, d => persianDigits[d]);
-        }
+        function toPersian(n) { return String(n).replace(/\d/g, d => persianDigits[d]); }
         if (textarea && counter) {
             textarea.addEventListener('input', function () {
                 const len = textarea.value.length;
