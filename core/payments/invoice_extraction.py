@@ -288,15 +288,27 @@ def _model_dir_ready(path):
 # ─── ابزارهای کمکی استخراج ─────────────────────────────────────────────────
 
 def _search_after_label(text, labels, max_chars=80):
-    """جستجو برای مقدار بعد از یک لیبل — با انعطاف بیشتر."""
+    """
+    جستجو برای مقدار بعد از یک لیبل.
+    دو حالت پشتیبانی می‌شود:
+    ۱. مقدار در همان خط لیبل
+    ۲. مقدار در خط بعد (رایج در فاکتورهای فارسی)
+    """
     for label in labels:
-        # الگو: لیبل + جداکننده اختیاری + مقدار (در همان خط یا خط بعد)
+        # حالت ۱: همان خط
         pattern = rf'(?:{label})\s*[:：\-]?\s*([^\n]{{1,{max_chars}}})'
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            value = match.group(1).strip(' :：-،')
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            value = m.group(1).strip(' :：-،')
             if value:
                 return value
+        # حالت ۲: خط بعدی (مقدار در سطر جداگانه)
+        pattern2 = rf'(?:{label})\s*[:：\-]?\s*\n\s*([^\n]{{1,{max_chars}}})'
+        m2 = re.search(pattern2, text, flags=re.IGNORECASE)
+        if m2:
+            value2 = m2.group(1).strip(' :：-،')
+            if value2:
+                return value2
     return ''
 
 
@@ -313,7 +325,7 @@ def _extract_number_from(text):
 # ─── استخراج شماره فاکتور ──────────────────────────────────────────────────
 
 def _extract_invoice_number(text):
-    """استخراج دقیق مقدار شماره فاکتور — فقط عدد/کد بعد از لیبل."""
+    """استخراج دقیق مقدار شماره فاکتور."""
     invoice_labels = [
         r'شماره\s*فاکتور',
         r'شماره\s*صورت\s*حساب',
@@ -327,22 +339,30 @@ def _extract_invoice_number(text):
         r'سریال\s*فاکتور',
         r'شماره\s*رسید',
         r'No\s*فاکتور',
+        r'شماره\s*:',    # "شماره:" به‌تنهایی (رایج در فاکتورهای فارسی)
     ]
     for label in invoice_labels:
-        # جستجوی عدد/کد مستقیماً بعد از لیبل
+        # همان خط: لیبل + عدد/کد
         pattern = rf'(?:{label})\s*[:：\-#]?\s*([A-Za-z0-9][A-Za-z0-9\-/]{{0,20}})'
         m = re.search(pattern, text, flags=re.IGNORECASE)
         if m:
             val = m.group(1).strip()
-            if re.search(r'\d', val):  # باید حداقل یک رقم داشته باشد
-                # فقط تا اولین فاصله بیشتر از یک کاراکتر
-                val = re.split(r'\s{2,}|\t|\n', val)[0].strip()
-                return _clean_short_value(val)
+            if re.search(r'\d', val):
+                return _clean_short_value(re.split(r'\s{2,}|\t|\n', val)[0].strip())
 
-    # الگوهای کلاسیک کد فاکتور
-    for pat in [
-        r'\b(?:INV|FA|FACT|FTR|FAK)[\-/]?[A-Z0-9\-/]{2,15}\b',
-    ]:
+        # خط بعدی: لیبل در یک خط، عدد در خط بعد
+        pattern2 = rf'(?:{label})\s*[:：\-#]?\s*\n\s*([A-Za-z0-9][A-Za-z0-9\-/\s]{{0,25}})'
+        m2 = re.search(pattern2, text, flags=re.IGNORECASE)
+        if m2:
+            val2 = m2.group(1).strip()
+            if re.search(r'\d', val2):
+                # فقط اولین کلمه/عدد
+                first_token = re.split(r'\s+', val2)[0].strip()
+                if first_token:
+                    return _clean_short_value(first_token)
+
+    # الگوهای کلاسیک
+    for pat in [r'\b(?:INV|FA|FACT|FTR|FAK)[\-/]?[A-Z0-9\-/]{2,15}\b']:
         m = re.search(pat, text, flags=re.IGNORECASE)
         if m:
             return _clean_short_value(m.group(0))
@@ -407,11 +427,27 @@ def _extract_amount(text):
     ]
 
     for label in priority_labels:
-        # جستجوی عدد مستقیماً بعد از لیبل (در همان خط)
+        # حالت ۱: عدد بعد از لیبل (LTR / logical order)
         pattern = rf'(?:{label})\s*[:：\-]?\s*([0-9][0-9,،\s.]{{2,30}})'
         m = re.search(pattern, text, flags=re.IGNORECASE)
         if m:
             digits = re.sub(r'\D', '', m.group(1))
+            if len(digits) >= 3:
+                return digits
+
+        # حالت ۲: عدد قبل از لیبل (RTL visual order — رایج در PDFهای فارسی)
+        pattern_rtl = rf'([0-9][0-9,،\s.]{{2,30}})\s*(?:{label})'
+        m2 = re.search(pattern_rtl, text, flags=re.IGNORECASE)
+        if m2:
+            digits = re.sub(r'\D', '', m2.group(1))
+            if len(digits) >= 5:
+                return digits
+
+        # حالت ۳: لیبل در خط جداگانه، عدد در خط بعد
+        pattern_nl = rf'(?:{label})\s*[:：\-]?\s*\n\s*([0-9][0-9,،\s.]{{2,20}})'
+        m3 = re.search(pattern_nl, text, flags=re.IGNORECASE)
+        if m3:
+            digits = re.sub(r'\D', '', m3.group(1))
             if len(digits) >= 3:
                 return digits
 
@@ -558,21 +594,24 @@ def _extract_customer_name(text):
 # ─── استخراج نام فروشنده (اختیاری) ────────────────────────────────────────
 
 def _extract_vendor_name(text):
+    """استخراج نام فروشنده — فقط اگر لیبل صریح وجود داشته باشد."""
     labels = [
-        r'فروشنده',
-        r'صادرکننده',
+        r'نام\s*(?:شرکت|فروشنده|صادرکننده|فروش)',
+        r'فروشنده\s*[:：]',
+        r'صادرکننده\s*[:：]',
         r'شرکت\s*فروشنده',
-        r'نام\s*(?:شرکت|فروشنده|صادرکننده)',
-        r'seller|vendor|supplier|issued\s*by',
+        r'seller\s*[:：]',
+        r'vendor\s*[:：]',
+        r'supplier\s*[:：]',
+        r'issued\s*by\s*[:：]',
     ]
     value = _search_after_label(text, labels, max_chars=60)
     if value:
-        return _clean_short_value(value)
-    # خط اول سند اغلب نام فروشنده است
-    for line in text.splitlines()[:5]:
-        line = line.strip()
-        if len(line) > 5 and not re.search(r'^\d', line):
-            return _clean_short_value(line)
+        cleaned = _clean_short_value(value)
+        # رد کردن مقادیر نامعتبر (لیبل‌های دیگر)
+        invalid = {'امضاء', 'signature', 'مهر', 'تاریخ', 'شماره', 'تلفن'}
+        if not any(inv in cleaned for inv in invalid):
+            return cleaned
     return ''
 
 

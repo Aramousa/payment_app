@@ -491,7 +491,7 @@
                 tax_amount:       'مبلغ مالیات',
             };
             // فیلدهایی که فقط نمایش داده می‌شوند (input متناظر ندارند)
-            const displayOnlyFields = new Set(['customer_name', 'vendor_name', 'tax_amount']);
+            const displayOnlyFields = new Set(['vendor_name', 'tax_amount']);
 
             function setParseStatus(message, type) {
                 if (!parseStatus) return;
@@ -508,12 +508,67 @@
                 return fieldName === 'amount' ? formatNumber(value) : String(value || '');
             }
 
+            /** جستجوی مشتری در dropdown بر اساس نام استخراج‌شده */
+            function applyCustomerName(value) {
+                const select = document.getElementById('id_customer');
+                if (!select || !value) return false;
+                const search = value.trim().replace(/\s+/g, ' ').toLowerCase();
+                // جستجوی تطبیق کامل یا جزئی در گزینه‌های dropdown
+                let bestOpt = null;
+                let bestScore = 0;
+                for (const opt of select.options) {
+                    if (!opt.value) continue;
+                    const label = opt.text.trim().toLowerCase();
+                    if (label === search) { bestOpt = opt; bestScore = 3; break; }
+                    // تطبیق جزئی — نام در label باشد یا label در نام
+                    const parts = search.split(/\s+/);
+                    const matched = parts.filter(p => p.length > 1 && label.includes(p)).length;
+                    if (matched > bestScore) { bestScore = matched; bestOpt = opt; }
+                }
+                if (bestOpt && bestScore > 0) {
+                    select.value = bestOpt.value;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }
+                // اگر مطابقت پیدا نشد، dropdown را هایلایت کن تا کاربر دستی انتخاب کند
+                select.style.borderColor = '#0d9488';
+                select.style.boxShadow = '0 0 0 3px rgba(13,148,136,.2)';
+                select.focus();
+                return false;
+            }
+
+            /** پیدا کردن input فرم به روش‌های مختلف */
+            function findFormInput(fieldName) {
+                const form = document.getElementById('invoice-upload-form');
+                const scope = form || document;
+                // روش ۱: id استاندارد Django
+                let el = scope.querySelector('#id_' + fieldName);
+                if (el) return el;
+                // روش ۲: name attribute (مطمئن‌ترین روش)
+                el = scope.querySelector('[name="' + fieldName + '"]');
+                if (el) return el;
+                // روش ۳: بدون محدودیت scope
+                el = document.getElementById('id_' + fieldName);
+                if (el) return el;
+                el = document.querySelector('[name="' + fieldName + '"]');
+                return el || null;
+            }
+
             function applyParsedField(fieldName, value) {
-                const input = document.getElementById('id_' + fieldName);
+                // مدیریت ویژه نام خریدار — جستجو در dropdown
+                if (fieldName === 'customer_name') {
+                    return applyCustomerName(value);
+                }
+                const input = findFormInput(fieldName);
                 if (!input || !value) return false;
                 input.value = parsedDisplayValue(fieldName, value);
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 input.dispatchEvent(new Event('change', { bubbles: true }));
+                // اسکرول به فیلد تا کاربر تغییر را ببیند
+                input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                input.style.borderColor = '#0d9488';
+                input.style.transition = 'border-color 1.5s';
+                setTimeout(function() { input.style.borderColor = ''; }, 2000);
                 return true;
             }
 
@@ -572,16 +627,21 @@
                             const button = document.createElement('button');
                             button.type = 'button';
                             button.className = 'parse-apply-btn';
-                            button.textContent = 'اعمال';
+                            // برای نام خریدار متن دکمه متفاوت
+                            button.textContent = fieldName === 'customer_name' ? 'جستجو در لیست' : 'اعمال';
                             button.addEventListener('click', function () {
-                                if (applyParsedField(fieldName, value)) {
+                                const ok = applyParsedField(fieldName, value);
+                                if (fieldName === 'customer_name') {
+                                    button.textContent = ok ? '✓ انتخاب شد' : '⚠ دستی انتخاب کنید';
+                                    button.style.background = ok ? '#16a34a' : '#d97706';
+                                    button.disabled = ok;
+                                } else if (ok) {
                                     button.textContent = 'اعمال شد';
                                     button.disabled = true;
                                 }
                             });
                             row.appendChild(button);
                         } else {
-                            // فقط نمایشی — فقط badge
                             const badge = document.createElement('span');
                             badge.style.cssText = 'font-size:11px;color:#64748b;margin-right:4px;';
                             badge.textContent = '(اطلاعاتی)';
