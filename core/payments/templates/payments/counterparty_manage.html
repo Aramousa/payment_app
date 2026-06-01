@@ -1,0 +1,346 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>مدیریت طرف حساب‌ها</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <script src="{% static 'js/bank-autocomplete.js' %}?v=3"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f0f4f8; padding: 20px; }
+        .wrap { max-width: 1300px; margin: 0 auto; display: grid; grid-template-columns: 1fr 420px; gap: 20px; align-items: start; }
+        @media(max-width:960px){ .wrap { grid-template-columns: 1fr; } }
+
+        .card { background: #fff; border-radius: 12px; padding: 20px;
+                box-shadow: 0 2px 10px rgba(0,0,0,.07); border-right: 4px solid #0d9488; margin-bottom: 16px; }
+        .card h3 { margin: 0 0 14px; font-size: 15px; color: #0f4e49; border: none; }
+
+        /* فرم */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .full { grid-column: 1/-1; }
+        label { display: block; font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 4px; }
+        input, select, textarea { width: 100%; box-sizing: border-box; border: 1.5px solid #b2e0da;
+            border-radius: 7px; padding: 8px 10px; font-family: Vazir, sans-serif; font-size: 13px;
+            background: #f7fffe; transition: border-color .15s, box-shadow .15s; }
+        input:focus, select:focus, textarea:focus {
+            border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,.12); outline: none; }
+        .field-error { color: #dc2626; font-size: 12px; margin-top: 3px; }
+
+        /* حساب‌های بانکی */
+        .bank-row { background: #f8fffe; border: 1px solid #ccf0ea; border-radius: 8px;
+                    padding: 12px; margin-bottom: 10px; position: relative; }
+        .bank-row-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .bank-row-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .primary-badge { background: #dcfce7; color: #15803d; border-radius: 5px;
+                         padding: 2px 8px; font-size: 11px; font-weight: 700; }
+        .del-bank-btn { position: absolute; top: 8px; left: 8px; background: #fee2e2;
+                        color: #dc2626; border: none; border-radius: 5px; padding: 3px 8px;
+                        cursor: pointer; font-size: 12px; font-family: Vazir, sans-serif; }
+        .add-bank-btn { background: #f0fdfa; border: 1.5px dashed #0d9488; border-radius: 7px;
+                        padding: 8px; text-align: center; cursor: pointer; color: #0f766e;
+                        font-size: 13px; font-weight: 700; width: 100%; margin-top: 6px; }
+
+        /* جدول */
+        table { width: 100%; border-collapse: collapse; }
+        th { background: linear-gradient(135deg,#042f2e,#0f766e); color: #fff;
+             padding: 10px; text-align: right; font-size: 12px; }
+        td { padding: 9px 10px; border-bottom: 1px solid #eef; font-size: 13px; vertical-align: middle; }
+        tr:hover td { background: #f0fdfa; }
+
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 5px;
+                        font-size: 11px; font-weight: 700; }
+        .status-active    { background: #dcfce7; color: #15803d; }
+        .status-inactive  { background: #fef9c3; color: #854d0e; }
+        .status-suspended { background: #fee2e2; color: #dc2626; }
+
+        .btn { display: inline-block; padding: 7px 14px; border-radius: 7px; border: none;
+               cursor: pointer; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700;
+               text-decoration: none; }
+        .btn-primary { background: linear-gradient(135deg,#0d9488,#0f766e); color: #fff;
+                       box-shadow: 0 2px 8px rgba(13,148,136,.3); }
+        .btn-edit { background: #c2500a; color: #fff; padding: 5px 10px; font-size: 12px; }
+        .btn-secondary { background: #64748b; color: #fff; }
+
+        /* فیلتر */
+        .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+        .filter-bar select, .filter-bar input { width: auto; min-width: 150px; }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+    {% include "payments/partials/system_messages_popup.html" %}
+
+    <div style="max-width:1300px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <h2 style="margin:0;">مدیریت طرف حساب‌ها</h2>
+        <div style="display:flex;gap:8px;">
+            <a href="{% url 'counterparty_manage_create' %}" class="btn btn-primary">+ طرف حساب جدید</a>
+            <a href="{% url 'users_manage' %}" class="btn btn-secondary">مدیریت کاربران</a>
+        </div>
+    </div>
+
+    <div class="wrap">
+        <!-- ستون چپ: لیست -->
+        <div>
+            <div class="card" style="border-right-color:#64748b;">
+                <h3>لیست طرف حساب‌ها</h3>
+                <form method="get" class="filter-bar">
+                    <div>
+                        <label>جستجو</label>
+                        <input type="search" name="q" value="{{ filters.q }}" placeholder="نام، فامیل، تلفن">
+                    </div>
+                    <div>
+                        <label>وضعیت</label>
+                        <select name="status">
+                            <option value="">همه</option>
+                            {% for val, lbl in status_choices %}
+                                <option value="{{ val }}" {% if filters.status == val %}selected{% endif %}>{{ lbl|truncatechars:15 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="padding:7px 12px;">فیلتر</button>
+                    <a href="{% url 'counterparty_manage_list' %}" class="btn btn-secondary" style="padding:7px 12px;">حذف</a>
+                </form>
+
+                <table>
+                    <thead><tr>
+                        <th>نام سازمان</th>
+                        <th>نام</th>
+                        <th>تلفن</th>
+                        <th>وضعیت</th>
+                        <th>حساب‌ها</th>
+                        <th>ویرایش</th>
+                    </tr></thead>
+                    <tbody>
+                        {% for cp in counterparties %}
+                        <tr>
+                            <td><strong>{{ cp.name }}</strong></td>
+                            <td>{{ cp.first_name }} {{ cp.last_name }}</td>
+                            <td>{{ cp.phone|default:'-' }}</td>
+                            <td>
+                                <span class="status-badge status-{{ cp.status }}">
+                                    {% if cp.status == 'active' %}✅ فعال
+                                    {% elif cp.status == 'inactive' %}⚠ غیرفعال
+                                    {% else %}🔴 معلق{% endif %}
+                                </span>
+                            </td>
+                            <td style="text-align:center;">
+                                {{ cp.bank_accounts.count }}
+                                {% with primary=cp.bank_accounts.filter.first %}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                <a href="{% url 'counterparty_manage_edit' cp.id %}" class="btn btn-edit">ویرایش</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px;">طرف حسابی ثبت نشده است.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                {% if page_obj and page_obj.has_other_pages %}
+                <div style="display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="btn btn-secondary" style="padding:5px 10px;">«</a>
+                    {% endif %}
+                    <span style="padding:5px 10px;font-size:13px;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    {% if page_obj.has_next %}
+                        <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="btn btn-secondary" style="padding:5px 10px;">»</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ستون راست: فرم ایجاد/ویرایش -->
+        {% if editing is not None or request.resolver_match.url_name == 'counterparty_manage_create' %}
+        <div>
+            <div class="card">
+                <h3>{% if editing %}ویرایش: {{ editing.name }}{% else %}ایجاد طرف حساب جدید{% endif %}</h3>
+                <form method="post" id="cp-form">
+                    {% csrf_token %}
+                    <div class="form-grid">
+                        <!-- نام سازمان -->
+                        <div class="full">
+                            <label>{{ form.name.label }}{% if form.name.field.required %}<span style="color:#c00;">*</span>{% endif %}</label>
+                            {{ form.name }}
+                            {% for e in form.name.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                        </div>
+                        <!-- نام / نام خانوادگی -->
+                        <div>
+                            <label>{{ form.first_name.label }}{% if form.first_name.field.required %}<span style="color:#c00;">*</span>{% endif %}</label>
+                            {{ form.first_name }}
+                            {% for e in form.first_name.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div>
+                            <label>{{ form.last_name.label }}{% if form.last_name.field.required %}<span style="color:#c00;">*</span>{% endif %}</label>
+                            {{ form.last_name }}
+                            {% for e in form.last_name.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                        </div>
+                        <!-- تلفن -->
+                        <div>
+                            <label>{{ form.phone.label }}</label>
+                            {{ form.phone }}
+                        </div>
+                        <!-- وضعیت -->
+                        <div>
+                            <label>{{ form.status.label }}</label>
+                            {{ form.status }}
+                        </div>
+                        <!-- توضیحات -->
+                        <div class="full">
+                            <label>{{ form.description.label }}</label>
+                            {{ form.description }}
+                        </div>
+                        <!-- حساب کاربری -->
+                        <div>
+                            <label>{{ form.username.label }}</label>
+                            {{ form.username }}
+                            <small style="color:#64748b;font-size:11px;">{{ form.username.help_text }}</small>
+                        </div>
+                        <div>
+                            <label>{{ form.password.label }}</label>
+                            {{ form.password }}
+                            <small style="color:#64748b;font-size:11px;">{{ form.password.help_text }}</small>
+                        </div>
+                    </div>
+
+                    <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">
+
+                    <!-- حساب‌های بانکی -->
+                    <h3 style="font-size:14px;margin:0 0 10px;color:#0f4e49;">🏦 حساب‌های بانکی</h3>
+                    {{ bank_formset.management_form }}
+                    <div id="bank-accounts-container">
+                        {% for bf in bank_formset %}
+                        <div class="bank-row bank-entry">
+                            {% for hidden in bf.hidden_fields %}{{ hidden }}{% endfor %}
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <strong style="font-size:13px;color:#0f4e49;">حساب #{{ forloop.counter }}</strong>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <label style="display:flex;align-items:center;gap:4px;margin:0;font-size:12px;cursor:pointer;">
+                                        {{ bf.is_primary }} حساب اصلی
+                                    </label>
+                                    {% if bf.DELETE %}
+                                    <label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;color:#dc2626;cursor:pointer;">
+                                        {{ bf.DELETE }} حذف
+                                    </label>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="bank-row-grid">
+                                <div>
+                                    <label>{{ bf.bank_name.label }}{% if bf.bank_name.field.required %}<span style="color:#c00;">*</span>{% endif %}</label>
+                                    {{ bf.bank_name }}
+                                </div>
+                                <div>
+                                    <label>{{ bf.city.label }}</label>
+                                    {{ bf.city }}
+                                </div>
+                                <div>
+                                    <label>{{ bf.branch.label }}</label>
+                                    {{ bf.branch }}
+                                </div>
+                            </div>
+                            <div class="bank-row-grid-2">
+                                <div>
+                                    <label>{{ bf.account_number.label }}{% if bf.account_number.field.required %}<span style="color:#c00;">*</span>{% endif %}</label>
+                                    {{ bf.account_number }}
+                                </div>
+                                <div>
+                                    <label>{{ bf.account_owner.label }}</label>
+                                    {{ bf.account_owner }}
+                                </div>
+                            </div>
+                            <div style="margin-top:8px;">
+                                <label>{{ bf.iban.label }}</label>
+                                {{ bf.iban }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="button" class="add-bank-btn" id="add-bank-btn">+ افزودن حساب بانکی</button>
+
+                    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+                        <a href="{% url 'counterparty_manage_list' %}" class="btn btn-secondary">انصراف</a>
+                        <button type="submit" class="btn btn-primary">💾 ذخیره</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Template خالی برای حساب بانکی جدید -->
+    <div id="bank-empty-template" style="display:none;">
+        <div class="bank-row bank-entry">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong style="font-size:13px;color:#0f4e49;">حساب جدید</strong>
+                <label style="display:flex;align-items:center;gap:4px;margin:0;font-size:12px;cursor:pointer;">
+                    <input type="checkbox" name="bank_accounts-__prefix__-is_primary"> حساب اصلی
+                </label>
+            </div>
+            <div class="bank-row-grid">
+                <div><label>نام بانک</label><input type="text" name="bank_accounts-__prefix__-bank_name" class="bank-autocomplete-input" data-bank-type="beneficiary" autocomplete="off"></div>
+                <div><label>شهر</label><input type="text" name="bank_accounts-__prefix__-city"></div>
+                <div><label>شعبه</label><input type="text" name="bank_accounts-__prefix__-branch"></div>
+            </div>
+            <div class="bank-row-grid-2" style="margin-top:8px;">
+                <div><label>شماره حساب</label><input type="text" name="bank_accounts-__prefix__-account_number" dir="ltr"></div>
+                <div><label>صاحب حساب</label><input type="text" name="bank_accounts-__prefix__-account_owner"></div>
+            </div>
+            <div style="margin-top:8px;"><label>شماره شبا</label><input type="text" name="bank_accounts-__prefix__-iban" dir="ltr" placeholder="IR000000000000000000000000"></div>
+            <input type="hidden" name="bank_accounts-__prefix__-id" value="">
+            <input type="hidden" name="bank_accounts-__prefix__-counterparty" value="">
+            <div style="margin-top:8px;text-align:left;">
+                <button type="button" class="del-bank-btn" onclick="this.closest('.bank-entry').remove(); updateFormCount();">✕ حذف</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function(){
+        const container = document.getElementById('bank-accounts-container');
+        const addBtn    = document.getElementById('add-bank-btn');
+        const tmpl      = document.getElementById('bank-empty-template');
+        const form      = document.getElementById('cp-form');
+
+        function getTotal() {
+            const inp = form ? form.querySelector('[name="bank_accounts-TOTAL_FORMS"]') : null;
+            return inp ? parseInt(inp.value, 10) : 0;
+        }
+
+        function updateFormCount() {
+            if (!form) return;
+            const inp = form.querySelector('[name="bank_accounts-TOTAL_FORMS"]');
+            if (inp) inp.value = container ? container.querySelectorAll('.bank-entry').length : 0;
+        }
+
+        if (addBtn && tmpl && container) {
+            addBtn.addEventListener('click', function () {
+                const idx  = getTotal();
+                const html = tmpl.innerHTML.replace(/__prefix__/g, idx);
+                const div  = document.createElement('div');
+                div.innerHTML = html;
+                const row = div.firstElementChild;
+                // دکمه حذف
+                const del = row.querySelector('.del-bank-btn');
+                if (del) del.addEventListener('click', function(){ row.remove(); updateFormCount(); });
+                container.appendChild(row);
+                updateFormCount();
+            });
+        }
+
+        // حذف ردیف‌های موجود
+        if (container) {
+            container.querySelectorAll('.del-bank-btn').forEach(function(btn){
+                btn.addEventListener('click', function(){ btn.closest('.bank-entry').remove(); updateFormCount(); });
+            });
+        }
+    })();
+    </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

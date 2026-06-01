@@ -28,9 +28,9 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from zoneinfo import ZoneInfo
 
-from .forms import CounterpartyForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import Counterparty, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -191,10 +191,15 @@ def _active_customer_profiles():
 
 
 def _is_counterparty_user(user):
-    """بررسی می‌کند که آیا کاربر یک طرف حساب است."""
+    """بررسی می‌کند که آیا کاربر یک طرف حساب است (از طریق رابطه یا نقش)."""
     if not user or not user.is_authenticated:
         return False
-    return bool(getattr(user, 'counterparty_account', None))
+    if getattr(user, 'counterparty_account', None):
+        return True
+    try:
+        return user.profile.role == 'counterparty'
+    except Exception:
+        return False
 
 
 def _get_user_counterparty(user):
@@ -1260,6 +1265,32 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         ) if staff_role else False
         payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
         payment.can_edit_details = bool(can_edit_payment_details)
+
+        # وضعیت طرف حساب
+        cs = payment.counterparty_status
+        if cs == PaymentRecord.CP_STATUS_APPROVED:
+            payment.cp_label      = 'تایید'
+            payment.cp_class      = 'flag-green'
+            payment.cp_needs_act  = False
+        elif cs == PaymentRecord.CP_STATUS_RETURNED:
+            payment.cp_label      = 'عودت — نیاز به اقدام'
+            payment.cp_class      = 'flag-orange'
+            payment.cp_needs_act  = True   # بازرگانی باید اقدام کند
+        elif cs == PaymentRecord.CP_STATUS_REJECTED:
+            payment.cp_label      = 'رد / ابطال'
+            payment.cp_class      = 'flag-red'
+            payment.cp_needs_act  = False
+        elif payment.counterparty_id:
+            payment.cp_label      = 'در انتظار'
+            payment.cp_class      = 'flag-gray'
+            payment.cp_needs_act  = False
+        else:
+            payment.cp_label      = ''
+            payment.cp_class      = ''
+            payment.cp_needs_act  = False
+        payment.cp_note = payment.counterparty_note or ''
+        payment.cp_icon = {'تایید': '✅', 'عودت — نیاز به اقدام': '⚠', 'رد / ابطال': '🚫', 'در انتظار': '⏳'}.get(payment.cp_label, '')
+
     return records
 
 
@@ -1277,6 +1308,7 @@ def _apply_record_filters(records, request, is_staff_user):
         'pay_date': (request.GET.get('pay_date') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
         'counterparty': (request.GET.get('counterparty') or '').strip(),
+        'cp_status':    (request.GET.get('cp_status') or '').strip(),
     }
 
     if is_staff_user:
@@ -1336,6 +1368,19 @@ def _apply_record_filters(records, request, is_staff_user):
         }
         if filters['status'] in customer_status_map:
             records = records.filter(status__in=customer_status_map[filters['status']])
+
+    # فیلتر وضعیت طرف حساب
+    cp_f = filters.get('cp_status', '')
+    if cp_f == 'pending':
+        records = records.filter(counterparty__isnull=False, counterparty_status__isnull=True)
+    elif cp_f == 'approved':
+        records = records.filter(counterparty_status=PaymentRecord.CP_STATUS_APPROVED)
+    elif cp_f == 'returned':
+        records = records.filter(counterparty_status=PaymentRecord.CP_STATUS_RETURNED)
+    elif cp_f == 'rejected':
+        records = records.filter(counterparty_status=PaymentRecord.CP_STATUS_REJECTED)
+    elif cp_f == 'has_cp':
+        records = records.filter(counterparty__isnull=False)
 
     return records, filters
 
@@ -2210,6 +2255,9 @@ def create_payment(request):
         'expired_daily_assignment': expired_daily_assignment,
         'show_payment_form': show_payment_form,
         'unread_notifications': _dashboard_notifications_for_user(request.user),
+        'cp_returned_count': PaymentRecord.objects.filter(
+            counterparty_status=PaymentRecord.CP_STATUS_RETURNED
+        ).count() if is_staff_user and _user_role(request.user) in {'commercial', 'commercial_manager'} else 0,
     })
 
 
@@ -2655,6 +2703,71 @@ def counterparties_manage(request):
         'page_base_query': page_base_query,
         'export_dataset': 'counterparties',
         'export_fields': COUNTERPARTY_EXPORT_FIELDS,
+    })
+
+
+@login_required
+def counterparty_manage_list(request):
+    """لیست و مدیریت طرف حساب‌ها — قابل دسترس برای مدیران."""
+    if not _can_manage_users(request.user) and not request.user.is_superuser:
+        return HttpResponseForbidden('دسترسی ممنوع.')
+
+    q = (request.GET.get('q') or '').strip()
+    status_f = (request.GET.get('status') or '').strip()
+    qs = Counterparty.objects.select_related('user').prefetch_related('bank_accounts').order_by('name')
+    if q:
+        qs = qs.filter(Q(name__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(phone__icontains=q))
+    if status_f:
+        qs = qs.filter(status=status_f)
+
+    page_obj = _paginate_queryset(request, qs, per_page=15)
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    return render(request, 'payments/counterparty_manage.html', {
+        'counterparties': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'filters': {'q': q, 'status': status_f},
+        'status_choices': Counterparty.STATUS_CHOICES,
+        'editing': None,
+    })
+
+
+@login_required
+def counterparty_manage_edit(request, cp_id=None):
+    """ایجاد یا ویرایش طرف حساب با حساب‌های بانکی."""
+    if not _can_manage_users(request.user) and not request.user.is_superuser:
+        return HttpResponseForbidden('دسترسی ممنوع.')
+
+    cp_instance = get_object_or_404(Counterparty, id=cp_id) if cp_id else None
+
+    if request.method == 'POST':
+        form = CounterpartyManagementForm(request.POST, instance=cp_instance)
+        bank_formset = CounterpartyBankAccountFormSet(request.POST, instance=cp_instance or Counterparty())
+        if form.is_valid():
+            cp = form.save(commit=False)
+            bank_fs = CounterpartyBankAccountFormSet(request.POST, instance=cp)
+            if bank_fs.is_valid():
+                cp.save()
+                bank_fs.instance = cp
+                bank_fs.save()
+                action = 'ایجاد طرف حساب' if not cp_id else 'ویرایش طرف حساب'
+                _log_system_activity(request.user, None, 'counterparty_action', f'{action}: {cp.name}')
+                messages.success(request, f'طرف حساب «{cp.name}» با موفقیت ذخیره شد.')
+                return redirect('counterparty_manage_list')
+        else:
+            bank_formset = CounterpartyBankAccountFormSet(request.POST, instance=cp_instance or Counterparty())
+    else:
+        form = CounterpartyManagementForm(instance=cp_instance)
+        bank_formset = CounterpartyBankAccountFormSet(instance=cp_instance or Counterparty())
+
+    return render(request, 'payments/counterparty_manage.html', {
+        'counterparties': Counterparty.objects.select_related('user').order_by('name')[:50],
+        'page_obj': None,
+        'filters': {},
+        'status_choices': Counterparty.STATUS_CHOICES,
+        'editing': cp_instance,
+        'form': form,
+        'bank_formset': bank_formset,
     })
 
 
@@ -3858,10 +3971,14 @@ def counterparty_dashboard(request):
     approved_filter = (request.GET.get('approved') or '').strip()
     if status_filter:
         payments = payments.filter(status=status_filter)
-    if approved_filter == 'yes':
-        payments = payments.filter(counterparty_approved_at__isnull=False)
-    elif approved_filter == 'no':
-        payments = payments.filter(counterparty_approved_at__isnull=True)
+    if approved_filter == 'approved':
+        payments = payments.filter(counterparty_status=PaymentRecord.CP_STATUS_APPROVED)
+    elif approved_filter == 'returned':
+        payments = payments.filter(counterparty_status=PaymentRecord.CP_STATUS_RETURNED)
+    elif approved_filter == 'rejected':
+        payments = payments.filter(counterparty_status=PaymentRecord.CP_STATUS_REJECTED)
+    elif approved_filter == 'pending':
+        payments = payments.filter(counterparty_status__isnull=True)
 
     # خروجی اکسل
     if request.GET.get('export') == 'excel':
@@ -3892,7 +4009,9 @@ def counterparty_dashboard(request):
     page_base_query = _build_query_string(request, remove_keys=['page'])
 
     total = payments.count()
-    approved_count = payments.filter(counterparty_approved_at__isnull=False).count()
+    approved_count = payments.filter(counterparty_status=PaymentRecord.CP_STATUS_APPROVED).count()
+    returned_count = payments.filter(counterparty_status=PaymentRecord.CP_STATUS_RETURNED).count()
+    rejected_count = payments.filter(counterparty_status=PaymentRecord.CP_STATUS_REJECTED).count()
 
     # ثبت مشاهده داشبورد
     _log_counterparty_action(cp, request.user, 'مشاهده داشبورد')
@@ -3904,7 +4023,9 @@ def counterparty_dashboard(request):
         'page_base_query': page_base_query,
         'total': total,
         'approved_count': approved_count,
-        'pending_count': total - approved_count,
+        'returned_count': returned_count,
+        'rejected_count': rejected_count,
+        'pending_count': total - approved_count - returned_count - rejected_count,
         'status_choices': PaymentRecord.STATUS_CHOICES,
         'filters': {'status': status_filter, 'approved': approved_filter},
         'can_operate': cp.can_operate,
@@ -3912,49 +4033,132 @@ def counterparty_dashboard(request):
     })
 
 
+def _cp_check_action(request, payment_id):
+    """بررسی دسترسی طرف حساب برای اقدام روی یک فیش."""
+    cp = _get_user_counterparty(request.user)
+    if not cp:
+        return None, None, HttpResponseForbidden('دسترسی ممنوع.')
+    if not cp.can_operate:
+        return None, None, HttpResponseForbidden('حساب شما غیرفعال است.')
+    payment = get_object_or_404(
+        PaymentRecord.objects.select_related('counterparty', 'user'),
+        id=payment_id, counterparty=cp,
+    )
+    if payment.counterparty_decided:
+        messages.error(request, 'تصمیم قبلی برای این فیش ثبت شده و قابل تغییر نیست.')
+        return None, None, redirect('counterparty_dashboard')
+    return cp, payment, None
+
+
 @login_required
 @require_POST
 def counterparty_approve_payment(request, payment_id):
-    """طرف حساب یک فیش را تایید می‌کند."""
-    cp = _get_user_counterparty(request.user)
-    if not cp:
-        return HttpResponseForbidden('دسترسی ممنوع.')
+    """طرف حساب فیش را تایید می‌کند — توضیح اختیاری."""
+    cp, payment, err = _cp_check_action(request, payment_id)
+    if err:
+        return err
 
-    payment = get_object_or_404(
-        PaymentRecord.objects.select_related('counterparty'),
-        id=payment_id, counterparty=cp,
-    )
+    note = (request.POST.get('note') or '').strip()
+    now = timezone.now()
 
-    if not cp.can_operate:
-        messages.error(request, 'حساب شما غیرفعال است و امکان تایید فیش وجود ندارد.')
-        return redirect('counterparty_dashboard')
-
-    if payment.is_counterparty_approved:
-        messages.error(request, 'این فیش قبلاً توسط طرف حساب تایید شده است.')
-        return redirect('counterparty_dashboard')
-
-    payment.counterparty_approved_at = timezone.now()
+    payment.counterparty_status = PaymentRecord.CP_STATUS_APPROVED
+    payment.counterparty_note = note
+    payment.counterparty_decided_at = now
+    payment.counterparty_decided_by = request.user
+    payment.counterparty_approved_at = now
     payment.counterparty_approved_by = request.user
-    payment.save(update_fields=['counterparty_approved_at', 'counterparty_approved_by'])
+    payment.save(update_fields=[
+        'counterparty_status', 'counterparty_note',
+        'counterparty_decided_at', 'counterparty_decided_by',
+        'counterparty_approved_at', 'counterparty_approved_by',
+    ])
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_CP_APPROVED,
-                  note=f'تایید توسط طرف حساب: {cp.name}')
-
-    # ثبت در لاگ عملیات طرف حساب
+                  note=note or f'تایید توسط طرف حساب: {cp.name}')
     _log_counterparty_action(cp, request.user, f'تایید فیش #{payment_id}')
 
-    # اطلاع‌رسانی به بازرگانی
-    commercial_users = list(_staff_notification_users({'commercial', 'commercial_manager'}))
     _notify_users(
-        commercial_users,
-        'تایید فیش توسط طرف حساب',
-        f'فیش #{payment_id} توسط طرف حساب «{cp.name}» تایید شد.',
-        reverse('counterparty_dashboard'),
-        category=UserNotification.CATEGORY_SYSTEM,
-        actor=request.user,
+        list(_staff_notification_users({'commercial', 'commercial_manager'})),
+        '✅ تایید فیش توسط طرف حساب',
+        f'فیش #{payment_id} توسط «{cp.name}» تایید شد.' + (f' توضیح: {note}' if note else ''),
+        reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
     )
+    messages.success(request, f'✅ فیش #{payment_id} با موفقیت تایید شد.')
+    return redirect('counterparty_dashboard')
 
-    messages.success(request, f'فیش #{payment_id} با موفقیت تایید شد.')
+
+@login_required
+@require_POST
+def counterparty_return_payment_cp(request, payment_id):
+    """طرف حساب فیش را به دلیل نقص عودت می‌دهد — توضیح اجباری."""
+    cp, payment, err = _cp_check_action(request, payment_id)
+    if err:
+        return err
+
+    note = (request.POST.get('note') or '').strip()
+    if not note:
+        messages.error(request, 'ثبت توضیح برای عودت اجباری است.')
+        return redirect('counterparty_dashboard')
+
+    old_status = payment.status
+    payment.counterparty_status = PaymentRecord.CP_STATUS_RETURNED
+    payment.counterparty_note = note
+    payment.counterparty_decided_at = timezone.now()
+    payment.counterparty_decided_by = request.user
+    payment.status = PaymentRecord.STATUS_COMMERCIAL_REVIEW  # برگشت به صف بازرگانی
+    payment.save(update_fields=[
+        'counterparty_status', 'counterparty_note',
+        'counterparty_decided_at', 'counterparty_decided_by', 'status',
+    ])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_CP_RETURNED,
+                  from_status=old_status, to_status=payment.status,
+                  note=f'عودت توسط طرف حساب: {note}')
+    _log_counterparty_action(cp, request.user, f'عودت فیش #{payment_id}: {note}')
+
+    _notify_users(
+        list(_staff_notification_users({'commercial', 'commercial_manager'})),
+        '⚠ عودت فیش از طرف حساب',
+        f'فیش #{payment_id} توسط «{cp.name}» عودت داده شد. دلیل: {note}',
+        reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+    )
+    messages.warning(request, f'⚠ فیش #{payment_id} به بازرگانی عودت داده شد.')
+    return redirect('counterparty_dashboard')
+
+
+@login_required
+@require_POST
+def counterparty_reject_payment_cp(request, payment_id):
+    """طرف حساب فیش را رد/ابطال می‌کند — توضیح اجباری."""
+    cp, payment, err = _cp_check_action(request, payment_id)
+    if err:
+        return err
+
+    note = (request.POST.get('note') or '').strip()
+    if not note:
+        messages.error(request, 'ثبت توضیح برای رد/ابطال اجباری است.')
+        return redirect('counterparty_dashboard')
+
+    payment.counterparty_status = PaymentRecord.CP_STATUS_REJECTED
+    payment.counterparty_note = note
+    payment.counterparty_decided_at = timezone.now()
+    payment.counterparty_decided_by = request.user
+    payment.save(update_fields=[
+        'counterparty_status', 'counterparty_note',
+        'counterparty_decided_at', 'counterparty_decided_by',
+    ])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_CP_REJECTED,
+                  note=f'رد/ابطال توسط طرف حساب: {note}')
+    _log_counterparty_action(cp, request.user, f'رد فیش #{payment_id}: {note}')
+
+    _notify_users(
+        list(_staff_notification_users({'commercial', 'commercial_manager'})),
+        '🚫 رد فیش توسط طرف حساب',
+        f'فیش #{payment_id} توسط «{cp.name}» رد/ابطال شد. دلیل: {note}',
+        reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+    )
+    messages.error(request, f'🚫 فیش #{payment_id} رد/ابطال شد.')
     return redirect('counterparty_dashboard')
 
 
@@ -4262,8 +4466,14 @@ def customers_list(request):
     if not is_staff_user:
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدها قابل دسترسی است.')
 
-    # Get all customer profiles — کارشناس فروش فقط مشتریان خود را می‌بیند
-    customers = UserProfile.objects.filter(role='customer').select_related('user').order_by('user__username')
+    # فقط مشتریان — طرف حساب‌ها مستثنی هستند
+    customers = (
+        UserProfile.objects
+        .filter(role='customer')
+        .exclude(user__counterparty_account__isnull=False)
+        .select_related('user')
+        .order_by('user__username')
+    )
     if _user_role(request.user) == 'sales' and not request.user.is_superuser:
         customers = customers.filter(user__sales_assignment__sales_user=request.user)
     filters = {

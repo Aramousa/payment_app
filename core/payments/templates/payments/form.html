@@ -590,6 +590,17 @@
 
     {% if is_staff_user or show_payment_form or is_history_mode %}
     <h2>{% if show_payment_form %}لیست فیش‌های واریزی{% elif is_history_mode %}سوابق واریزی ها{% else %}گزارش واریزی ها{% endif %}{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
+
+    {% if cp_returned_count %}
+    <div style="max-width:1200px;margin:0 auto 14px;background:#fff8e6;border:1px solid #f0c05a;border-right:4px solid #d97706;border-radius:8px;padding:12px 16px;display:flex;gap:10px;align-items:center;font-size:13px;color:#7a4f00;">
+        <span style="font-size:20px;">⚠</span>
+        <div>
+            <strong>{{ cp_returned_count }} فیش عودت شده از طرف حساب</strong> در انتظار بررسی و اقدام شما است.
+            <a href="?cp_status=returned" style="margin-right:8px;color:#0d9488;font-weight:700;">مشاهده فیش‌های عودتی</a>
+        </div>
+    </div>
+    {% endif %}
+
     {% include "payments/partials/system_messages_popup.html" %}
 
     <div class="filter-box">
@@ -610,6 +621,17 @@
                         {% for cp in counterparties %}
                             <option value="{{ cp.id }}" {% if filters.counterparty == cp.id|stringformat:"s" %}selected{% endif %}>{{ cp.name }}</option>
                         {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="cp_status">وضعیت طرف حساب</label>
+                    <select id="cp_status" name="cp_status">
+                        <option value="">همه</option>
+                        <option value="has_cp"  {% if filters.cp_status == 'has_cp' %}selected{% endif %}>دارای طرف حساب</option>
+                        <option value="pending"  {% if filters.cp_status == 'pending' %}selected{% endif %}>⏳ در انتظار تصمیم</option>
+                        <option value="approved" {% if filters.cp_status == 'approved' %}selected{% endif %}>✅ تایید شده</option>
+                        <option value="returned" {% if filters.cp_status == 'returned' %}selected{% endif %}>⚠ عودت — نیاز به اقدام</option>
+                        <option value="rejected" {% if filters.cp_status == 'rejected' %}selected{% endif %}>🚫 رد / ابطال</option>
                     </select>
                 </div>
             {% endif %}
@@ -694,12 +716,14 @@
                 </th>
                 <th>وضعیت بازرگانی</th>
                 <th>وضعیت مالی</th>
+                {% if is_staff_user %}<th>طرف حساب</th>{% endif %}
                 <th>اقدام سریع</th>
             </tr>
         </thead>
         <tbody>
             {% for payment in records %}
-            <tr class="summary-row" data-row="{{ payment.id }}">
+            <tr class="summary-row{% if payment.cp_needs_act %} cp-returned-row{% endif %}" data-row="{{ payment.id }}"
+                {% if payment.cp_needs_act %}style="background:#fffbeb;"{% endif %}>
                 <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ payment.id }}</span></td>
                 {% if is_staff_user %}
                 <td>{{ payment.first_name }} {{ payment.last_name }}</td>
@@ -720,6 +744,18 @@
                 <td>{% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</td>
                 <td><span class="status-pill {{ payment.commercial_flag_class }}">&#9873; {{ payment.commercial_status_label }}</span></td>
                 <td><span class="status-pill {{ payment.finance_flag_class }}">&#9873; {{ payment.finance_status_label }}</span></td>
+                {% if is_staff_user %}
+                <td>
+                    {% if payment.cp_label %}
+                    <span class="status-pill {{ payment.cp_class }}" title="{{ payment.cp_note }}">
+                        {{ payment.cp_icon }} {{ payment.cp_label }}
+                    </span>
+                    {% if payment.cp_needs_act %}
+                    <div style="font-size:10px;color:#c62828;font-weight:700;margin-top:2px;">نیاز به اقدام</div>
+                    {% endif %}
+                    {% else %}-{% endif %}
+                </td>
+                {% endif %}
                 <td>
                     {% if not is_staff_user %}
                         {% if payment.status == 'incomplete' %}
@@ -780,6 +816,32 @@
                                 <div>آخرین توضیح: {{ payment.last_staff_note|default:'-' }}</div>
                             {% endif %}
                         </div>
+
+                        {% if is_staff_user and payment.counterparty %}
+                        <div class="detail-card" style="{% if payment.cp_needs_act %}border:2px solid #f0c05a;background:#fffbeb;{% elif payment.cp_label == 'رد / ابطال' %}border:2px solid #fca5a5;background:#fff5f5;{% elif payment.cp_label == 'تایید' %}border:2px solid #86efac;background:#f0fdf4;{% endif %}">
+                            <strong>🏢 طرف حساب: {{ payment.counterparty }}</strong>
+                            <div style="margin-top:6px;">
+                                {% if payment.cp_label %}
+                                    <span class="status-pill {{ payment.cp_class }}" style="font-size:12px;">{{ payment.cp_icon }} {{ payment.cp_label }}</span>
+                                    {% if payment.cp_note %}
+                                    <div style="margin-top:6px;background:#fff;border-right:3px solid {% if payment.cp_needs_act %}#d97706{% elif payment.cp_class == 'flag-red' %}#dc2626{% else %}#16a34a{% endif %};padding:6px 8px;border-radius:4px;font-size:12px;color:#374151;">
+                                        {{ payment.cp_note }}
+                                    </div>
+                                    {% endif %}
+                                    {% if payment.counterparty_decided_at %}
+                                    <div style="font-size:11px;color:#94a3b8;margin-top:4px;">{{ payment.counterparty_decided_at|jalali_datetime }}</div>
+                                    {% endif %}
+                                    {% if payment.cp_needs_act %}
+                                    <div style="margin-top:8px;background:#fef3c7;border-radius:6px;padding:6px 10px;font-size:12px;color:#92400e;font-weight:700;">
+                                        ⚠ این فیش باید توسط بازرگانی بررسی و اقدام شود.
+                                    </div>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color:#94a3b8;font-size:12px;">⏳ در انتظار تصمیم طرف حساب</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
 
                         <div class="detail-card">
                             <strong>اسناد</strong>

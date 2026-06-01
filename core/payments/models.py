@@ -335,18 +335,52 @@ class PaymentRecord(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
 
-    # تایید طرف حساب
-    counterparty_approved_at = models.DateTimeField('زمان تایید طرف حساب', null=True, blank=True, db_index=True)
+    # تصمیم طرف حساب روی فیش
+    CP_STATUS_APPROVED = 'cp_approved'
+    CP_STATUS_RETURNED = 'cp_returned'
+    CP_STATUS_REJECTED = 'cp_rejected'
+    CP_STATUS_CHOICES = [
+        (CP_STATUS_APPROVED, 'تایید شده'),
+        (CP_STATUS_RETURNED, 'عودت / ناقص'),
+        (CP_STATUS_REJECTED, 'رد / ابطال'),
+    ]
+
+    counterparty_status = models.CharField(
+        'وضعیت طرف حساب', max_length=20,
+        choices=CP_STATUS_CHOICES, null=True, blank=True, db_index=True,
+    )
+    counterparty_note = models.TextField('توضیح طرف حساب', blank=True)
+    counterparty_decided_at = models.DateTimeField('زمان تصمیم طرف حساب', null=True, blank=True)
+    counterparty_decided_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='counterparty_decisions',
+        verbose_name='تصمیم‌گیرنده طرف حساب',
+    )
+    # فیلدهای قدیمی — برای سازگاری با کد قبلی
+    counterparty_approved_at = models.DateTimeField('زمان تایید (قدیمی)', null=True, blank=True)
     counterparty_approved_by = models.ForeignKey(
         User, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='counterparty_approvals',
-        verbose_name='تایید شده توسط طرف حساب',
+        verbose_name='تایید شده توسط (قدیمی)',
     )
 
     @property
     def is_counterparty_approved(self):
-        return self.counterparty_approved_at is not None
+        return self.counterparty_status == self.CP_STATUS_APPROVED
+
+    @property
+    def is_counterparty_returned(self):
+        return self.counterparty_status == self.CP_STATUS_RETURNED
+
+    @property
+    def is_counterparty_rejected(self):
+        return self.counterparty_status == self.CP_STATUS_REJECTED
+
+    @property
+    def counterparty_decided(self):
+        return self.counterparty_status is not None
 
     class Meta:
         ordering = ['-id']
@@ -447,15 +481,19 @@ class PaymentRecord(models.Model):
 
 class UserProfile(models.Model):
     ROLE_CHOICES = (
-        ('customer', 'مشتری'),
-        ('finance', 'واحد مالی'),
-        ('finance_manager', 'مدیر مالی'),
-        ('commercial', 'واحد بازرگانی'),
-        ('commercial_manager', 'مدیر بازرگانی'),
-        ('sales', 'فروش'),
-        ('sales_manager', 'مدیر فروش'),
-        ('data_entry', 'تکمیل اطلاعات فیش'),
-        ('staff', 'کارمند'),
+        # گروه مشتریان
+        ('customer',          'مشتری'),
+        # گروه کارکنان
+        ('commercial',        'واحد بازرگانی'),
+        ('commercial_manager','مدیر بازرگانی'),
+        ('finance',           'واحد مالی'),
+        ('finance_manager',   'مدیر مالی'),
+        ('sales',             'فروش'),
+        ('sales_manager',     'مدیر فروش'),
+        ('data_entry',        'تکمیل اطلاعات فیش'),
+        ('staff',             'کارمند'),
+        # گروه طرف حساب‌ها
+        ('counterparty',      'طرف حساب'),
     )
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -612,6 +650,7 @@ class PaymentActivityLog(models.Model):
     ACTION_CUSTOMER_NOTE        = 'customer_note'
     ACTION_CP_APPROVED          = 'cp_approved'
     ACTION_CP_RETURNED          = 'cp_returned'
+    ACTION_CP_REJECTED          = 'cp_rejected'
 
     ACTION_CHOICES = [
         (ACTION_CREATED,          'ایجاد'),
@@ -620,7 +659,8 @@ class PaymentActivityLog(models.Model):
         (ACTION_VIEWED,           'رویت'),
         (ACTION_CUSTOMER_NOTE,    'توضیح مشتری'),
         (ACTION_CP_APPROVED,      'تایید طرف حساب'),
-        (ACTION_CP_RETURNED,      'بازگشت از طرف حساب'),
+        (ACTION_CP_RETURNED,      'عودت/ناقص از طرف حساب'),
+        (ACTION_CP_REJECTED,      'رد/ابطال توسط طرف حساب'),
     ]
 
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')

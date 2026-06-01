@@ -21,11 +21,14 @@ def normalize_digits(value):
 
 def normalize_text(value):
     text = normalize_digits(value)
-    text = text.replace('\u200c', ' ')
-    text = text.replace('ك', 'ک').replace('ي', 'ی')
-    text = text.replace('٬', ',').replace('٫', '.')
+    text = text.replace('‌', ' ').replace('‏', '').replace('‎', '')
+    text = text.replace('ك', 'ک').replace('ي', 'ی').replace('ئ', 'ی')
+    text = text.replace('٬', ',').replace('٫', '.').replace('٫', '.').replace('٬', ',')
+    # نرمال‌سازی فاصله
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\r\n?', '\n', text)
+    # حذف خطوط کاملاً خالی متوالی
+    text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
 
@@ -83,15 +86,8 @@ def process_invoice_extraction_job(job_id):
         job.warnings = result.get('warnings', [])
         job.status = InvoiceExtractionJob.STATUS_DONE
         job.finished_at = timezone.now()
-        job.save(update_fields=[
-            'file_kind',
-            'text_source',
-            'raw_text',
-            'result_json',
-            'warnings',
-            'status',
-            'finished_at',
-        ])
+        job.save(update_fields=['file_kind', 'text_source', 'raw_text', 'result_json',
+                                'warnings', 'status', 'finished_at'])
     except Exception as exc:
         job.status = InvoiceExtractionJob.STATUS_FAILED
         job.error_message = str(exc)
@@ -117,12 +113,18 @@ def extract_invoice_file(file_path, original_name=''):
     normalized_text = normalize_text(raw_text)
     parsed = parse_invoice_text(normalized_text)
     parsed['raw_text'] = normalized_text
-    parsed['raw_text_preview'] = normalized_text[:1200]
+    parsed['raw_text_preview'] = normalized_text[:1500]
     parsed['file_kind'] = file_kind
     parsed['text_source'] = text_source
     parsed['warnings'] = warnings + parsed.get('warnings', [])
     parsed['ok'] = bool(parsed.get('fields'))
-    parsed['message'] = 'اطلاعات پیشنهادی از فایل خوانده شد.' if parsed['ok'] else 'متن فایل خوانده شد، اما فیلد قابل اطمینانی تشخیص داده نشد.'
+    n_fields = len(parsed.get('fields', {}))
+    if n_fields >= 3:
+        parsed['message'] = f'اطلاعات فاکتور خوانده شد ({n_fields} فیلد تشخیص داده شد).'
+    elif n_fields > 0:
+        parsed['message'] = f'{n_fields} فیلد از فاکتور استخراج شد. بقیه را دستی وارد کنید.'
+    else:
+        parsed['message'] = 'متن فایل خوانده شد اما فیلدی تشخیص داده نشد. اطلاعات را دستی وارد کنید.'
     return parsed
 
 
@@ -134,7 +136,7 @@ def extract_pdf_text_or_ocr(file_path):
 
         with fitz.open(file_path) as doc:
             text = '\n'.join(page.get_text('text') or '' for page in doc)
-            if normalize_text(text):
+            if normalize_text(text).strip():
                 return text, 'pymupdf_text', warnings
 
             page_texts = []
@@ -145,7 +147,7 @@ def extract_pdf_text_or_ocr(file_path):
                     temp_path = temp.name
                 try:
                     page_text, _source, page_warnings = extract_image_text(temp_path)
-                    warnings.extend([f'صفحه {page_index + 1}: {warning}' for warning in page_warnings])
+                    warnings.extend([f'صفحه {page_index + 1}: {w}' for w in page_warnings])
                     page_texts.append(page_text)
                 finally:
                     try:
@@ -154,9 +156,9 @@ def extract_pdf_text_or_ocr(file_path):
                         pass
             return '\n'.join(page_texts), 'paddleocr_pdf', warnings
     except ImportError:
-        warnings.append('PyMuPDF نصب نیست؛ تلاش با pypdf انجام شد.')
+        warnings.append('PyMuPDF نصب نیست؛ تلاش با pypdf.')
     except Exception as exc:
-        warnings.append(f'خواندن PDF با PyMuPDF ناموفق بود: {exc}')
+        warnings.append(f'خواندن PDF با PyMuPDF: {exc}')
 
     try:
         from pypdf import PdfReader
@@ -169,9 +171,9 @@ def extract_pdf_text_or_ocr(file_path):
     except ImportError:
         warnings.append('pypdf نصب نیست.')
     except Exception as exc:
-        warnings.append(f'خواندن PDF با pypdf ناموفق بود: {exc}')
+        warnings.append(f'خواندن PDF با pypdf: {exc}')
 
-    warnings.append('متن قابل استخراج از PDF پیدا نشد. اگر PDF اسکن‌شده باشد، PyMuPDF و PaddleOCR لازم است.')
+    warnings.append('متن قابل استخراج از PDF پیدا نشد.')
     return '', '', warnings
 
 
@@ -202,29 +204,25 @@ def preprocess_image(file_path):
             return file_path, '', ['OpenCV نتوانست تصویر را بخواند.']
         image = cv2.fastNlMeansDenoising(image, None, 12, 7, 21)
         image = cv2.adaptiveThreshold(
-            image,
-            255,
+            image, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            31,
-            11,
+            cv2.THRESH_BINARY, 31, 11,
         )
         temp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
         temp.close()
         cv2.imwrite(temp.name, image)
         return temp.name, temp.name, []
     except ImportError:
-        return file_path, '', ['OpenCV نصب نیست؛ تصویر بدون بهبود کیفیت به OCR ارسال شد.']
+        return file_path, '', ['OpenCV نصب نیست.']
     except Exception as exc:
-        return file_path, '', [f'بهبود کیفیت تصویر با OpenCV ناموفق بود: {exc}']
+        return file_path, '', [f'پیش‌پردازش تصویر: {exc}']
 
 
 def paddle_ocr_image(file_path):
     try:
         from paddleocr import PaddleOCR
     except ImportError:
-        return '', ['PaddleOCR نصب نیست؛ امکان OCR عکس یا PDF اسکن‌شده وجود ندارد.']
-
+        return '', ['PaddleOCR نصب نیست؛ OCR عکس امکان‌پذیر نیست.']
     try:
         ocr = get_paddle_ocr()
         result = ocr.ocr(file_path, cls=True)
@@ -237,7 +235,7 @@ def paddle_ocr_image(file_path):
                     continue
         return '\n'.join(lines), []
     except Exception as exc:
-        return '', [f'اجرای PaddleOCR ناموفق بود: {exc}']
+        return '', [f'PaddleOCR: {exc}']
 
 
 _PADDLE_OCR = None
@@ -251,11 +249,9 @@ def get_paddle_ocr():
         model_dirs = _paddle_ocr_model_dirs()
         if not model_dirs:
             raise RuntimeError(
-                'PaddleOCR local model directories are not configured. '
-                'Set PADDLEOCR_DET_MODEL_DIR and PADDLEOCR_REC_MODEL_DIR, '
-                'or put models under offline_packages/paddleocr-models/det and rec.'
+                'PaddleOCR: مسیر مدل‌ها پیدا نشد. '
+                'PADDLEOCR_DET_MODEL_DIR و PADDLEOCR_REC_MODEL_DIR را تنظیم کنید.'
             )
-
         kwargs = {
             'lang': 'fa',
             'show_log': False,
@@ -274,14 +270,12 @@ def _paddle_ocr_model_dirs():
     det_dir = Path(getattr(settings, 'PADDLEOCR_DET_MODEL_DIR', '') or (base_dir / 'det' if base_dir else ''))
     rec_dir = Path(getattr(settings, 'PADDLEOCR_REC_MODEL_DIR', '') or (base_dir / 'rec' if base_dir else ''))
     cls_dir = Path(getattr(settings, 'PADDLEOCR_CLS_MODEL_DIR', '') or (base_dir / 'cls' if base_dir else ''))
-
     if not _model_dir_ready(det_dir) or not _model_dir_ready(rec_dir):
         return None
-
-    model_dirs = {'det': det_dir, 'rec': rec_dir}
+    result = {'det': det_dir, 'rec': rec_dir}
     if _model_dir_ready(cls_dir):
-        model_dirs['cls'] = cls_dir
-    return model_dirs
+        result['cls'] = cls_dir
+    return result
 
 
 def _model_dir_ready(path):
@@ -291,29 +285,340 @@ def _model_dir_ready(path):
         return False
 
 
-def _line_after_label(text, labels):
+# ─── ابزارهای کمکی استخراج ─────────────────────────────────────────────────
+
+def _search_after_label(text, labels, max_chars=80):
+    """جستجو برای مقدار بعد از یک لیبل — با انعطاف بیشتر."""
     for label in labels:
-        pattern = rf'{label}\s*[:：\-]?\s*([^\n]+)'
+        # الگو: لیبل + جداکننده اختیاری + مقدار (در همان خط یا خط بعد)
+        pattern = rf'(?:{label})\s*[:：\-]?\s*([^\n]{{1,{max_chars}}})'
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
-            value = match.group(1).strip(' :：-')
+            value = match.group(1).strip(' :：-،')
             if value:
                 return value
     return ''
 
 
+def _extract_number_from(text):
+    """استخراج اولین عدد معنادار از یک رشته."""
+    nums = re.findall(r'[\d,\s]+', normalize_digits(text or ''))
+    for n in nums:
+        digits = re.sub(r'\D', '', n)
+        if len(digits) >= 3:
+            return digits
+    return ''
+
+
+# ─── استخراج شماره فاکتور ──────────────────────────────────────────────────
+
+def _extract_invoice_number(text):
+    """استخراج دقیق مقدار شماره فاکتور — فقط عدد/کد بعد از لیبل."""
+    invoice_labels = [
+        r'شماره\s*فاکتور',
+        r'شماره\s*صورت\s*حساب',
+        r'شماره\s*صورتحساب',
+        r'فاکتور\s*(?:شماره|#|no\.?)',
+        r'شماره\s*پیش\s*فاکتور',
+        r'invoice\s*(?:no\.?|number|#)',
+        r'شناسه\s*فاکتور',
+        r'کد\s*فاکتور',
+        r'شماره\s*سند',
+        r'سریال\s*فاکتور',
+        r'شماره\s*رسید',
+        r'No\s*فاکتور',
+    ]
+    for label in invoice_labels:
+        # جستجوی عدد/کد مستقیماً بعد از لیبل
+        pattern = rf'(?:{label})\s*[:：\-#]?\s*([A-Za-z0-9][A-Za-z0-9\-/]{{0,20}})'
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            val = m.group(1).strip()
+            if re.search(r'\d', val):  # باید حداقل یک رقم داشته باشد
+                # فقط تا اولین فاصله بیشتر از یک کاراکتر
+                val = re.split(r'\s{2,}|\t|\n', val)[0].strip()
+                return _clean_short_value(val)
+
+    # الگوهای کلاسیک کد فاکتور
+    for pat in [
+        r'\b(?:INV|FA|FACT|FTR|FAK)[\-/]?[A-Z0-9\-/]{2,15}\b',
+    ]:
+        m = re.search(pat, text, flags=re.IGNORECASE)
+        if m:
+            return _clean_short_value(m.group(0))
+    return ''
+
+
+# ─── استخراج شماره حواله / مرجع ────────────────────────────────────────────
+
+def _extract_reference_number(text):
+    labels = [
+        r'شماره\s*حواله',
+        r'شماره\s*ارجاع',
+        r'شماره\s*مرجع',
+        r'کد\s*رهگیری',
+        r'شماره\s*پیگیری',
+        r'شناسه\s*پرداخت',
+        r'شماره\s*تراکنش',
+        r'کد\s*تراکنش',
+        r'reference\s*(?:no|number)',
+        r'tracking\s*(?:no|code)',
+        r'شماره\s*(?:دستور|پرداخت)',
+        r'کد\s*مرجع',
+        r'کد\s*پیگیری',
+    ]
+    value = _search_after_label(text, labels)
+    return _clean_short_value(value)
+
+
+# ─── استخراج مبلغ ──────────────────────────────────────────────────────────
+
+def _extract_amount(text):
+    """
+    استخراج مبلغ کل فاکتور با اولویت‌بندی دقیق:
+    ۱. لیبل مبلغ کل/قابل پرداخت مستقیم (بالاترین اولویت)
+    ۲. خطوط با کلمه کل/جمع + ریال/تومان
+    ۳. bزرگ‌ترین عدد ریالی (fallback)
+    """
+
+    # ─── اولویت ۱: لیبل‌های صریح مبلغ کل ─────────────────────────────
+    # اول دقیق‌ترین لیبل‌ها
+    priority_labels = [
+        r'مبلغ\s*کل',
+        r'جمع\s*کل',
+        r'مبلغ\s*قابل\s*پرداخت',
+        r'قابل\s*پرداخت',
+        r'مبلغ\s*نهایی',
+        r'جمع\s*نهایی',
+        r'مجموع\s*کل',
+        r'مانده\s*قابل\s*پرداخت',
+        r'مبلغ\s*بدهکار',
+        r'grand\s*total',
+        r'total\s*payable',
+        r'total\s*amount',
+        r'amount\s*due',
+        r'مبلغ\s*(?:واجب\s*الدفع|پرداختنی)',
+        r'جمع\s*فاکتور',
+        r'مبلغ\s*فاکتور',
+        r'مبلغ\s*صورتحساب',
+        r'جمع\s*صورتحساب',
+        r'مبلغ\s*کل\s*(?:با|بدون|شامل)\s*مالیات',
+        r'net\s*(?:amount|total)',
+    ]
+
+    for label in priority_labels:
+        # جستجوی عدد مستقیماً بعد از لیبل (در همان خط)
+        pattern = rf'(?:{label})\s*[:：\-]?\s*([0-9][0-9,،\s.]{{2,30}})'
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            digits = re.sub(r'\D', '', m.group(1))
+            if len(digits) >= 3:
+                return digits
+
+    # ─── اولویت ۲: خط حاوی هم «کل/جمع/نهایی» و هم «ریال/تومان» ──────
+    for line in text.splitlines():
+        ln = line.strip()
+        if not ln:
+            continue
+        has_currency = bool(re.search(r'ریال|تومان|rial|irr', ln, flags=re.IGNORECASE))
+        has_total_kw = bool(re.search(
+            r'کل|جمع|قابل\s*پرداخت|مانده|نهایی|بدهکار|total|grand|payable|net',
+            ln, flags=re.IGNORECASE
+        ))
+        if has_currency and has_total_kw:
+            nums = [
+                int(re.sub(r'\D', '', m.group(1)))
+                for m in re.finditer(r'(?<!\d)([0-9]{1,3}(?:[,\s][0-9]{3})+|[0-9]{5,})(?!\d)', ln)
+                if re.sub(r'\D', '', m.group(1))
+            ]
+            if nums:
+                return str(max(nums))
+
+    # ─── اولویت ۳: بزرگ‌ترین عدد ریالی (fallback) ─────────────────────
+    currency_nums = []
+    for line in text.splitlines():
+        if re.search(r'ریال|تومان|rial|irr', line, flags=re.IGNORECASE):
+            for m in re.finditer(r'(?<!\d)([0-9]{1,3}(?:[,\s][0-9]{3})+|[0-9]{6,})(?!\d)', line):
+                digits = re.sub(r'\D', '', m.group(1))
+                if digits:
+                    currency_nums.append(int(digits))
+    if currency_nums:
+        return str(max(currency_nums))
+
+    return ''
+
+
+# ─── استخراج تاریخ ─────────────────────────────────────────────────────────
+
+def _extract_invoice_date(text):
+    date_labels = [
+        r'تاریخ\s*فاکتور',
+        r'تاریخ\s*صورت(?:\s*حساب|حساب)',
+        r'تاریخ\s*صدور',
+        r'تاریخ\s*سند',
+        r'تاریخ\s*رسید',
+        r'تاریخ\s*پیش\s*فاکتور',
+        r'invoice\s*date',
+        r'date\s*(?:of\s*)?(?:invoice|issue)',
+        r'تاریخ',
+    ]
+    # ابتدا بعد از لیبل‌ها
+    label_value = _search_after_label(text, date_labels[:-1], max_chars=40)
+    date_text = _find_date_in(label_value) or _find_date_in(text)
+    if not date_text:
+        return ''
+    return _parse_date_to_jalali(date_text)
+
+
+def _find_date_in(text):
+    """پیدا کردن الگوی تاریخ در متن — با پشتیبانی از فرمت‌های بیشتر."""
+    patterns = [
+        r'(?<!\d)(\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})(?!\d)',   # YYYY/MM/DD
+        r'(?<!\d)(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})(?!\d)',   # DD/MM/YYYY
+        r'(?<!\d)(\d{2}[\/\-.]\d{1,2}[\/\-.]\d{1,2})(?!\d)',   # YY/MM/DD
+    ]
+    for pat in patterns:
+        m = re.search(pat, text or '')
+        if m:
+            return m.group(1)
+    return ''
+
+
+def _parse_date_to_jalali(date_text):
+    try:
+        import jdatetime
+    except ImportError:
+        return date_text
+
+    parts_raw = re.split(r'[\/\-.]', date_text)
+    if len(parts_raw) != 3:
+        return ''
+    try:
+        parts = [int(p) for p in parts_raw]
+    except ValueError:
+        return ''
+
+    # تشخیص ترتیب: اگر اولین عدد > 31 → YYYY/MM/DD
+    if parts[0] > 31:
+        year, month, day = parts
+    elif parts[2] > 31:
+        # DD/MM/YYYY
+        day, month, year = parts
+    else:
+        year, month, day = parts
+
+    if year < 100:
+        year += 1400 if year < 50 else 1300
+
+    # میلادی → شمسی
+    if year > 1800:
+        try:
+            return jdatetime.date.fromgregorian(year=year, month=month, day=day).strftime('%Y/%m/%d')
+        except (ValueError, Exception):
+            return ''
+
+    # شمسی
+    try:
+        return jdatetime.date(year, month, day).strftime('%Y/%m/%d')
+    except (ValueError, Exception):
+        return ''
+
+
+# ─── استخراج نام خریدار/مشتری ─────────────────────────────────────────────
+
+def _extract_customer_name(text):
+    """استخراج نام خریدار از فاکتور."""
+    buyer_labels = [
+        r'نام\s*خریدار',
+        r'خریدار\s*(?:محترم)?',
+        r'نام\s*مشتری',
+        r'مشتری',
+        r'طرف\s*حساب',
+        r'فروخته\s*شده\s*به',
+        r'تحویل\s*به',
+        r'گیرنده',
+        r'buyer|customer|client|bill\s*to|sold\s*to',
+        r'نام\s*و\s*نام\s*خانوادگی\s*خریدار',
+        r'شرکت\s*خریدار',
+        r'نام\s*شرکت\s*(?:خریدار|مشتری)',
+        r'به\s*نام',
+    ]
+    for label in buyer_labels:
+        pattern = rf'(?:{label})\s*[:：\-]?\s*([^\n\d]{{2,60}})'
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            val = m.group(1).strip(' :：-،,')
+            # حذف کلمات اضافه آخر
+            val = re.split(r'\s{2,}|\t', val)[0].strip()
+            if len(val) >= 2 and not re.match(r'^\d+$', val):
+                return _clean_short_value(val)
+    return ''
+
+
+# ─── استخراج نام فروشنده (اختیاری) ────────────────────────────────────────
+
+def _extract_vendor_name(text):
+    labels = [
+        r'فروشنده',
+        r'صادرکننده',
+        r'شرکت\s*فروشنده',
+        r'نام\s*(?:شرکت|فروشنده|صادرکننده)',
+        r'seller|vendor|supplier|issued\s*by',
+    ]
+    value = _search_after_label(text, labels, max_chars=60)
+    if value:
+        return _clean_short_value(value)
+    # خط اول سند اغلب نام فروشنده است
+    for line in text.splitlines()[:5]:
+        line = line.strip()
+        if len(line) > 5 and not re.search(r'^\d', line):
+            return _clean_short_value(line)
+    return ''
+
+
+# ─── استخراج مالیات ────────────────────────────────────────────────────────
+
+def _extract_tax_amount(text):
+    labels = [
+        r'مالیات\s*(?:بر\s*ارزش\s*افزوده)?',
+        r'ارزش\s*افزوده',
+        r'VAT|tax',
+        r'مالیات\s*کل',
+    ]
+    for label in labels:
+        pattern = rf'(?:{label})[^\d\n]{{0,40}}([0-9][\d,\s.]{{2,}})'
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            digits = re.sub(r'\D', '', m.group(1))
+            if len(digits) >= 2:
+                return digits
+    return ''
+
+
+# ─── تجمیع پارسر ───────────────────────────────────────────────────────────
+
 def parse_invoice_text(text):
-    fields = {
-        'invoice_number': _extract_invoice_number(text),
+    """استخراج تمام فیلدهای فاکتور از متن نرمال‌شده."""
+    raw_fields = {
+        'invoice_number':   _extract_invoice_number(text),
         'reference_number': _extract_reference_number(text),
-        'amount': _extract_amount(text),
-        'invoice_date': _extract_invoice_date(text),
+        'amount':           _extract_amount(text),
+        'invoice_date':     _extract_invoice_date(text),
+        'customer_name':    _extract_customer_name(text),
+        'vendor_name':      _extract_vendor_name(text),
+        'tax_amount':       _extract_tax_amount(text),
     }
-    fields = {key: {'value': value, 'confidence': 0.8, 'source': 'parser'} for key, value in fields.items() if value}
-    return {
-        'fields': fields,
-        'warnings': [],
-    }
+
+    # confidence بر اساس اینکه بعد از لیبل آمده یا heuristic
+    label_based = {'invoice_number', 'invoice_date', 'reference_number', 'customer_name', 'vendor_name', 'tax_amount'}
+    fields = {}
+    for key, value in raw_fields.items():
+        if not value:
+            continue
+        confidence = 0.85 if key in label_based else 0.70
+        fields[key] = {'value': value, 'confidence': confidence, 'source': 'parser'}
+
+    return {'fields': fields, 'warnings': []}
 
 
 def flatten_fields(result):
@@ -325,114 +630,11 @@ def flatten_fields(result):
     }
 
 
-def _extract_invoice_number(text):
-    value = _line_after_label(text, [
-        r'شماره\s*فاکتور',
-        r'شماره\s*صورتحساب',
-        r'فاکتور\s*شماره',
-        r'invoice\s*(?:no|number)',
-    ])
-    if not value:
-        match = re.search(r'\b(?:INV|FA|FACT|INVOICE)[\-/]?[A-Z0-9\-/]{2,}\b', text, flags=re.IGNORECASE)
-        value = match.group(0) if match else ''
-    return _clean_short_value(value)
-
-
-def _extract_reference_number(text):
-    value = _line_after_label(text, [
-        r'شماره\s*حواله',
-        r'شماره\s*ارجاع',
-        r'شماره\s*مرجع',
-        r'کد\s*رهگیری',
-        r'reference\s*(?:no|number)',
-    ])
-    return _clean_short_value(value)
-
-
-def _extract_amount(text):
-    amount_labels = [
-        r'مبلغ\s*کل',
-        r'جمع\s*کل',
-        r'جمع\s*فاکتور',
-        r'مبلغ\s*قابل\s*پرداخت',
-        r'مانده\s*قابل\s*پرداخت',
-        r'total\s*amount',
-        r'grand\s*total',
-    ]
-    for label in amount_labels:
-        pattern = rf'{label}[^\d\n]{{0,40}}([0-9][0-9,\s\.]{{3,}})'
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            digits = re.sub(r'\D', '', match.group(1))
-            if digits:
-                return digits
-
-    labeled_line_candidates = []
-    for line in text.splitlines():
-        if not re.search(r'ریال|تومان|rial|irr|toman', line, flags=re.IGNORECASE):
-            continue
-        if not re.search(r'کل|جمع|قابل\s*پرداخت|مانده|total|grand', line, flags=re.IGNORECASE):
-            continue
-        for match in re.finditer(r'(?<!\d)([0-9]{1,3}(?:[, ]?[0-9]{3})+|[0-9]{5,})(?!\d)', line):
-            digits = re.sub(r'\D', '', match.group(1))
-            if digits:
-                labeled_line_candidates.append(int(digits))
-    if labeled_line_candidates:
-        return str(max(labeled_line_candidates))
-
-    currency_candidates = []
-    for line in text.splitlines():
-        if not re.search(r'ریال|تومان|rial|irr|toman', line, flags=re.IGNORECASE):
-            continue
-        for match in re.finditer(r'(?<!\d)([0-9]{1,3}(?:[, ]?[0-9]{3})+|[0-9]{5,})(?!\d)', line):
-            digits = re.sub(r'\D', '', match.group(1))
-            if digits:
-                currency_candidates.append(int(digits))
-    unique_candidates = sorted(set(currency_candidates))
-    if len(unique_candidates) == 1:
-        return str(unique_candidates[0])
-    return ''
-
-
-def _extract_invoice_date(text):
-    label_value = _line_after_label(text, [
-        r'تاریخ\s*فاکتور',
-        r'تاریخ\s*صورتحساب',
-        r'تاریخ\s*صدور',
-        r'invoice\s*date',
-    ])
-    date_text = _find_date(label_value) or _find_date(text)
-    if not date_text:
-        return ''
-
-    parts = [int(part) for part in re.split(r'[\/\-.]', date_text) if part]
-    if len(parts) != 3:
-        return ''
-    year, month, day = parts
-    if year < 100:
-        year += 1400 if year < 50 else 1300
-    if year > 1700:
-        try:
-            import jdatetime
-
-            return jdatetime.date.fromgregorian(year=year, month=month, day=day).strftime('%Y/%m/%d')
-        except ValueError:
-            return ''
-    try:
-        import jdatetime
-
-        return jdatetime.date(year, month, day).strftime('%Y/%m/%d')
-    except ValueError:
-        return ''
-
-
-def _find_date(text):
-    match = re.search(r'(?<!\d)(\d{2,4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})(?!\d)', text or '')
-    return match.group(1) if match else ''
-
+# ─── ابزار تمیزسازی ─────────────────────────────────────────────────────────
 
 def _clean_short_value(value):
-    value = normalize_digits(value)
+    value = normalize_digits(str(value or ''))
+    # برش بعد از whitespace چندگانه یا newline
     value = re.split(r'\s{2,}|\t|\n', value)[0]
     value = value.strip(' :：-،,')
-    return value[:80]
+    return value[:100]

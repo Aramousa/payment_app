@@ -104,7 +104,7 @@ def app_navigation(request):
         if user.is_superuser:
             items.extend([
                 _nav_item('مدیریت کاربران', 'users_manage', 'users', 'admin'),
-                _nav_item('طرف حساب‌ها', 'counterparties_manage', 'counterparties', 'admin'),
+                _nav_item('مدیریت طرف حساب‌ها', 'counterparty_manage_list', 'counterparties_full', 'admin'),
             ])
 
     items.extend([
@@ -113,16 +113,17 @@ def app_navigation(request):
     ])
 
     role_label = {
-        'admin': 'مدیر سیستم',
-        'customer': 'مشتری',
-        'finance': 'مالی',
-        'finance_manager': 'مدیر مالی',
-        'commercial': 'بازرگانی',
+        'admin':              'مدیر سیستم',
+        'customer':           'مشتری',
+        'commercial':         'واحد بازرگانی',
         'commercial_manager': 'مدیر بازرگانی',
-        'sales': 'فروش',
-        'sales_manager': 'مدیر فروش',
-        'data_entry': 'تکمیل اطلاعات',
-        'staff': 'کارمند',
+        'finance':            'واحد مالی',
+        'finance_manager':    'مدیر مالی',
+        'sales':              'فروش',
+        'sales_manager':      'مدیر فروش',
+        'data_entry':         'تکمیل اطلاعات',
+        'staff':              'کارمند',
+        'counterparty':       'طرف حساب',
     }.get(role, 'کاربر')
 
     return {

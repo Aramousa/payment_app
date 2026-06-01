@@ -59,17 +59,32 @@
         .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
                  border-radius: 6px; font-size: 11px; font-weight: 700; }
         .badge-approved { background: #dcfce7; color: #15803d; }
-        .badge-pending  { background: #fef9c3; color: #854d0e; }
-        .badge-locked   { background: #f1f5f9; color: #64748b; }
+        .badge-returned { background: #fef9c3; color: #854d0e; }
+        .badge-rejected { background: #fee2e2; color: #dc2626; }
+        .badge-pending  { background: #f1f5f9; color: #475569; }
 
-        /* دکمه تایید */
-        .approve-btn { background: linear-gradient(135deg,#0d9488,#0f766e); color: #fff;
-                       border: none; border-radius: 7px; padding: 7px 14px; cursor: pointer;
-                       font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700;
-                       box-shadow: 0 2px 8px rgba(13,148,136,.3);
-                       transition: transform .1s, box-shadow .15s; }
-        .approve-btn:hover { box-shadow: 0 4px 14px rgba(13,148,136,.4); }
-        .approve-btn:active { transform: translateY(1px); }
+        /* دکمه‌های عملیاتی */
+        .action-btn { border: none; border-radius: 6px; padding: 5px 10px; cursor: pointer;
+                      font-family: Vazir, sans-serif; font-size: 12px; font-weight: 700;
+                      transition: transform .1s, box-shadow .1s; }
+        .action-btn:active { transform: translateY(1px); }
+        .btn-approve { background: #0d9488; color: #fff; box-shadow: 0 2px 6px rgba(13,148,136,.3); }
+        .btn-return  { background: #d97706; color: #fff; box-shadow: 0 2px 6px rgba(217,119,6,.3); }
+        .btn-reject  { background: #dc2626; color: #fff; box-shadow: 0 2px 6px rgba(220,38,38,.3); }
+
+        /* پنل inline عملیات */
+        .action-panel { display: none; background: #f8fafc; border: 1px solid #e2e8f0;
+                        border-radius: 8px; padding: 12px; margin-top: 8px; }
+        .action-panel.open { display: block; }
+        .action-panel textarea { width: 100%; box-sizing: border-box; min-height: 70px;
+                                 border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px;
+                                 font-family: Vazir, sans-serif; font-size: 13px; resize: vertical; }
+        .action-panel textarea:focus { border-color: #0d9488; outline: none;
+                                       box-shadow: 0 0 0 3px rgba(13,148,136,.12); }
+        .action-panel.return-panel textarea:focus { border-color: #d97706;
+                                                     box-shadow: 0 0 0 3px rgba(217,119,6,.12); }
+        .action-panel.reject-panel textarea:focus { border-color: #dc2626;
+                                                     box-shadow: 0 0 0 3px rgba(220,38,38,.12); }
 
         /* pagination */
         .pagination { display: flex; gap: 6px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
@@ -120,13 +135,21 @@
                 <div class="num">{{ total }}</div>
                 <div class="lbl">کل فیش‌ها</div>
             </div>
-            <div class="stat-card ok">
-                <div class="num">{{ approved_count }}</div>
-                <div class="lbl">تایید شده توسط شما</div>
-            </div>
             <div class="stat-card warn">
                 <div class="num">{{ pending_count }}</div>
-                <div class="lbl">در انتظار تایید</div>
+                <div class="lbl">⏳ در انتظار تصمیم</div>
+            </div>
+            <div class="stat-card ok">
+                <div class="num">{{ approved_count }}</div>
+                <div class="lbl">✅ تایید شده</div>
+            </div>
+            <div class="stat-card" style="border-top-color:#d97706;">
+                <div class="num" style="color:#d97706;">{{ returned_count }}</div>
+                <div class="lbl">⚠ عودت / ناقص</div>
+            </div>
+            <div class="stat-card" style="border-top-color:#dc2626;">
+                <div class="num" style="color:#dc2626;">{{ rejected_count }}</div>
+                <div class="lbl">🚫 رد / ابطال</div>
             </div>
         </div>
 
@@ -142,11 +165,13 @@
                 </select>
             </div>
             <div>
-                <label>تایید طرف حساب</label>
+                <label>وضعیت طرف حساب</label>
                 <select name="approved">
                     <option value="">همه</option>
-                    <option value="no"  {% if filters.approved == 'no' %}selected{% endif %}>در انتظار تایید</option>
-                    <option value="yes" {% if filters.approved == 'yes' %}selected{% endif %}>تایید شده</option>
+                    <option value="pending"  {% if filters.approved == 'pending' %}selected{% endif %}>⏳ در انتظار</option>
+                    <option value="approved" {% if filters.approved == 'approved' %}selected{% endif %}>✅ تایید شده</option>
+                    <option value="returned" {% if filters.approved == 'returned' %}selected{% endif %}>⚠ عودت / ناقص</option>
+                    <option value="rejected" {% if filters.approved == 'rejected' %}selected{% endif %}>🚫 رد / ابطال</option>
                 </select>
             </div>
             <div>
@@ -200,28 +225,77 @@
                             </span>
                         </td>
                         <td>
-                            {% if payment.is_counterparty_approved %}
-                                <span class="badge badge-approved">✓ تایید شده</span>
-                                <div style="font-size:11px;color:#64748b;margin-top:3px;">
-                                    {{ payment.counterparty_approved_at|jalali_datetime }}
-                                </div>
+                            {% if payment.counterparty_status == 'cp_approved' %}
+                                <span class="badge badge-approved">✅ تایید</span>
+                                <div style="font-size:11px;color:#64748b;margin-top:2px;">{{ payment.counterparty_decided_at|jalali_datetime }}</div>
+                            {% elif payment.counterparty_status == 'cp_returned' %}
+                                <span class="badge badge-returned">⚠ عودت</span>
+                                <div style="font-size:11px;color:#854d0e;margin-top:2px;" title="{{ payment.counterparty_note }}">{{ payment.counterparty_note|truncatechars:30 }}</div>
+                            {% elif payment.counterparty_status == 'cp_rejected' %}
+                                <span class="badge badge-rejected">🚫 رد</span>
+                                <div style="font-size:11px;color:#dc2626;margin-top:2px;" title="{{ payment.counterparty_note }}">{{ payment.counterparty_note|truncatechars:30 }}</div>
                             {% else %}
                                 <span class="badge badge-pending">⏳ در انتظار</span>
                             {% endif %}
                         </td>
-                        <td>
-                            {% if not payment.is_counterparty_approved %}
+                        <td style="min-width:220px;">
+                            {% if not payment.counterparty_decided %}
                                 {% if can_operate %}
-                                <form method="post" action="{% url 'counterparty_approve_payment' payment.id %}"
-                                      onsubmit="return confirm('آیا این فیش را تایید می‌کنید؟ پس از تایید غیرقابل برگشت است.');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="approve-btn">✓ تایید</button>
-                                </form>
+                                <div id="actions-{{ payment.id }}">
+                                    <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                                        <button type="button" class="action-btn btn-approve"
+                                                onclick="togglePanel('approve-{{ payment.id }}', this)">✅ تایید</button>
+                                        <button type="button" class="action-btn btn-return"
+                                                onclick="togglePanel('return-{{ payment.id }}', this)">⚠ عودت</button>
+                                        <button type="button" class="action-btn btn-reject"
+                                                onclick="togglePanel('reject-{{ payment.id }}', this)">🚫 رد</button>
+                                    </div>
+
+                                    {# پنل تایید — توضیح اختیاری #}
+                                    <div class="action-panel" id="approve-{{ payment.id }}">
+                                        <div style="font-size:12px;color:#0f766e;margin-bottom:6px;font-weight:700;">✅ تایید فیش — توضیح (اختیاری)</div>
+                                        <form method="post" action="{% url 'counterparty_approve_payment' payment.id %}">
+                                            {% csrf_token %}
+                                            <textarea name="note" placeholder="توضیح تکمیلی (اختیاری)…"></textarea>
+                                            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">
+                                                <button type="button" class="action-btn" style="background:#94a3b8;color:#fff;" onclick="closePanel('approve-{{ payment.id }}')">انصراف</button>
+                                                <button type="submit" class="action-btn btn-approve">ثبت تایید</button>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    {# پنل عودت — توضیح اجباری #}
+                                    <div class="action-panel return-panel" id="return-{{ payment.id }}">
+                                        <div style="font-size:12px;color:#854d0e;margin-bottom:6px;font-weight:700;">⚠ عودت / ناقص — توضیح اجباری</div>
+                                        <form method="post" action="{% url 'counterparty_return_payment_cp' payment.id %}">
+                                            {% csrf_token %}
+                                            <textarea name="note" placeholder="دلیل عودت را وارد کنید (اجباری)…" required></textarea>
+                                            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">
+                                                <button type="button" class="action-btn" style="background:#94a3b8;color:#fff;" onclick="closePanel('return-{{ payment.id }}')">انصراف</button>
+                                                <button type="submit" class="action-btn btn-return">ثبت عودت</button>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    {# پنل رد — توضیح اجباری #}
+                                    <div class="action-panel reject-panel" id="reject-{{ payment.id }}">
+                                        <div style="font-size:12px;color:#dc2626;margin-bottom:6px;font-weight:700;">🚫 رد / ابطال — توضیح اجباری</div>
+                                        <form method="post" action="{% url 'counterparty_reject_payment_cp' payment.id %}">
+                                            {% csrf_token %}
+                                            <textarea name="note" placeholder="دلیل رد/ابطال را وارد کنید (اجباری)…" required></textarea>
+                                            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">
+                                                <button type="button" class="action-btn" style="background:#94a3b8;color:#fff;" onclick="closePanel('reject-{{ payment.id }}')">انصراف</button>
+                                                <button type="submit" class="action-btn btn-reject"
+                                                        onclick="return confirm('آیا از رد این فیش مطمئنید؟')">ثبت رد</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                                 {% else %}
-                                <span class="badge" style="background:#fef9c3;color:#854d0e;" title="حساب غیرفعال">⛔ غیرمجاز</span>
+                                <span class="badge" style="background:#fef9c3;color:#854d0e;">⛔ حساب غیرفعال</span>
                                 {% endif %}
                             {% else %}
-                            <span class="badge badge-locked">🔒 قفل شده</span>
+                            <span class="badge" style="background:#f1f5f9;color:#64748b;">🔒 ثبت‌شده</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -256,6 +330,27 @@
         {% endif %}
 
     </div>
+    <script>
+    function togglePanel(id, btn) {
+        // بستن همه پنل‌های باز در همان ردیف
+        const row = btn.closest('td');
+        row.querySelectorAll('.action-panel.open').forEach(function(p) {
+            if (p.id !== id) p.classList.remove('open');
+        });
+        const panel = document.getElementById(id);
+        if (panel) {
+            panel.classList.toggle('open');
+            if (panel.classList.contains('open')) {
+                const ta = panel.querySelector('textarea');
+                if (ta) { ta.value = ''; ta.focus(); }
+            }
+        }
+    }
+    function closePanel(id) {
+        const p = document.getElementById(id);
+        if (p) p.classList.remove('open');
+    }
+    </script>
     <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

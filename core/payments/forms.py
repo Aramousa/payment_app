@@ -807,6 +807,16 @@ class CounterpartyManagementForm(forms.ModelForm):
                 u.save()
                 cp.user = u
 
+            # نقش کاربری را به «طرف حساب» ست کن
+            try:
+                from .models import UserProfile
+                profile = u.profile
+                if profile.role != 'counterparty':
+                    profile.role = 'counterparty'
+                    profile.save(update_fields=['role'])
+            except Exception:
+                pass
+
         if commit:
             cp.save()
         return cp
@@ -1286,16 +1296,17 @@ class InvoiceCustomerNoteForm(forms.ModelForm):
 
 
 class UserAccountManagementForm(forms.Form):
+    # طرف حساب از این فرم ایجاد نمی‌شود — فقط از بخش «مدیریت طرف حساب‌ها»
     ROLE_CHOICES = (
-        ('customer', 'مشتری'),
-        ('commercial', 'بازرگانی'),
-        ('commercial_manager', 'مدیر بازرگانی'),
-        ('finance', 'مالی'),
-        ('finance_manager', 'مدیر مالی'),
-        ('sales', 'فروش'),
-        ('sales_manager', 'مدیر فروش'),
-        ('data_entry', 'تکمیل اطلاعات فیش'),
-        ('staff', 'کارمند'),
+        ('customer',          '👤 مشتری'),
+        ('commercial',        '🏬 واحد بازرگانی'),
+        ('commercial_manager','🏬 مدیر بازرگانی'),
+        ('finance',           '💰 واحد مالی'),
+        ('finance_manager',   '💰 مدیر مالی'),
+        ('sales',             '📊 فروش'),
+        ('sales_manager',     '📊 مدیر فروش'),
+        ('data_entry',        '✏️ تکمیل اطلاعات فیش'),
+        ('staff',             '🔧 کارمند'),
     )
 
     first_name = forms.CharField(label='نام', max_length=50, required=True)

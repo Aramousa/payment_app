@@ -140,7 +140,18 @@
     </div>
 
     <div class="section">
-        <h2>فهرست کاربران</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+            <h2 style="margin:0;">فهرست کاربران</h2>
+            <div style="display:flex;gap:8px;">
+                <a href="{% url 'counterparty_manage_list' %}" class="button-link" style="background:#0d9488;font-size:13px;padding:7px 12px;">
+                    🏢 مدیریت طرف حساب‌ها
+                </a>
+            </div>
+        </div>
+        <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#0f4e49;">
+            💡 کاربران با نقش <strong>«🏢 طرف حساب»</strong> از طریق صفحه مدیریت طرف حساب‌ها ایجاد و ویرایش می‌شوند.
+            دکمه ویرایش آن‌ها مستقیماً به صفحه مدیریت طرف حساب هدایت می‌کند.
+        </div>
         <form method="get" class="app-filter-panel">
             <div class="app-filter-grid">
                 <div>
@@ -223,7 +234,16 @@
                         <td>{{ item.profile.accounting_code|default:'-' }}</td>
                         <td>{{ item.username }}</td>
                         <td>{{ item.first_name }} {{ item.last_name }}</td>
-                        <td>{{ item.profile.get_role_display }}</td>
+                        <td>
+                            {% with cp=item.counterparty_account %}
+                            {% if cp %}
+                                <span style="display:inline-block;background:#ccfbf1;color:#0f766e;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700;">🏢 طرف حساب</span>
+                                <div style="font-size:11px;color:#64748b;margin-top:2px;">{{ cp.name }}</div>
+                            {% else %}
+                                {{ item.profile.get_role_display }}
+                            {% endif %}
+                            {% endwith %}
+                        </td>
                         <td>{{ item.profile.phone|default:'-' }}</td>
                         <td>{{ item.profile.mobile|default:'-' }}</td>
                         <td>{{ item.profile.organization|default:'-' }}</td>
@@ -234,7 +254,11 @@
                         <td>
                             <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:center;">
                                 <button type="button" class="reset-password-btn" data-user-id="{{ item.id }}" data-username="{{ item.username }}" style="background:#198754; color:#fff; border:none; border-radius:4px; padding:4px 8px; cursor:pointer; font-size:11px;">🔄</button>
-                                <a href="{% url 'user_edit' item.id %}" class="edit-link">ویرایش</a>
+                                {% if item.counterparty_account %}
+                                    <a href="{% url 'counterparty_manage_edit' item.counterparty_account.id %}" class="edit-link" style="background:#0d9488;" title="ویرایش طرف حساب">ویرایش</a>
+                                {% else %}
+                                    <a href="{% url 'user_edit' item.id %}" class="edit-link">ویرایش</a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

@@ -480,12 +480,18 @@
             const parseBtn = document.getElementById('parse-invoice-btn');
             const parseStatus = document.getElementById('parse-invoice-status');
             const attachmentInput = document.getElementById('{{ form.attachment.id_for_label }}');
+            // فیلدهایی که مستقیم در فرم جایگذاری می‌شوند
             const parsedFieldLabels = {
-                invoice_date: 'تاریخ فاکتور',
-                invoice_number: 'شماره فاکتور',
-                amount: 'مبلغ',
-                reference_number: 'شماره حواله'
+                invoice_number:   'شماره فاکتور',
+                reference_number: 'شماره حواله',
+                amount:           'مبلغ کل (ریال)',
+                invoice_date:     'تاریخ فاکتور',
+                customer_name:    'نام خریدار / مشتری',
+                vendor_name:      'نام فروشنده',
+                tax_amount:       'مبلغ مالیات',
             };
+            // فیلدهایی که فقط نمایش داده می‌شوند (input متناظر ندارند)
+            const displayOnlyFields = new Set(['customer_name', 'vendor_name', 'tax_amount']);
 
             function setParseStatus(message, type) {
                 if (!parseStatus) return;
@@ -514,16 +520,37 @@
             function renderParsedSuggestions(fields, message, rawTextPreview) {
                 if (!parseStatus) return;
                 const entries = Object.entries(fields || {}).filter(function (entry) { return entry[1]; });
+                const applyableEntries = entries.filter(([k]) => !displayOnlyFields.has(k));
                 parseStatus.className = entries.length ? 'parse-status ok' : 'parse-status warn';
                 parseStatus.innerHTML = '';
 
                 const intro = document.createElement('div');
                 intro.textContent = entries.length
-                    ? 'اطلاعات زیر فقط پیشنهاد هستند. هر مقدار را با خود فاکتور کنترل کنید و در صورت درست بودن، جداگانه اعمال کنید.'
+                    ? 'اطلاعات زیر از فاکتور خوانده شدند. با خود فاکتور کنترل کنید و اعمال نمایید.'
                     : (message || 'فیلد قابل اطمینانی برای پیشنهاد پیدا نشد.');
                 parseStatus.appendChild(intro);
 
                 if (entries.length) {
+                    // دکمه اعمال همه
+                    if (applyableEntries.length > 1) {
+                        const applyAll = document.createElement('button');
+                        applyAll.type = 'button';
+                        applyAll.className = 'parse-apply-btn';
+                        applyAll.style.cssText = 'margin:8px 0;background:#0d9488;width:100%;';
+                        applyAll.textContent = '✅ اعمال همه فیلدها';
+                        applyAll.addEventListener('click', function () {
+                            applyableEntries.forEach(([fieldName, value]) => {
+                                applyParsedField(fieldName, value);
+                            });
+                            applyAll.textContent = '✅ همه اعمال شدند';
+                            applyAll.disabled = true;
+                            parseStatus.querySelectorAll('.parse-apply-btn:not([disabled])').forEach(b => {
+                                b.textContent = 'اعمال شد'; b.disabled = true;
+                            });
+                        });
+                        parseStatus.appendChild(applyAll);
+                    }
+
                     const list = document.createElement('div');
                     list.className = 'parse-suggestions';
                     entries.forEach(function ([fieldName, value]) {
@@ -539,19 +566,28 @@
                         text.appendChild(document.createTextNode(': '));
                         text.appendChild(code);
 
-                        const button = document.createElement('button');
-                        button.type = 'button';
-                        button.className = 'parse-apply-btn';
-                        button.textContent = 'اعمال';
-                        button.addEventListener('click', function () {
-                            if (applyParsedField(fieldName, value)) {
-                                button.textContent = 'اعمال شد';
-                                button.disabled = true;
-                            }
-                        });
-
                         row.appendChild(text);
-                        row.appendChild(button);
+
+                        if (!displayOnlyFields.has(fieldName)) {
+                            const button = document.createElement('button');
+                            button.type = 'button';
+                            button.className = 'parse-apply-btn';
+                            button.textContent = 'اعمال';
+                            button.addEventListener('click', function () {
+                                if (applyParsedField(fieldName, value)) {
+                                    button.textContent = 'اعمال شد';
+                                    button.disabled = true;
+                                }
+                            });
+                            row.appendChild(button);
+                        } else {
+                            // فقط نمایشی — فقط badge
+                            const badge = document.createElement('span');
+                            badge.style.cssText = 'font-size:11px;color:#64748b;margin-right:4px;';
+                            badge.textContent = '(اطلاعاتی)';
+                            row.appendChild(badge);
+                        }
+
                         list.appendChild(row);
                     });
                     parseStatus.appendChild(list);
