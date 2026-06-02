@@ -495,11 +495,29 @@ class FieldRequirementConfigAdmin(admin.ModelAdmin):
 
 @admin.register(SystemSettings)
 class SystemSettingsAdmin(admin.ModelAdmin):
-    list_display = ('session_inactivity_timeout', 'jalali_updated_at')
+    list_display = ('session_inactivity_timeout', 'sms_provider', 'sms_notifications_enabled', 'jalali_updated_at')
     fieldsets = (
         ('تنظیمات نشست', {
             'fields': ('session_inactivity_timeout',),
             'description': 'مقادیر زیر حداکثر ۶۰ ثانیه پس از ذخیره اعمال می‌شوند.',
+        }),
+        ('تنظیمات پیامک', {
+            'fields': (
+                'sms_provider',
+                'sms_api_key',
+                'sms_sender',
+                'sms_notifications_enabled',
+            ),
+            'description': 'برای فعال‌سازی پیامک، اپراتور را انتخاب و API Key را وارد کنید.',
+        }),
+        ('تنظیمات پیشرفته پیامک', {
+            'classes': ('collapse',),
+            'fields': (
+                'sms_otp_template',
+                'sms_otp_expiry_minutes',
+                'sms_generic_url',
+                'sms_generic_extra',
+            ),
         }),
     )
 
