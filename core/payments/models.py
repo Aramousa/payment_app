@@ -334,10 +334,16 @@ class PaymentRecord(models.Model):
 
     @property
     def ready_for_final_approval(self):
-        """تأیید نهایی فقط وقتی هر دو فلگ در وضعیت تکمیل‌شده باشند."""
+        """
+        شرایط تأیید نهایی:
+        ۱. بازرگانی ثبت کرده (status == approved)
+        ۲. مالی ثبت کرده (finance_status == finance_ok)
+        ۳. اگر طرف حساب دارد → طرف حساب هم تأیید کرده باشد
+        """
         return (
             self.status == self.STATUS_APPROVED
             and self.is_finance_registered
+            and (self.counterparty_id is None or self.is_counterparty_approved)
         )
 
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
