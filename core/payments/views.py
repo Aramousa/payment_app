@@ -1555,7 +1555,10 @@ def _apply_record_filters(records, request, is_staff_user):
 
     valid_statuses = {choice[0] for choice in PaymentRecord.STATUS_CHOICES}
     if is_staff_user:
-        if filters['status'] in valid_statuses:
+        if filters['status'] == 'finance_ok':
+            # فیلتر ثبت مالی — فلگ مستقل مالی
+            records = records.filter(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
+        elif filters['status'] in valid_statuses:
             records = records.filter(status=filters['status'])
     else:
         customer_status_map = {
@@ -2443,7 +2446,7 @@ def create_payment(request):
         'page_base_query': page_base_query,
         'is_staff_user': is_staff_user,
         'filters': active_filters,
-        'status_choices': PaymentRecord.STATUS_CHOICES if is_staff_user else CUSTOMER_STATUSES,
+        'status_choices': PaymentRecord.STAFF_FILTER_CHOICES if is_staff_user else CUSTOMER_STATUSES,
         'counterparties': Counterparty.objects.all() if is_staff_user else [],
         'staff_user_role': staff_role,
         'staff_role_label': _staff_role_label(staff_role),
@@ -2503,7 +2506,7 @@ def payment_history(request):
         'page_base_query': page_base_query,
         'is_staff_user': True,
         'filters': active_filters,
-        'status_choices': PaymentRecord.STATUS_CHOICES,
+        'status_choices': PaymentRecord.STAFF_FILTER_CHOICES,
         'counterparties': Counterparty.objects.all(),
         'staff_user_role': staff_role,
         'staff_role_label': _staff_role_label(staff_role),

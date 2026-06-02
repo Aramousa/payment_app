@@ -291,12 +291,16 @@ class PaymentRecord(models.Model):
     STATUS_CHOICES = [
         (STATUS_PENDING, 'در حال بررسی'),
         (STATUS_COMMERCIAL_REVIEW, 'بررسی بازرگانی'),
-        (STATUS_FINANCE_REVIEW, 'ثبت مالی'),
         (STATUS_APPROVED, 'ثبت بازرگانی'),
         (STATUS_FINAL_APPROVED, 'تایید نهایی'),
         (STATUS_REJECTED, 'رد شده'),
         (STATUS_INCOMPLETE, 'ناقص'),
         (STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
+    ]
+
+    # گزینه‌های فیلتر اضافی برای پنل کارکنان (شامل فلگ مستقل مالی)
+    STAFF_FILTER_CHOICES = STATUS_CHOICES + [
+        ('finance_ok', 'ثبت مالی'),
     ]
 
     CUSTOMER_VISIBLE_LABELS = {
