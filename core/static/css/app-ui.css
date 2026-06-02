@@ -1309,51 +1309,51 @@ tr.detail-row {
 }
 
 .app-nav-link {
-    color: rgba(255,255,255,.85) !important;
+    color: rgba(255,255,255,.88) !important;
     border-color: transparent !important;
     font-size: 13px;
 }
 
 .app-nav-link:hover {
-    background: rgba(20,184,166,.22) !important;
-    border-color: rgba(94,234,212,.35) !important;
-    color: #99f6e4 !important;
+    background: rgba(255,255,255,.14) !important;
+    border-color: rgba(255,255,255,.28) !important;
+    color: #fff !important;
 }
 
-.app-nav-documents { color: #99f6e4 !important; }
-.app-nav-finance   { color: #fcd88a !important; }
-.app-nav-admin     { color: #c4b5fd !important; }
-.app-nav-account   { color: rgba(255,255,255,.6) !important; }
+.app-nav-documents { color: rgba(255,255,255,.88) !important; }
+.app-nav-finance   { color: rgba(255,255,255,.88) !important; }
+.app-nav-admin     { color: rgba(255,255,255,.88) !important; }
+.app-nav-account   { color: rgba(255,255,255,.88) !important; }
 
 .app-nav-user {
-    background: rgba(20,184,166,.18) !important;
-    border-color: rgba(94,234,212,.3) !important;
-    color: #99f6e4 !important;
+    background: rgba(255,255,255,.1) !important;
+    border-color: rgba(255,255,255,.2) !important;
+    color: rgba(255,255,255,.88) !important;
 }
 
 .app-nav-user-name  { color: #fff !important; }
-.app-nav-user-role  { color: #99f6e4 !important; }
+.app-nav-user-role  { color: rgba(255,255,255,.7) !important; }
 
 .app-nav-logout button {
     background: rgba(255,255,255,.1) !important;
     border: 1px solid rgba(255,255,255,.2) !important;
-    color: rgba(255,255,255,.9) !important;
+    color: rgba(255,255,255,.88) !important;
 }
 
 .app-nav-logout button:hover {
-    background: #0d9488 !important;
-    border-color: #0d9488 !important;
+    background: rgba(255,255,255,.22) !important;
+    border-color: rgba(255,255,255,.4) !important;
     color: #fff !important;
 }
 
 .notification-trigger {
-    background: rgba(20,184,166,.15) !important;
-    border-color: rgba(94,234,212,.3) !important;
-    color: #99f6e4 !important;
+    background: rgba(255,255,255,.1) !important;
+    border-color: rgba(255,255,255,.2) !important;
+    color: rgba(255,255,255,.88) !important;
 }
 
 .notification-trigger:hover {
-    background: rgba(20,184,166,.28) !important;
+    background: rgba(255,255,255,.2) !important;
     color: #fff !important;
 }
 
