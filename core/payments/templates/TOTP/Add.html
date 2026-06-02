@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head %}
+    {{ block.super }}
+    <link href="{% static 'mfa/css/mfa.css' %}" rel="stylesheet">
+    <script src="{% static 'mfa/js/qrious.min.js' %}"></script>
+    {% url 'get_new_otop' as get_new_otop %}
+    {{ get_new_otop|json_script:"get_new_otop" }}
+    {% url 'verify_otop' as verify_otop %}
+    {{ verify_otop|json_script:"verify_otop" }}
+    {{ redirect_html|json_script:"redirect_html" }}
+    {{ reg_success_msg|json_script:"reg_success_msg" }}
+    {{ RECOVERY_METHOD|json_script:"RECOVERY_METHOD" }}
+    {% url 'manage_recovery_codes' as manage_recovery_codes %}
+    {{ manage_recovery_codes|json_script:"manage_recovery_codes" }}
+    {% url 'mfa_home' as mfa_home %}
+    {{ mfa_home|json_script:"mfa_home" }}
+    <script src="{% static 'mfa/js/TOTP/add.js' %}"></script>
+    <script>
+    /* override addToken برای QR بزرگ‌تر */
+    function addToken() {
+        const get_new_otop = JSON.parse(document.getElementById('get_new_otop').textContent);
+        $.ajax({
+            url: get_new_otop,
+            dataType: "JSON",
+            success: function(data) {
+                window.key = data.secret_key;
+                new QRious({
+                    element: document.getElementById('qr'),
+                    value: data.qr,
+                    size: 280
+                });
+                $("#second_step").show();
+            }
+        });
+    }
+    </script>
+    <style>
+        .totp-wrap { max-width: 540px; margin: 32px auto; padding: 0 16px; }
+        .totp-card { background: #fff; border-radius: 14px; padding: 32px;
+                     box-shadow: 0 2px 12px rgba(0,0,0,.08); border: 1px solid #e2e8f0; }
+        .totp-card h3 { font-size: 17px; color: #1e293b; margin: 0 0 20px; text-align: center; }
+        .totp-step { background: #f0fdfa; border-right: 3px solid #0d9488; border-radius: 8px;
+                     padding: 14px 16px; font-size: 13px; color: #134e4a; margin-bottom: 20px; line-height: 1.8; }
+        .qr-box { text-align: center; margin: 20px 0; }
+        #qr { width: 280px; height: 280px; border: 6px solid #e2e8f0; border-radius: 8px;
+              padding: 6px; background: #fff; image-rendering: pixelated; }
+        .otp-input { width: 100%; padding: 14px; border: 2px solid #d1d5db; border-radius: 10px;
+                     font-size: 22px; font-family: monospace; text-align: center; letter-spacing: 6px;
+                     outline: none; direction: ltr; }
+        .otp-input:focus { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,.15); }
+        .btn-verify { width: 100%; padding: 13px; background: linear-gradient(135deg, #0d9488, #0f766e);
+                      color: #fff; border: none; border-radius: 10px; font-family: Vazir, sans-serif;
+                      font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 14px; }
+        .btn-verify:hover { opacity: .9; }
+        .btn-cancel { display: block; text-align: center; margin-top: 12px; font-size: 13px;
+                      color: #64748b; text-decoration: none; }
+        #res { margin-bottom: 12px; }
+        .toggle-link { font-size: 12px; color: #0d9488; cursor: pointer; text-decoration: underline; }
+    </style>
+{% endblock %}
+{% block content %}
+<div class="totp-wrap">
+    <div class="totp-card">
+        <h3>📱 افزودن اپلیکیشن احراز هویت (TOTP)</h3>
+
+        <div class="totp-step">
+            <strong>مرحله ۱:</strong> اپلیکیشن احراز هویت را روی گوشی نصب کنید.<br>
+            مثل: <strong>Google Authenticator</strong>، <strong>Authy</strong> یا <strong>Microsoft Authenticator</strong>
+        </div>
+
+        <div class="totp-step">
+            <strong>مرحله ۲:</strong> کد QR زیر را با اپلیکیشن اسکن کنید.<br>
+            اگر نمی‌توانید اسکن کنید،
+            <a href="#" id="showTOTP" class="toggle-link">کد متنی را نمایش دهید</a> یا
+            <a href="#" id="showKey" class="toggle-link">کلید را به صورت دستی وارد کنید</a>.
+        </div>
+
+        <div id="res"></div>
+
+        <div class="qr-box" id="second_step" style="display:none;">
+            <img id="qr" alt="کد QR احراز هویت"/>
+        </div>
+
+        <div class="totp-step">
+            <strong>مرحله ۳:</strong> کد ۶ رقمی نمایش‌داده‌شده در اپلیکیشن را وارد کنید.
+        </div>
+
+        <input maxlength="6" size="6" class="otp-input" id="answer"
+               placeholder="• • • • • •" inputmode="numeric" autocomplete="one-time-code"/>
+
+        <button class="btn-verify" id="verify">✅ فعال‌سازی</button>
+        <a href="{% url 'mfa_home' %}" class="btn-cancel">انصراف</a>
+    </div>
+</div>
+{% include "modal.html" %}
+{% endblock %}

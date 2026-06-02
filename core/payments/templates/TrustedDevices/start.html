@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head %}
+    {{ block.super }}
+    <link href="{% static 'mfa/css/mfa.css' %}" rel="stylesheet">
+    <script src="{% static 'mfa/js/qrious.min.js' %}"></script>
+    {{ url|json_script:"url" }}
+    {{ request.user.username|json_script:"request_user_username" }}
+    {{ key|json_script:"key" }}
+    {% url 'td_sendemail' as td_sendemail %}
+    {{ td_sendemail|json_script:"td_sendemail" }}
+    {% url 'td_trust_device' as td_trust_device %}
+    {{ td_trust_device|json_script:"td_trust_device" }}
+    {% url 'td_get_useragent' as td_get_useragent %}
+    {{ td_get_useragent|json_script:"td_get_useragent" }}
+    <script src="{% static 'mfa/js/TrustedDevices/start.js' %}"></script>
+    <style>
+        .td-wrap { max-width: 680px; margin: 32px auto; padding: 0 16px; }
+        .td-card { background: #fff; border-radius: 14px; padding: 28px;
+                   box-shadow: 0 2px 12px rgba(0,0,0,.08); border: 1px solid #e2e8f0; }
+        .td-card h3 { font-size: 17px; color: #1e293b; margin: 0 0 20px; text-align: center; }
+        .td-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .td-method { background: #f8fafc; border-radius: 10px; padding: 20px;
+                     border: 1.5px solid #e2e8f0; }
+        .td-method h4 { font-size: 14px; color: #0f766e; margin: 0 0 12px; }
+        .td-method ol { margin: 0; padding-right: 18px; font-size: 13px;
+                        color: #475569; line-height: 2; }
+        .td-digits { font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #0d9488;
+                     font-family: monospace; display: block; text-align: center;
+                     margin: 8px 0; direction: ltr; }
+        #qr { width: 180px; height: 180px; border: 4px solid #e2e8f0; border-radius: 8px;
+              padding: 4px; display: block; margin: 8px auto; image-rendering: pixelated; }
+        .waiting-box { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px;
+                       padding: 14px; font-size: 13px; color: #134e4a; text-align: center;
+                       margin-top: 20px; }
+        @media(max-width:600px) { .td-methods { grid-template-columns: 1fr; } }
+    </style>
+{% endblock %}
+{% block content %}
+<div class="td-wrap">
+    <div class="td-card">
+        <h3>💻 افزودن دستگاه مورد اعتماد</h3>
+
+        {% if not_allowed %}
+        <div style="background:#fff5f5;border:1px solid #fca5a5;color:#7f1d1d;
+                    border-radius:8px;padding:14px;font-size:13px;text-align:center;">
+            حداکثر تعداد دستگاه‌های مجاز ثبت شده است.<br>
+            برای افزودن دستگاه جدید، ابتدا یکی از دستگاه‌های قبلی را حذف کنید.
+        </div>
+        {% else %}
+        <p style="font-size:13px;color:#64748b;text-align:center;margin:0 0 8px;">
+            از موبایل یا تبلت خود برای تأیید این دستگاه استفاده کنید.
+        </p>
+
+        <div class="td-methods">
+            <div class="td-method">
+                <h4>📷 با اسکن کد QR</h4>
+                <ol>
+                    <li>روی گوشی یا تبلت مرورگر Chrome یا Firefox را باز کنید.</li>
+                    <li>کد QR زیر را اسکن کنید:</li>
+                </ol>
+                <img id="qr" alt="QR Code"/>
+            </div>
+            <div class="td-method">
+                <h4>⌨️ به صورت دستی</h4>
+                <ol>
+                    <li>روی گوشی یا تبلت مرورگر Chrome یا Firefox را باز کنید.</li>
+                    <li>به آدرس زیر بروید:<br>
+                        <strong style="font-size:11px;direction:ltr;display:block;word-break:break-all;">{{ url }}</strong>
+                    </li>
+                    <li>نام کاربری و کد زیر را وارد کنید:<br>
+                        <span class="td-digits">{{ key|slice:":3" }} - {{ key|slice:"3:" }}</span>
+                    </li>
+                    <li>تأیید را بزنید.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="waiting-box">
+            ⏳ این پنجره منتظر تأیید از دستگاه شما است...
+        </div>
+        {% endif %}
+
+        <div style="text-align:center;margin-top:20px;">
+            <a href="{% url 'mfa_home' %}" style="font-size:13px;color:#64748b;text-decoration:none;">
+                انصراف و بازگشت
+            </a>
+        </div>
+    </div>
+</div>
+{% include "modal.html" %}
+{% include 'mfa_check.html' %}
+{% endblock %}

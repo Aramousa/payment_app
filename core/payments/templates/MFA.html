@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head %}
+    {{ block.super }}
+    <link href="{% static 'mfa/css/mfa.css' %}" rel="stylesheet">
+    {% url 'mfa_delKey' as mfa_delKey %}
+    {{ mfa_delKey|json_script:"mfa_delKey" }}
+    {{ csrf_token|stringformat:"s"|json_script:"csrf_token" }}
+    {% url 'toggle_key' as toggle_key %}
+    {{ toggle_key|json_script:"toggle_key" }}
+    <script src="{% static 'mfa/js/mfa.js' %}"></script>
+    <link href="{% static 'mfa/css/bootstrap-toggle.min.css' %}" rel="stylesheet">
+    <script src="{% static 'mfa/js/bootstrap-toggle.min.js' %}"></script>
+    <script>
+    /* ترجمه پیام‌های حذف دستگاه/کلید */
+    function deleteKey(id, name) {
+        $("#modal-title").html("تأیید حذف");
+        $("#modal-body").html(
+            "آیا مطمئن هستید که می‌خواهید <strong>«" + name + "»</strong> را حذف کنید؟<br><br>" +
+            "<span style='color:#dc2626;font-size:13px;'>⚠️ اگر این تنها روش احراز هویت دو مرحله‌ای شماست، " +
+            "ممکن است دسترسی به سامانه را از دست بدهید.</span>"
+        );
+        $("#actionBtn").remove();
+        $("#modal-footer").prepend(
+            "<button id='actionBtn' class='btn btn-danger'>حذف</button>"
+        );
+        $("#actionBtn").click(function() { confirmDel(id); });
+        $("#popUpModal").modal('show');
+    }
+
+    function confirmDel(id) {
+        const mfa_delKey = JSON.parse(document.getElementById('mfa_delKey').textContent);
+        const csrf_token = JSON.parse(document.getElementById('csrf_token').textContent);
+        $.ajax({
+            url: mfa_delKey,
+            method: "POST",
+            data: {"id": id, "csrfmiddlewaretoken": csrf_token},
+            success: function(data) {
+                var msg = String(data);
+                var fa = msg === 'Deleted' ? 'روش با موفقیت حذف شد.' :
+                         msg === 'Error'   ? 'خطا در حذف. لطفاً دوباره امتحان کنید.' :
+                         msg;
+                $("#popUpModal").modal('hide');
+                setTimeout(function() {
+                    alert(fa);
+                    window.location.reload();
+                }, 300);
+            }
+        });
+    }
+    </script>
+    <style>
+        .mfa-wrap { max-width: 860px; margin: 24px auto; padding: 0 16px; }
+        .mfa-header { display: flex; align-items: center; justify-content: space-between;
+                      flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+        .mfa-header h2 { margin: 0; font-size: 18px; color: #1e293b; }
+        .mfa-card { background: #fff; border-radius: 14px; padding: 20px;
+                    box-shadow: 0 2px 12px rgba(0,0,0,.07); border: 1px solid #e2e8f0; }
+        .mfa-table { width: 100%; border-collapse: collapse; }
+        .mfa-table th { background: linear-gradient(135deg, #042f2e, #0f4e49); color: #fff;
+                        padding: 11px 14px; text-align: right; font-size: 13px; font-weight: 600; }
+        .mfa-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px;
+                        vertical-align: middle; }
+        .mfa-table tr:last-child td { border-bottom: none; }
+        .mfa-table tr:hover td { background: #f0fdfa; }
+        .empty-row td { text-align: center; color: #94a3b8; padding: 32px; }
+        .add-btn { background: #0d9488; color: #fff; border: none; border-radius: 8px;
+                   padding: 9px 18px; font-family: Vazir, sans-serif; font-size: 13px;
+                   font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
+        .add-btn:hover { background: #0f766e; color: #fff; }
+        .dropdown-menu { text-align: right; min-width: 200px; }
+        .dropdown-menu .dropdown-item { text-align: right; }
+        .del-link { color: #dc2626; text-decoration: none; font-size: 18px; }
+        .del-link:hover { color: #b91c1c; }
+    </style>
+{% endblock %}
+{% block content %}
+<div class="mfa-wrap">
+    <div class="mfa-header">
+        <h2>🔐 مدیریت احراز هویت دو مرحله‌ای</h2>
+        <div class="dropdown">
+            <button class="add-btn dropdown-toggle" data-bs-toggle="dropdown">
+                ➕ افزودن روش جدید
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                {% if not 'TOTP' in UNALLOWED_AUTHEN_METHODS %}
+                <li>
+                    <a class="dropdown-item" href="{% url 'start_new_otop' %}">
+                        📱 اپلیکیشن احراز هویت (TOTP)
+                    </a>
+                </li>
+                {% endif %}
+                {% if not 'Email' in UNALLOWED_AUTHEN_METHODS %}
+                <li>
+                    <a class="dropdown-item" href="{% url 'start_email' %}">
+                        ✉️ کد یک‌بارمصرف از طریق ایمیل
+                    </a>
+                </li>
+                {% endif %}
+                {# U2F منسوخ شده — از منو حذف شده است، از FIDO2 استفاده کنید #}
+                {% if not 'FIDO2' in UNALLOWED_AUTHEN_METHODS %}
+                <li>
+                    <a class="dropdown-item" href="{% url 'start_fido2' %}">🔑 FIDO2</a>
+                </li>
+                {% endif %}
+                {% if not 'Trusted_Devices' in UNALLOWED_AUTHEN_METHODS %}
+                <li>
+                    <a class="dropdown-item" href="{% url 'start_td' %}">💻 دستگاه مورد اعتماد</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="mfa-card">
+        <table class="mfa-table">
+            <thead>
+                <tr>
+                    <th>روش</th>
+                    <th>تاریخ افزودن</th>
+                    <th>انقضا</th>
+                    <th>دستگاه</th>
+                    <th>آخرین استفاده</th>
+                    <th>وضعیت</th>
+                    <th>حذف</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if keys %}
+                    {% for key in keys %}
+                    <tr class="mfa_key" data-key-id="{{ key.id }}" data-key-type="{{ key.key_type }}">
+                        <td><strong>{{ key.name }}</strong></td>
+                        <td>{{ key.added_on }}</td>
+                        <td>{% if key.expires %}{{ key.expires }}{% else %}—{% endif %}</td>
+                        <td>{% if key.device %}{{ key.device }}{% else %}—{% endif %}</td>
+                        <td>{% if key.last_used %}{{ key.last_used }}{% else %}هرگز{% endif %}</td>
+                        {% if key.key_type in HIDE_DISABLE %}
+                            <td>{% if key.enabled %}فعال{% else %}غیرفعال{% endif %}</td>
+                        {% else %}
+                            <td>
+                                <input type="checkbox" id="toggle_{{ key.id }}"
+                                    {% if key.enabled %}checked{% endif %}
+                                    data-onstyle="success" data-offstyle="danger"
+                                    data-toggle="toggle" class="status_chk">
+                            </td>
+                        {% endif %}
+                        {% if key.key_type in HIDE_DISABLE %}
+                            <td>—</td>
+                        {% else %}
+                            <td>
+                                <a href="#" id="delete_{{ key.id }}" class="del-link" title="حذف">🗑</a>
+                            </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    {% if "RECOVERY" not in UNALLOWED_AUTHEN_METHODS and recovery %}
+                    <tr>
+                        <td>{{ recovery.name }}</td>
+                        <td>{{ recovery.added_on }}</td>
+                        <td>—</td><td>—</td>
+                        <td>{% if recovery.last_used %}{{ recovery.last_used }}{% else %}هرگز{% endif %}</td>
+                        <td>فعال</td>
+                        <td>
+                            <a href="{% url 'manage_recovery_codes' %}" title="مدیریت کدهای بازیابی">⚙</a>
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% else %}
+                <tr class="empty-row">
+                    <td colspan="7">هنوز هیچ روش احراز هویتی اضافه نشده است.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top:16px;text-align:center;">
+        <a href="{% url 'submit' %}" style="font-size:13px;color:#64748b;text-decoration:none;">← بازگشت به داشبورد</a>
+    </div>
+</div>
+{% include "modal.html" %}
+{% endblock %}

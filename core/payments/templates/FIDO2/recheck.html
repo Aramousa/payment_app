@@ -1,0 +1,41 @@
+{% load static %}
+{% block head %}
+    <link href="{% static 'mfa/css/mfa.css' %}" rel="stylesheet">
+{% endblock %}
+{% block content %}
+<div style="max-width:420px; margin:40px auto; padding:0 16px;">
+    <div style="background:#fff; border-radius:14px; padding:32px;
+                box-shadow:0 2px 12px rgba(0,0,0,.08); border:1px solid #e2e8f0; text-align:center;">
+        <div style="font-size:48px; margin-bottom:16px;">🔑</div>
+        <h3 style="font-size:17px; color:#1e293b; margin:0 0 8px;">تأیید هویت با کلید FIDO2</h3>
+
+        {% if mode == "auth" %}
+        <p style="font-size:13px; color:#475569; margin:0 0 20px;">
+            خوش آمدید <strong>{{ request.session.base_username }}</strong><br>
+            <a href="{% url 'mfa_reset_cookie' %}" style="font-size:12px; color:#0d9488;">این من نیستم</a>
+        </p>
+        {% endif %}
+
+        <div id="res" style="font-size:13px; color:#64748b; margin-bottom:16px;">
+            دکمه کلید امنیتی خود را فشار دهید تا هویت‌تان تأیید شود.
+        </div>
+        <div id="msgdiv"></div>
+
+        {% if mode == "auth" %}
+        <form id="fido2_login" action="{% url 'fido2_complete_auth' %}" method="post">
+        {% elif mode == "recheck" %}
+        <form id="fido2_login" action="{% url 'fido2_recheck' %}" method="post">
+        {% endif %}
+            {% csrf_token %}
+            <input type="hidden" name="response" id="response" value=""/>
+        </form>
+
+        {% if request.session.mfa_methods|length > 1 %}
+        <a href="{% url 'mfa_methods_list' %}" style="font-size:12px; color:#0d9488;">
+            استفاده از روش دیگر
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% include 'FIDO2/Auth_JS.html' %}
+{% endblock %}

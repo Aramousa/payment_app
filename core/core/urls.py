@@ -17,17 +17,31 @@ Including another URLconf
 from django.urls import include
 from django.contrib import admin
 from django.urls import path
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from payments.views import SafeLoginView, safe_logout
+
 
 def redirect_to_submit(request):
     return redirect('submit')
+
+
+def handler404_view(request, exception=None):
+    return render(request, 'errors/404.html', status=404)
+
+
+def handler500_view(request):
+    return render(request, 'errors/500.html', status=500)
+
+
+handler404 = handler404_view
+handler500 = handler500_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/login/', SafeLoginView.as_view(), name='login'),
     path('accounts/logout/', safe_logout, name='logout'),
     path('accounts/', include('django.contrib.auth.urls')),
+    path('mfa/', include('mfa.urls')),
     path('', include('payments.urls')),
     path('', redirect_to_submit),
 ]

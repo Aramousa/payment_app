@@ -1,0 +1,153 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تأیید پیامکی — سامانه ارتباط با مشتری</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Vazir, sans-serif;
+            direction: rtl;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #012322 0%, #063f3b 50%, #0d766e 100%);
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 18px;
+            padding: 40px 36px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 24px 60px rgba(0,0,0,.35);
+            text-align: center;
+        }
+        .icon { font-size: 48px; margin-bottom: 16px; }
+        h1 { font-size: 18px; color: #1e293b; margin-bottom: 8px; }
+        .subtitle { font-size: 13px; color: #64748b; margin-bottom: 28px; line-height: 1.7; }
+        .phone { font-weight: 700; color: #0d9488; direction: ltr; display: inline-block; }
+        .otp-input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 22px;
+            font-family: monospace;
+            text-align: center;
+            letter-spacing: 6px;
+            outline: none;
+            transition: border-color .15s;
+            margin-bottom: 16px;
+            direction: ltr;
+        }
+        .otp-input:focus { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,.15); }
+        .btn {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            font-family: Vazir, sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .15s;
+        }
+        .btn:hover { opacity: .88; }
+        .btn-primary { background: linear-gradient(135deg, #0d9488, #0f766e); color: #fff; margin-bottom: 10px; }
+        .btn-secondary { background: #f1f5f9; color: #475569; font-size: 13px; }
+        .error-box {
+            background: #fff5f5; border: 1px solid #fca5a5; color: #7f1d1d;
+            border-radius: 8px; padding: 10px 14px; font-size: 13px;
+            margin-bottom: 16px; text-align: right;
+        }
+        .success-box {
+            background: #f0fdf4; border: 1px solid #86efac; color: #14532d;
+            border-radius: 8px; padding: 10px 14px; font-size: 13px;
+            margin-bottom: 16px; text-align: right;
+        }
+        .timer { font-size: 12px; color: #94a3b8; margin-top: 12px; }
+        .logout-link { display: block; margin-top: 20px; font-size: 12px; color: #94a3b8; }
+        .logout-link a { color: #ef4444; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">📱</div>
+    <h1>تأیید دو مرحله‌ای</h1>
+    <p class="subtitle">
+        کد ۶ رقمی ارسال شده به شماره<br>
+        <span class="phone">{{ masked_phone }}</span><br>
+        را وارد کنید.
+    </p>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    {% if resent %}
+    <div class="success-box">کد جدید ارسال شد.</div>
+    {% endif %}
+
+    <form method="post" id="otp-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="verify">
+        <input
+            type="text"
+            name="code"
+            class="otp-input"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="8"
+            autocomplete="one-time-code"
+            autofocus
+            placeholder="• • • • • •"
+            required
+        >
+        <button type="submit" class="btn btn-primary">تأیید و ورود</button>
+    </form>
+
+    <form method="post" style="margin-top:0;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="resend">
+        <button type="submit" class="btn btn-secondary" id="resend-btn">ارسال مجدد کد</button>
+    </form>
+
+    <div class="timer" id="timer-text"></div>
+
+    <div class="logout-link">
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <a href="#" onclick="this.closest('form').submit()">انصراف و خروج</a>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    var btn = document.getElementById('resend-btn');
+    var timerEl = document.getElementById('timer-text');
+    var seconds = 90;
+
+    function tick() {
+        if (seconds <= 0) {
+            btn.disabled = false;
+            timerEl.textContent = '';
+            return;
+        }
+        btn.disabled = true;
+        var m = Math.floor(seconds / 60);
+        var s = seconds % 60;
+        timerEl.textContent = 'ارسال مجدد پس از ' + (m ? m + ':' + (s<10?'0':'') : '') + s + ' ثانیه';
+        seconds--;
+        setTimeout(tick, 1000);
+    }
+    tick();
+})();
+</script>
+</body>
+</html>

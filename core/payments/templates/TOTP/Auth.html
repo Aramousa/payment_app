@@ -1,0 +1,5 @@
+{% extends "mfa_auth_base.html" %}
+{% block head %}{% endblock %}
+{% block content %}
+    {% include "TOTP/recheck.html" with mode='auth' %}
+{% endblock %}

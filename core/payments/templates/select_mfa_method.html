@@ -1,0 +1,30 @@
+{% extends "mfa_auth_base.html" %}
+{% block content %}
+<div style="max-width:420px;margin:40px auto;padding:0 16px;">
+    <div style="background:#fff;border-radius:14px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.08);
+                border:1px solid #e2e8f0;text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;">🔐</div>
+        <h3 style="font-size:17px;color:#1e293b;margin:0 0 8px;">انتخاب روش تأیید هویت</h3>
+        <p style="font-size:13px;color:#64748b;margin:0 0 24px;">
+            یکی از روش‌های زیر را برای تأیید هویت دو مرحله‌ای انتخاب کنید:
+        </p>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;">
+            {% for method in request.session.mfa_methods %}
+            <li>
+                <a href="{% url 'mfa_goto' method %}"
+                   style="display:block;padding:13px 20px;background:#f0fdfa;border:1.5px solid #0d9488;
+                          border-radius:10px;color:#0f766e;font-weight:700;font-size:14px;
+                          text-decoration:none;">
+                    {% if method == "TOTP" %}📱 اپلیکیشن احراز هویت
+                    {% elif method == "Email" %}✉️ کد از طریق ایمیل
+                    {% elif method == "U2F" %}🔑 کلید سخت‌افزاری
+                    {% elif method == "FIDO2" %}🔑 FIDO2
+                    {% elif method == "RECOVERY" %}🆘 کد بازیابی
+                    {% else %}{{ method }}{% endif %}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

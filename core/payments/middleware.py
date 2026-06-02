@@ -7,7 +7,8 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 
-_SESSION_EXEMPT_PREFIXES = ('/accounts/', '/admin/', '/static/', '/media/')
+_SESSION_EXEMPT_PREFIXES = ('/accounts/', '/admin/', '/static/', '/media/', '/sms-verify/')
+_SMS_OTP_VERIFY_URL = '/sms-verify/'
 _COUNTERPARTY_ALLOWED_PREFIXES = ('/counterparty/', '/accounts/', '/admin/', '/static/', '/media/', '/profile/')
 
 # کش ساده برای timeout — هر ۶۰ ثانیه از دیتابیس می‌خواند
@@ -111,6 +112,29 @@ class SingleSessionMiddleware:
 
         request.session['_last_activity'] = now
         return None
+
+
+class SMSOTPMiddleware:
+    """
+    بعد از login موفق، اگر کاربر SMS MFA فعال داشته باشد،
+    تا تأیید OTP پیامکی، او را به صفحه تأیید هدایت می‌کند.
+    اگر پیامک غیرفعال باشد (sms_provider='disabled')، هیچ کاری نمی‌کند.
+    """
+
+    _EXEMPT = ('/accounts/', '/admin/', '/static/', '/media/', '/sms-verify/', '/mfa/')
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if (
+            request.user.is_authenticated
+            and not any(request.path.startswith(p) for p in self._EXEMPT)
+            and request.session.get('sms_mfa_pending')
+        ):
+            from django.urls import reverse as _rev
+            return redirect(_rev('sms_otp_verify'))
+        return self.get_response(request)
 
 
 class EnforceCustomerPasswordChangeMiddleware:

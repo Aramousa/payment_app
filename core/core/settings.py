@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 
@@ -78,6 +79,8 @@ ALLOWED_HOSTS = [
 INSTALLED_APPS = [
     'payments',
     'django_jalali',
+    'axes',
+    'mfa',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -89,12 +92,15 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'csp.middleware.CSPMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'axes.middleware.AxesMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'payments.middleware.SingleSessionMiddleware',
+    'payments.middleware.SMSOTPMiddleware',
     'payments.middleware.EnforceCustomerPasswordChangeMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -107,7 +113,9 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'payments' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -129,6 +137,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+_db_sslmode = os.getenv('VISIUNAPP_DB_SSLMODE', 'require' if not DEBUG else 'disable')
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -138,6 +147,9 @@ DATABASES = {
         'HOST': os.getenv('VISIUNAPP_DB_HOST', '127.0.0.1'),
         'PORT': os.getenv('VISIUNAPP_DB_PORT', '5432'),
         'CONN_MAX_AGE': int(os.getenv('VISIUNAPP_DB_CONN_MAX_AGE', '60')),
+        'OPTIONS': {
+            'sslmode': _db_sslmode,
+        },
     }
 }
 
@@ -148,6 +160,7 @@ if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql' and not DAT
 # Authentication backends
 # Custom backend for date-based access control
 AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
     'payments.auth_backend.DateRestrictedBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
@@ -155,6 +168,15 @@ AUTHENTICATION_BACKENDS = [
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
+
+# Argon2 — هش قوی‌تر از PBKDF2 پیش‌فرض Django
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',   # fallback برای رمزهای قدیمی
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+
+# Django با اولین hasher رمز جدید می‌سازد و هنگام login رمزهای قدیمی را upgrade می‌کند.
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -196,6 +218,10 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# حداکثر حجم فایل در حافظه قبل از نوشتن روی دیسک (2MB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
 PADDLEOCR_MODEL_DIR = Path(os.getenv('PADDLEOCR_MODEL_DIR', BASE_DIR / 'offline_packages' / 'paddleocr-models'))
 PADDLEOCR_DET_MODEL_DIR = Path(os.getenv('PADDLEOCR_DET_MODEL_DIR', PADDLEOCR_MODEL_DIR / 'det'))
 PADDLEOCR_REC_MODEL_DIR = Path(os.getenv('PADDLEOCR_REC_MODEL_DIR', PADDLEOCR_MODEL_DIR / 'rec'))
@@ -217,16 +243,134 @@ LOGOUT_REDIRECT_URL = '/accounts/login/'
 SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', not DEBUG)
 SESSION_COOKIE_SECURE = env_bool('DJANGO_SESSION_COOKIE_SECURE', not DEBUG)
 CSRF_COOKIE_SECURE = env_bool('DJANGO_CSRF_COOKIE_SECURE', not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-X_FRAME_OPTIONS = 'SAMEORIGIN'
+# HSTS — فقط در صورتی که SSL فعال است فعال می‌شود
+if not DEBUG:
+    SECURE_HSTS_SECONDS = int(os.getenv('DJANGO_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('DJANGO_HSTS_SUBDOMAINS', True)
+    SECURE_HSTS_PRELOAD = env_bool('DJANGO_HSTS_PRELOAD', True)
 
-EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = os.getenv('DJANGO_EMAIL_HOST', 'localhost')
-EMAIL_PORT = int(os.getenv('DJANGO_EMAIL_PORT', '25'))
-EMAIL_HOST_USER = os.getenv('DJANGO_EMAIL_HOST_USER', '')
+X_FRAME_OPTIONS = 'DENY'
+
+# ─── django-axes: قفل حساب بعد از چند تلاش ناموفق ─────────────────────────
+AXES_FAILURE_LIMIT = int(os.getenv('AXES_FAILURE_LIMIT', '5'))
+AXES_COOLOFF_TIME = timedelta(minutes=int(os.getenv('AXES_COOLOFF_MINUTES', '15')))
+AXES_LOCKOUT_PARAMETERS = ['ip_address', 'username']
+AXES_RESET_ON_SUCCESS = True
+AXES_ENABLE_ADMIN = True
+AXES_LOCKOUT_TEMPLATE = 'errors/lockout.html'
+
+# ─── django-csp: Content Security Policy ─────────────────────────────────────
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC  = ("'self'", "'unsafe-inline'")
+CSP_STYLE_SRC   = ("'self'", "'unsafe-inline'")
+CSP_IMG_SRC     = ("'self'", "data:", "blob:")
+CSP_FONT_SRC    = ("'self'",)
+CSP_CONNECT_SRC = ("'self'",)
+CSP_FRAME_ANCESTORS = ("'none'",)
+CSP_BASE_URI    = ("'self'",)
+CSP_FORM_ACTION = ("'self'",)
+
+# ─── django-mfa2: احراز هویت دو مرحله‌ای ───────────────────────────────────
+MFA_UNALLOWED_METHODS = ('U2F',)  # U2F منسوخ شده — FIDO2 جایگزین مدرن آن است
+MFA_LOGIN_CALLBACK = 'payments.mfa_hooks.mfa_login_callback'
+MFA_RECHECK = True
+MFA_RECHECK_MIN = int(os.getenv('MFA_RECHECK_MIN', '10'))
+MFA_RECHECK_MAX = int(os.getenv('MFA_RECHECK_MAX', '30'))
+MFA_QUICKLOGIN = False
+MFA_ALWAYS_GO_TO_LOGIN_PAGE = True
+MFA_REDIRECT_AFTER_REGISTRATION = 'mfa_home'
+MFA_SUCCESS_REGISTRATION_MSG = 'روش احراز هویت دو مرحله‌ای با موفقیت افزوده شد.'
+MFA_HIDE_DISABLE = ()
+MFA_EMAIL_FROM = os.getenv('DJANGO_DEFAULT_FROM_EMAIL', 'noreply@localhost')
+MFA_RENAME_METHODS = {
+    'TOTP':           'اپلیکیشن احراز هویت (TOTP)',
+    'Email':          'کد از طریق ایمیل',
+    'RECOVERY':       'کد بازیابی',
+    'U2F':            'کلید سخت‌افزاری',
+    'FIDO2':          'FIDO2',
+    'Trusted_Devices': 'دستگاه مورد اعتماد',
+}
+EMAIL_FROM = 'سامانه ارتباط با مشتری'
+
+# برای TOTP — نام سازمان که در Google Authenticator نمایش داده می‌شود
+TOKEN_ISSUER_NAME = os.getenv('MFA_TOKEN_ISSUER', 'سامانه ارتباط با مشتری')
+
+# BASE_URL برای لینک‌های ایمیل در MFA
+BASE_URL = os.getenv('APP_BASE_URL', 'http://localhost:8000')
+
+# FIDO2 — شناسه سرور باید دقیقاً با domain مرورگر مطابقت داشته باشد
+# dev روی 127.0.0.1 → مقدار '127.0.0.1'
+# dev روی localhost  → مقدار 'localhost'
+# production         → مقدار 'app.rabasa.ir'
+FIDO_SERVER_ID   = os.getenv('FIDO_SERVER_ID', 'localhost')
+FIDO_SERVER_NAME = os.getenv('FIDO_SERVER_NAME', 'سامانه ارتباط با مشتری')
+
+# U2F — منسوخ شده، فقط برای جلوگیری از crash در صورت وجود داده قدیمی
+U2F_APPID = os.getenv('APP_BASE_URL', 'http://localhost:8000')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file_errors': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(BASE_DIR / 'logs' / 'errors.log'),
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file_errors'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'payments': {
+            'handlers': ['file_errors', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
+
+# ─── ایمیل ────────────────────────────────────────────────────────────────────
+# development: ایمیل‌ها در فایل ذخیره می‌شوند (بدون نیاز به SMTP)
+# production:  از SMTP واقعی استفاده می‌شود
+_default_email_backend = (
+    'django.core.mail.backends.filebased.EmailBackend'
+    if DEBUG else
+    'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND', _default_email_backend)
+EMAIL_FILE_PATH = BASE_DIR / 'logs' / 'emails'   # محل ذخیره ایمیل‌ها در dev
+
+EMAIL_HOST     = os.getenv('DJANGO_EMAIL_HOST', 'localhost')
+EMAIL_PORT     = int(os.getenv('DJANGO_EMAIL_PORT', '25'))
+EMAIL_HOST_USER     = os.getenv('DJANGO_EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('DJANGO_EMAIL_HOST_PASSWORD', '')
-EMAIL_USE_TLS = env_bool('DJANGO_EMAIL_USE_TLS', False)
-EMAIL_USE_SSL = env_bool('DJANGO_EMAIL_USE_SSL', False)
+EMAIL_USE_TLS  = env_bool('DJANGO_EMAIL_USE_TLS', False)
+EMAIL_USE_SSL  = env_bool('DJANGO_EMAIL_USE_SSL', False)
 DEFAULT_FROM_EMAIL = os.getenv('DJANGO_DEFAULT_FROM_EMAIL', 'noreply@localhost')

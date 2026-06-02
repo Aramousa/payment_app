@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}سامانه ارتباط با مشتری{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <!-- Bootstrap + jQuery — فایل‌های محلی، بدون نیاز به اینترنت -->
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.rtl.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/css/bootstrap-icons.min.css' %}">
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; }
+        .container { padding-top: 20px; }
+        .btn-success { background-color: #0d9488; border-color: #0d9488; }
+        .btn-success:hover { background-color: #0f766e; border-color: #0f766e; }
+        table th { background: linear-gradient(135deg, #042f2e, #0f4e49); color: #fff; }
+        .table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #f0fdfa; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+    {% if messages %}
+    <div class="container" style="margin-top:8px;">
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

@@ -1,5 +1,8 @@
 from django.urls import path
 from .views import (
+    sms_mfa_setup,
+    sms_otp_verify,
+    sms_test_send,
     bank_names_autocomplete,
     counterparty_edit,
     counterparties_manage,
@@ -127,6 +130,9 @@ urlpatterns = [
     path('counterparties/<int:counterparty_id>/edit/', counterparty_edit, name='counterparty_edit'),
     path('export-records/', export_records, name='export_records'),
     path('export/<str:dataset>/', export_data, name='export_data'),
+    path('sms-verify/', sms_otp_verify, name='sms_otp_verify'),
+    path('sms-mfa/setup/', sms_mfa_setup, name='sms_mfa_setup'),
+    path('sms-mfa/test/', sms_test_send, name='sms_test_send'),
     path('profile/', profile_edit, name='profile_edit'),
     path('profile-change-requests/<int:request_id>/review/', profile_change_request_review, name='profile_change_request_review'),
     path('profile/password/', profile_password_change, name='profile_password_change'),

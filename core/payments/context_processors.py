@@ -112,6 +112,8 @@ def app_navigation(request):
     items.extend([
         _nav_item('ویرایش مشخصات', 'profile_edit', 'profile', 'account'),
         _nav_item('تغییر رمز عبور', 'profile_password_change', 'password', 'account'),
+        _nav_item('احراز هویت دو مرحله‌ای (TOTP)', 'mfa_home', 'mfa', 'account'),
+        _nav_item('تأیید پیامکی', 'sms_mfa_setup', 'sms_mfa', 'account'),
     ])
 
     role_label = {

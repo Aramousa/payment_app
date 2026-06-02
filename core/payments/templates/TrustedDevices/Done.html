@@ -1,0 +1,21 @@
+{% extends "mfa_auth_base.html" %}
+{% load static %}
+{% block content %}
+<div style="max-width:420px;margin:40px auto;padding:0 16px;text-align:center;">
+    <div style="background:#fff;border-radius:14px;padding:32px;
+                box-shadow:0 2px 12px rgba(0,0,0,.08);border:1px solid #e2e8f0;">
+        <div style="font-size:56px;margin-bottom:16px;">✅</div>
+        <h3 style="font-size:17px;color:#1e293b;margin:0 0 12px;">دستگاه با موفقیت ثبت شد</h3>
+        <p style="font-size:13px;color:#64748b;margin:0 0 24px;line-height:1.8;">
+            این دستگاه اکنون مورد اعتماد است.<br>
+            می‌توانید وارد سامانه شوید.
+        </p>
+        <a href="{{ HOST }}{{ BASE_URL }}accounts/login/"
+           style="display:inline-block;padding:12px 28px;
+                  background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;
+                  border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;">
+            ورود به سامانه
+        </a>
+    </div>
+</div>
+{% endblock %}

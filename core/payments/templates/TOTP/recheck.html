@@ -1,0 +1,64 @@
+{% load static %}
+{% block head %}
+    <link href="{% static 'mfa/css/mfa.css' %}" rel="stylesheet">
+    {% url 'totp_recheck' as totp_recheck %}
+    {{ totp_recheck|json_script:"totp_recheck" }}
+    {{ csrf_token|stringformat:"s"|json_script:"csrf_token" }}
+    {{ mode|json_script:"mode" }}
+    <script src="{% static 'mfa/js/TOTP/recheck.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div style="max-width:420px;margin:40px auto;padding:0 16px;">
+    <div style="background:#fff;border-radius:14px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.08);
+                border:1px solid #e2e8f0;text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;">🔐</div>
+        <h3 style="font-size:17px;color:#1e293b;margin:0 0 8px;">تأیید هویت دو مرحله‌ای</h3>
+        <p style="font-size:13px;color:#64748b;margin:0 0 24px;line-height:1.7;">
+            کد ۶ رقمی نمایش‌داده‌شده در اپلیکیشن احراز هویت خود را وارد کنید.
+        </p>
+
+        <form method="POST" action="{% url 'totp_auth' %}">
+            {% csrf_token %}
+            {% if invalid %}
+            <div style="background:#fff5f5;border:1px solid #fca5a5;color:#7f1d1d;border-radius:8px;
+                        padding:10px 14px;font-size:13px;margin-bottom:16px;">
+                کد وارد شده معتبر نیست. لطفاً دوباره امتحان کنید.
+            </div>
+            {% endif %}
+
+            {% if mode == "auth" %}
+            <div style="font-size:13px;color:#475569;margin-bottom:16px;">
+                خوش آمدید <strong>{{ request.session.base_username }}</strong><br>
+                <a href="{% url 'mfa_reset_cookie' %}" style="font-size:12px;color:#0d9488;">
+                    این من نیستم
+                </a>
+            </div>
+            {% endif %}
+
+            <input class="form-control" style="text-align:center;font-size:22px;letter-spacing:6px;
+                   font-family:monospace;direction:ltr;padding:14px;border:2px solid #d1d5db;
+                   border-radius:10px;width:100%;box-sizing:border-box;margin-bottom:16px;"
+                   size="6" maxlength="6" autocomplete="one-time-code"
+                   placeholder="• • • • • •"
+                   name="otp" inputmode="numeric" pattern="\d{6}" type="text" id="otp" autofocus>
+
+            <button type="{% if mode == 'auth' %}submit{% elif mode == 'recheck' %}button{% endif %}"
+                    {% if mode == 'recheck' %}id="send_totp"{% endif %}
+                    style="width:100%;padding:13px;background:linear-gradient(135deg,#0d9488,#0f766e);
+                           color:#fff;border:none;border-radius:10px;font-family:Vazir,sans-serif;
+                           font-size:15px;font-weight:700;cursor:pointer;">
+                تأیید و ورود
+            </button>
+        </form>
+
+        {% if request.session.mfa_methods|length > 1 %}
+        <div style="margin-top:16px;">
+            <a href="{% url 'mfa_methods_list' %}" style="font-size:12px;color:#0d9488;">
+                استفاده از روش دیگر
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% include "modal.html" %}
+{% endblock %}

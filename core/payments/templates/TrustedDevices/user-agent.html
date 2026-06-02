@@ -1,0 +1,14 @@
+<table style="font-size:13px;border-collapse:collapse;width:100%;">
+    <tr>
+        <th style="text-align:right;padding:6px 12px;color:#64748b;font-weight:600;width:100px;">مرورگر:</th>
+        <td style="padding:6px 12px;">{{ ua.browser.family }}</td>
+    </tr>
+    <tr style="background:#f8fafc;">
+        <th style="text-align:right;padding:6px 12px;color:#64748b;font-weight:600;">نسخه:</th>
+        <td style="padding:6px 12px;">{{ ua.browser.version_string }}</td>
+    </tr>
+    <tr>
+        <th style="text-align:right;padding:6px 12px;color:#64748b;font-weight:600;">دستگاه:</th>
+        <td style="padding:6px 12px;">{{ ua.device.brand }} / {{ ua.device.model }}</td>
+    </tr>
+</table>

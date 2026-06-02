@@ -1,0 +1,83 @@
+{% load static %}
+<script src="{% static 'mfa/js/base64url.js' %}"></script>
+<script src="{% static 'mfa/js/helpers.js' %}"></script>
+<script src="{% static 'mfa/js/ua-parser.min.js' %}"></script>
+{% url 'fido2_begin_auth' as fido2_begin_auth %}
+{{ fido2_begin_auth|json_script:"fido2_begin_auth" }}
+{% url 'fido2_complete_auth' as fido2_complete_auth %}
+{{ fido2_complete_auth|json_script:"fido2_complete_auth" }}
+{{ mode|json_script:"mode" }}
+
+<script>
+window.conditionalUI = false;
+window.conditionUIAbortController = new AbortController();
+window.conditionUIAbortSignal = conditionUIAbortController.signal;
+
+var GetAssertReq = (getAssert) => {
+    getAssert.publicKey.challenge = base64url.decode(getAssert.publicKey.challenge);
+    for (let allowCred of getAssert.publicKey.allowCredentials) {
+        allowCred.id = base64url.decode(allowCred.id);
+    }
+    return getAssert;
+};
+
+function authen(conditionalUI) {
+    conditionalUI = conditionalUI || false;
+    const fido2_begin_auth = JSON.parse(document.getElementById('fido2_begin_auth').textContent);
+    const fido2_complete_auth = JSON.parse(document.getElementById('fido2_complete_auth').textContent);
+    const mode = JSON.parse(document.getElementById('mode').textContent);
+
+    fetch(fido2_begin_auth).then(function(response) {
+        if (response.ok) return response.json().then(function(req) { return GetAssertReq(req); });
+        throw new Error('اطلاعات احراز هویت موجود نیست');
+    }).then(function(options) {
+        if (conditionalUI) { options.mediation='conditional'; options.signal=window.conditionUIAbortSignal; }
+        else { window.conditionUIAbortController.abort(); }
+        return navigator.credentials.get(options);
+    }).then(function(assertion) {
+        return fetch(fido2_complete_auth, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(publicKeyCredentialToJSON(assertion)),
+        });
+    }).then(function(response) {
+        if (response.ok) return response.json();
+    }).then(function(res) {
+        if (res.status === 'OK') {
+            $("#msgdiv").addClass("alert alert-success").html("✅ تأیید شد، در حال انتقال...");
+            if (mode === 'auth' || !mode) { window.location.href = res.redirect; }
+            else if (mode === 'recheck') { mfa_success_function(); }
+        } else {
+            var msg = res.message || '';
+            var fa = msg.includes('domain') ? 'خطای domain — از localhost یا HTTPS استفاده کنید.' :
+                     msg.includes('cancelled') || msg.includes('NotAllowed') ? 'عملیات لغو شد.' :
+                     'تأیید ناموفق بود: ' + msg;
+            $("#msgdiv").addClass("alert alert-danger").html(
+                fa + ' <a href="#" id="failed_authen">تلاش مجدد</a>'
+            );
+            $("#failed_authen").click(function(){ authen(); });
+            if (mode === 'recheck') { mfa_failed_function(); }
+        }
+    });
+}
+
+$(document).ready(function() {
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        $("#res").addClass("alert alert-warning").html(
+            '⚠️ FIDO2 نیاز به اتصال امن دارد.<br>' +
+            'برای استفاده در محیط توسعه، آدرس مرورگر را از <code>127.0.0.1</code> به ' +
+            '<a href="http://localhost:8000/mfa/fido2/" style="color:#92400e;font-weight:700;">localhost:8000</a>' +
+            ' تغییر دهید، یا در production از HTTPS استفاده کنید.'
+        );
+        return;
+    }
+    var ua = new UAParser().getResult();
+    if (ua.browser.name === 'Safari' || ua.browser.name === 'Mobile Safari' ||
+        ua.os.name === 'iOS' || ua.os.name === 'iPadOS') {
+        $("#res").html("<button class='btn btn-success' id='ua_authen'>شروع احراز هویت...</button>");
+        $("#ua_authen").click(function(){ authen(); });
+    } else {
+        authen();
+    }
+});
+</script>

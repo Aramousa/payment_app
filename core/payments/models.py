@@ -570,9 +570,15 @@ class UserProfile(models.Model):
     can_upload_invoices = models.BooleanField('دسترسی بارگذاری فاکتورها', default=False)
     can_edit_payment_details = models.BooleanField('دسترسی تکمیل اطلاعات فیش‌ها', default=False)
     accounting_code = models.CharField('کد تفضیلی', max_length=50, blank=True)
+    sms_mfa_enabled = models.BooleanField('ورود دو مرحله‌ای با پیامک', default=False)
 
     def __str__(self):
         return self.user.username
+
+    @property
+    def sms_number(self):
+        """شماره برای ارسال پیامک — موبایل اول، در غیر این‌صورت شماره تلفن."""
+        return (self.mobile or self.phone or '').strip()
 
 
 class ProfileChangeRequest(models.Model):
@@ -1245,6 +1251,44 @@ class SystemSettings(models.Model):
         default=30,
         help_text='پس از این مدت بی‌فعالیت، کاربر به‌صورت خودکار خارج می‌شود.',
     )
+
+    # ─── تنظیمات پیامک ──────────────────────────────────────────────────────
+    SMS_PROVIDER_KAVENEGAR = 'kavenegar'
+    SMS_PROVIDER_GHASEDAK  = 'ghasedak'
+    SMS_PROVIDER_GENERIC   = 'generic'
+    SMS_PROVIDER_DISABLED  = 'disabled'
+    SMS_PROVIDER_CHOICES = [
+        (SMS_PROVIDER_DISABLED,  'غیرفعال'),
+        (SMS_PROVIDER_KAVENEGAR, 'کاوه‌نگار (Kavenegar)'),
+        (SMS_PROVIDER_GHASEDAK,  'قاصدک (Ghasedak)'),
+        (SMS_PROVIDER_GENERIC,   'HTTP عمومی (سایر اپراتورها)'),
+    ]
+
+    sms_provider = models.CharField(
+        'اپراتور پیامک', max_length=20,
+        choices=SMS_PROVIDER_CHOICES, default=SMS_PROVIDER_DISABLED,
+    )
+    sms_api_key = models.CharField('کلید API پیامک', max_length=256, blank=True)
+    sms_sender = models.CharField(
+        'شماره فرستنده', max_length=40, blank=True,
+        help_text='شماره خط اختصاصی یا نام خط (بسته به اپراتور)',
+    )
+    sms_generic_url = models.URLField(
+        'آدرس API پیامک عمومی', blank=True,
+        help_text='فقط برای نوع HTTP عمومی — آدرس endpoint ارسال پیامک',
+    )
+    sms_generic_extra = models.JSONField(
+        'پارامترهای اضافه API', default=dict, blank=True,
+        help_text='JSON اضافی که به body درخواست اضافه می‌شود (مثلاً username/password)',
+    )
+    sms_otp_template = models.CharField(
+        'قالب پیام OTP', max_length=200,
+        default='کد تأیید سامانه: {code}\nاعتبار: {minutes} دقیقه',
+        help_text='متغیرهای مجاز: {code}, {minutes}',
+    )
+    sms_otp_expiry_minutes = models.PositiveSmallIntegerField('اعتبار کد OTP (دقیقه)', default=5)
+    sms_notifications_enabled = models.BooleanField('اطلاع‌رسانی پیامکی فعال', default=False)
+
     updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
 
     class Meta:
@@ -1265,6 +1309,70 @@ class SystemSettings(models.Model):
 
     def __str__(self):
         return 'تنظیمات سیستم'
+
+
+class SMSOTPCode(models.Model):
+    """کد یک‌بارمصرف ارسال‌شده از طریق پیامک."""
+
+    PURPOSE_MFA       = 'mfa'
+    PURPOSE_APPROVAL  = 'approval'
+    PURPOSE_CHOICES = [
+        (PURPOSE_MFA,      'ورود دو مرحله‌ای'),
+        (PURPOSE_APPROVAL, 'تأیید عملیات'),
+    ]
+
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sms_otps', verbose_name='کاربر')
+    phone      = models.CharField('شماره گیرنده', max_length=20)
+    code       = models.CharField('کد OTP', max_length=8)
+    purpose    = models.CharField('هدف', max_length=20, choices=PURPOSE_CHOICES, default=PURPOSE_MFA)
+    ref_id     = models.CharField('شناسه مرجع', max_length=50, blank=True,
+                                   help_text='مثلاً شناسه سند برای تأیید از طریق پیامک')
+    is_used    = models.BooleanField('مصرف شده', default=False)
+    attempts   = models.PositiveSmallIntegerField('تعداد تلاش', default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField('زمان انقضا')
+
+    class Meta:
+        verbose_name = 'کد OTP پیامکی'
+        verbose_name_plural = 'کدهای OTP پیامکی'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'purpose', 'is_used'])]
+
+    def __str__(self):
+        return f'{self.user.username} — {self.phone} — {self.purpose}'
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self):
+        return not self.is_used and not self.is_expired and self.attempts < 5
+
+
+class SMSSendLog(models.Model):
+    """لاگ ارسال پیامک‌ها برای مانیتورینگ و حسابرسی."""
+
+    STATUS_SENT    = 'sent'
+    STATUS_FAILED  = 'failed'
+    STATUS_CHOICES = [(STATUS_SENT, 'ارسال شد'), (STATUS_FAILED, 'خطا')]
+
+    recipient  = models.CharField('گیرنده', max_length=20)
+    message    = models.TextField('متن پیام')
+    purpose    = models.CharField('هدف', max_length=40, blank=True)
+    status     = models.CharField('وضعیت', max_length=10, choices=STATUS_CHOICES)
+    provider   = models.CharField('اپراتور', max_length=20, blank=True)
+    error      = models.TextField('خطا', blank=True)
+    sent_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'لاگ پیامک'
+        verbose_name_plural = 'لاگ پیامک‌ها'
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f'{self.recipient} — {self.status} — {self.sent_at:%Y/%m/%d %H:%M}'
 
 
 class FinalApprovalDelegate(models.Model):

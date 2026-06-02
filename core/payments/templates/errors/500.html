@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>خطای سرور — سامانه ارتباط با مشتری</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Vazir, sans-serif;
+            background: linear-gradient(135deg, #012322 0%, #063f3b 50%, #0d766e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+        .card {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 48px 40px;
+            max-width: 480px;
+            width: 100%;
+        }
+        .code { font-size: 80px; font-weight: 900; color: #f87171; line-height: 1; }
+        h1 { font-size: 22px; margin: 16px 0 10px; }
+        p { font-size: 14px; color: rgba(255,255,255,0.7); line-height: 1.8; }
+        .btn {
+            display: inline-block;
+            margin-top: 28px;
+            padding: 10px 28px;
+            background: #0d9488;
+            color: #fff;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .btn:hover { background: #0f766e; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="code">500</div>
+        <h1>خطای داخلی سرور</h1>
+        <p>مشکلی در سرور رخ داده است.<br>تیم پشتیبانی در حال بررسی است. لطفاً دقایقی دیگر تلاش کنید.</p>
+        <a href="/" class="btn">بازگشت به صفحه اصلی</a>
+    </div>
+</body>
+</html>

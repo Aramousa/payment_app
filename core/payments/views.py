@@ -26,6 +26,10 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
+from axes.helpers import get_client_ip_address
 from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
@@ -309,8 +313,16 @@ def safe_logout(request):
 class SafeLoginView(LoginView):
     template_name = 'registration/login.html'
 
+    @method_decorator(never_cache)
+    @method_decorator(ratelimit(key='ip', rate='10/m', method='POST', block=False))
+    def post(self, request, *args, **kwargs):
+        if getattr(request, 'limited', False):
+            from django.contrib import messages as _msg
+            _msg.error(request, 'تعداد درخواست‌های ورود بیش از حد مجاز است. لطفاً چند دقیقه صبر کنید.')
+            return self.get(request, *args, **kwargs)
+        return super().post(request, *args, **kwargs)
+
     def get_success_url(self):
-        # طرف حساب → داشبورد اختصاصی
         user = self.request.user
         if _is_counterparty_user(user):
             return reverse('counterparty_dashboard')
@@ -318,7 +330,7 @@ class SafeLoginView(LoginView):
 
     def form_valid(self, form):
         try:
-            return super().form_valid(form)
+            response = super().form_valid(form)
         except DatabaseError:
             logger.exception('Login failed because the session/database could not be written.')
             form.add_error(
@@ -326,6 +338,35 @@ class SafeLoginView(LoginView):
                 'ورود انجام نشد، چون سامانه در حال حاضر امکان ثبت نشست کاربر در دیتابیس را ندارد. لطفا با مدیر سیستم تماس بگیرید.',
             )
             return self.form_invalid(form)
+
+        # SMS MFA — اگر کاربر SMS MFA فعال داشته باشد و پیامک سیستم روشن باشد
+        user = self.request.user
+        try:
+            profile = user.profile
+            if profile.sms_mfa_enabled and _sms_mfa_is_active() and profile.sms_number:
+                from .sms_service import send_otp
+                otp = send_otp(user, purpose='mfa')
+                if otp:
+                    self.request.session['sms_mfa_pending'] = True
+                    self.request.session['sms_mfa_otp_key'] = otp.pk
+                    self.request.session['sms_mfa_next'] = self.get_success_url()
+                    return redirect(reverse('sms_otp_verify'))
+        except Exception:
+            logger.exception('SMS MFA check failed for user %s', user.username)
+
+        return response
+
+    def form_invalid(self, form):
+        from axes.helpers import get_lockout_response
+        from axes.signals import user_locked_out
+        if getattr(self.request, 'axes_locked_out', False):
+            cooloff = getattr(settings, 'AXES_COOLOFF_TIME', None)
+            minutes = int(cooloff.total_seconds() // 60) if cooloff else 15
+            form.add_error(
+                None,
+                f'حساب کاربری به دلیل تلاش‌های ناموفق مکرر به مدت {minutes} دقیقه قفل شده است.',
+            )
+        return super().form_invalid(form)
 
 
 def _suggest_five_digit_password():
@@ -1133,7 +1174,8 @@ def _notification_payload(notification):
     }
 
 
-def _notify_users(users, title, message, url='', category=UserNotification.CATEGORY_SYSTEM, actor=None):
+def _notify_users(users, title, message, url='', category=UserNotification.CATEGORY_SYSTEM, actor=None, sms_message=None):
+    from .sms_service import notify_sms
     seen_user_ids = set()
     notifications = []
     for user in users:
@@ -1148,6 +1190,9 @@ def _notify_users(users, title, message, url='', category=UserNotification.CATEG
             url=url,
             category=category,
         ))
+        # ارسال پیامک اطلاع‌رسانی (اگر فعال باشد)
+        if sms_message:
+            notify_sms(user, sms_message, purpose='notification')
     if notifications:
         UserNotification.objects.bulk_create(notifications)
 
@@ -5169,5 +5214,117 @@ def reset_user_password(request, user_id):
     })
 
 
+# ─── SMS OTP MFA ─────────────────────────────────────────────────────────────
 
+def _sms_mfa_is_active():
+    """آیا SMS MFA در کل سیستم فعال است؟"""
+    try:
+        from .models import SystemSettings
+        cfg = SystemSettings.load()
+        return cfg.sms_provider != 'disabled' and bool(cfg.sms_api_key)
+    except Exception:
+        return False
+
+
+@login_required
+def sms_mfa_setup(request):
+    """صفحه فعال/غیرفعال کردن SMS MFA توسط خود کاربر."""
+    if not _sms_mfa_is_active():
+        messages.info(request, 'ارسال پیامک در حال حاضر توسط مدیر سیستم غیرفعال است.')
+        return redirect('submit')
+
+    profile = getattr(request.user, 'profile', None)
+    if not profile:
+        messages.error(request, 'پروفایل کاربری یافت نشد.')
+        return redirect('submit')
+
+    if not profile.sms_number:
+        messages.error(request, 'برای فعال‌سازی ورود پیامکی ابتدا باید شماره موبایل خود را در پروفایل ثبت کنید.')
+        return redirect('profile_edit')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'enable':
+            profile.sms_mfa_enabled = True
+            profile.save(update_fields=['sms_mfa_enabled'])
+            messages.success(request, 'ورود دو مرحله‌ای با پیامک فعال شد.')
+        elif action == 'disable':
+            profile.sms_mfa_enabled = False
+            profile.save(update_fields=['sms_mfa_enabled'])
+            messages.success(request, 'ورود دو مرحله‌ای با پیامک غیرفعال شد.')
+        return redirect('sms_mfa_setup')
+
+    return render(request, 'payments/sms_mfa_setup.html', {
+        'profile': profile,
+        'sms_active': _sms_mfa_is_active(),
+        'masked_phone': _mask_phone(profile.sms_number),
+    })
+
+
+def _mask_phone(phone):
+    """09xxxxxxx89 → 09***x89"""
+    if not phone or len(phone) < 6:
+        return phone
+    return phone[:3] + '****' + phone[-3:]
+
+
+@login_required
+def sms_otp_verify(request):
+    """صفحه تأیید کد OTP پیامکی بعد از login."""
+    if not request.session.get('sms_mfa_pending'):
+        return redirect('submit')
+
+    error = ''
+    resent = False
+
+    if request.method == 'POST':
+        action = request.POST.get('action', 'verify')
+
+        if action == 'resend':
+            from .sms_service import send_otp
+            otp = send_otp(request.user, purpose='mfa')
+            if otp:
+                request.session['sms_mfa_otp_key'] = otp.pk
+                resent = True
+                messages.success(request, 'کد جدید ارسال شد.')
+            else:
+                error = 'ارسال کد جدید ناموفق بود. لطفاً با مدیر سیستم تماس بگیرید.'
+
+        else:
+            submitted = request.POST.get('code', '').strip()
+            from .sms_service import verify_otp
+            ok, msg = verify_otp(request.user, submitted, purpose='mfa')
+            if ok:
+                request.session.pop('sms_mfa_pending', None)
+                request.session.pop('sms_mfa_otp_key', None)
+                next_url = request.session.pop('sms_mfa_next', '') or reverse('submit')
+                return redirect(next_url)
+            else:
+                error = msg
+
+    profile = getattr(request.user, 'profile', None)
+    masked = _mask_phone(profile.sms_number if profile else '')
+    return render(request, 'payments/sms_otp_verify.html', {
+        'masked_phone': masked,
+        'error': error,
+        'resent': resent,
+    })
+
+
+@login_required
+def sms_test_send(request):
+    """ارسال پیامک آزمایشی — فقط ادمین."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        phone = request.POST.get('phone', '').strip()
+        msg = request.POST.get('message', 'پیامک آزمایشی از سامانه').strip()
+        from .sms_service import send_sms
+        ok, err = send_sms(phone, msg, purpose='test')
+        if ok:
+            messages.success(request, f'پیامک به {phone} ارسال شد.')
+        else:
+            messages.error(request, f'خطا: {err}')
+        return redirect(request.META.get('HTTP_REFERER', '/admin/'))
+    return HttpResponseForbidden()
 

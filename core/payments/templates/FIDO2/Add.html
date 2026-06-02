@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head %}
+    {{ block.super }}
+    <link href="{% static 'mfa/css/mfa.css' %}" rel="stylesheet">
+    <script src="{% static 'mfa/js/ua-parser.min.js' %}"></script>
+    <script src="{% static 'mfa/js/base64url.js' %}"></script>
+    <script src="{% static 'mfa/js/helpers.js' %}"></script>
+    {% url 'fido2_begin_reg' as fido2_begin_reg %}
+    {{ fido2_begin_reg|json_script:"fido2_begin_reg" }}
+    {% url 'fido2_complete_reg' as fido2_complete_reg %}
+    {{ fido2_complete_reg|json_script:"fido2_complete_reg" }}
+    {{ redirect_html|json_script:"redirect_html" }}
+    {{ reg_success_msg|json_script:"reg_success_msg" }}
+    {% url 'manage_recovery_codes' as manage_recovery_codes %}
+    {{ manage_recovery_codes|json_script:"manage_recovery_codes" }}
+    {{ RECOVERY_METHOD|json_script:"RECOVERY_METHOD" }}
+    {% url 'mfa_home' as mfa_home %}
+    {{ mfa_home|json_script:"mfa_home" }}
+    <script src="{% static 'mfa/js/FIDO2/add.js' %}"></script>
+    <script>
+    /* ترجمه پیام‌های FIDO2 */
+    (function() {
+        var _origBeginReg = begin_reg;
+        function _msg(reason) {
+            var r = String(reason);
+            if (r.includes('invalid domain') || r.includes('SecurityError'))
+                return 'خطای domain: برای استفاده از FIDO2 باید از آدرس <b>localhost</b> (نه 127.0.0.1) یا HTTPS استفاده کنید.';
+            if (r.includes('NotAllowedError') || r.includes('cancelled'))
+                return 'عملیات لغو شد یا تأیید نشد. لطفاً دوباره امتحان کنید.';
+            if (r.includes('NotSupportedError'))
+                return 'مرورگر یا دستگاه شما از FIDO2 پشتیبانی نمی‌کند.';
+            if (r.includes('InvalidStateError'))
+                return 'این کلید قبلاً ثبت شده است.';
+            return 'خطا: ' + r;
+        }
+
+        window.begin_reg = function() {
+            const fido2_begin_reg = JSON.parse(document.getElementById('fido2_begin_reg').textContent);
+            const fido2_complete_reg = JSON.parse(document.getElementById('fido2_complete_reg').textContent);
+            const redirect_html = JSON.parse(document.getElementById('redirect_html').textContent);
+            const reg_success_msg = JSON.parse(document.getElementById('reg_success_msg').textContent);
+            const manage_recovery_codes = JSON.parse(document.getElementById('manage_recovery_codes').textContent);
+            const RECOVERY_METHOD = JSON.parse(document.getElementById('RECOVERY_METHOD').textContent);
+            const mfa_home = JSON.parse(document.getElementById('mfa_home').textContent);
+
+            fetch(fido2_begin_reg).then(function(response) {
+                if (response.ok) return response.json().then(function(req) { return MakeCredReq(req); });
+                throw new Error('خطا در دریافت اطلاعات ثبت‌نام');
+            }).then(function(options) {
+                return navigator.credentials.create(options);
+            }).then(function(attestation) {
+                return fetch(fido2_complete_reg, {
+                    method: 'POST',
+                    body: JSON.stringify(publicKeyCredentialToJSON(attestation))
+                });
+            }).then(function(response) {
+                return response.json();
+            }).then(function(res) {
+                if (res['status'] === 'OK') {
+                    $("#res").html("<div class='alert alert-success'>✅ ثبت موفق! <a href='"+redirect_html+"'>"+reg_success_msg+"</a></div>");
+                } else {
+                    $("#res").html("<div class='alert alert-danger'>" + _msg(res['message']) + " &nbsp;<a href='#' id='failed_begin_reg'>تلاش مجدد</a> | <a href='"+mfa_home+"'>بازگشت</a></div>");
+                    $("#failed_begin_reg").click(function(){ begin_reg(); });
+                }
+            }, function(reason) {
+                $("#res").html("<div class='alert alert-danger'>" + _msg(reason) + " &nbsp;<a href='#' id='failed_begin_reg'>تلاش مجدد</a> | <a href='"+mfa_home+"'>بازگشت</a></div>");
+                $("#failed_begin_reg").click(function(){ begin_reg(); });
+            });
+        };
+    })();
+    </script>
+{% endblock %}
+{% block content %}
+<div style="max-width:540px; margin:40px auto; padding:0 16px;">
+    <div style="background:#fff; border-radius:14px; padding:32px;
+                box-shadow:0 2px 12px rgba(0,0,0,.08); border:1px solid #e2e8f0; text-align:center;">
+        <div style="font-size:48px; margin-bottom:16px;">🔑</div>
+        <h3 style="font-size:17px; color:#1e293b; margin:0 0 8px;">ثبت کلید امنیتی FIDO2</h3>
+        <p style="font-size:13px; color:#64748b; margin:0 0 20px; line-height:1.7;">
+            مرورگر از شما می‌خواهد هویت خود را تأیید کنید.<br>
+            کلید سخت‌افزاری، Face ID یا اثر انگشت خود را آماده کنید.
+        </p>
+
+        <div style="background:#fef9c3; border:1px solid #fde68a; border-radius:8px;
+                    padding:10px 14px; font-size:12px; color:#92400e; margin-bottom:20px; text-align:right;">
+            ⚠️ <strong>نکته:</strong> FIDO2 فقط روی <code>localhost</code> یا HTTPS کار می‌کند.
+            اگر از <code>127.0.0.1</code> استفاده می‌کنید، آدرس را به <code>localhost:8000</code> تغییر دهید.
+        </div>
+
+        <div id="res" style="margin-bottom:16px;">
+            <div class="alert alert-info" style="font-size:13px;">
+                ⏳ در حال آماده‌سازی... مرورگر به زودی درخواست تأیید ارسال می‌کند.
+            </div>
+        </div>
+
+        <a href="{% url 'mfa_home' %}"
+           style="font-size:13px; color:#64748b; text-decoration:none;">
+            انصراف و بازگشت
+        </a>
+    </div>
+</div>
+{% include "modal.html" %}
+{% endblock %}
