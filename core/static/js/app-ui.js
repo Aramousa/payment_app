@@ -326,14 +326,40 @@
             function renderItems(items) {
                 if (!list) return;
                 if (!items.length) {
-                    list.innerHTML = '<div class="notification-empty">اعلان جدیدی وجود ندارد.</div>';
+                    list.innerHTML = '<div class="notification-empty">📭 پیام جدیدی وجود ندارد.</div>';
                     return;
                 }
                 list.innerHTML = items.map(function (item) {
-                    return '<a class="notification-item" href="' + escapeHtml(item.url) + '">' +
-                        '<strong>' + escapeHtml(item.title) + ':</strong> ' + escapeHtml(item.message) +
+                    var icon = item.icon || '🔔';
+                    var time = item.time_label ? '<span class="notif-time">' + escapeHtml(item.time_label) + '</span>' : '';
+                    return '<a class="notification-item" href="' + escapeHtml(item.url) + '" data-notif-id="' + item.id + '">' +
+                        '<span class="notif-icon">' + icon + '</span>' +
+                        '<span class="notif-body">' +
+                            '<strong class="notif-title">' + escapeHtml(item.title) + '</strong>' +
+                            '<span class="notif-msg">' + escapeHtml(item.message) + '</span>' +
+                            time +
+                        '</span>' +
                         '</a>';
                 }).join('');
+
+                // کلیک روی هر item → read شدن همان notification
+                list.querySelectorAll('[data-notif-id]').forEach(function (link) {
+                    link.addEventListener('click', async function () {
+                        var nid = link.dataset.notifId;
+                        if (!readUrl || !nid) return;
+                        try {
+                            await fetch(readUrl, {
+                                method: 'POST',
+                                credentials: 'same-origin',
+                                headers: {
+                                    'X-CSRFToken': getCookie('csrftoken'),
+                                    'Content-Type': 'application/x-www-form-urlencoded'
+                                },
+                                body: 'id=' + encodeURIComponent(nid)
+                            });
+                        } catch (e) { /* silent */ }
+                    });
+                });
             }
 
             function showBrowserNotification(item) {
@@ -376,10 +402,28 @@
             }
 
             if (trigger) {
-                trigger.addEventListener('click', function (event) {
+                trigger.addEventListener('click', async function (event) {
                     event.preventDefault();
                     event.stopPropagation();
-                    setOpen(!bell.classList.contains('open'));
+                    var wasOpen = bell.classList.contains('open');
+                    setOpen(!wasOpen);
+                    // باز کردن → mark all as read بعد از ۲ ثانیه (کاربر دید)
+                    if (!wasOpen && readUrl) {
+                        setTimeout(async function () {
+                            try {
+                                await fetch(readUrl, {
+                                    method: 'POST',
+                                    credentials: 'same-origin',
+                                    headers: {
+                                        'X-CSRFToken': getCookie('csrftoken'),
+                                        'Content-Type': 'application/x-www-form-urlencoded'
+                                    },
+                                    body: ''
+                                });
+                                await poll();
+                            } catch (e) { /* silent */ }
+                        }, 2000);
+                    }
                 });
             }
             bell.addEventListener('click', function (event) {

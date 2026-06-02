@@ -236,7 +236,51 @@ h3 {
 }
 
 .notification-badge.zero {
-    background: #8b99a8;
+    display: none;  /* وقتی صفر است مخفی می‌شود */
+}
+
+/* ─── محتوای هر notification ─────────────────────────────────── */
+.notification-item {
+    display: flex !important;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.notif-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.notif-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    display: block;
+}
+
+.notif-msg {
+    font-size: 12px;
+    color: #475569;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notif-time {
+    font-size: 11px;
+    color: #94a3b8;
+    display: block;
+    margin-top: 2px;
 }
 
 .app-image-zoom-viewport {

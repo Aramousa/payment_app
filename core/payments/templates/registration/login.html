@@ -3,165 +3,264 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>ورود</title>
+    <title>ورود — VISIUN VISTA</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
         body {
             font-family: Vazir, sans-serif;
             direction: rtl;
-            background: linear-gradient(135deg, #012322 0%, #063f3b 50%, #0d766e 100%);
-            min-height: 100vh;
             margin: 0;
-            padding: 24px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(160deg, #0f1c2e 0%, #1a3050 50%, #0f2944 100%);
+            padding: 20px;
         }
-        .page {
-            max-width: 1280px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 380px 1fr;
-            gap: 20px;
-            align-items: start;
-        }
-        .card {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 24px 64px rgba(0,0,0,.25);
-            padding: 32px;
-            position: sticky;
-            top: 20px;
-            border-top: 4px solid #0d9488;
-        }
-        h2 {
-            margin: 0 0 6px;
-            text-align: center;
-            color: #0f172a;
-            font-size: 22px;
-            border: none;
-        }
-        .login-subtitle {
-            text-align: center;
-            color: #64748b;
-            font-size: 13px;
-            margin: 0 0 22px;
-        }
-        label {
-            display: block;
-            margin: 14px 0 6px;
-            font-weight: 700;
-            font-size: 13px;
-            color: #374151;
-        }
-        input {
+
+        /* ─── کارت اصلی ──────────────────────────────────────── */
+        .login-wrapper {
             width: 100%;
-            padding: 11px 14px;
+            max-width: 400px;
+        }
+
+        .login-card {
+            background: #ffffff;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(0,0,0,.4);
+        }
+
+        /* ─── بخش لوگو ───────────────────────────────────────── */
+        .logo-section {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 28px 32px 20px;
+            text-align: center;
+        }
+
+        .login-logo {
+            max-width: 220px;
+            max-height: 70px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto 10px;
+        }
+
+        .logo-tagline {
+            font-size: 12px;
+            color: #64748b;
+            letter-spacing: .5px;
+            margin: 0;
+        }
+
+        /* ─── بخش فرم ───────────────────────────────────────── */
+        .form-section {
+            padding: 28px 32px 32px;
+        }
+
+        .welcome-title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 24px;
+        }
+
+        /* ─── Input با آیکون ─────────────────────────────────── */
+        .input-group {
+            position: relative;
+            margin-bottom: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 13px 46px 13px 16px;
             border: 1.5px solid #d1d5db;
             border-radius: 10px;
-            box-sizing: border-box;
             font-family: Vazir, sans-serif;
             font-size: 14px;
-            transition: border-color .15s ease, box-shadow .15s ease;
-        }
-        input:focus {
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 3px rgba(13,110,253,.15);
+            color: #1e293b;
+            background: #f9fafb;
+            transition: border-color .15s, box-shadow .15s, background .15s;
             outline: none;
         }
-        button[type=submit] {
+
+        .input-group input:focus {
+            border-color: #1a3050;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(26,48,80,.12);
+        }
+
+        .input-group input::placeholder {
+            color: #9ca3af;
+            font-size: 13px;
+        }
+
+        .input-icon {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: #9ca3af;
+            pointer-events: none;
+            line-height: 1;
+        }
+
+        /* ─── یادآوری ────────────────────────────────────────── */
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .remember-row input[type=checkbox] {
+            width: 16px;
+            height: 16px;
+            accent-color: #1a3050;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .remember-row label {
+            font-size: 13px;
+            color: #374151;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* ─── دکمه ورود ──────────────────────────────────────── */
+        .login-btn {
             width: 100%;
-            margin-top: 22px;
-            padding: 13px;
+            padding: 14px;
             border: 0;
             border-radius: 10px;
-            background: linear-gradient(135deg, #0d9488, #0f766e);
+            background: linear-gradient(135deg, #1e8449, #145a32);
             color: #fff;
-            cursor: pointer;
             font-family: Vazir, sans-serif;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 800;
-            letter-spacing: .3px;
-            box-shadow: 0 4px 14px rgba(13,148,136,.4);
+            letter-spacing: .4px;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(30,132,73,.4);
             transition: transform .1s ease, box-shadow .15s ease;
         }
-        button[type=submit]:hover {
-            box-shadow: 0 6px 20px rgba(13,148,136,.5);
+
+        .login-btn:hover {
+            box-shadow: 0 6px 22px rgba(30,132,73,.5);
             transform: translateY(-1px);
         }
-        button[type=submit]:active {
+
+        .login-btn:active {
             transform: translateY(1px);
+            box-shadow: 0 2px 8px rgba(30,132,73,.3);
         }
-        .errorlist {
-            color: #c62828;
-            margin: 8px 0;
-            padding-right: 18px;
-        }
-        .ads-column {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 14px;
-        }
-        .ad-box {
-            min-height: 180px;
-            background: #fff;
-            border: 1px solid #e7e7e7;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,.05);
-        }
-        .ad-content {
-            padding: 12px;
-        }
-        .ad-title {
-            margin: 0 0 8px;
-            font-size: 16px;
-        }
-        .ad-desc {
-            margin: 0;
-            color: #444;
+
+        /* ─── پیام‌ها ─────────────────────────────────────────── */
+        .alert {
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
             font-size: 13px;
-            line-height: 1.7;
+            line-height: 1.6;
         }
-        .ad-image {
+
+        .alert-warning {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
+        .alert-error {
+            background: #fff5f5;
+            border: 1px solid #fca5a5;
+            color: #7f1d1d;
+        }
+
+        .errorlist {
+            list-style: none;
+            padding: 0;
+            margin: 4px 0 0;
+            font-size: 12px;
+            color: #dc2626;
+        }
+
+        /* ─── فوتر کارت ──────────────────────────────────────── */
+        .card-footer {
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            padding: 14px 32px;
+            text-align: center;
+        }
+
+        .card-footer p {
+            margin: 0;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        /* ─── آگهی‌ها ─────────────────────────────────────────── */
+        .page-layout {
+            display: grid;
+            grid-template-columns: 1fr 400px 1fr;
+            gap: 24px;
+            align-items: center;
             width: 100%;
-            height: 120px;
+            max-width: 1280px;
+        }
+
+        .ads-col { display: grid; gap: 16px; }
+
+        .ad-box {
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 12px;
+            overflow: hidden;
+            backdrop-filter: blur(6px);
+            min-height: 160px;
+        }
+
+        .ad-box.ad-hidden { display: none; }
+
+        .ad-img {
+            width: 100%;
+            height: 100px;
             object-fit: cover;
             display: block;
-            background: #eef2f7;
         }
-        .ad-link {
-            display: inline-block;
-            margin-top: 10px;
-            text-decoration: none;
-            color: #0d6efd;
-            font-size: 13px;
-        }
-        .ad-hidden {
-            display: none;
-        }
-        @media (max-width: 940px) {
-            .page {
-                grid-template-columns: 1fr;
-            }
-            .card {
-                position: static;
-            }
+
+        .ad-content { padding: 12px; }
+        .ad-title { margin: 0 0 6px; font-size: 14px; color: #e2e8f0; }
+        .ad-desc { margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+        .ad-link { display: inline-block; margin-top: 8px; font-size: 12px; color: #5eead4; text-decoration: none; }
+
+        @media (max-width: 900px) {
+            .page-layout { grid-template-columns: 1fr; }
+            .ads-col { display: none; }
+            body { align-items: flex-start; padding: 16px; }
         }
     </style>
 </head>
 <body>
-    <div class="page">
-        <div class="ads-column">
+    <div class="page-layout">
+
+        <!-- آگهی چپ -->
+        <div class="ads-col">
             {% for item in login_slot_ads %}
                 {% if item.slot == 1 or item.slot == 2 %}
                 <div class="ad-box {% if not item.ad %}ad-hidden{% endif %}">
                     {% if item.ad %}
                         {% if item.ad.link_url %}<a href="{{ item.ad.link_url }}" target="_blank" rel="noopener">{% endif %}
-                        {% if item.ad.image %}<img class="ad-image" src="{% url 'login_ad_image' item.ad.id %}" alt="{{ item.ad.title }}">{% endif %}
+                        {% if item.ad.image %}<img class="ad-img" src="{% url 'login_ad_image' item.ad.id %}" alt="{{ item.ad.title }}">{% endif %}
                         {% if item.ad.link_url %}</a>{% endif %}
                         <div class="ad-content">
                             <h3 class="ad-title">{{ item.ad.title }}</h3>
                             {% if item.ad.description %}<p class="ad-desc">{{ item.ad.description }}</p>{% endif %}
-                            {% if item.ad.link_url %}<a class="ad-link" href="{{ item.ad.link_url }}" target="_blank" rel="noopener">مشاهده بیشتر</a>{% endif %}
+                            {% if item.ad.link_url %}<a class="ad-link" href="{{ item.ad.link_url }}" target="_blank" rel="noopener">مشاهده بیشتر ←</a>{% endif %}
                         </div>
                     {% endif %}
                 </div>
@@ -169,42 +268,100 @@
             {% endfor %}
         </div>
 
-        <div class="card">
-            <h2>ورود به سامانه</h2>
-            <p class="login-subtitle">اطلاعات خود را وارد کنید</p>
-            {% if messages %}
-                {% for message in messages %}
-                    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px 14px;margin-bottom:14px;color:#856404;font-size:13px;line-height:1.6;">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-            <form method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit">ورود</button>
-            </form>
+        <!-- کارت ورود -->
+        <div class="login-wrapper">
+            <div class="login-card">
+
+                <!-- بخش لوگو -->
+                <div class="logo-section">
+                    <img src="{% static 'logo/logo-top.png' %}" alt="VISIUN VISTA" class="login-logo">
+                    <p class="logo-tagline">سامانه ارتباط با مشتری</p>
+                </div>
+
+                <!-- بخش فرم -->
+                <div class="form-section">
+                    <p class="welcome-title">به سامانه خوش آمدید</p>
+
+                    {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert alert-warning">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" id="login-form">
+                        {% csrf_token %}
+
+                        <!-- نام کاربری -->
+                        <div class="input-group">
+                            <span class="input-icon">✉</span>
+                            {{ form.username }}
+                            {% if form.username.errors %}
+                            <ul class="errorlist">{% for e in form.username.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                            {% endif %}
+                        </div>
+
+                        <!-- کلمه عبور -->
+                        <div class="input-group">
+                            <span class="input-icon">🔒</span>
+                            {{ form.password }}
+                            {% if form.password.errors %}
+                            <ul class="errorlist">{% for e in form.password.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                            {% endif %}
+                        </div>
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-error">
+                            {% for e in form.non_field_errors %}{{ e }}{% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- یادآوری -->
+                        <div class="remember-row">
+                            <input type="checkbox" id="remember-me" name="remember">
+                            <label for="remember-me">یادآوری</label>
+                        </div>
+
+                        <button type="submit" class="login-btn">ورود به سامانه</button>
+                    </form>
+                </div>
+
+                <!-- فوتر کارت -->
+                <div class="card-footer">
+                    <p>VISIUN VISTA &copy; {{ request.META.SERVER_NAME|default:"" }}</p>
+                </div>
+            </div>
         </div>
 
-        <div class="ads-column">
+        <!-- آگهی راست -->
+        <div class="ads-col">
             {% for item in login_slot_ads %}
                 {% if item.slot == 3 or item.slot == 4 %}
                 <div class="ad-box {% if not item.ad %}ad-hidden{% endif %}">
                     {% if item.ad %}
                         {% if item.ad.link_url %}<a href="{{ item.ad.link_url }}" target="_blank" rel="noopener">{% endif %}
-                        {% if item.ad.image %}<img class="ad-image" src="{% url 'login_ad_image' item.ad.id %}" alt="{{ item.ad.title }}">{% endif %}
+                        {% if item.ad.image %}<img class="ad-img" src="{% url 'login_ad_image' item.ad.id %}" alt="{{ item.ad.title }}">{% endif %}
                         {% if item.ad.link_url %}</a>{% endif %}
                         <div class="ad-content">
                             <h3 class="ad-title">{{ item.ad.title }}</h3>
                             {% if item.ad.description %}<p class="ad-desc">{{ item.ad.description }}</p>{% endif %}
-                            {% if item.ad.link_url %}<a class="ad-link" href="{{ item.ad.link_url }}" target="_blank" rel="noopener">مشاهده بیشتر</a>{% endif %}
+                            {% if item.ad.link_url %}<a class="ad-link" href="{{ item.ad.link_url }}" target="_blank" rel="noopener">مشاهده بیشتر ←</a>{% endif %}
                         </div>
                     {% endif %}
                 </div>
                 {% endif %}
             {% endfor %}
         </div>
+
     </div>
-    <script src="{% static 'js/app-ui.js' %}"></script>
+
+    <script>
+    /* placeholder برای input ها */
+    document.addEventListener('DOMContentLoaded', function() {
+        const u = document.querySelector('[name="username"]');
+        const p = document.querySelector('[name="password"]');
+        if (u) { u.placeholder = 'کد / کلمه کاربری'; u.autocomplete = 'username'; }
+        if (p) { p.placeholder = 'کلمه عبور'; p.autocomplete = 'current-password'; }
+    });
+    </script>
 </body>
 </html>

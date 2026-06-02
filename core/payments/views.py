@@ -347,39 +347,71 @@ def _suggest_five_digit_password():
 
 
 def _staff_status_choices_for_role(role):
-    """انتخاب‌های وضعیت برای فلگ بازرگانی (مالی فلگ مستقل دارد)."""
-    role = _department_role(role)
-    if role == 'commercial':
-        return [
-            (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'شروع بررسی بازرگانی'),
-            (PaymentRecord.STATUS_APPROVED, 'ثبت بازرگانی'),
-            (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
-            (PaymentRecord.STATUS_REJECTED, 'رد شده'),
-        ]
-    if role == 'finance':
-        # مالی تنها کار روی فلگ مستقل finance_status دارد (نه status اصلی)
-        # تأیید نهایی و عودت به بازرگانی از طریق دکمه‌های جداگانه انجام می‌شود
+    """
+    وضعیت‌های مجاز برای فلگ بازرگانی — بر اساس نقش.
+    فلگ مالی مستقل است و از طریق finance_unified_action مدیریت می‌شود.
+    """
+    # وضعیت‌های مجاز بازرگانی — مستقل از نقش مالی
+    COMMERCIAL_CHOICES = [
+        (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'در حال بررسی بازرگانی'),
+        (PaymentRecord.STATUS_APPROVED,           'ثبت بازرگانی'),
+        (PaymentRecord.STATUS_INCOMPLETE,         'ناقص'),
+        (PaymentRecord.STATUS_REJECTED,           'رد شده'),
+    ]
+
+    dept = _department_role(role)
+
+    if dept == 'commercial':
+        return COMMERCIAL_CHOICES
+
+    if dept == 'finance':
+        # مالی فقط می‌تواند عودت به بازرگانی کند (از طریق status اصلی)
         return [
             (PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
         ]
-    return PaymentRecord.STATUS_CHOICES
+
+    if dept == 'sales':
+        # فروش همان اختیارات بازرگانی برای بررسی اولیه
+        return COMMERCIAL_CHOICES
+
+    # سایر نقش‌ها (staff, data_entry, ...) — بدون تغییر وضعیت از این dropdown
+    # ادمین سیستم — اختیارات بازرگانی + امکان بازگشت از ناقص به بررسی
+    return COMMERCIAL_CHOICES + [
+        (PaymentRecord.STATUS_PENDING, 'بازگشت به صف بررسی (رفع نقص ادمین)'),
+    ]
 
 
 def _can_staff_act_on_payment(role, payment, is_system_admin=False):
-    """بازرگانی و مالی مستقل از هم می‌توانند روی سند اقدام کنند."""
-    if is_system_admin:
-        return True
-    role = _department_role(role)
-    if role == 'commercial':
-        # بازرگانی روی فلگ اصلی status اقدام می‌کند
-        return payment.status in {
-            PaymentRecord.STATUS_PENDING,
-            PaymentRecord.STATUS_COMMERCIAL_REVIEW,
-            PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
-        }
-    if role == 'finance':
-        # مالی می‌تواند عودت به بازرگانی کند (وقتی بازرگانی ثبت کرده)
+    """
+    آیا کاربر می‌تواند روی فلگ بازرگانی (status اصلی) اقدام کند؟
+
+    قوانین قفل:
+    - بازرگانی/فروش: فقط در pending, commercial_review, returned_commercial
+    - بازرگانی بعد از ثبت بازرگانی (approved): قفل است
+    - مالی: فقط در approved (برای عودت)
+    - ادمین: هم دسترسی بازرگانی هم مالی دارد ولی با رعایت منطق
+    """
+    dept = _department_role(role)
+
+    COMMERCIAL_ACTIVE_STATUSES = {
+        PaymentRecord.STATUS_PENDING,
+        PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+    }
+
+    if dept == 'commercial' or dept == 'sales':
+        return payment.status in COMMERCIAL_ACTIVE_STATUSES
+
+    if dept == 'finance':
+        # مالی فقط عودت به بازرگانی را از طریق این فلگ انجام می‌دهد
         return payment.status == PaymentRecord.STATUS_APPROVED
+
+    if is_system_admin:
+        # ادمین در هر وضعیتی می‌تواند اقدام کند (برای مدیریت)
+        return payment.status not in {
+            PaymentRecord.STATUS_FINAL_APPROVED,
+        }
+
     return False
 
 
@@ -390,22 +422,44 @@ def _can_finance_register(role, payment, is_system_admin=False):
     role = _department_role(role)
     if role != 'finance':
         return False
-    # مالی می‌تواند ثبت کند مگر اینکه سند رد شده یا تأیید نهایی شده یا قبلاً ثبت مالی شده
+    # مالی می‌تواند ثبت کند مگر:
+    # - سند رد شده (rejected)
+    # - سند تأیید نهایی شده (final_approved)
+    # - سند ناقص است و در انتظار اصلاح مشتری (incomplete)
+    # - قبلاً ثبت مالی انجام شده
     return (
-        payment.status not in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_FINAL_APPROVED}
+        payment.status not in {
+            PaymentRecord.STATUS_REJECTED,
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_INCOMPLETE,
+        }
         and not payment.is_finance_registered
     )
 
 
-def _can_final_approve(role, payment, is_system_admin=False):
-    """آیا تأیید نهایی مجاز است؟ — فقط مدیر مالی + هر دو فلگ تکمیل شده."""
-    if is_system_admin:
-        return payment.ready_for_final_approval
-    role_raw = role
-    if role_raw in {'finance_manager'} or _department_role(role_raw) == 'finance':
-        if role_raw == 'finance_manager':
-            return payment.ready_for_final_approval
+def _can_final_approve(role, payment, is_system_admin=False, user=None):
+    """
+    آیا تأیید نهایی مجاز است؟
+    - مدیر مالی: همیشه (اگر هر دو فلگ آماده باشند)
+    - کاربر تفویض‌شده (از FinalApprovalDelegate): اگر delegation فعال باشد
+    - ادمین: همیشه
+    """
+    if not payment.ready_for_final_approval:
+        return False
+    if is_system_admin or role == 'finance_manager':
+        return True
+    # بررسی تفویض جهانی
+    if user:
+        from .models import FinalApprovalDelegate
+        return FinalApprovalDelegate.objects.filter(
+            delegated_user=user, is_active=True
+        ).exists()
     return False
+
+
+def _can_delegate_final_approval(role, is_system_admin=False):
+    """آیا کاربر می‌تواند تأیید نهایی را تفویض کند؟"""
+    return is_system_admin or role == 'finance_manager'
 
 
 def _records_for_user(user):
@@ -464,10 +518,12 @@ def _history_payment_records_for_user(user):
 
     role = _department_role(_user_role(user))
     if role == 'commercial':
+        # سوابق بازرگانی: ثبت شده، تأیید نهایی، رد شده، ناقص
         return records.filter(status__in=[
             PaymentRecord.STATUS_APPROVED,
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_REJECTED,
+            PaymentRecord.STATUS_INCOMPLETE,
         ])
     if role == 'finance':
         return records.filter(status__in=[
@@ -1043,12 +1099,36 @@ def _log_activity(payment, actor, action, from_status='', to_status='', note='')
 
 
 def _notification_payload(notification):
+    # آیکون بر اساس دسته‌بندی
+    icon_map = {
+        UserNotification.CATEGORY_PAYMENT: '💳',
+        UserNotification.CATEGORY_INVOICE: '📄',
+        UserNotification.CATEGORY_SYSTEM:  '🔔',
+    }
+    icon = icon_map.get(notification.category, '🔔')
+
+    # متن زمانی نسبی
+    now = timezone.now()
+    delta = now - notification.created_at
+    if delta.total_seconds() < 60:
+        time_label = 'همین الان'
+    elif delta.total_seconds() < 3600:
+        mins = int(delta.total_seconds() / 60)
+        time_label = f'{mins} دقیقه پیش'
+    elif delta.total_seconds() < 86400:
+        hours = int(delta.total_seconds() / 3600)
+        time_label = f'{hours} ساعت پیش'
+    else:
+        time_label = _format_jalali_datetime(notification.created_at)
+
     return {
-        'id': notification.id,
-        'title': notification.title,
-        'message': notification.message,
-        'url': notification.url or reverse('submit'),
-        'category': notification.category,
+        'id':         notification.id,
+        'title':      notification.title,
+        'message':    notification.message,
+        'url':        notification.url or reverse('submit'),
+        'category':   notification.category,
+        'icon':       icon,
+        'time_label': time_label,
         'created_at': _format_jalali_datetime(notification.created_at),
     }
 
@@ -1311,7 +1391,7 @@ def _customer_visible_logs(logs):
     return visible
 
 
-def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_payment_details=False):
+def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_payment_details=False, acting_user=None):
     status_order = [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_FINANCE_REVIEW,
@@ -1361,9 +1441,32 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         payment.can_finance_register = _can_finance_register(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
+
+        # اقدام بازرگانی — فقط بازرگانی/فروش/ادمین (نه مالی)
+        _dept = _department_role(staff_role) if staff_role else ''
+        payment.can_commercial_act = (
+            _dept in {'commercial', 'sales'} and payment.staff_can_act
+        ) or (
+            is_system_admin and payment.staff_can_act and _dept not in {'finance'}
+        )
         payment.can_final_approve = _can_final_approve(
-            staff_role, payment, is_system_admin=is_system_admin,
+            staff_role, payment, is_system_admin=is_system_admin, user=acting_user,
         ) if staff_role else False
+        payment.can_delegate = _can_delegate_final_approval(staff_role, is_system_admin)
+
+        # وضعیت‌های مجاز مالی (برای dropdown)
+        dept = _department_role(staff_role) if staff_role else ''
+        # مالی، مدیر مالی، و ادمین به بخش مالی دسترسی دارند
+        is_finance_actor = dept == 'finance' or is_system_admin
+        finance_choices = []
+        if is_finance_actor:
+            if payment.can_finance_register:
+                finance_choices.append(('finance_register', 'ثبت مالی'))
+            # عودت فقط وقتی بازرگانی ثبت کرده (status=approved)
+            if payment.status == PaymentRecord.STATUS_APPROVED:
+                finance_choices.append(('return_to_commercial', 'عودت به بازرگانی'))
+        payment.finance_choices = finance_choices
+        payment.is_finance_actor = is_finance_actor
 
         # وضعیت طرف حساب
         cs = payment.counterparty_status
@@ -2327,6 +2430,7 @@ def create_payment(request):
         staff_role=staff_role,
         is_system_admin=is_system_admin,
         can_edit_payment_details=_can_edit_payment_details(request.user),
+        acting_user=request.user,
     )
     page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
@@ -2363,6 +2467,8 @@ def create_payment(request):
         'expired_daily_assignment': expired_daily_assignment,
         'show_payment_form': show_payment_form,
         'unread_notifications': _dashboard_notifications_for_user(request.user),
+        'finance_users': list(User.objects.filter(profile__role__in=['finance', 'finance_manager'], is_active=True).select_related('profile')) if is_staff_user else [],
+        'can_bulk_final_approve': _can_delegate_final_approval(staff_role, is_system_admin) or _can_final_approve(staff_role, PaymentRecord(), is_system_admin, user=request.user),
         'cp_returned_count': PaymentRecord.objects.filter(
             counterparty_status=PaymentRecord.CP_STATUS_RETURNED
         ).count() if is_staff_user and _user_role(request.user) in {'commercial', 'commercial_manager'} else 0,
@@ -2384,6 +2490,7 @@ def payment_history(request):
         staff_role=staff_role,
         is_system_admin=is_system_admin,
         can_edit_payment_details=_can_edit_payment_details(request.user),
+        acting_user=request.user,
     )
     page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
@@ -2597,6 +2704,192 @@ def profile_password_cancel(request):
 
 @login_required
 @require_POST
+def finance_bulk_final_approve(request):
+    """تأیید نهایی گروهی — مدیر مالی یا تفویض‌شده."""
+    redirect_target = _safe_next_url(request, default=reverse('submit'))
+    role = _user_role(request.user)
+    if not _can_delegate_final_approval(role, request.user.is_superuser) and \
+       not _can_final_approve(role, PaymentRecord(), request.user.is_superuser, user=request.user):
+        # بررسی اینکه آیا کاربر اصلاً مجاز به تأیید نهایی است
+        from .models import FinalApprovalDelegate
+        if not FinalApprovalDelegate.objects.filter(delegated_user=request.user, is_active=True).exists():
+            messages.error(request, 'شما مجاز به تأیید نهایی نیستید.')
+            return redirect(redirect_target)
+
+    payment_ids = request.POST.getlist('payment_ids')
+    note = (request.POST.get('note') or '').strip()
+
+    if not payment_ids:
+        messages.error(request, 'هیچ سندی انتخاب نشده است.')
+        return redirect(redirect_target)
+
+    approved = 0
+    skipped = 0
+    for pid in payment_ids:
+        try:
+            payment = PaymentRecord.objects.get(id=int(pid))
+            if not payment.ready_for_final_approval:
+                skipped += 1
+                continue
+            old_status = payment.status
+            payment.status = PaymentRecord.STATUS_FINAL_APPROVED
+            payment.save(update_fields=['status'])
+            _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINAL_APPROVED,
+                          from_status=old_status, to_status=payment.status,
+                          note=note or 'تأیید نهایی گروهی')
+            if payment.user:
+                _notify_users([payment.user], 'تأیید نهایی سند',
+                              f'سند #{pid} تأیید نهایی شد.',
+                              reverse('submit'), category=UserNotification.CATEGORY_SYSTEM,
+                              actor=request.user)
+            approved += 1
+        except (PaymentRecord.DoesNotExist, ValueError):
+            skipped += 1
+
+    if approved:
+        messages.success(request, f'✅ {approved} سند تأیید نهایی شد.' + (f' ({skipped} سند رد شد)' if skipped else ''))
+    else:
+        messages.error(request, f'هیچ سندی تأیید نشد. ({skipped} سند آماده نبود)')
+    return redirect(redirect_target)
+
+
+@login_required
+def final_approval_delegation_page(request):
+    """صفحه مستقل مدیریت تفویض اختیار تأیید نهایی."""
+    role = _user_role(request.user)
+    if not _can_delegate_final_approval(role, request.user.is_superuser):
+        return HttpResponseForbidden('فقط مدیر مالی می‌تواند تفویض اختیار انجام دهد.')
+
+    from .models import FinalApprovalDelegate
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        user_id = (request.POST.get('user_id') or '').strip()
+        note = (request.POST.get('note') or '').strip()
+
+        if action == 'add' and user_id.isdigit():
+            target_user = get_object_or_404(User, id=int(user_id), is_active=True)
+            obj, created = FinalApprovalDelegate.objects.get_or_create(
+                delegated_user=target_user,
+                defaults={'granted_by': request.user, 'note': note, 'is_active': True},
+            )
+            if not created:
+                obj.is_active = True
+                obj.granted_by = request.user
+                obj.note = note
+                obj.save(update_fields=['is_active', 'granted_by', 'note', 'updated_at'])
+            messages.success(request, f'اختیار تأیید نهایی به {target_user.get_full_name() or target_user.username} تفویض شد.')
+
+        elif action == 'deactivate' and user_id.isdigit():
+            FinalApprovalDelegate.objects.filter(delegated_user_id=int(user_id)).update(is_active=False)
+            messages.success(request, 'تفویض اختیار لغو شد.')
+
+        return redirect('final_approval_delegation')
+
+    delegates = FinalApprovalDelegate.objects.select_related('delegated_user', 'granted_by').order_by('-is_active', '-updated_at')
+    # کاربران مالی قابل تفویض
+    finance_users = User.objects.filter(
+        profile__role__in=['finance', 'finance_manager'], is_active=True
+    ).select_related('profile').exclude(
+        id__in=delegates.values_list('delegated_user_id', flat=True)
+    )
+    return render(request, 'payments/final_approval_delegation.html', {
+        'delegates': delegates,
+        'finance_users': finance_users,
+        'is_staff_user': True,
+    })
+
+
+@login_required
+@require_POST
+def delegate_final_approval(request, payment_id):
+    """تفویض اختیار تأیید نهایی به کاربر دیگر توسط مدیر مالی."""
+    redirect_target = _safe_next_url(request, default=reverse('submit'))
+    role = _user_role(request.user)
+    if not _can_delegate_final_approval(role, request.user.is_superuser):
+        messages.error(request, 'فقط مدیر مالی می‌تواند تفویض اختیار کند.')
+        return redirect(redirect_target)
+
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    delegate_user_id = request.POST.get('delegate_to') or ''
+
+    if delegate_user_id == 'clear':
+        payment.final_approval_delegated_to = None
+        payment.save(update_fields=['final_approval_delegated_to'])
+        messages.success(request, f'تفویض اختیار تأیید نهایی سند #{payment_id} لغو شد.')
+    elif delegate_user_id.isdigit():
+        delegate_user = get_object_or_404(User, id=int(delegate_user_id), is_active=True)
+        payment.final_approval_delegated_to = delegate_user
+        payment.save(update_fields=['final_approval_delegated_to'])
+        # اطلاع‌رسانی به کاربر تفویض‌شده
+        _notify_users(
+            [delegate_user],
+            '📋 تفویض اختیار تأیید نهایی',
+            f'اختیار تأیید نهایی سند #{payment_id} به شما تفویض شد.',
+            reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+        )
+        _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
+                      note=f'تفویض اختیار تأیید نهایی به {_display_name(delegate_user)}')
+        messages.success(request, f'اختیار تأیید نهایی سند #{payment_id} به {delegate_user.get_full_name() or delegate_user.username} تفویض شد.')
+    else:
+        messages.error(request, 'کاربر نامعتبر است.')
+
+    return redirect(redirect_target)
+
+
+@login_required
+@require_POST
+def finance_unified_action(request, payment_id):
+    """عملیات یکپارچه مالی — ثبت مالی یا عودت به بازرگانی."""
+    redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or reverse('submit'))
+    action_type = (request.POST.get('finance_action') or '').strip()
+    note = (request.POST.get('note') or '').strip()
+
+    if action_type == 'finance_register':
+        payment = get_object_or_404(PaymentRecord, id=payment_id)
+        role = _user_role(request.user)
+        if not _can_finance_register(role, payment, request.user.is_superuser):
+            messages.error(request, 'مجاز به ثبت مالی این سند نیستید.')
+            return redirect(redirect_target)
+        payment.finance_status = PaymentRecord.FINANCE_STATUS_APPROVED
+        payment.finance_registered_at = timezone.now()
+        payment.finance_registered_by = request.user
+        payment.save(update_fields=['finance_status', 'finance_registered_at', 'finance_registered_by'])
+        _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_REGISTERED, note=note)
+        if payment.ready_for_final_approval:
+            _notify_users(
+                list(_staff_notification_users({'finance_manager'})),
+                '✅ سند آماده تأیید نهایی',
+                f'سند #{payment_id} هم ثبت بازرگانی و هم ثبت مالی دارد.',
+                reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+            )
+        messages.success(request, f'ثبت مالی سند #{payment_id} انجام شد.')
+
+    elif action_type == 'return_to_commercial':
+        payment = get_object_or_404(PaymentRecord, id=payment_id)
+        role = _user_role(request.user)
+        dept = _department_role(role)
+        if dept != 'finance' and not request.user.is_superuser:
+            messages.error(request, 'فقط واحد مالی می‌تواند سند را عودت دهد.')
+            return redirect(redirect_target)
+        old_status = payment.status
+        payment.status = PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL
+        payment.finance_status = None
+        payment.finance_registered_at = None
+        payment.finance_registered_by = None
+        payment.save(update_fields=['status', 'finance_status', 'finance_registered_at', 'finance_registered_by', 'updated_at'] if hasattr(PaymentRecord, 'updated_at') else ['status', 'finance_status', 'finance_registered_at', 'finance_registered_by'])
+        _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
+                      from_status=old_status, to_status=payment.status,
+                      note=note or 'عودت به بازرگانی توسط مالی')
+        messages.warning(request, f'سند #{payment_id} به بازرگانی عودت داده شد.')
+
+    else:
+        messages.error(request, 'عملیات نامعتبر است.')
+
+    return redirect(redirect_target)
+
+
+@login_required
+@require_POST
 def finance_register_payment(request, payment_id):
     """ثبت مالی — فلگ مستقل مالی. هر زمانی قابل انجام است (مگر رد/تأیید نهایی)."""
     redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or reverse('submit'))
@@ -2717,7 +3010,22 @@ def staff_update_status(request, payment_id):
     if selected_counterparty and department_role in {'commercial', 'staff'}:
         payment.counterparty = selected_counterparty
 
-    payment.save(update_fields=['status', 'last_staff_note', 'counterparty', 'locked_by_finance'])
+    update_fields = ['status', 'last_staff_note', 'counterparty', 'locked_by_finance']
+
+    # هر بار که سند از حالت ناقص خارج می‌شود، ثبت مالی قبلی ابطال می‌شود
+    REACTIVATE_FROM_INCOMPLETE = {
+        PaymentRecord.STATUS_PENDING,
+        PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+    }
+    if (request.user.is_superuser and from_status == PaymentRecord.STATUS_INCOMPLETE
+            and target_status in REACTIVATE_FROM_INCOMPLETE):
+        payment.finance_status = None
+        payment.finance_registered_at = None
+        payment.finance_registered_by = None
+        update_fields += ['finance_status', 'finance_registered_at', 'finance_registered_by']
+
+    payment.save(update_fields=update_fields)
 
     _log_activity(
         payment,
@@ -2768,9 +3076,17 @@ def edit_payment(request, payment_id):
             from_status = payment.status
             payment.status = PaymentRecord.STATUS_PENDING
             payment.locked_by_finance = False
+            # وقتی مشتری رفع نقص می‌کند، ثبت مالی قبلی ابطال می‌شود تا مالی مجدداً بررسی کند
+            payment.finance_status = None
+            payment.finance_registered_at = None
+            payment.finance_registered_by = None
             payment.save()
             _save_receipts(payment, form)
-            _log_activity(payment, request.user, PaymentActivityLog.ACTION_EDITED, from_status=from_status, to_status=payment.status)
+            _log_activity(
+                payment, request.user, PaymentActivityLog.ACTION_EDITED,
+                from_status=from_status, to_status=payment.status,
+                note='رفع نقص توسط مشتری - ثبت مالی ابطال شد',
+            )
             _notify_payment_edited(payment, request.user)
             return redirect(return_url or 'submit')
     else:

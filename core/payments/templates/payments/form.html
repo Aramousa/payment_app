@@ -171,6 +171,38 @@
         .rot-btn { color:#fff;border:none;border-radius:5px;padding:5px 11px;cursor:pointer;font-family:Vazir,sans-serif;font-size:13px; }
         .rot-btn:disabled { opacity:.5;cursor:not-allowed; }
 
+        /* ─── Quick Action یکپارچه ─── */
+        .quick-action-wrap { display:flex; flex-direction:column; gap:4px; }
+        .qa-btns { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+        .qa-btn { border:none; border-radius:6px; padding:4px 9px; cursor:pointer;
+                  font-family:Vazir,sans-serif; font-size:11px; font-weight:700;
+                  color:#fff; transition:opacity .15s; white-space:nowrap; }
+        .qa-btn:hover { opacity:.88; }
+        .qa-commercial { background:#0d6efd; }
+        .qa-finance     { background:#7c3aed; }
+        .qa-approve     { background:#16a34a; }
+        .qa-lock        { color:#94a3b8; font-size:13px; }
+
+        .qa-panel { border-radius:8px; padding:10px; margin-top:2px;
+                    border:1px solid #e2e8f0; animation:qaFadeIn .15s ease; }
+        .qa-panel-commercial { background:#eff6ff; border-color:#bfdbfe; }
+        .qa-panel-finance     { background:#f5f3ff; border-color:#ddd6fe; }
+        .qa-panel-approve     { background:#f0fdf4; border-color:#bbf7d0; }
+        @keyframes qaFadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+        .qa-form { display:flex; flex-direction:column; gap:6px; }
+        .qa-select,.qa-note { border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px;
+                               font-family:Vazir,sans-serif; font-size:12px; width:100%; box-sizing:border-box; }
+        .qa-actions { display:flex; gap:6px; }
+        .qa-confirm { border:none; border-radius:6px; padding:6px 12px; font-family:Vazir,sans-serif;
+                      font-size:12px; font-weight:800; color:#fff; cursor:pointer; flex:1; }
+        .qa-confirm.qa-commercial { background:#0d6efd; }
+        .qa-confirm.qa-finance    { background:#7c3aed; }
+        .qa-confirm.qa-approve    { background:#16a34a; }
+        .qa-cancel { border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px;
+                     background:#fff; font-family:Vazir,sans-serif; font-size:12px;
+                     cursor:pointer; color:#64748b; }
+
         /* ─── پیش‌نمایش فیش ─── */
         #receipt-preview-wrap {
             display: none;
@@ -681,9 +713,18 @@
         </form>
     </div>
 
+    {# فرم standalone تأیید نهایی گروهی — فقط برای مجازین #}
+    {% if can_bulk_final_approve %}
+    <form id="bulk-approve-form" method="post" action="{% url 'finance_bulk_final_approve' %}" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    </form>
+    {% endif %}
+
     <table>
         <thead>
             <tr>
+                {% if can_bulk_final_approve %}<th style="width:34px;"><input type="checkbox" id="select-all-cb" title="انتخاب همه"></th>{% endif %}
                 <th>ردیف</th>
                 {% if is_staff_user %}
                 <th>نام مشتری</th>
@@ -726,6 +767,13 @@
             {% for payment in records %}
             <tr class="summary-row{% if payment.cp_needs_act %} cp-returned-row{% endif %}" data-row="{{ payment.id }}"
                 {% if payment.cp_needs_act %}style="background:#fffbeb;"{% endif %}>
+                {% if can_bulk_final_approve %}
+                <td onclick="event.stopPropagation()">
+                    {% if payment.ready_for_final_approval %}
+                    <input type="checkbox" name="payment_ids" value="{{ payment.id }}" class="bulk-cb" style="width:16px;height:16px;accent-color:#16a34a;">
+                    {% endif %}
+                </td>
+                {% endif %}
                 <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:800;margin-top:3px;letter-spacing:0.5px;font-family:monospace;">#{{ payment.id }}</span></td>
                 {% if is_staff_user %}
                 <td>{{ payment.first_name }} {{ payment.last_name }}</td>
@@ -765,61 +813,17 @@
                         {% endif %}
                         <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
                     {% else %}
-                        <div style="display:flex;flex-direction:column;gap:4px;">
-
-                        {# ─── فلگ بازرگانی: اقدام بازرگانی/فروش ─── #}
-                        {% if payment.staff_can_act %}
-                            <form class="staff-quick" method="post" action="{% url 'staff_update_status' payment.id %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <select name="status" required>
-                                    {% for value, label in payment.staff_allowed_choices %}
-                                        <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                                <input type="text" name="note" placeholder="توضیح">
-                                {% if staff_user_role == 'commercial' or staff_user_role == 'staff' %}
-                                    <select name="counterparty">
-                                        <option value="">بدون طرف حساب</option>
-                                        {% for cp in counterparties %}
-                                            <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                {% endif %}
-                                <button type="submit" style="background:#0d6efd;">🏬 ثبت بازرگانی</button>
-                            </form>
-                        {% endif %}
-
-                        {# ─── فلگ مالی: ثبت مالی مستقل ─── #}
-                        {% if payment.can_finance_register %}
-                            <form class="staff-quick" method="post" action="{% url 'finance_register_payment' payment.id %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <input type="text" name="note" placeholder="توضیح (اختیاری)">
-                                <button type="submit" style="background:#7c3aed;">💰 ثبت مالی</button>
-                            </form>
-                        {% endif %}
-
-                        {# ─── تأیید نهایی — فقط مدیر مالی + هر دو فلگ تکمیل ─── #}
-                        {% if payment.can_final_approve %}
-                            <form class="staff-quick" method="post" action="{% url 'finance_final_approve' payment.id %}"
-                                  onsubmit="return confirm('آیا از تأیید نهایی این سند مطمئنید؟');">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <input type="text" name="note" placeholder="توضیح (اختیاری)">
-                                <button type="submit" style="background:#16a34a;font-weight:800;">✅ تأیید نهایی</button>
-                            </form>
-                        {% endif %}
-
-                        {% if not payment.staff_can_act and not payment.can_finance_register and not payment.can_final_approve and staff_user_role != 'data_entry' %}
-                            <span title="این سند در وضعیت قفل است" style="color:#94a3b8;font-size:12px;">🔒 قفل</span>
-                        {% endif %}
-
-                        {% if payment.can_edit_details %}
-                            <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل اطلاعات</a>
-                        {% endif %}
-                        <button type="button" class="expand-btn" data-row="{{ payment.id }}">جزئیات</button>
-
+                        {# ─── ستون اقدام — فقط نشانگر وضعیت + دکمه جزئیات ─── #}
+                        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+                            {% if payment.can_commercial_act or payment.can_finance_register or payment.can_final_approve %}
+                            <span style="display:inline-block;background:#fef9c3;color:#854d0e;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;">نیاز به اقدام</span>
+                            {% elif staff_user_role != 'data_entry' %}
+                            <span style="color:#94a3b8;font-size:12px;" title="قفل">🔒</span>
+                            {% endif %}
+                            {% if payment.can_edit_details %}
+                            <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل</a>
+                            {% endif %}
+                            <button type="button" class="expand-btn" data-row="{{ payment.id }}">جزئیات و اقدام</button>
                         </div>
                     {% endif %}
                 </td>
@@ -917,35 +921,152 @@
                         </div>
 
                         {% if is_staff_user and staff_user_role != 'data_entry' %}
-                        <div class="detail-card">
-                            <strong>تغییر وضعیت و توضیح</strong>
-                            {% if payment.staff_can_act %}
+                        <div class="detail-card" style="{% if payment.staff_can_act or payment.can_finance_register or payment.can_final_approve %}border:2px solid #fde68a;background:#fffef0;{% endif %}">
+                            <strong style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+                                ⚙ اقدام روی سند
+                                {% if payment.can_commercial_act or payment.can_finance_register or payment.can_final_approve %}
+                                <span style="background:#fef9c3;color:#854d0e;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;">نیاز به اقدام</span>
+                                {% endif %}
+                            </strong>
+
+                            {# ── وضعیت جاری روال ─────────────────────── #}
+                            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;">
+                                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                                    <div>
+                                        <span style="color:#64748b;">🏬 بازرگانی:</span>
+                                        <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:11px;margin-right:4px;">{{ payment.commercial_status_label }}</span>
+                                    </div>
+                                    <div>
+                                        <span style="color:#64748b;">💰 مالی:</span>
+                                        <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:11px;margin-right:4px;">{{ payment.finance_status_label }}</span>
+                                    </div>
+                                </div>
+                                {# راهنمای قفل #}
+                                <div style="margin-top:6px;color:#94a3b8;font-size:11px;">
+                                    {% if payment.status == 'approved' and not payment.is_finance_registered %}
+                                    ⚡ ثبت بازرگانی — در انتظار ثبت مالی
+                                    {% elif payment.ready_for_final_approval %}
+                                    ✅ هر دو فلگ تکمیل — آماده تأیید نهایی
+                                    {% elif payment.status == 'final_approved' %}
+                                    🔒 سند تأیید نهایی شده — قفل
+                                    {% elif payment.status == 'rejected' %}
+                                    🚫 سند رد شده — قفل
+                                    {% elif payment.status == 'incomplete' %}
+                                    ⚠ ناقص — در انتظار اصلاح مشتری
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if not payment.can_commercial_act and not payment.can_finance_register and not payment.can_final_approve %}
+                            <div class="tiny" style="color:#94a3b8;">🔒 در این مرحله امکان اقدام برای نقش شما وجود ندارد.</div>
+
+                            {% else %}
+
+                            {# ── بخش بازرگانی — فقط بازرگانی/فروش/ادمین ── #}
+                            {% if payment.can_commercial_act %}
+                            <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
+                                <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:6px;">🏬 فلگ بازرگانی / فروش</div>
                                 <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <select name="status" required>
+                                    <select name="status" required style="margin-bottom:6px;">
                                         {% for value, label in payment.staff_allowed_choices %}
                                             <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
                                         {% endfor %}
                                     </select>
-                                    <textarea name="note" placeholder="توضیح برای مشتری (برای رد/ناقص الزامی)"></textarea>
                                     {% if staff_user_role == 'commercial' or staff_user_role == 'staff' %}
-                                        <select name="counterparty">
-                                            <option value="">بدون طرف حساب</option>
-                                            {% for cp in counterparties %}
-                                                <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
-                                            {% endfor %}
-                                        </select>
+                                    <select name="counterparty" style="margin-bottom:6px;">
+                                        <option value="">بدون طرف حساب</option>
+                                        {% for cp in counterparties %}
+                                            <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
+                                        {% endfor %}
+                                    </select>
                                     {% endif %}
-                                    <button type="submit">ثبت تغییرات</button>
+                                    <textarea name="note" placeholder="توضیح (برای رد/ناقص اجباری)" style="min-height:56px;margin-bottom:6px;"></textarea>
+                                    <button type="submit" style="background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:Vazir,sans-serif;font-weight:700;font-size:13px;cursor:pointer;width:100%;">ثبت وضعیت بازرگانی</button>
                                 </form>
-                            {% else %}
-                                <div class="tiny">در این مرحله امکان تغییر وضعیت برای نقش شما وجود ندارد.</div>
+                            </div>
                             {% endif %}
-                            {% if payment.can_edit_details %}
-                                <div style="margin-top:8px;">
-                                    <a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل یا اصلاح اطلاعات فیش</a>
+
+                            {# ── بخش مالی با dropdown وضعیت ──────── #}
+                            {% if payment.finance_choices %}
+                            <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
+                                <div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px;">💰 فلگ مالی</div>
+                                <form class="staff-action" method="post" action="{% url 'finance_unified_action' payment.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <select name="finance_action" required style="margin-bottom:6px;">
+                                        {% for val, lbl in payment.finance_choices %}
+                                        <option value="{{ val }}">{{ lbl }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <textarea name="note" placeholder="توضیح (برای عودت به بازرگانی الزامی)" style="min-height:56px;margin-bottom:6px;"></textarea>
+                                    <button type="submit" style="background:#6d28d9;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:Vazir,sans-serif;font-weight:700;font-size:13px;cursor:pointer;width:100%;">ثبت وضعیت مالی</button>
+                                </form>
+                            </div>
+                            {% endif %}
+
+                            {# ── بخش تأیید نهایی — فقط برای مدیر مالی / تفویض‌شده ── #}
+                            {% if payment.can_final_approve or payment.can_delegate %}
+                            <div style="margin-bottom:6px;">
+                                <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:6px;">✅ تأیید نهایی</div>
+
+                                {% if payment.ready_for_final_approval %}
+                                <div style="font-size:11px;color:#15803d;background:#f0fdf4;border-radius:6px;padding:6px 10px;margin-bottom:8px;border:1px solid #bbf7d0;">
+                                    هر دو فلگ تکمیل شده — سند آماده تأیید نهایی است.
+                                    {% if payment.final_approval_delegated_to %}
+                                    <br><strong>تفویض‌شده به: {{ payment.final_approval_delegated_to.get_full_name|default:payment.final_approval_delegated_to.username }}</strong>
+                                    {% endif %}
                                 </div>
+                                {% endif %}
+
+                                {# دکمه تأیید — مدیر مالی یا کاربر تفویض‌شده #}
+                                {% if payment.can_final_approve %}
+                                <form class="staff-action" method="post" action="{% url 'finance_final_approve' payment.id %}"
+                                      onsubmit="return confirm('آیا از تأیید نهایی این سند مطمئنید؟');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <textarea name="note" placeholder="توضیح تأییدیه (اختیاری)" style="min-height:50px;margin-bottom:6px;"></textarea>
+                                    <button type="submit" style="background:#16a34a;color:#fff;border:none;border-radius:7px;padding:10px 16px;font-family:Vazir,sans-serif;font-weight:800;font-size:14px;cursor:pointer;width:100%;box-shadow:0 3px 10px rgba(22,163,74,.3);">✅ تأیید نهایی سند</button>
+                                </form>
+                                {% elif payment.ready_for_final_approval %}
+                                <div style="font-size:12px;color:#64748b;background:#f8fafc;border-radius:6px;padding:8px;text-align:center;">
+                                    🔒 تأیید نهایی فقط توسط مدیر مالی یا کاربر تفویض‌شده
+                                </div>
+                                {% endif %}
+
+                                {# تفویض اختیار — فقط مدیر مالی #}
+                                {% if payment.can_delegate and finance_users %}
+                                <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #d1d5db;">
+                                    <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">📋 تفویض اختیار تأیید نهایی به:</div>
+                                    <form method="post" action="{% url 'delegate_final_approval' payment.id %}" style="display:flex;gap:6px;flex-wrap:wrap;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <select name="delegate_to" style="flex:1;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-family:Vazir,sans-serif;font-size:12px;">
+                                            <option value="">انتخاب کاربر...</option>
+                                            {% for fu in finance_users %}
+                                            <option value="{{ fu.id }}" {% if payment.final_approval_delegated_to_id == fu.id %}selected{% endif %}>
+                                                {{ fu.get_full_name|default:fu.username }} — {{ fu.profile.get_role_display }}
+                                            </option>
+                                            {% endfor %}
+                                            {% if payment.final_approval_delegated_to %}
+                                            <option value="clear">✕ لغو تفویض</option>
+                                            {% endif %}
+                                        </select>
+                                        <button type="submit" style="background:#0d6efd;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-family:Vazir,sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;">تفویض</button>
+                                    </form>
+                                </div>
+                                {% endif %}
+
+                            </div>
+                            {% endif %}
+
+                            {% endif %}{# end not locked #}
+
+                            {% if payment.can_edit_details %}
+                            <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0;">
+                                <a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">✏ تکمیل یا اصلاح اطلاعات فیش</a>
+                            </div>
                             {% endif %}
                         </div>
                         {% endif %}
@@ -953,10 +1074,23 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="{% if is_staff_user %}12{% else %}8{% endif %}">اطلاعاتی موجود نیست</td></tr>
+            <tr><td colspan="{% if is_staff_user %}13{% else %}8{% endif %}">اطلاعاتی موجود نیست</td></tr>
             {% endfor %}
         </tbody>
     </table>
+
+    {# نوار پایین — فقط برای مجازین #}
+    {% if can_bulk_final_approve %}
+        <div id="bulk-bar" style="display:none;position:sticky;bottom:0;background:#f0fdf4;border-top:2px solid #16a34a;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:10;">
+            <span id="bulk-count" style="font-size:13px;font-weight:700;color:#15803d;">۰ سند انتخاب‌شده</span>
+            <input type="text" id="bulk-note-input" placeholder="توضیح (اختیاری)"
+                   style="flex:1;border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:13px;font-family:Vazir,sans-serif;">
+            <button type="button" id="bulk-submit-btn"
+                    style="background:#16a34a;color:#fff;border:none;border-radius:7px;padding:8px 18px;font-weight:800;font-size:13px;cursor:pointer;font-family:Vazir,sans-serif;">
+                ✅ تأیید نهایی انتخاب‌شده‌ها
+            </button>
+        </div>
+    {% endif %}
 
     {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
     {% if legacy_pagination_enabled and page_obj.has_other_pages %}
@@ -1414,6 +1548,91 @@
         }
 
     });
+
+    /* ─── Quick Action یکپارچه ─── */
+    /* ─── Bulk Approve (form جداست، JS ارسال می‌کند) ─── */
+    (function(){
+        const selectAll   = document.getElementById('select-all-cb');
+        const bulkBar     = document.getElementById('bulk-bar');
+        const bulkCount   = document.getElementById('bulk-count');
+        const bulkForm    = document.getElementById('bulk-approve-form');
+        const bulkSubmit  = document.getElementById('bulk-submit-btn');
+        const bulkNote    = document.getElementById('bulk-note-input');
+        const persD       = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+        const toPers      = n => String(n).replace(/\d/g, d => persD[d]);
+
+        function getChecked() {
+            return Array.from(document.querySelectorAll('.bulk-cb:checked'));
+        }
+
+        function updateBar() {
+            const cbs = getChecked();
+            if (bulkBar) bulkBar.style.display = cbs.length ? 'flex' : 'none';
+            if (bulkCount) bulkCount.textContent = toPers(cbs.length) + ' سند انتخاب‌شده';
+        }
+
+        if (bulkSubmit && bulkForm) {
+            bulkSubmit.addEventListener('click', function() {
+                const cbs = getChecked();
+                if (!cbs.length) return;
+                if (!confirm('تأیید نهایی ' + toPers(cbs.length) + ' سند انتخاب‌شده؟')) return;
+
+                // حذف IDs قبلی
+                bulkForm.querySelectorAll('input[name="payment_ids"]').forEach(el => el.remove());
+                // اضافه کردن IDs انتخاب‌شده
+                cbs.forEach(function(cb) {
+                    const inp = document.createElement('input');
+                    inp.type  = 'hidden';
+                    inp.name  = 'payment_ids';
+                    inp.value = cb.value;
+                    bulkForm.appendChild(inp);
+                });
+                // اضافه کردن توضیح
+                const oldNote = bulkForm.querySelector('input[name="note"]');
+                if (oldNote) oldNote.remove();
+                const noteInp = document.createElement('input');
+                noteInp.type  = 'hidden';
+                noteInp.name  = 'note';
+                noteInp.value = bulkNote ? bulkNote.value : '';
+                bulkForm.appendChild(noteInp);
+
+                bulkForm.submit();
+            });
+        }
+
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                document.querySelectorAll('.bulk-cb').forEach(cb => { cb.checked = selectAll.checked; });
+                updateBar();
+            });
+        }
+        document.querySelectorAll('.bulk-cb').forEach(cb => {
+            cb.addEventListener('change', updateBar);
+        });
+    })();
+
+    function qaToggle(pid, type) {
+        var wrap = document.getElementById('qa-' + pid);
+        if (!wrap) return;
+        var panels = wrap.querySelectorAll('.qa-panel');
+        var target = document.getElementById('qa-' + type + '-' + pid);
+        var isOpen = target && target.style.display !== 'none';
+
+        // بستن همه پانل‌ها
+        panels.forEach(function(p) { p.style.display = 'none'; });
+
+        if (!isOpen && target) {
+            target.style.display = 'block';
+            var note = target.querySelector('.qa-note');
+            if (note) { note.value = ''; note.focus(); }
+        }
+    }
+
+    function qaClose(pid) {
+        var wrap = document.getElementById('qa-' + pid);
+        if (!wrap) return;
+        wrap.querySelectorAll('.qa-panel').forEach(function(p) { p.style.display = 'none'; });
+    }
     </script>
     <script src="{% static 'js/app-ui.js' %}"></script>
 </body>

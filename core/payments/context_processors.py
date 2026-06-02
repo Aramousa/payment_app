@@ -97,6 +97,8 @@ def app_navigation(request):
             items.append(_nav_item('داشبورد فروش', 'sales_expert_dashboard', 'sales_dashboard', 'documents'))
         if user.is_superuser or role == 'sales_manager':
             items.append(_nav_item('تخصیص مشتریان فروش', 'sales_assignments', 'sales_assignments', 'admin'))
+        if user.is_superuser or role == 'finance_manager':
+            items.append(_nav_item('تفویض تأیید نهایی', 'final_approval_delegation', 'delegation', 'finance'))
         if is_staff_user:
             items.append(_nav_item('برنامه واریز', 'daily_payment_plans', 'daily_payments', 'finance'))
             if not user.is_superuser:

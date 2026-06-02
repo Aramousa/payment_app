@@ -330,6 +330,8 @@ class PaymentRecord(models.Model):
     def is_finance_registered(self):
         return self.finance_status == self.FINANCE_STATUS_APPROVED
 
+    # (تفویض جهانی از طریق FinalApprovalDelegate مدیریت می‌شود)
+
     @property
     def ready_for_final_approval(self):
         """تأیید نهایی فقط وقتی هر دو فلگ در وضعیت تکمیل‌شده باشند."""
@@ -1253,3 +1255,29 @@ class SystemSettings(models.Model):
 
     def __str__(self):
         return 'تنظیمات سیستم'
+
+
+class FinalApprovalDelegate(models.Model):
+    """تفویض اختیار تأیید نهایی — مدیر مالی می‌تواند به کاربران مشخصی این اختیار را بدهد."""
+    delegated_user = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='final_approval_delegations',
+        verbose_name='کاربر تفویض‌شده',
+    )
+    granted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='granted_delegations',
+        verbose_name='تفویض‌کننده',
+    )
+    is_active = models.BooleanField('فعال', default=True)
+    note = models.TextField('توضیح', blank=True)
+    created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        unique_together = [('delegated_user',)]
+        verbose_name = 'تفویض تأیید نهایی'
+        verbose_name_plural = 'تفویض‌های تأیید نهایی'
+
+    def __str__(self):
+        return f"{self.delegated_user.get_full_name() or self.delegated_user.username} ({'فعال' if self.is_active else 'غیرفعال'})"
