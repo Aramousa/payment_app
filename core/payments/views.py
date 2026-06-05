@@ -1680,6 +1680,63 @@ def _apply_record_sort(records, request):
 
     return records, current_sort, current_dir, base_query
 
+def _check_duplicate_payment(form, user):
+    """
+    بررسی تکراری بودن فیش با فیلدهایی که مشتری پر کرده است.
+
+    قوانین:
+    ۱. اگر کد پیگیری وارد شده → به تنهایی کافی است (یکتاست)
+    ۲. اگر کد پیگیری نبود → از ترکیب فیلدهای موجود استفاده می‌شود
+    ۳. حداقل ۲ فیلد معنادار باید پر باشد تا بررسی انجام شود
+    ۴. فیش‌های «رد شده» نادیده گرفته می‌شوند
+    """
+    amount           = form.cleaned_data.get('amount')
+    tracking_code    = (form.cleaned_data.get('tracking_code') or '').strip()
+    payer_account    = (form.cleaned_data.get('payer_account_number') or '').replace(' ', '').strip()
+    beneficiary_acct = (form.cleaned_data.get('beneficiary_account_number') or '').replace(' ', '').strip()
+    pay_date         = form.cleaned_data.get('pay_date')
+
+    base_qs = PaymentRecord.objects.filter(
+        user=user,
+    ).exclude(
+        status=PaymentRecord.STATUS_REJECTED,
+    )
+
+    duplicate = None
+
+    # ── مسیر ۱: کد پیگیری وارد شده — به تنهایی یکتاست ─────────
+    if tracking_code:
+        qs = base_qs.filter(tracking_code=tracking_code)
+        if amount:
+            qs = qs.filter(amount=amount)
+        duplicate = qs.first()
+
+    # ── مسیر ۲: بدون کد پیگیری — ترکیب فیلدهای موجود ──────────
+    if not duplicate and not tracking_code:
+        filters = {}
+        if amount:
+            filters['amount'] = amount
+        if payer_account:
+            filters['payer_account_number'] = payer_account
+        if beneficiary_acct:
+            filters['beneficiary_account_number'] = beneficiary_acct
+        if pay_date:
+            filters['pay_date'] = pay_date
+
+        # حداقل ۲ فیلد معنادار لازم است
+        meaningful = [v for v in [amount, payer_account, beneficiary_acct] if v]
+        if len(meaningful) >= 2 and filters:
+            duplicate = base_qs.filter(**filters).first()
+
+    if duplicate:
+        form.add_error(
+            None,
+            f'⚠️ این فیش احتمالاً قبلاً ثبت شده است (سریال #{duplicate.id} — '
+            f'وضعیت: {duplicate.get_status_display() if hasattr(duplicate, "get_status_display") else duplicate.status}). '
+            f'پیش از ارسال مجدد، وضعیت فیش قبلی را بررسی کنید.'
+        )
+
+
 def _account_initial_data(user, profile, payment=None):
     payment = payment or PaymentRecord()
     return {
@@ -2449,6 +2506,10 @@ def create_payment(request):
                 )
                 if assigned_accounts.exists():
                     form.add_error('beneficiary_account_number', 'این شماره حساب برای امروز معتبر نیست و امکان ثبت فیش با آن وجود ندارد.')
+
+            # ── بررسی تکراری بودن فیش ──────────────────────────────
+            if not form.errors:
+                _check_duplicate_payment(form, request.user)
 
             if not form.errors:
                 payment = form.save(commit=False)
@@ -5327,4 +5388,47 @@ def sms_test_send(request):
             messages.error(request, f'خطا: {err}')
         return redirect(request.META.get('HTTP_REFERER', '/admin/'))
     return HttpResponseForbidden()
+
+
+# ─── تست خوانش فیش بانکی — فقط ادمین ──────────────────────────────────────
+
+@login_required
+def receipt_reader_test(request):
+    """ابزار تست OCR فیش بانکی — فقط مدیر سیستم."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('فقط مدیر سیستم به این صفحه دسترسی دارد.')
+
+    result = None
+    error  = None
+
+    if request.method == 'POST' and request.FILES.get('receipt_file'):
+        uploaded = request.FILES['receipt_file']
+        import tempfile as _tmp, os as _os
+        from .receipt_extraction import extract_receipt_file
+
+        suffix = _os.path.splitext(uploaded.name or '')[1].lower() or '.tmp'
+        tmp_path = None
+        try:
+            with _tmp.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                for chunk in uploaded.chunks():
+                    tmp.write(chunk)
+                tmp_path = tmp.name
+            result = extract_receipt_file(tmp_path, original_name=uploaded.name)
+        except Exception as exc:
+            error = str(exc)
+            logger.exception('Receipt reader test failed')
+        finally:
+            if tmp_path:
+                try:
+                    _os.unlink(tmp_path)
+                except Exception:
+                    pass
+
+    return render(request, 'payments/receipt_reader_test.html', {
+        'result':         result,
+        'error':          error,
+        'gemini_enabled':   bool(getattr(settings, 'GEMINI_API_KEY', '')),
+        'claude_enabled':   bool(getattr(settings, 'ANTHROPIC_API_KEY', '')),
+        'ocrspace_enabled': bool(getattr(settings, 'OCRSPACE_API_KEY', '')),
+    })
 

@@ -16,7 +16,7 @@
         .top-bar { max-width: 1180px; margin: 0 auto 18px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .button-link, .logout-btn, .submit-btn { border: none; border-radius: 6px; padding: 8px 14px; text-decoration: none; color: #fff; display: inline-block; cursor: pointer; font-family: inherit; }
-        .button-link { background: #0d6efd; }
+        .button-link { background: #1e3a5f; }
         .logout-btn { background: #dc3545; }
         .submit-btn { background: #198754; }
         .section { max-width: 1180px; margin: 0 auto 18px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
@@ -27,9 +27,7 @@
         label { font-size: 12px; color: #243447; }
         .hint-box { background: #eef6ff; border: 1px solid #cfe2ff; color: #124b91; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
         .field-error { color: #c62828; font-size: 11px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 10px; border-bottom: 1px solid #e7ebf0; text-align: center; vertical-align: top; }
-        th { background: #0d6efd; color: #fff; }
+
         .edit-link { background: #fd7e14; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; }
         .cancel-link { background: #6c757d; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; }
         .system-message-list { margin: 0; padding-right: 18px; }
@@ -143,12 +141,12 @@
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
             <h2 style="margin:0;">فهرست کاربران</h2>
             <div style="display:flex;gap:8px;">
-                <a href="{% url 'counterparty_manage_list' %}" class="button-link" style="background:#0d9488;font-size:13px;padding:7px 12px;">
+                <a href="{% url 'counterparty_manage_list' %}" class="button-link" style="background:#1e3a5f;font-size:13px;padding:7px 12px;">
                     🏢 مدیریت طرف حساب‌ها
                 </a>
             </div>
         </div>
-        <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#0f4e49;">
+        <div style="background:#eef2f8;border:1px solid #eef2f8;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1a2f4e;">
             💡 کاربران با نقش <strong>«🏢 طرف حساب»</strong> از طریق صفحه مدیریت طرف حساب‌ها ایجاد و ویرایش می‌شوند.
             دکمه ویرایش آن‌ها مستقیماً به صفحه مدیریت طرف حساب هدایت می‌کند.
         </div>
@@ -230,14 +228,14 @@
             <tbody>
                 {% for item in users %}
                     <tr>
-                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ item.id }}</span></td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ item.id }}</span></td>
                         <td>{{ item.profile.accounting_code|default:'-' }}</td>
                         <td>{{ item.username }}</td>
                         <td>{{ item.first_name }} {{ item.last_name }}</td>
                         <td>
                             {% with cp=item.counterparty_account %}
                             {% if cp %}
-                                <span style="display:inline-block;background:#ccfbf1;color:#0f766e;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700;">🏢 طرف حساب</span>
+                                <span class="tbl-badge tbl-badge-green">🏢 طرف حساب</span>
                                 <div style="font-size:11px;color:#64748b;margin-top:2px;">{{ cp.name }}</div>
                             {% else %}
                                 {{ item.profile.get_role_display }}
@@ -255,7 +253,7 @@
                             <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:center;">
                                 <button type="button" class="reset-password-btn" data-user-id="{{ item.id }}" data-username="{{ item.username }}" style="background:#198754; color:#fff; border:none; border-radius:4px; padding:4px 8px; cursor:pointer; font-size:11px;">🔄</button>
                                 {% if item.counterparty_account %}
-                                    <a href="{% url 'counterparty_manage_edit' item.counterparty_account.id %}" class="edit-link" style="background:#0d9488;" title="ویرایش طرف حساب">ویرایش</a>
+                                    <a href="{% url 'counterparty_manage_edit' item.counterparty_account.id %}" class="edit-link" style="background:#1e3a5f;" title="ویرایش طرف حساب">ویرایش</a>
                                 {% else %}
                                     <a href="{% url 'user_edit' item.id %}" class="edit-link">ویرایش</a>
                                 {% endif %}

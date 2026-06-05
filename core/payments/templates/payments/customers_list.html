@@ -13,24 +13,19 @@
         h2 { text-align: center; margin-bottom: 20px; }
         .top-bar { max-width: 1200px; margin: 0 auto 16px auto; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .back-link { background: #6c757d; color: #fff; border-radius: 5px; padding: 8px 14px; text-decoration: none; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
-        th { background-color: #007bff; color: white; }
+
         .money-cell { direction: ltr; white-space: nowrap; }
-        
-        tr:hover { background: #f5f9ff; }
-        
+
         .customer-link {
             display: inline-block;
-            background: #0d6efd;
+            background: #1e3a5f;
             color: #fff;
             border-radius: 5px;
             padding: 6px 12px;
             text-decoration: none;
             font-size: 13px;
         }
-        .customer-link:hover { background: #0a58ca; }
+        .customer-link:hover { background: #152a45; }
         
         .status-badge { display: inline-block; padding: 4px 10px; border-radius: 16px; font-size: 12px; }
         .status-active { background: #2e7d32; color: #fff; }
@@ -123,10 +118,10 @@
             <tbody id="customerTableBody">
                 {% for customer in customer_data %}
                     <tr class="customer-row" data-search="{{ customer.user.username }} {{ customer.profile.first_name|default:'' }} {{ customer.profile.last_name|default:'' }} {{ customer.profile.organization|default:'' }} {{ customer.profile.city|default:'' }} {{ customer.profile.phone|default:'' }} {{ customer.profile.mobile|default:'' }} {{ customer.profile.accounting_code|default:'' }}">
-                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ customer.user.id }}</span></td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ customer.user.id }}</span></td>
                         <td>
                             {% if customer.profile.accounting_code %}
-                            <span style="display:inline-block;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700;font-family:monospace;letter-spacing:0.4px;">{{ customer.profile.accounting_code }}</span>
+                            <span class="tbl-badge tbl-badge-green">{{ customer.profile.accounting_code }}</span>
                             {% else %}<span style="color:#94a3b8;font-size:12px;">—</span>{% endif %}
                         </td>
                         <td>{{ customer.user.username }}</td>

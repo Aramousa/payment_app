@@ -1,23 +1,31 @@
 {% load static %}
 {% if request.user.is_authenticated and app_nav_items %}
-<nav class="app-shell-nav" aria-label="منوی اصلی برنامه">
-    <div class="app-shell-brand">
+
+<div class="sb-overlay" id="sb-overlay"></div>
+
+<button class="app-nav-toggle" id="sb-toggle" type="button" aria-label="منو" aria-expanded="false">
+    <span class="app-nav-toggle-lines"></span>
+</button>
+
+<header class="app-top-header" role="banner">
+    <div class="app-top-brand">
         <img class="app-shell-logo" src="{% static 'logo/logo-top.png' %}" alt="VISIUN">
     </div>
 
-    <button class="app-nav-toggle" type="button" aria-expanded="false" aria-label="باز کردن منوی اصلی"></button>
-
-    <div class="app-nav-panel">
-        <div class="app-nav-links">
-            {% for item in app_nav_items %}
-                <a class="app-nav-link app-nav-{{ item.group }}" href="{{ item.url }}">{{ item.label }}</a>
-            {% endfor %}
-        </div>
+    <div class="app-top-context">
+        <span class="app-top-title">سامانه واریزی‌ها</span>
+        <span class="app-top-role">{{ app_nav_role_label }}</span>
     </div>
 
-    <div class="app-nav-side">
-        <div class="notification-bell app-nav-notification" title="اعلان‌ها" data-feed-url="{% url 'notifications_feed' %}" data-read-url="{% url 'notifications_mark_read' %}" data-user-id="{{ request.user.id }}">
-            <button class="notification-trigger" type="button" aria-label="اعلان‌ها" aria-expanded="false"></button>
+    <div class="app-top-actions">
+        <div class="notification-bell app-nav-notification"
+             title="اعلان‌ها"
+             data-feed-url="{% url 'notifications_feed' %}"
+             data-read-url="{% url 'notifications_mark_read' %}"
+             data-user-id="{{ request.user.id }}">
+            <button class="notification-trigger" type="button" aria-label="اعلان‌ها" aria-expanded="false">
+                اعلان‌ها
+            </button>
             <span class="notification-badge{% if unread_notifications.total == 0 %} zero{% endif %}">{{ unread_notifications.total }}</span>
             <div class="notification-dropdown">
                 <div class="notification-actions">
@@ -36,14 +44,87 @@
             </div>
         </div>
 
-        <div class="app-nav-user">
-            <span class="app-nav-user-name">{{ app_nav_user_display }}</span>
-            <span class="app-nav-user-role">{{ app_nav_role_label }}</span>
+        <details class="app-user-menu">
+            <summary>
+                <span class="app-user-avatar">{{ app_nav_user_display|first|default:"ک" }}</span>
+                <span class="app-user-summary">
+                    <span class="app-nav-user-name">{{ app_nav_user_display }}</span>
+                    <span class="app-nav-user-role">{{ app_nav_role_label }}</span>
+                </span>
+            </summary>
+            <div class="app-user-menu-panel">
+                {% for group in app_nav_groups %}
+                    {% if group.key == 'account' %}
+                        {% for item in group.items %}
+                            <a href="{{ item.url }}">{{ item.label }}</a>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+                <form class="app-nav-logout" method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit">خروج</button>
+                </form>
+            </div>
+        </details>
+    </div>
+</header>
+
+<nav class="app-shell-nav" id="app-sidebar" aria-label="منوی اصلی">
+    <div class="app-nav-panel">
+        <div class="app-nav-links">
+            {% for group in app_nav_groups %}
+                {% if group.key != 'account' %}
+                    <section class="app-nav-section">
+                        <div class="sb-group-header">{{ group.label }}</div>
+                        {% for item in group.items %}
+                            <a class="app-nav-link app-nav-{{ group.key }}" href="{{ item.url }}">
+                                <span class="app-nav-icon">{{ item.icon }}</span>
+                                <span class="app-nav-text">{{ item.label }}</span>
+                            </a>
+                        {% endfor %}
+                    </section>
+                {% endif %}
+            {% endfor %}
         </div>
-        <form class="app-nav-logout" method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button type="submit">خروج</button>
-        </form>
     </div>
 </nav>
+
+<script>
+(function() {
+    var sidebar = document.getElementById('app-sidebar');
+    var toggle = document.getElementById('sb-toggle');
+    var overlay = document.getElementById('sb-overlay');
+    if (!sidebar) return;
+
+    var currentPath = window.location.pathname.replace(/\/$/, '');
+    document.querySelectorAll('.app-nav-link').forEach(function(link) {
+        var href = link.getAttribute('href') || '';
+        var path = href.split('?')[0].replace(/\/$/, '');
+        if (path && (path === currentPath || (path !== '' && currentPath.indexOf(path + '/') === 0))) {
+            link.classList.add('active-link');
+        }
+    });
+
+    function setOpen(open) {
+        sidebar.classList.toggle('open', open);
+        if (overlay) overlay.classList.toggle('show', open);
+        if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    if (toggle) {
+        toggle.addEventListener('click', function(event) {
+            event.stopPropagation();
+            setOpen(!sidebar.classList.contains('open'));
+        });
+    }
+    if (overlay) {
+        overlay.addEventListener('click', function() {
+            setOpen(false);
+        });
+    }
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') setOpen(false);
+    });
+})();
+</script>
 {% endif %}

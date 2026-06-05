@@ -12,8 +12,8 @@
             {% for method in request.session.mfa_methods %}
             <li>
                 <a href="{% url 'mfa_goto' method %}"
-                   style="display:block;padding:13px 20px;background:#f0fdfa;border:1.5px solid #0d9488;
-                          border-radius:10px;color:#0f766e;font-weight:700;font-size:14px;
+                   style="display:block;padding:13px 20px;background:#eef2f8;border:1.5px solid #1e3a5f;
+                          border-radius:10px;color:#152a45;font-weight:700;font-size:14px;
                           text-decoration:none;">
                     {% if method == "TOTP" %}📱 اپلیکیشن احراز هویت
                     {% elif method == "Email" %}✉️ کد از طریق ایمیل

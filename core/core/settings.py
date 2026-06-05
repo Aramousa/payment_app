@@ -364,6 +364,15 @@ _default_email_backend = (
     if DEBUG else
     'django.core.mail.backends.smtp.EmailBackend'
 )
+# ─── Anthropic API — برای OCR هوشمند فیش بانکی ─────────────────────────────
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+# Google Gemini Flash — کاملاً رایگان، بدون کارت اعتباری
+# کلید رایگان از: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY    = os.getenv('GEMINI_API_KEY', '')
+# OCR.space — رایگان تا ۲۵,۰۰۰ درخواست در ماه
+# رجیستر رایگان: https://ocr.space/ocrapi/freekey
+OCRSPACE_API_KEY  = os.getenv('OCRSPACE_API_KEY', '')
+
 EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND', _default_email_backend)
 EMAIL_FILE_PATH = BASE_DIR / 'logs' / 'emails'   # محل ذخیره ایمیل‌ها در dev
 

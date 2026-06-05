@@ -15,7 +15,7 @@
         .card-header { display: flex; justify-content: space-between; align-items: center;
                        flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
         .card-header h3 { margin: 0; font-size: 16px; }
-        .status-chip { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fff; background: #0d9488; }
+        .status-chip { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fff; background: #1e3a5f; }
 
         /* دو فلگ */
         .flags-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -30,18 +30,18 @@
         .staff-tl-dot { position: absolute; right: -28px; top: 6px; width: 18px; height: 18px;
                         border-radius: 50%; display: flex; align-items: center; justify-content: center;
                         font-size: 11px; border: 2px solid #fff; box-shadow: 0 0 0 2px #e2e8f0; background: #cbd5e1; }
-        .staff-tl-dot.created   { background: #0d9488; box-shadow: 0 0 0 2px #0d9488; }
+        .staff-tl-dot.created   { background: #1e3a5f; box-shadow: 0 0 0 2px #1e3a5f; }
         .staff-tl-dot.edited    { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
         .staff-tl-dot.commercial{ background: #3b82f6; box-shadow: 0 0 0 2px #3b82f6; }
         .staff-tl-dot.finance   { background: #7c3aed; box-shadow: 0 0 0 2px #7c3aed; }
         .staff-tl-dot.approved  { background: #16a34a; box-shadow: 0 0 0 2px #16a34a; }
         .staff-tl-dot.rejected  { background: #dc2626; box-shadow: 0 0 0 2px #dc2626; }
         .staff-tl-dot.incomplete{ background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
-        .staff-tl-dot.customer  { background: #0d9488; box-shadow: 0 0 0 2px #0d9488; }
+        .staff-tl-dot.customer  { background: #1e3a5f; box-shadow: 0 0 0 2px #1e3a5f; }
         .staff-tl-dot.cp        { background: #0369a1; box-shadow: 0 0 0 2px #0369a1; }
 
         .staff-tl-body { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; }
-        .staff-tl-body.is-note  { background: #f0fdfa; border-color: #99f6e4; }
+        .staff-tl-body.is-note  { background: #eef2f8; border-color: #c7d2e8; }
         .staff-tl-body.is-final { background: #f0fdf4; border-color: #86efac; }
         .staff-tl-body.is-reject{ background: #fff5f5; border-color: #fca5a5; }
         .staff-tl-body.is-incomplete { background: #fffbeb; border-color: #fde68a; }
@@ -53,7 +53,7 @@
         .tl-note  { margin-top: 6px; font-size: 13px; color: #374151; line-height: 1.7;
                     background: #fff; border-right: 3px solid #94a3b8; padding: 6px 9px; border-radius: 0 6px 6px 0; }
         .tl-note.note-red   { border-color: #ef4444; background: #fff5f5; color: #7f1d1d; }
-        .tl-note.note-teal  { border-color: #0d9488; background: #f0fdfa; }
+        .tl-note.note-teal  { border-color: #1e3a5f; background: #eef2f8; }
         .tl-note.note-purple{ border-color: #7c3aed; background: #f5f3ff; }
         .tl-time  { font-size: 11px; color: #94a3b8; margin-top: 4px; }
 
@@ -66,7 +66,7 @@
         .cust-body.final-ok  { background: #f0fdf4; border-color: #86efac; }
         .cust-body.rejected  { background: #fff5f5; border-color: #fca5a5; }
         .cust-body.incomplete{ background: #fffbeb; border-color: #fde68a; }
-        .cust-body.my-note   { background: #f0fdfa; border-color: #99f6e4; }
+        .cust-body.my-note   { background: #eef2f8; border-color: #c7d2e8; }
         .cust-text { font-size: 14px; font-weight: 600; color: #1e293b; }
         .cust-note { margin-top: 6px; font-size: 13px; background: #fff;
                      border-right: 3px solid #ef4444; padding: 6px 9px; border-radius: 0 6px 6px 0;
@@ -75,16 +75,16 @@
 
         /* فرم توضیح */
         .note-form-card { background: #fff; border-radius: 12px; padding: 20px;
-                          box-shadow: 0 2px 12px rgba(0,0,0,.07); border-right: 4px solid #0d9488; }
-        .note-form-card h4 { margin: 0 0 12px; font-size: 14px; color: #0f4e49; }
+                          box-shadow: 0 2px 12px rgba(0,0,0,.07); border-right: 4px solid #1e3a5f; }
+        .note-form-card h4 { margin: 0 0 12px; font-size: 14px; color: #1a2f4e; }
         .note-form-card textarea { width: 100%; box-sizing: border-box; min-height: 80px;
-                                   border: 1.5px solid #b2e0da; border-radius: 8px; padding: 10px 12px;
+                                   border: 1.5px solid #c7d2e8; border-radius: 8px; padding: 10px 12px;
                                    font-family: Vazir, sans-serif; font-size: 13px; resize: vertical; }
-        .note-form-card textarea:focus { outline: none; border-color: #0d9488;
-                                         box-shadow: 0 0 0 3px rgba(13,148,136,.12); }
+        .note-form-card textarea:focus { outline: none; border-color: #1e3a5f;
+                                         box-shadow: 0 0 0 3px rgba(30,58,95,.12); }
         .char-count { font-size: 11px; color: #94a3b8; text-align: left; margin-top: 4px; }
         .char-count.warn { color: #ef4444; }
-        .note-submit-btn { margin-top: 10px; background: linear-gradient(135deg, #0d9488, #0f766e);
+        .note-submit-btn { margin-top: 10px; background: linear-gradient(135deg, #1e3a5f, #152a45);
                            color: #fff; border: none; border-radius: 8px; padding: 10px 20px;
                            font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; }
         .locked-notice { background: #fef9c3; border: 1px solid #fde047; border-radius: 8px;

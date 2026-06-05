@@ -1,0 +1,273 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تست خوانش فیش بانکی</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        .rr-wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+        .rr-card { background: #fff; border-radius: 14px; padding: 28px;
+                   box-shadow: 0 2px 12px rgba(30,58,95,.08);
+                   border: 1px solid #e2e8f0; margin-bottom: 20px; }
+        .rr-card h3 { font-size: 15px; color: #1e3a5f; margin: 0 0 18px;
+                      padding-bottom: 10px; border-bottom: 2px solid #eef2f8; }
+        .upload-zone { border: 2px dashed #c7d2e8; border-radius: 10px;
+                       padding: 40px 20px; text-align: center; cursor: pointer;
+                       transition: all .15s; background: #fafbfd; }
+        .upload-zone:hover { border-color: #1e3a5f; background: #eef2f8; }
+        .upload-zone input[type=file] { display: none; }
+        .upload-zone .icon { font-size: 40px; margin-bottom: 12px; }
+        .upload-zone p { margin: 0; font-size: 13px; color: #64748b; }
+        .upload-zone .filename { margin-top: 10px; font-size: 13px;
+                                  font-weight: 700; color: #1e3a5f; }
+        .btn-submit { width: 100%; padding: 13px; margin-top: 16px;
+                      background: linear-gradient(135deg, #1e3a5f, #152a45);
+                      color: #fff; border: none; border-radius: 10px;
+                      font-family: Vazir, sans-serif; font-size: 15px;
+                      font-weight: 700; cursor: pointer; }
+        .btn-submit:hover { opacity: .9; }
+        .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* نتایج */
+        .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+        .field-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+                      padding: 14px 16px; }
+        .field-card .field-label { font-size: 11px; color: #64748b; font-weight: 700;
+                                    margin-bottom: 6px; text-transform: uppercase; }
+        .field-card .field-value { font-size: 15px; color: #1e3a5f; font-weight: 800;
+                                    word-break: break-all; direction: ltr; text-align: right; }
+        .field-card .field-icon { font-size: 22px; float: left; margin-right: 8px; }
+
+        .raw-text { background: #f1f5f9; border-radius: 8px; padding: 14px;
+                    font-size: 11px; font-family: monospace; direction: ltr;
+                    text-align: left; max-height: 300px; overflow-y: auto;
+                    white-space: pre-wrap; word-break: break-all; color: #374151; }
+        .msg-ok   { background: #f0fdf4; border: 1px solid #86efac; color: #14532d;
+                    border-radius: 8px; padding: 12px 16px; font-weight: 700; margin-bottom: 16px; }
+        .msg-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+                    border-radius: 8px; padding: 12px 16px; font-weight: 700; margin-bottom: 16px; }
+        .msg-err  { background: #fff5f5; border: 1px solid #fca5a5; color: #7f1d1d;
+                    border-radius: 8px; padding: 12px 16px; font-weight: 700; margin-bottom: 16px; }
+        .badge-src { background: #eef2f8; color: #1e3a5f; border-radius: 5px;
+                     padding: 1px 7px; font-size: 11px; font-family: monospace; }
+        .warnings-list { font-size: 12px; color: #92400e; margin: 8px 0 0;
+                         padding-right: 16px; }
+
+        /* loading overlay */
+        #loading { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+                   z-index: 9999; align-items: center; justify-content: center; }
+        #loading.show { display: flex; }
+        .spinner { width: 56px; height: 56px; border: 5px solid rgba(255,255,255,.3);
+                   border-top-color: #fff; border-radius: 50%;
+                   animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+{% include "payments/partials/app_navigation.html" %}
+{% include "payments/partials/system_messages_popup.html" %}
+
+<div id="loading">
+    <div style="text-align:center;color:#fff;">
+        <div class="spinner" style="margin:0 auto 16px;"></div>
+        <div style="font-size:14px;">در حال پردازش تصویر...</div>
+        <div style="font-size:12px;margin-top:6px;opacity:.8;">OCR ممکن است چند ثانیه طول بکشد</div>
+    </div>
+</div>
+
+<div class="rr-wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <h2 style="margin:0;font-size:18px;color:#1e3a5f;">🔍 تست خوانش فیش بانکی</h2>
+        <a href="{% url 'submit' %}" style="font-size:13px;color:#64748b;text-decoration:none;">← بازگشت</a>
+    </div>
+
+    <!-- فرم آپلود -->
+    <div class="rr-card">
+        <h3 style="margin-bottom:12px;">⚙️ موتور OCR فعال</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;
+                        background:{% if gemini_enabled %}#f0fdf4{% else %}#fffbeb{% endif %};
+                        border:1px solid {% if gemini_enabled %}#86efac{% else %}#fde68a{% endif %};">
+                <span>{% if gemini_enabled %}✅{% else %}⭐{% endif %}</span>
+                <div>
+                    <strong>Google Gemini Flash</strong>
+                    <span style="font-size:11px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 6px;margin-right:4px;">رایگان</span>
+                    {% if gemini_enabled %}
+                    <span style="color:#15803d;font-size:11px;"> — فعال</span>
+                    {% else %}
+                    <div style="font-size:11px;color:#64748b;margin-top:3px;">
+                        کلید رایگان از <strong>aistudio.google.com/app/apikey</strong> ← بدون کارت اعتباری
+                        <br>سپس: <code>GEMINI_API_KEY=AIza...</code> در .env
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;
+                        background:{% if claude_enabled %}#f0fdf4{% else %}#f8fafc{% endif %};
+                        border:1px solid {% if claude_enabled %}#86efac{% else %}#e2e8f0{% endif %};">
+                <span>{% if claude_enabled %}✅{% else %}⭕{% endif %}</span>
+                <div>
+                    <strong>Claude Vision API</strong>
+                    {% if claude_enabled %}<span style="color:#15803d;font-size:11px;"> — فعال</span>
+                    {% else %}<span style="color:#94a3b8;font-size:11px;"> — پولی</span>{% endif %}
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;
+                        background:{% if ocrspace_enabled %}#f0fdf4{% else %}#f8fafc{% endif %};
+                        border:1px solid {% if ocrspace_enabled %}#86efac{% else %}#e2e8f0{% endif %};">
+                <span>{% if ocrspace_enabled %}✅{% else %}⭕{% endif %}</span>
+                <div>
+                    <strong>OCR.space</strong> — رایگان آنلاین
+                    {% if ocrspace_enabled %}<span style="color:#15803d;font-size:11px;"> — فعال</span>
+                    {% else %}
+                    <span style="color:#94a3b8;font-size:11px;"> — تنظیم OCRSPACE_API_KEY در .env</span>
+                    <div style="font-size:11px;color:#64748b;margin-top:3px;">
+                        رجیستر رایگان در <code>ocr.space/ocrapi/freekey</code> — 25,000 درخواست/ماه
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;
+                        background:#f8fafc;border:1px solid #e2e8f0;">
+                <span>✅</span>
+                <div>
+                    <strong>Tesseract OCR</strong> — محلی (بدون اینترنت)
+                    <span style="color:#64748b;font-size:11px;"> — همیشه فعال به عنوان fallback</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="rr-card">
+        <h3>📂 بارگذاری فیش</h3>
+        <form method="post" enctype="multipart/form-data" id="upload-form">
+            {% csrf_token %}
+            <label class="upload-zone" for="receipt_file" id="drop-zone">
+                <div class="icon">🖼️</div>
+                <p>کلیک کنید یا فایل را اینجا رها کنید</p>
+                <p style="margin-top:6px;font-size:11px;color:#94a3b8;">JPEG، PNG، PDF — حداکثر ۱۰ مگابایت</p>
+                <div class="filename" id="file-name">هیچ فایلی انتخاب نشده</div>
+                <input type="file" name="receipt_file" id="receipt_file"
+                       accept="image/jpeg,image/png,image/gif,application/pdf,.jpg,.jpeg,.png,.pdf">
+            </label>
+            <button type="submit" class="btn-submit" id="submit-btn" disabled>
+                🔍 استخراج اطلاعات فیش
+            </button>
+        </form>
+    </div>
+
+    <!-- خطا -->
+    {% if error %}
+    <div class="rr-card">
+        <div class="msg-err">❌ خطا در پردازش: {{ error }}</div>
+    </div>
+    {% endif %}
+
+    <!-- نتایج -->
+    {% if result %}
+    <div class="rr-card">
+        <h3>📊 نتیجه استخراج</h3>
+
+        <!-- پیام وضعیت -->
+        {% if result.ok %}
+        <div class="msg-ok">{{ result.message }}</div>
+        {% else %}
+        <div class="msg-warn">{{ result.message }}</div>
+        {% endif %}
+
+        <!-- اطلاعات منبع -->
+        <div style="margin-bottom:16px;font-size:12px;color:#64748b;">
+            روش استخراج: <span class="badge-src">{{ result.text_source|default:"—" }}</span>
+            &nbsp;|&nbsp; نوع فایل: <span class="badge-src">{{ result.file_kind|default:"—" }}</span>
+        </div>
+
+        <!-- فیلدهای استخراج‌شده -->
+        {% if result.fields %}
+        <div class="field-grid">
+            {% for key, field in result.fields.items %}
+            <div class="field-card">
+                <span class="field-icon">{{ field.icon }}</span>
+                <div class="field-label">{{ field.label }}</div>
+                <div class="field-value">{{ field.value }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="text-align:center;color:#94a3b8;padding:32px;font-size:14px;">
+            هیچ فیلدی شناسایی نشد
+        </div>
+        {% endif %}
+
+        <!-- هشدارها -->
+        {% if result.warnings %}
+        <div style="margin-top:16px;">
+            <div style="font-size:12px;color:#92400e;font-weight:700;">⚠️ هشدارها:</div>
+            <ul class="warnings-list">
+                {% for w in result.warnings %}<li>{{ w }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- متن خام OCR -->
+    {% if result.raw_text %}
+    <div class="rr-card">
+        <h3>📄 متن خام OCR</h3>
+        <div class="raw-text">{{ result.raw_text }}</div>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+
+<script src="{% static 'js/app-ui.js' %}"></script>
+<script>
+(function() {
+    var fileInput = document.getElementById('receipt_file');
+    var fileName  = document.getElementById('file-name');
+    var submitBtn = document.getElementById('submit-btn');
+    var form      = document.getElementById('upload-form');
+    var loading   = document.getElementById('loading');
+
+    fileInput.addEventListener('change', function() {
+        if (fileInput.files.length) {
+            fileName.textContent = fileInput.files[0].name;
+            submitBtn.disabled = false;
+        } else {
+            fileName.textContent = 'هیچ فایلی انتخاب نشده';
+            submitBtn.disabled = true;
+        }
+    });
+
+    // drag & drop
+    var zone = document.getElementById('drop-zone');
+    zone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        zone.style.borderColor = '#1e3a5f';
+        zone.style.background  = '#eef2f8';
+    });
+    zone.addEventListener('dragleave', function() {
+        zone.style.borderColor = '';
+        zone.style.background  = '';
+    });
+    zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        zone.style.borderColor = '';
+        zone.style.background  = '';
+        var files = e.dataTransfer.files;
+        if (files.length) {
+            fileInput.files = files;
+            fileName.textContent = files[0].name;
+            submitBtn.disabled = false;
+        }
+    });
+
+    form.addEventListener('submit', function() {
+        loading.classList.add('show');
+        submitBtn.disabled = true;
+    });
+})();
+</script>
+</body>
+</html>

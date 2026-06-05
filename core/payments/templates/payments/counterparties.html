@@ -11,10 +11,8 @@
         .box { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
         input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; }
         button, a { padding: 8px 12px; border-radius: 6px; border: none; text-decoration: none; cursor: pointer; }
-        button { background: #0d6efd; color: #fff; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border-bottom: 1px solid #ddd; padding: 10px; text-align: right; }
-        th { background: #0d6efd; color: #fff; }
+        button { background: #1e3a5f; color: #fff; }
+
     </style>
 </head>
 <body>
@@ -55,7 +53,7 @@
             <tbody>
                 {% for cp in counterparties %}
                 <tr>
-                    <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ cp.id }}</span></td>
+                    <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ cp.id }}</span></td>
                     <td>{{ cp.name }}</td>
                     <td>{{ cp.description|default:'-' }}</td>
                     <td><a href="{% url 'counterparty_edit' cp.id %}">ویرایش</a></td>
@@ -70,10 +68,10 @@
         {% if legacy_pagination_enabled and page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
                 {% if page_obj.number > 1 %}
-                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page=1" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page=1" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
                 {% endif %}
                 {% if page_obj.has_previous %}
-                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.previous_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
                 {% endif %}
 
                 <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
@@ -83,14 +81,14 @@
                         {% endif %}
                     {% endfor %}
                     <input type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
-                    <button type="submit" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
+                    <button type="submit" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
                 </form>
 
                 {% if page_obj.has_next %}
-                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.next_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
                 {% endif %}
                 {% if page_obj.number < page_obj.paginator.num_pages %}
-                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.paginator.num_pages }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
+                    <a href="?{% if page_base_query %}{{ page_base_query }}&{% endif %}page={{ page_obj.paginator.num_pages }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
                 {% endif %}
             </div>
         {% endif %}

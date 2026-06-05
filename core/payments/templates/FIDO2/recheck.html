@@ -12,7 +12,7 @@
         {% if mode == "auth" %}
         <p style="font-size:13px; color:#475569; margin:0 0 20px;">
             خوش آمدید <strong>{{ request.session.base_username }}</strong><br>
-            <a href="{% url 'mfa_reset_cookie' %}" style="font-size:12px; color:#0d9488;">این من نیستم</a>
+            <a href="{% url 'mfa_reset_cookie' %}" style="font-size:12px; color:#1e3a5f;">این من نیستم</a>
         </p>
         {% endif %}
 
@@ -31,7 +31,7 @@
         </form>
 
         {% if request.session.mfa_methods|length > 1 %}
-        <a href="{% url 'mfa_methods_list' %}" style="font-size:12px; color:#0d9488;">
+        <a href="{% url 'mfa_methods_list' %}" style="font-size:12px; color:#1e3a5f;">
             استفاده از روش دیگر
         </a>
         {% endif %}

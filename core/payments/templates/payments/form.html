@@ -37,13 +37,13 @@
 
         .button-link, .logout-btn { border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; text-decoration: none; color: #fff; display: inline-block; font-weight: 700; }
         .logout-btn { background: linear-gradient(135deg, #dc3545, #b02a37); }
-        .button-link { background: linear-gradient(135deg, #0d9488, #0f766e); box-shadow: 0 2px 8px rgba(13,148,136,.25); }
-        .button-link:hover { box-shadow: 0 4px 14px rgba(13,148,136,.4); }
+        .button-link { background: linear-gradient(135deg, #1e3a5f, #152a45); box-shadow: 0 2px 8px rgba(30,58,95,.25); }
+        .button-link:hover { box-shadow: 0 4px 14px rgba(30,58,95,.4); }
         .logout-form { margin: 0; }
 
-        #payment-form { max-width: 980px; margin: auto; background: #fff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.08); border-top: 3px solid #0d9488; display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 12px 16px; }
+        #payment-form { max-width: 980px; margin: auto; background: #fff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.08); border-top: 3px solid #1e3a5f; display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 12px 16px; }
         #payment-form > p { margin: 0; }
-        #payment-form button { background: linear-gradient(135deg, #0d9488, #0f766e); color: #fff; padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer; margin-top: 6px; grid-column: 1 / -1; font-weight: 800; font-size: 15px; box-shadow: 0 4px 14px rgba(13,148,136,.35); }
+        #payment-form button { background: linear-gradient(135deg, #1e3a5f, #152a45); color: #fff; padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer; margin-top: 6px; grid-column: 1 / -1; font-weight: 800; font-size: 15px; box-shadow: 0 4px 14px rgba(30,58,95,.35); }
         #payment-form .helptext { display: block; font-size: 12px; color: #6c757d; margin-top: -10px; margin-bottom: 12px; }
         #payment-form .full-row { grid-column: 1 / -1; }
         #payment-form p:has(textarea[name="customer_notes"]) { grid-column: 1 / -1; }
@@ -125,7 +125,7 @@
         .filter-grid label { display: block; margin-bottom: 4px; font-size: 13px; }
         .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .filter-actions button, .filter-actions a { border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; text-decoration: none; text-align: center; }
-        .apply-btn { background: #0d6efd; color: #fff; }
+        .apply-btn { background: #1e3a5f; color: #fff; }
         .clear-btn { background: #6c757d; color: #fff; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
@@ -137,6 +137,7 @@
         tr.summary-row:hover { background: #f5f9ff; }
         tr.detail-row { display: none; background: #fafafa; }
         tr.detail-row.open { display: table-row; }
+        tr.detail-row td { white-space: normal !important; overflow: visible !important; }
 
         .status-pill { display: inline-block; padding: 4px 10px; border-radius: 16px; color: #fff; font-size: 12px; line-height: 1.5; }
         .flag-chip { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; margin: 2px; color: #fff; }
@@ -151,17 +152,17 @@
         .detail-card { background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; padding: 10px; }
 
         .staff-action textarea { min-height: 58px; }
-        .staff-action button { border: none; border-radius: 5px; padding: 8px 10px; background: #198754; color: #fff; cursor: pointer; width: 100%; }
+        .staff-action button { border: none; border-radius: 5px; padding: 8px 10px; background: #1e3a5f; color: #fff; cursor: pointer; width: 100%; }
         .staff-quick { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
         .staff-quick select, .staff-quick input { width: auto; min-width: 140px; margin: 0; }
-        .staff-quick button { border: none; border-radius: 5px; padding: 6px 10px; background: #198754; color: #fff; cursor: pointer; }
-        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #0d6efd; color: #fff; cursor: pointer; margin-top: 6px; }
+        .staff-quick button { border: none; border-radius: 5px; padding: 6px 10px; background: #1e3a5f; color: #fff; cursor: pointer; }
+        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #1e3a5f; color: #fff; cursor: pointer; margin-top: 6px; }
         .timeline-list { margin: 0; padding-right: 18px; }
         .timeline-list li { margin-bottom: 6px; }
         .tiny { color: #666; font-size: 12px; }
 
         .edit-link { display: inline-block; background: #fd7e14; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; margin-bottom: 6px; }
-        .track-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; }
+        .track-link { display: inline-block; background: #1e3a5f; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; }
         .preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
         .preview-overlay.open { display: flex; }
         .preview-box { background: #fff; border-radius: 10px; max-width: 92vw; max-height: 92vh; width: 980px; padding: 10px; position: relative; }
@@ -178,7 +179,7 @@
                   font-family:Vazir,sans-serif; font-size:11px; font-weight:700;
                   color:#fff; transition:opacity .15s; white-space:nowrap; }
         .qa-btn:hover { opacity:.88; }
-        .qa-commercial { background:#0d6efd; }
+        .qa-commercial { background:#1e3a5f; }
         .qa-finance     { background:#7c3aed; }
         .qa-approve     { background:#16a34a; }
         .qa-lock        { color:#94a3b8; font-size:13px; }
@@ -196,7 +197,7 @@
         .qa-actions { display:flex; gap:6px; }
         .qa-confirm { border:none; border-radius:6px; padding:6px 12px; font-family:Vazir,sans-serif;
                       font-size:12px; font-weight:800; color:#fff; cursor:pointer; flex:1; }
-        .qa-confirm.qa-commercial { background:#0d6efd; }
+        .qa-confirm.qa-commercial { background:#1e3a5f; }
         .qa-confirm.qa-finance    { background:#7c3aed; }
         .qa-confirm.qa-approve    { background:#16a34a; }
         .qa-cancel { border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px;
@@ -207,9 +208,9 @@
         #receipt-preview-wrap {
             display: none;
             grid-column: 1 / -1;
-            border: 2px dashed #0d9488;
+            border: 2px dashed #1e3a5f;
             border-radius: 12px;
-            background: linear-gradient(135deg, #f0fdfa, #e6fffc);
+            background: linear-gradient(135deg, #eef2f8, #eef2f8);
             padding: 16px;
             text-align: center;
             margin-top: 4px;
@@ -226,7 +227,7 @@
         #receipt-preview-info {
             margin-top: 10px;
             font-size: 13px;
-            color: #0f766e;
+            color: #152a45;
             font-weight: 600;
         }
         #receipt-preview-pdf-icon { font-size: 56px; }
@@ -239,15 +240,15 @@
         #receipt-file-label {
             display: block;
             cursor: pointer;
-            border: 2px dashed #b2e0da;
+            border: 2px dashed #c7d2e8;
             border-radius: 10px;
             padding: 18px;
             background: #f7fffe;
             text-align: center;
             transition: border-color .2s, background .2s;
         }
-        #receipt-file-label:hover { border-color: #0d9488; background: #edfaf8; }
-        #receipt-file-label.has-file { border-color: #0d9488; background: #e6fffc; }
+        #receipt-file-label:hover { border-color: #1e3a5f; background: #eef2f8; }
+        #receipt-file-label.has-file { border-color: #1e3a5f; background: #eef2f8; }
         #receipt-file-input { display: none; }
         .upload-icon { font-size: 32px; display: block; margin-bottom: 6px; }
         @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
@@ -628,7 +629,7 @@
         <span style="font-size:20px;">⚠</span>
         <div>
             <strong>{{ cp_returned_count }} فیش عودت شده از طرف حساب</strong> در انتظار بررسی و اقدام شما است.
-            <a href="?cp_status=returned" style="margin-right:8px;color:#0d9488;font-weight:700;">مشاهده فیش‌های عودتی</a>
+            <a href="?cp_status=returned" style="margin-right:8px;color:#1e3a5f;font-weight:700;">مشاهده فیش‌های عودتی</a>
         </div>
     </div>
     {% endif %}
@@ -724,43 +725,21 @@
     <table>
         <thead>
             <tr>
-                {% if can_bulk_final_approve %}<th style="width:34px;"><input type="checkbox" id="select-all-cb" title="انتخاب همه"></th>{% endif %}
-                <th>ردیف</th>
+                {% if can_bulk_final_approve %}<th style="width:28px;padding:5px 6px !important;"><input type="checkbox" id="select-all-cb" title="انتخاب همه"></th>{% endif %}
+                <th style="width:70px;">ردیف</th>
                 {% if is_staff_user %}
-                <th>نام مشتری</th>
-                <th>مجموعه</th>
-                <th>شهر</th>
-                <th>حساب مقصد</th>
+                <th style="width:160px;">مشتری</th>
+                <th style="width:120px;">واریز به</th>
                 {% endif %}
-                <th>
-                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_full_name&dir={% if current_sort == 'payer_full_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                        نام واریز کننده{% if current_sort == 'payer_full_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
-                    </a>
-                </th>
-                <th>
-                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=pay_date&dir={% if current_sort == 'pay_date' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                        تاریخ{% if current_sort == 'pay_date' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
-                    </a>
-                </th>
-                <th>
-                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=tracking_code&dir={% if current_sort == 'tracking_code' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                        شماره پیگیری{% if current_sort == 'tracking_code' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
-                    </a>
-                </th>
-                <th>
+                <th style="width:120px;">پرداخت</th>
+                <th style="width:100px;">تاریخ / پیگیری</th>
+                <th style="width:100px;">
                     <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=amount&dir={% if current_sort == 'amount' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         مبلغ (ریال){% if current_sort == 'amount' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
                     </a>
                 </th>
-                <th>
-                    <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=payer_bank_name&dir={% if current_sort == 'payer_bank_name' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                        نام بانک{% if current_sort == 'payer_bank_name' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
-                    </a>
-                </th>
-                <th>🏬 بازرگانی / فروش</th>
-                <th>💰 مالی</th>
-                {% if is_staff_user %}<th>طرف حساب</th>{% endif %}
-                <th>اقدام سریع</th>
+                <th style="width:140px;">وضعیت</th>
+                <th style="width:80px;">اقدام</th>
             </tr>
         </thead>
         <tbody>
@@ -774,38 +753,55 @@
                     {% endif %}
                 </td>
                 {% endif %}
-                <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:800;margin-top:3px;letter-spacing:0.5px;font-family:monospace;">#{{ payment.id }}</span></td>
+                <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ payment.id }}</span></td>
                 {% if is_staff_user %}
-                <td>{{ payment.first_name }} {{ payment.last_name }}</td>
-                <td>{{ payment.organization|default:'-' }}</td>
-                <td>{{ payment.city|default:'-' }}</td>
-                <td>
-                    {% if payment.beneficiary_bank_name and payment.beneficiary_account_number and payment.beneficiary_account_owner and payment.beneficiary_bank_name != 'Z' and payment.beneficiary_account_number != 'Z' and payment.beneficiary_account_owner != 'Z' %}
-                        {{ payment.beneficiary_bank_name }} | {{ payment.beneficiary_account_number }} - {{ payment.beneficiary_account_owner }}
-                    {% else %}
-                        -
+                <td style="white-space:normal;line-height:1.6;">
+                    <div>{{ payment.first_name }} {{ payment.last_name }}</div>
+                    {% if payment.organization %}<div style="color:#64748b;font-size:11px;">{{ payment.organization }}</div>{% endif %}
+                    {% if payment.city %}<div style="color:#94a3b8;font-size:11px;">{{ payment.city }}</div>{% endif %}
+                </td>
+                <td style="white-space:normal;line-height:1.6;text-align:center;">
+                    {% if payment.beneficiary_bank_name and payment.beneficiary_bank_name != 'Z' %}
+                        <div>{{ payment.beneficiary_bank_name }}</div>
                     {% endif %}
+                    {% if payment.beneficiary_account_number and payment.beneficiary_account_number != 'Z' %}
+                        <div style="color:#64748b;font-size:11px;direction:ltr;">{{ payment.beneficiary_account_number }}</div>
+                    {% endif %}
+                    {% if payment.beneficiary_account_owner and payment.beneficiary_account_owner != 'Z' %}
+                        <div style="color:#94a3b8;font-size:11px;">{{ payment.beneficiary_account_owner }}</div>
+                    {% endif %}
+                    {% if not payment.beneficiary_bank_name or payment.beneficiary_bank_name == 'Z' %}-{% endif %}
                 </td>
                 {% endif %}
-                <td>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</td>
-                <td>{{ payment.pay_date|jalali_date }}</td>
-                <td>{{ payment.tracking_code|default:'-' }}</td>
+                <td style="white-space:normal;line-height:1.6;">
+                    <div>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</div>
+                    {% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}<div style="color:#64748b;font-size:11px;">{{ payment.payer_bank_name }}</div>{% endif %}
+                </td>
+                <td style="white-space:normal;line-height:1.6;">
+                    <div>{{ payment.pay_date|jalali_date }}</div>
+                    <div style="display:inline-block;margin-top:2px;padding:1px 6px;font-size:12px;font-family:monospace;color:#1e3a5f;background:#eef2f8;border:1px solid #c7d2e8;border-radius:4px;letter-spacing:.3px;">{{ payment.tracking_code|default:'-' }}</div>
+                </td>
                 <td>{{ payment.amount|thousand_sep }}</td>
-                <td>{% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</td>
-                <td><span class="status-pill {{ payment.commercial_flag_class }}">&#9873; {{ payment.commercial_status_label }}</span></td>
-                <td><span class="status-pill {{ payment.finance_flag_class }}">&#9873; {{ payment.finance_status_label }}</span></td>
-                {% if is_staff_user %}
-                <td>
-                    {% if payment.cp_label %}
-                    <span class="status-pill {{ payment.cp_class }}" title="{{ payment.cp_note }}">
-                        {{ payment.cp_icon }} {{ payment.cp_label }}
-                    </span>
-                    {% if payment.cp_needs_act %}
-                    <div style="font-size:10px;color:#c62828;font-weight:700;margin-top:2px;">نیاز به اقدام</div>
+                <td style="white-space:normal;line-height:1.8;">
+                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
+                        <span style="font-size:10px;color:#64748b;min-width:42px;flex-shrink:0;">بازرگانی:</span>
+                        <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:10px;">&#9873; {{ payment.commercial_status_label }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
+                        <span style="font-size:10px;color:#64748b;min-width:42px;flex-shrink:0;">مالی:</span>
+                        <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:10px;">&#9873; {{ payment.finance_status_label }}</span>
+                    </div>
+                    {% if is_staff_user and payment.counterparty %}
+                    <div style="display:flex;align-items:center;gap:5px;">
+                        <span style="font-size:10px;color:#64748b;min-width:42px;flex-shrink:0;">طرف‌حساب:</span>
+                        {% if payment.cp_label %}
+                        <span class="status-pill {{ payment.cp_class }}" style="font-size:10px;" title="{{ payment.cp_note }}">{{ payment.cp_icon }} {{ payment.cp_label }}</span>
+                        {% else %}
+                        <span style="font-size:10px;color:#94a3b8;">—</span>
+                        {% endif %}
+                    </div>
                     {% endif %}
-                    {% else %}-{% endif %}
                 </td>
-                {% endif %}
                 <td>
                     {% if not is_staff_user %}
                         {% if payment.status == 'incomplete' %}
@@ -816,7 +812,7 @@
                         {# ─── ستون اقدام — فقط نشانگر وضعیت + دکمه جزئیات ─── #}
                         <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
                             {% if payment.can_commercial_act or payment.can_finance_register or payment.can_final_approve %}
-                            <span style="display:inline-block;background:#fef9c3;color:#854d0e;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;">نیاز به اقدام</span>
+                            <span class="tbl-badge tbl-badge-yellow">نیاز به اقدام</span>
                             {% elif staff_user_role != 'data_entry' %}
                             <span style="color:#94a3b8;font-size:12px;" title="قفل">🔒</span>
                             {% endif %}
@@ -829,7 +825,7 @@
                 </td>
             </tr>
             <tr class="detail-row" id="detail-{{ payment.id }}">
-                <td colspan="{% if is_staff_user %}12{% else %}8{% endif %}">
+                <td colspan="{% if is_staff_user %}9{% else %}6{% endif %}" style="white-space:normal !important; overflow:visible !important;">
                     <div class="detail-grid">
                         <div class="detail-card">
                             <strong>اطلاعات رکورد</strong>
@@ -837,7 +833,7 @@
                             <div>کد تفضیلی:
                                 {% with ac=payment.user.profile.accounting_code %}
                                 {% if ac %}
-                                <span style="display:inline-block;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:4px;padding:1px 7px;font-size:12px;font-weight:700;font-family:monospace;">{{ ac }}</span>
+                                <span class="tbl-badge tbl-badge-green">{{ ac }}</span>
                                 {% else %}<span style="color:#94a3b8;">—</span>{% endif %}
                                 {% endwith %}
                             </div>
@@ -1053,7 +1049,7 @@
                                             <option value="clear">✕ لغو تفویض</option>
                                             {% endif %}
                                         </select>
-                                        <button type="submit" style="background:#0d6efd;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-family:Vazir,sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;">تفویض</button>
+                                        <button type="submit" style="background:#1e3a5f;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-family:Vazir,sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;">تفویض</button>
                                     </form>
                                 </div>
                                 {% endif %}
@@ -1265,7 +1261,7 @@
             // drag & drop روی label
             fileLabel.addEventListener('dragover', function (e) {
                 e.preventDefault();
-                fileLabel.style.borderColor = '#0d9488';
+                fileLabel.style.borderColor = '#1e3a5f';
             });
             fileLabel.addEventListener('dragleave', function () {
                 if (!fileLabel.classList.contains('has-file'))

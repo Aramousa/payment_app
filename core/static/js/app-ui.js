@@ -17,6 +17,19 @@
         });
     }
 
+    /** tooltip خودکار روی سلول‌های بریده‌شده */
+    function addTruncationTooltips(table) {
+        requestAnimationFrame(function() {
+            table.querySelectorAll('tbody td.cell-truncate').forEach(function(td) {
+                if (td.scrollWidth > td.clientWidth + 1) {
+                    td.setAttribute('title', td.textContent.trim());
+                } else {
+                    td.removeAttribute('title');
+                }
+            });
+        });
+    }
+
     function enhanceTables() {
         document.querySelectorAll('table').forEach(function (table, index) {
             if (table.closest('.app-table-wrap')) return;
@@ -24,6 +37,8 @@
             wrapper.className = 'app-table-wrap';
             table.parentNode.insertBefore(wrapper, table);
             wrapper.appendChild(table);
+
+            addTruncationTooltips(table);
 
             if (table.dataset.noClientSearch === '1') return;
             var searchableRows = table.querySelectorAll('tbody tr:not(.detail-row)');
@@ -492,11 +507,44 @@
         }
     });
 
+    function enhanceNavDropdowns() {
+        document.querySelectorAll('.app-nav-dropdown').forEach(function(dd) {
+            var btn = dd.querySelector('.app-nav-drop-btn');
+            if (!btn) return;
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var isOpen = dd.classList.toggle('open');
+                // بستن بقیه dropdown ها
+                document.querySelectorAll('.app-nav-dropdown.open').forEach(function(other) {
+                    if (other !== dd) other.classList.remove('open');
+                });
+            });
+        });
+
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.app-nav-dropdown.open').forEach(function(dd) {
+                dd.classList.remove('open');
+            });
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.app-nav-dropdown.open').forEach(function(dd) {
+                    dd.classList.remove('open');
+                });
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         localStorage.removeItem('paymentAppTheme');
         document.documentElement.removeAttribute('data-theme');
         enhanceShellNavigation();
+        enhanceNavDropdowns();
         enhanceTables();
+        document.querySelectorAll('.app-table-wrap table').forEach(function(t) {
+            addTruncationTooltips(t);
+        });
         enhanceCustomerSelects();
         disableDateAutocomplete();
         enhanceNotifications();

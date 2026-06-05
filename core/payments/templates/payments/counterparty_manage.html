@@ -14,18 +14,18 @@
         @media(max-width:960px){ .wrap { grid-template-columns: 1fr; } }
 
         .card { background: #fff; border-radius: 12px; padding: 20px;
-                box-shadow: 0 2px 10px rgba(0,0,0,.07); border-right: 4px solid #0d9488; margin-bottom: 16px; }
-        .card h3 { margin: 0 0 14px; font-size: 15px; color: #0f4e49; border: none; }
+                box-shadow: 0 2px 10px rgba(0,0,0,.07); border-right: 4px solid #1e3a5f; margin-bottom: 16px; }
+        .card h3 { margin: 0 0 14px; font-size: 15px; color: #1a2f4e; border: none; }
 
         /* فرم */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .full { grid-column: 1/-1; }
         label { display: block; font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 4px; }
-        input, select, textarea { width: 100%; box-sizing: border-box; border: 1.5px solid #b2e0da;
+        input, select, textarea { width: 100%; box-sizing: border-box; border: 1.5px solid #c7d2e8;
             border-radius: 7px; padding: 8px 10px; font-family: Vazir, sans-serif; font-size: 13px;
             background: #f7fffe; transition: border-color .15s, box-shadow .15s; }
         input:focus, select:focus, textarea:focus {
-            border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,.12); outline: none; }
+            border-color: #1e3a5f; box-shadow: 0 0 0 3px rgba(30,58,95,.12); outline: none; }
         .field-error { color: #dc2626; font-size: 12px; margin-top: 3px; }
 
         /* حساب‌های بانکی */
@@ -38,16 +38,14 @@
         .del-bank-btn { position: absolute; top: 8px; left: 8px; background: #fee2e2;
                         color: #dc2626; border: none; border-radius: 5px; padding: 3px 8px;
                         cursor: pointer; font-size: 12px; font-family: Vazir, sans-serif; }
-        .add-bank-btn { background: #f0fdfa; border: 1.5px dashed #0d9488; border-radius: 7px;
-                        padding: 8px; text-align: center; cursor: pointer; color: #0f766e;
+        .add-bank-btn { background: #eef2f8; border: 1.5px dashed #1e3a5f; border-radius: 7px;
+                        padding: 8px; text-align: center; cursor: pointer; color: #152a45;
                         font-size: 13px; font-weight: 700; width: 100%; margin-top: 6px; }
 
         /* جدول */
-        table { width: 100%; border-collapse: collapse; }
-        th { background: linear-gradient(135deg,#042f2e,#0f766e); color: #fff;
-             padding: 10px; text-align: right; font-size: 12px; }
+
         td { padding: 9px 10px; border-bottom: 1px solid #eef; font-size: 13px; vertical-align: middle; }
-        tr:hover td { background: #f0fdfa; }
+        tr:hover td { background: #eef2f8; }
 
         .status-badge { display: inline-block; padding: 2px 8px; border-radius: 5px;
                         font-size: 11px; font-weight: 700; }
@@ -58,8 +56,8 @@
         .btn { display: inline-block; padding: 7px 14px; border-radius: 7px; border: none;
                cursor: pointer; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700;
                text-decoration: none; }
-        .btn-primary { background: linear-gradient(135deg,#0d9488,#0f766e); color: #fff;
-                       box-shadow: 0 2px 8px rgba(13,148,136,.3); }
+        .btn-primary { background: linear-gradient(135deg,#1e3a5f,#152a45); color: #fff;
+                       box-shadow: 0 2px 8px rgba(30,58,95,.3); }
         .btn-edit { background: #c2500a; color: #fff; padding: 5px 10px; font-size: 12px; }
         .btn-secondary { background: #64748b; color: #fff; }
 
@@ -210,14 +208,14 @@
                     <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">
 
                     <!-- حساب‌های بانکی -->
-                    <h3 style="font-size:14px;margin:0 0 10px;color:#0f4e49;">🏦 حساب‌های بانکی</h3>
+                    <h3 style="font-size:14px;margin:0 0 10px;color:#1a2f4e;">🏦 حساب‌های بانکی</h3>
                     {{ bank_formset.management_form }}
                     <div id="bank-accounts-container">
                         {% for bf in bank_formset %}
                         <div class="bank-row bank-entry">
                             {% for hidden in bf.hidden_fields %}{{ hidden }}{% endfor %}
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                <strong style="font-size:13px;color:#0f4e49;">حساب #{{ forloop.counter }}</strong>
+                                <strong style="font-size:13px;color:#1a2f4e;">حساب #{{ forloop.counter }}</strong>
                                 <div style="display:flex;gap:8px;align-items:center;">
                                     <label style="display:flex;align-items:center;gap:4px;margin:0;font-size:12px;cursor:pointer;">
                                         {{ bf.is_primary }} حساب اصلی
@@ -277,7 +275,7 @@
     <div id="bank-empty-template" style="display:none;">
         <div class="bank-row bank-entry">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <strong style="font-size:13px;color:#0f4e49;">حساب جدید</strong>
+                <strong style="font-size:13px;color:#1a2f4e;">حساب جدید</strong>
                 <label style="display:flex;align-items:center;gap:4px;margin:0;font-size:12px;cursor:pointer;">
                     <input type="checkbox" name="bank_accounts-__prefix__-is_primary"> حساب اصلی
                 </label>

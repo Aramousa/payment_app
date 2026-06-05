@@ -16,14 +16,12 @@
         .top-bar, .section { max-width: 1100px; margin: 0 auto 16px; }
         .top-bar { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
         .section { background: #fff; border: 1px solid #e4e9f2; border-radius: 8px; padding: 16px; }
-        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
+        .button-link { display: inline-block; background: #1e3a5f; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
         .button-link.alt { background: #6c757d; }
         .form-grid, .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
         label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
         input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
-        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 12px; }
-        th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
-        th { background: #007bff; color: #fff; }
+
         .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
         .status { display: inline-block; padding: 4px 10px; border-radius: 14px; color: #fff; font-size: 12px; }
         .status.pending { background: #f9a825; color: #111; }
@@ -87,7 +85,7 @@
             <tbody>
                 {% for proforma in records %}
                     <tr>
-                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ proforma.id }}</span></td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ proforma.id }}</span></td>
                         {% if is_staff_user %}
                             <td>{{ proforma.customer.get_full_name|default:proforma.customer.username }}</td>
                             <td>{{ proforma.customer.profile.organization|default:'-' }}</td>

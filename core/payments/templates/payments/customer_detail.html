@@ -55,7 +55,7 @@
         .timeline-list { margin: 0; padding-right: 18px; }
         .timeline-list li { margin-bottom: 6px; font-size: 12px; color: #666; }
         
-        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #0d6efd; color: #fff; cursor: pointer; margin-top: 6px; }
+        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #1e3a5f; color: #fff; cursor: pointer; margin-top: 6px; }
         tr.detail-row { display: none; background: #fafafa; }
         tr.detail-row.open { display: table-row; }
         
@@ -271,10 +271,10 @@
         {% if legacy_pagination_enabled and payments_page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
                 {% if payments_page_obj.number > 1 %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page=1" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page=1" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
                 {% endif %}
                 {% if payments_page_obj.has_previous %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.previous_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
                 {% endif %}
 
                 <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
@@ -284,14 +284,14 @@
                         {% endif %}
                     {% endfor %}
                     <input type="number" name="payments_page" min="1" max="{{ payments_page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
-                    <button type="submit" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
+                    <button type="submit" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
                 </form>
 
                 {% if payments_page_obj.has_next %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.next_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
                 {% endif %}
                 {% if payments_page_obj.number < payments_page_obj.paginator.num_pages %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.paginator.num_pages }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
+                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.paginator.num_pages }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
                 {% endif %}
             </div>
         {% endif %}
@@ -381,10 +381,10 @@
         {% if legacy_pagination_enabled and invoices_page_obj.has_other_pages %}
             <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
                 {% if invoices_page_obj.number > 1 %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page=1" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page=1" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
                 {% endif %}
                 {% if invoices_page_obj.has_previous %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.previous_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.previous_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
                 {% endif %}
 
                 <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
@@ -394,14 +394,14 @@
                         {% endif %}
                     {% endfor %}
                     <input type="number" name="invoice_page" min="1" max="{{ invoices_page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
-                    <button type="submit" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
+                    <button type="submit" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
                 </form>
 
                 {% if invoices_page_obj.has_next %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.next_page_number }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.next_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
                 {% endif %}
                 {% if invoices_page_obj.number < invoices_page_obj.paginator.num_pages %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.paginator.num_pages }}" style="display:inline-block; background:#0d6efd; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
+                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.paginator.num_pages }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
                 {% endif %}
             </div>
         {% endif %}

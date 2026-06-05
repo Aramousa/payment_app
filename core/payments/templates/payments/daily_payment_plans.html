@@ -15,7 +15,7 @@
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
         .top-bar { max-width: 1200px; margin: 0 auto 16px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .button-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
+        .button-link { display: inline-block; background: #1e3a5f; color: #fff; border-radius: 6px; padding: 8px 14px; text-decoration: none; border: 0; cursor: pointer; }
         .button-link.alt { background: #6c757d; }
         .panel { max-width: 1200px; margin: 0 auto 18px; background: #fff; border: 1px solid #e4e9f2; border-radius: 10px; padding: 16px; }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
@@ -23,9 +23,7 @@
         label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
         input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; }
         .field-error { color: #c62828; font-size: 12px; margin-top: 4px; }
-        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
-        th, td { padding: 10px; border-bottom: 1px solid #e6e6e6; text-align: center; vertical-align: top; }
-        th { background: #007bff; color: #fff; }
+
         .money { direction: ltr; white-space: nowrap; }
         .messages { max-width: 1200px; margin: 0 auto 12px; color: #155724; }
         .period-summary { margin-top: 12px; color: #42526e; font-size: 13px; }
@@ -114,7 +112,7 @@
             <tbody>
                 {% for plan in plans %}
                 <tr>
-                    <td>{{ forloop.counter }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ plan.id }}</span></td>
+                    <td>{{ forloop.counter }}<br><span class="tbl-id-badge">#{{ plan.id }}</span></td>
                     <td>{{ plan.deposit_date|jalali_date }}</td>
                     <td>{{ plan.bank_name|default:'-' }}<br>{{ plan.account_number }}</td>
                     <td class="money">{{ plan.total_expected_amount|thousand_sep }}</td>

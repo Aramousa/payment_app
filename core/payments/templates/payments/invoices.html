@@ -19,7 +19,7 @@
         .top-bar { max-width: 1180px; margin: 0 auto 18px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .button-link, .logout-btn { border: none; border-radius: 6px; padding: 8px 14px; text-decoration: none; color: #fff; display: inline-block; cursor: pointer; }
-        .button-link { background: #0d6efd; }
+        .button-link { background: #1e3a5f; }
         .button-link.alt { background: #198754; }
         .logout-btn { background: #dc3545; }
         .user-chip { background: #fff; border: 1px solid #d8dce3; border-radius: 6px; padding: 7px 12px; font-size: 13px; text-align: center; }
@@ -54,7 +54,7 @@
         .parse-suggestion { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 6px; padding: 6px 8px; }
         .parse-suggestion strong { color: #243447; }
         .parse-suggestion code { direction: ltr; unicode-bidi: plaintext; font-family: inherit; color: #111827; }
-        .parse-apply-btn { width: auto; border: none; border-radius: 5px; background: #0d6efd; color: #fff; padding: 4px 8px; cursor: pointer; font-family: inherit; font-size: 11px; white-space: nowrap; }
+        .parse-apply-btn { width: auto; border: none; border-radius: 5px; background: #1e3a5f; color: #fff; padding: 4px 8px; cursor: pointer; font-family: inherit; font-size: 11px; white-space: nowrap; }
 
         .customer-picker-grid { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr); gap: 12px; }
         .customer-card { border: 1px solid #e2e7ef; border-radius: 8px; background: #f9fbff; padding: 12px; min-height: 108px; }
@@ -68,21 +68,18 @@
         .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
         .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .filter-actions button, .filter-actions a { border: none; border-radius: 6px; padding: 8px 12px; text-decoration: none; cursor: pointer; }
-        .apply-btn { background: #0d6efd; color: #fff; }
+        .apply-btn { background: #1e3a5f; color: #fff; }
         .clear-btn { background: #6c757d; color: #fff; }
 
-        table { width: 100%; border-collapse: collapse; background: #fff; }
-        th, td { padding: 10px; border-bottom: 1px solid #e7ebf0; text-align: center; vertical-align: top; }
-        th { background: #0d6efd; color: #fff; }
         tr.summary-row { cursor: pointer; }
-        tr.summary-row:hover { background: #f5f9ff; }
+        
         tr.detail-row { display: none; background: #fafbfd; }
         tr.detail-row.open { display: table-row; }
         tr.unseen-row { background: #fff7db; }
         .status-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
         .status-seen { background: #dff3e4; color: #155724; }
         .status-unseen { background: #fff3cd; color: #7a5300; }
-        .detail-link { display: inline-block; background: #0d6efd; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; }
+        .detail-link { display: inline-block; background: #1e3a5f; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; }
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; text-align: right; }
         .detail-card { background: #fff; border: 1px solid #e5eaf1; border-radius: 8px; padding: 12px; }
         .system-message-list { margin: 0; padding-right: 18px; }
@@ -300,7 +297,7 @@
             <tbody>
                 {% for invoice in records %}
                     <tr class="summary-row {% if not invoice.is_seen_by_customer %}unseen-row{% endif %}" data-row="{{ invoice.id }}">
-                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span style="display:inline-block;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:0.3px;font-family:monospace;">#{{ invoice.id }}</span></td>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ invoice.id }}</span></td>
                         {% if is_staff_user %}
                             <td>{{ invoice.customer.get_full_name|default:invoice.customer.username }}</td>
                             <td>{{ invoice.customer.profile.organization|default:'-' }}</td>
@@ -531,8 +528,8 @@
                     return true;
                 }
                 // اگر مطابقت پیدا نشد، dropdown را هایلایت کن تا کاربر دستی انتخاب کند
-                select.style.borderColor = '#0d9488';
-                select.style.boxShadow = '0 0 0 3px rgba(13,148,136,.2)';
+                select.style.borderColor = '#1e3a5f';
+                select.style.boxShadow = '0 0 0 3px rgba(30,58,95,.2)';
                 select.focus();
                 return false;
             }
@@ -566,7 +563,7 @@
                 input.dispatchEvent(new Event('change', { bubbles: true }));
                 // اسکرول به فیلد تا کاربر تغییر را ببیند
                 input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                input.style.borderColor = '#0d9488';
+                input.style.borderColor = '#1e3a5f';
                 input.style.transition = 'border-color 1.5s';
                 setTimeout(function() { input.style.borderColor = ''; }, 2000);
                 return true;
@@ -591,7 +588,7 @@
                         const applyAll = document.createElement('button');
                         applyAll.type = 'button';
                         applyAll.className = 'parse-apply-btn';
-                        applyAll.style.cssText = 'margin:8px 0;background:#0d9488;width:100%;';
+                        applyAll.style.cssText = 'margin:8px 0;background:#1e3a5f;width:100%;';
                         applyAll.textContent = '✅ اعمال همه فیلدها';
                         applyAll.addEventListener('click', function () {
                             applyableEntries.forEach(([fieldName, value]) => {

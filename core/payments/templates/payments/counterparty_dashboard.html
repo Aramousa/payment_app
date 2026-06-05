@@ -13,13 +13,13 @@
         .wrap { max-width: 1280px; margin: 0 auto; }
         .page-header { display: flex; justify-content: space-between; align-items: center;
                        flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-        .page-header h2 { margin: 0; font-size: 20px; color: #0f4e49; }
+        .page-header h2 { margin: 0; font-size: 20px; color: #1a2f4e; }
 
         /* کارت‌های آماری */
         .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 14px; margin-bottom: 20px; }
         .stat-card { background: #fff; border-radius: 10px; padding: 16px; text-align: center;
-                     box-shadow: 0 2px 8px rgba(0,0,0,.07); border-top: 3px solid #0d9488; }
-        .stat-card .num { font-size: 30px; font-weight: 800; color: #0d9488; }
+                     box-shadow: 0 2px 8px rgba(0,0,0,.07); border-top: 3px solid #1e3a5f; }
+        .stat-card .num { font-size: 30px; font-weight: 800; color: #1e3a5f; }
         .stat-card .lbl { font-size: 12px; color: #64748b; margin-top: 4px; }
         .stat-card.warn { border-top-color: #f59e0b; }
         .stat-card.warn .num { color: #f59e0b; }
@@ -32,27 +32,24 @@
                           display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
         .filter-section label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
         .filter-section select, .filter-section input {
-            border: 1.5px solid #b2e0da; border-radius: 7px; padding: 7px 10px;
+            border: 1.5px solid #c7d2e8; border-radius: 7px; padding: 7px 10px;
             font-family: Vazir, sans-serif; background: #f7fffe; }
         .filter-section button, .filter-section a {
             border: none; border-radius: 7px; padding: 8px 14px; cursor: pointer;
             font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700;
             text-decoration: none; display: inline-block; }
-        .btn-apply { background: #0d9488; color: #fff; }
+        .btn-apply { background: #1e3a5f; color: #fff; }
         .btn-clear  { background: #64748b; color: #fff; }
         .btn-export { background: #1a7044; color: #fff; }
 
         /* جدول */
         .table-wrap { background: #fff; border-radius: 10px; overflow: hidden;
                       box-shadow: 0 2px 8px rgba(0,0,0,.07); }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: linear-gradient(135deg,#042f2e,#0f766e); color: #fff;
-             padding: 11px 12px; text-align: right; font-size: 12px; font-weight: 700;
-             letter-spacing: .3px; text-transform: uppercase; }
+
         td { padding: 10px 12px; border-bottom: 1px solid #eef0f5; font-size: 13px;
              color: #374151; vertical-align: middle; }
         tr:last-child td { border-bottom: 0; }
-        tr:hover td { background: #f0fdfa; }
+        tr:hover td { background: #eef2f8; }
         tr.approved-row td { background: #f0fdf4; }
 
         /* بج‌ها */
@@ -68,7 +65,7 @@
                       font-family: Vazir, sans-serif; font-size: 12px; font-weight: 700;
                       transition: transform .1s, box-shadow .1s; }
         .action-btn:active { transform: translateY(1px); }
-        .btn-approve { background: #0d9488; color: #fff; box-shadow: 0 2px 6px rgba(13,148,136,.3); }
+        .btn-approve { background: #1e3a5f; color: #fff; box-shadow: 0 2px 6px rgba(30,58,95,.3); }
         .btn-return  { background: #d97706; color: #fff; box-shadow: 0 2px 6px rgba(217,119,6,.3); }
         .btn-reject  { background: #dc2626; color: #fff; box-shadow: 0 2px 6px rgba(220,38,38,.3); }
 
@@ -79,8 +76,8 @@
         .action-panel textarea { width: 100%; box-sizing: border-box; min-height: 70px;
                                  border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px;
                                  font-family: Vazir, sans-serif; font-size: 13px; resize: vertical; }
-        .action-panel textarea:focus { border-color: #0d9488; outline: none;
-                                       box-shadow: 0 0 0 3px rgba(13,148,136,.12); }
+        .action-panel textarea:focus { border-color: #1e3a5f; outline: none;
+                                       box-shadow: 0 0 0 3px rgba(30,58,95,.12); }
         .action-panel.return-panel textarea:focus { border-color: #d97706;
                                                      box-shadow: 0 0 0 3px rgba(217,119,6,.12); }
         .action-panel.reject-panel textarea:focus { border-color: #dc2626;
@@ -90,9 +87,9 @@
         .pagination { display: flex; gap: 6px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
         .pagination a, .pagination span {
             padding: 6px 12px; border-radius: 6px; font-size: 13px; text-decoration: none;
-            border: 1px solid #b2e0da; background: #fff; color: #0f766e; font-weight: 600; }
-        .pagination a:hover { background: #f0fdfa; }
-        .pagination .current { background: #0d9488; color: #fff; border-color: #0d9488; }
+            border: 1px solid #c7d2e8; background: #fff; color: #152a45; font-weight: 600; }
+        .pagination a:hover { background: #eef2f8; }
+        .pagination .current { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
     </style>
 </head>
 <body>
@@ -253,7 +250,7 @@
 
                                     {# پنل تایید — توضیح اختیاری #}
                                     <div class="action-panel" id="approve-{{ payment.id }}">
-                                        <div style="font-size:12px;color:#0f766e;margin-bottom:6px;font-weight:700;">✅ تایید فیش — توضیح (اختیاری)</div>
+                                        <div style="font-size:12px;color:#152a45;margin-bottom:6px;font-weight:700;">✅ تایید فیش — توضیح (اختیاری)</div>
                                         <form method="post" action="{% url 'counterparty_approve_payment' payment.id %}">
                                             {% csrf_token %}
                                             <textarea name="note" placeholder="توضیح تکمیلی (اختیاری)…"></textarea>

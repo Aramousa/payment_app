@@ -6,9 +6,9 @@
     --app-border-strong: #c5d1dd;
     --app-text: #1f2933;
     --app-muted: #66788a;
-    --app-primary: #0d9488;
-    --app-primary-dark: #0f766e;
-    --app-primary-light: #f0fdfa;
+    --app-primary: #1e3a5f;
+    --app-primary-dark: #152a45;
+    --app-primary-light: #eef2f8;
     --app-success: #1a7044;
     --app-success-dark: #145a38;
     --app-warning: #a86405;
@@ -884,7 +884,8 @@ button:disabled {
 .app-table-wrap {
     border: 1px solid var(--app-border);
     border-radius: var(--app-radius);
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: visible;
     width: 100%;
 }
 
@@ -940,6 +941,8 @@ table {
     box-shadow: var(--app-shadow-soft) !important;
     overflow: hidden;
     table-layout: auto;
+    width: 100% !important;
+    min-width: max-content; /* اجازه می‌دهد ستون‌ها نفس بکشند */
 }
 
 th {
@@ -949,18 +952,25 @@ th {
     position: sticky;
     top: 0;
     z-index: 1;
+    padding-top: 18px !important;
+    padding-bottom: 18px !important;
 }
 
 td,
 th {
     border-bottom-color: #e7edf3 !important;
-    font-size: 13px;
-    line-height: 1.7;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 5px 8px !important;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
 td {
     color: var(--app-text);
 }
+
+td[title] { cursor: default; }
 
 td:first-child,
 th:first-child {
@@ -1155,9 +1165,11 @@ tr.detail-row {
     }
 
     table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
+        font-size: 11px !important;
+    }
+
+    td, th {
+        padding: 4px 6px !important;
     }
 
     .app-filter-panel {
@@ -1290,14 +1302,245 @@ tr.detail-row {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   VISUAL ENHANCEMENT LAYER — تغییرات بصری
+   SIDEBAR NAVIGATION — منوی کناری
    ═══════════════════════════════════════════════════════════════ */
 
-/* ─── Navigation — فیروزه‌ای ─────────────────────────────────── */
+:root { --sb-width: 230px; }
+
+/* ─── Sidebar ─────────────────────────────────────────────── */
 .app-shell-nav {
-    background: linear-gradient(135deg, #042f2e 0%, #0f4e49 60%, #134e4a 100%) !important;
-    border-color: rgba(255,255,255,.08) !important;
-    box-shadow: 0 4px 28px rgba(13,148,136,.30) !important;
+    background: linear-gradient(180deg, #0d1b2e 0%, #1a2f4e 50%, #1e3a5f 100%) !important;
+    border: none !important;
+    border-left: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 0 !important;
+    box-shadow: -4px 0 20px rgba(0,0,0,.25) !important;
+
+    /* override grid → flex column sidebar */
+    position: fixed !important;
+    right: 0 !important;
+    top: 0 !important;
+    width: var(--sb-width) !important;
+    height: 100vh !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 200 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+}
+
+/* body → فضا برای sidebar */
+body {
+    margin-right: var(--sb-width) !important;
+    background: #f0f4f8;
+}
+
+/* ─── لوگو ─────────────────────────────────────────────────── */
+.app-shell-brand {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 20px 16px 16px !important;
+    border-bottom: 1px solid rgba(255,255,255,.1) !important;
+    background: rgba(255,255,255,.05) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    min-width: 0 !important;
+    flex-shrink: 0;
+}
+
+.app-shell-logo {
+    height: 40px !important;
+    max-width: 160px !important;
+}
+
+/* ─── دکمه موبایل ────────────────────────────────────────── */
+.app-nav-toggle { display: none !important; }
+
+/* ─── Panel — ناحیه اسکرول‌پذیر ─────────────────────────── */
+.app-nav-panel {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 8px 0 !important;
+    display: block !important;
+}
+
+/* ─── Links — container ───────────────────────────────────── */
+.app-nav-links {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    flex-wrap: nowrap !important;
+}
+
+/* ─── Group header ────────────────────────────────────────── */
+.sb-group-header {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.35);
+    padding: 14px 16px 4px;
+    user-select: none;
+}
+
+/* ─── Nav item ────────────────────────────────────────────── */
+.app-nav-link {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 9px 16px !important;
+    color: rgba(255,255,255,.78) !important;
+    font-size: 13px !important;
+    border-radius: 0 !important;
+    border: none !important;
+    text-decoration: none !important;
+    transition: background .12s, color .12s !important;
+    white-space: nowrap !important;
+}
+
+.app-nav-link:hover {
+    background: rgba(255,255,255,.1) !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+.app-nav-link.active-link {
+    background: rgba(255,255,255,.15) !important;
+    color: #fff !important;
+    border-right: 3px solid #fff !important;
+    font-weight: 700 !important;
+}
+
+.app-nav-icon {
+    font-size: 16px;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* ─── Dropdown در sidebar غیرفعال ──────────────────────────── */
+.app-nav-dropdown { position: relative; }
+.app-nav-drop-btn {
+    width: 100% !important;
+    text-align: right !important;
+}
+.app-nav-drop-menu {
+    position: static !important;
+    display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    background: rgba(0,0,0,.15) !important;
+}
+.app-nav-drop-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 16px 8px 32px !important;
+    color: rgba(255,255,255,.65) !important;
+    font-size: 12px !important;
+}
+.app-nav-drop-item:hover {
+    background: rgba(255,255,255,.08) !important;
+    color: #fff !important;
+}
+.drop-arrow { display: none !important; }
+
+/* ─── Side (اعلان + کاربر + خروج) ───────────────────────── */
+.app-nav-side {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    padding: 12px !important;
+    border-top: 1px solid rgba(255,255,255,.1) !important;
+    flex-shrink: 0;
+    align-items: stretch !important;
+}
+
+.notification-bell {
+    order: -1;
+    margin-bottom: 8px;
+}
+
+.notification-trigger {
+    width: 100% !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    text-align: right !important;
+    justify-content: flex-start !important;
+}
+
+.notification-badge {
+    position: static !important;
+    display: inline-flex !important;
+    margin-right: 6px !important;
+}
+
+.app-nav-user {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    padding: 10px 12px !important;
+    background: rgba(255,255,255,.08) !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255,255,255,.1) !important;
+    margin-bottom: 8px !important;
+    align-items: flex-start !important;
+}
+
+.app-nav-user-name { font-size: 13px !important; }
+.app-nav-user-role { font-size: 11px !important; }
+
+.app-nav-logout button {
+    width: 100% !important;
+    border-radius: 8px !important;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+    text-align: center !important;
+}
+
+/* ─── موبایل: sidebar به drawer تبدیل می‌شود ─────────────── */
+@media (max-width: 900px) {
+    :root { --sb-width: 0px; }
+    body { margin-right: 0 !important; }
+
+    .app-shell-nav {
+        width: 230px !important;
+        transform: translateX(100%) !important;
+        transition: transform .25s ease !important;
+    }
+    .app-shell-nav.open {
+        transform: translateX(0) !important;
+    }
+    .app-nav-toggle {
+        display: flex !important;
+        position: fixed !important;
+        top: 12px !important;
+        right: 12px !important;
+        z-index: 300 !important;
+        background: #1e3a5f !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 8px 10px !important;
+        color: #fff !important;
+        font-size: 20px !important;
+        cursor: pointer !important;
+    }
+    .sb-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.5);
+        z-index: 199;
+    }
+    .sb-overlay.show { display: block; }
 }
 
 /* لوگو — پس‌زمینه سفید تا در هر رنگ nav خوانا باشد */
@@ -1324,6 +1567,79 @@ tr.detail-row {
 .app-nav-finance   { color: rgba(255,255,255,.88) !important; }
 .app-nav-admin     { color: rgba(255,255,255,.88) !important; }
 .app-nav-account   { color: rgba(255,255,255,.88) !important; }
+.app-nav-customers { color: rgba(255,255,255,.88) !important; }
+.app-nav-main      { color: rgba(255,255,255,.88) !important; }
+
+/* ─── Dropdown منو ──────────────────────────────────────────── */
+.app-nav-dropdown {
+    position: relative;
+}
+
+.app-nav-drop-btn {
+    background: none !important;
+    border: 1px solid transparent !important;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.app-nav-drop-btn:hover,
+.app-nav-dropdown.open .app-nav-drop-btn {
+    background: rgba(255,255,255,.14) !important;
+    border-color: rgba(255,255,255,.28) !important;
+}
+
+.drop-arrow {
+    font-size: 10px;
+    transition: transform .2s;
+    display: inline-block;
+}
+
+.app-nav-dropdown.open .drop-arrow {
+    transform: rotate(180deg);
+}
+
+.app-nav-drop-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 180px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(30,58,95,.15);
+    z-index: 200;
+    padding: 6px 0;
+    direction: rtl;
+}
+
+.app-nav-dropdown.open .app-nav-drop-menu {
+    display: block;
+    animation: dropFade .15s ease;
+}
+
+@keyframes dropFade {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.app-nav-drop-item {
+    display: block;
+    padding: 9px 16px;
+    font-size: 13px;
+    color: #1e3a5f !important;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background .1s;
+    font-family: Vazir, sans-serif;
+}
+
+.app-nav-drop-item:hover {
+    background: #eef2f8;
+    color: #152a45 !important;
+}
 
 .app-nav-user {
     background: rgba(255,255,255,.1) !important;
@@ -1357,23 +1673,498 @@ tr.detail-row {
     color: #fff !important;
 }
 
-/* ─── Table header — فیروزه‌ای تیره ─────────────────────────── */
+/* ==========================================================================
+   Application navigation refresh
+   ========================================================================== */
+:root {
+    --app-header-height: 64px;
+    --app-nav-width: 218px;
+}
+
+body:has(.app-shell-nav) {
+    margin-right: var(--app-nav-width) !important;
+    padding-top: var(--app-header-height) !important;
+    background: #f4f7fb !important;
+}
+
+body:not(:has(.app-shell-nav)) {
+    margin-right: 0 !important;
+    padding-top: 0 !important;
+}
+
+.app-top-header {
+    align-items: center;
+    background: rgba(255,255,255,.96);
+    border-bottom: 1px solid #dfe7f1;
+    box-shadow: 0 8px 22px rgba(15,23,42,.07);
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 176px minmax(160px, 1fr) auto;
+    height: var(--app-header-height);
+    inset: 0 0 auto 0;
+    padding: 0 18px;
+    position: fixed;
+    z-index: 260;
+}
+
+.app-top-brand {
+    align-items: center;
+    display: flex;
+    height: 100%;
+}
+
+.app-top-brand .app-shell-logo {
+    background: #fff;
+    border: 1px solid #edf1f6;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    height: 38px !important;
+    max-width: 150px !important;
+    padding: 4px 8px;
+}
+
+.app-top-context {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.app-top-title {
+    color: #172033;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.app-top-role {
+    color: #65758b;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.app-top-actions {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.app-shell-nav {
+    background: #172033 !important;
+    border-left: 1px solid rgba(255,255,255,.08) !important;
+    box-shadow: -6px 0 18px rgba(15,23,42,.16) !important;
+    height: calc(100vh - var(--app-header-height)) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 10px 0 14px !important;
+    position: fixed !important;
+    right: 0 !important;
+    top: var(--app-header-height) !important;
+    width: var(--app-nav-width) !important;
+    z-index: 240 !important;
+}
+
+.app-nav-panel {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+}
+
+.app-nav-links {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+}
+
+.app-nav-section {
+    display: grid;
+    gap: 2px;
+}
+
+.sb-group-header {
+    color: #9fb0c7 !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0 !important;
+    padding: 8px 16px 4px !important;
+    text-transform: none !important;
+}
+
+.app-nav-link {
+    align-items: center !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    color: #e7edf6 !important;
+    display: grid !important;
+    font-size: 13px !important;
+    font-weight: 650 !important;
+    gap: 9px !important;
+    grid-template-columns: 24px 1fr !important;
+    line-height: 1.65 !important;
+    margin: 0 !important;
+    min-height: 38px !important;
+    padding: 7px 14px 7px 10px !important;
+    text-decoration: none !important;
+    white-space: normal !important;
+}
+
+.app-nav-link:hover {
+    background: rgba(255,255,255,.08) !important;
+    color: #fff !important;
+}
+
+.app-nav-link.active-link {
+    background: #eff6ff !important;
+    border-right: 4px solid #2aa876 !important;
+    color: #102033 !important;
+    font-weight: 800 !important;
+}
+
+.app-nav-icon {
+    align-items: center;
+    display: inline-flex;
+    font-size: 15px !important;
+    height: 24px;
+    justify-content: center;
+    opacity: .95;
+    width: 24px !important;
+}
+
+.app-nav-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.app-top-header .notification-bell {
+    margin: 0 !important;
+    order: 0 !important;
+    position: relative;
+}
+
+.app-top-header .notification-trigger {
+    background: #eef5ff !important;
+    border: 1px solid #cfe0f6 !important;
+    border-radius: 8px !important;
+    color: #18416f !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    min-height: 36px;
+    padding: 7px 12px !important;
+    width: auto !important;
+}
+
+.app-top-header .notification-badge {
+    left: -7px !important;
+    margin: 0 !important;
+    position: absolute !important;
+    right: auto !important;
+    top: -7px !important;
+}
+
+.app-top-header .notification-dropdown {
+    left: 0 !important;
+    right: auto !important;
+    top: calc(100% + 10px) !important;
+}
+
+.app-user-menu {
+    position: relative;
+}
+
+.app-user-menu summary {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    color: #172033;
+    cursor: pointer;
+    display: flex;
+    gap: 8px;
+    list-style: none;
+    min-height: 40px;
+    padding: 5px 8px 5px 12px;
+}
+
+.app-user-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.app-user-avatar {
+    align-items: center;
+    background: #2aa876;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 30px;
+    font-size: 13px;
+    font-weight: 900;
+    height: 30px;
+    justify-content: center;
+    width: 30px;
+}
+
+.app-user-summary {
+    display: flex;
+    flex-direction: column;
+    min-width: 90px;
+}
+
+.app-user-menu .app-nav-user-name {
+    color: #172033 !important;
+    font-size: 12px !important;
+    font-weight: 800;
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-user-menu .app-nav-user-role {
+    color: #69778b !important;
+    font-size: 11px !important;
+}
+
+.app-user-menu-panel {
+    background: #fff;
+    border: 1px solid #dde6f1;
+    border-radius: 8px;
+    box-shadow: 0 16px 34px rgba(15,23,42,.16);
+    display: grid;
+    gap: 4px;
+    left: 0;
+    min-width: 210px;
+    padding: 8px;
+    position: absolute;
+    top: calc(100% + 8px);
+    z-index: 320;
+}
+
+.app-user-menu-panel a,
+.app-user-menu-panel button {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 7px !important;
+    box-shadow: none !important;
+    color: #24344d !important;
+    display: block !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1.8 !important;
+    padding: 7px 10px !important;
+    text-align: right !important;
+    text-decoration: none !important;
+    width: 100% !important;
+}
+
+.app-user-menu-panel a:hover,
+.app-user-menu-panel button:hover {
+    background: #f1f6fc !important;
+}
+
+.app-user-menu-panel .app-nav-logout {
+    margin: 3px 0 0 !important;
+}
+
+.app-user-menu-panel .app-nav-logout button {
+    color: #b42318 !important;
+}
+
+.app-nav-toggle {
+    align-items: center !important;
+    background: #172033 !important;
+    border: 1px solid rgba(255,255,255,.2) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 18px rgba(15,23,42,.18) !important;
+    color: #fff !important;
+    cursor: pointer !important;
+    display: none !important;
+    height: 40px !important;
+    justify-content: center !important;
+    position: fixed !important;
+    right: 12px !important;
+    top: 12px !important;
+    width: 42px !important;
+    z-index: 340 !important;
+}
+
+.app-nav-toggle-lines,
+.app-nav-toggle-lines::before,
+.app-nav-toggle-lines::after {
+    background: currentColor;
+    border-radius: 999px;
+    content: "";
+    display: block;
+    height: 2px;
+    position: relative;
+    width: 18px;
+}
+
+.app-nav-toggle-lines::before {
+    position: absolute;
+    top: -6px;
+}
+
+.app-nav-toggle-lines::after {
+    position: absolute;
+    top: 6px;
+}
+
+.sb-overlay {
+    background: rgba(15,23,42,.44);
+    display: none;
+    inset: 0;
+    position: fixed;
+    z-index: 230;
+}
+
+.sb-overlay.show {
+    display: block;
+}
+
+@media (max-width: 980px) {
+    body:has(.app-shell-nav) {
+        margin-right: 0 !important;
+        padding-top: var(--app-header-height) !important;
+    }
+
+    .app-top-header {
+        grid-template-columns: 48px minmax(120px, 1fr) auto;
+        padding: 0 64px 0 10px;
+    }
+
+    .app-top-brand {
+        display: none;
+    }
+
+    .app-nav-toggle {
+        display: flex !important;
+    }
+
+    .app-shell-nav {
+        height: calc(100vh - var(--app-header-height)) !important;
+        transform: translateX(105%) !important;
+        transition: transform .18s ease !important;
+        width: 236px !important;
+    }
+
+    .app-shell-nav.open {
+        transform: translateX(0) !important;
+    }
+
+    .app-top-title {
+        font-size: 13px;
+    }
+
+    .app-top-role {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .app-top-header {
+        gap: 8px;
+        grid-template-columns: minmax(80px, 1fr) auto;
+        padding-left: 8px;
+    }
+
+    .app-top-actions {
+        gap: 6px;
+    }
+
+    .app-top-header .notification-trigger {
+        padding: 7px 9px !important;
+    }
+
+    .app-user-summary {
+        display: none;
+    }
+
+    .app-user-menu summary {
+        padding: 5px;
+    }
+
+    .app-user-menu-panel {
+        left: 0;
+        min-width: 190px;
+    }
+}
+
+/* ─── Table — سازمانی Navy ────────────────────────────────── */
 th {
-    background: linear-gradient(135deg, #042f2e 0%, #0f766e 100%) !important;
+    background: linear-gradient(135deg, #1a2f4e 0%, #1e3a5f 100%) !important;
     border-bottom: none !important;
     font-size: 12px;
     letter-spacing: .4px;
-    text-transform: uppercase;
+}
+
+tbody tr:not(.detail-row) {
+    background: #fff !important;
+    border-bottom: 1px solid #e9eef4 !important;
+    transition: background .12s ease, box-shadow .12s ease;
 }
 
 tbody tr:nth-child(even):not(.detail-row) {
-    background: #f0fdfa !important;
+    background: #fff !important;
 }
 
 tbody tr:hover:not(.detail-row) {
-    background: #ccfbf1 !important;
-    box-shadow: inset 3px 0 0 var(--app-primary);
+    background: #f0f4fa !important;
+    box-shadow: inset 4px 0 0 #1e3a5f !important;
 }
+
+/* ─── کلاس‌های مشترک جداول — همه لیست‌ها ───────────────────── */
+
+/* badge شماره ردیف */
+.tbl-id {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+.tbl-id-badge {
+    display: inline-block;
+    background: #eef2f8;
+    color: #1e3a5f;
+    border: 1px solid #c7d2e8;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 800;
+    font-family: monospace;
+    letter-spacing: .4px;
+}
+
+/* سلول دو‌خطی داخل جدول */
+.tbl-cell-stack {
+    white-space: normal;
+    line-height: 1.6;
+}
+.tbl-cell-stack .main  { font-size: 12px; color: var(--app-text); }
+.tbl-cell-stack .sub   { font-size: 11px; color: #64748b; }
+.tbl-cell-stack .sub2  { font-size: 11px; color: #94a3b8; }
+.tbl-cell-stack .mono  { font-family: monospace; direction: ltr; }
+
+/* badge وضعیت */
+.tbl-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.tbl-badge-blue    { background: #dbeafe; color: #1e40af; }
+.tbl-badge-green   { background: #dcfce7; color: #15803d; }
+.tbl-badge-red     { background: #fee2e2; color: #b91c1c; }
+.tbl-badge-yellow  { background: #fef9c3; color: #854d0e; }
+.tbl-badge-gray    { background: #f1f5f9; color: #475569; }
+.tbl-badge-purple  { background: #f3e8ff; color: #6d28d9; }
+.tbl-badge-navy    { background: #eef2f8; color: #1e3a5f; border: 1px solid #c7d2e8; }
+
+/* link های جدول */
+.tbl-link { color: var(--app-primary); text-decoration: none; font-weight: 600; }
+.tbl-link:hover { text-decoration: underline; }
 
 /* ─── Cards / Section ────────────────────────────────────────── */
 .section,
@@ -1381,7 +2172,7 @@ tbody tr:hover:not(.detail-row) {
 .filter-box {
     border-left: 3px solid var(--app-primary) !important;
     border-radius: var(--app-radius) !important;
-    box-shadow: 0 2px 12px rgba(13,148,136,.07) !important;
+    box-shadow: 0 2px 12px rgba(30,58,95,.07) !important;
 }
 
 .summary-card {
@@ -1391,7 +2182,7 @@ tbody tr:hover:not(.detail-row) {
 }
 
 .summary-card:hover {
-    box-shadow: 0 6px 20px rgba(13,148,136,.18) !important;
+    box-shadow: 0 6px 20px rgba(30,58,95,.18) !important;
     transform: translateY(-2px);
 }
 
@@ -1414,7 +2205,7 @@ input:not([type=checkbox]):not([type=radio]),
 select,
 textarea {
     background: #f7fffe !important;
-    border: 1.5px solid #b2e0da !important;
+    border: 1.5px solid #c7d2e8 !important;
     border-radius: var(--app-radius-sm) !important;
     font-size: 13px;
     padding: 9px 12px !important;
@@ -1426,7 +2217,7 @@ select:focus,
 textarea:focus {
     background: #fff !important;
     border-color: var(--app-primary) !important;
-    box-shadow: 0 0 0 3px rgba(13,148,136,.14) !important;
+    box-shadow: 0 0 0 3px rgba(30,58,95,.14) !important;
     outline: none;
 }
 
@@ -1472,10 +2263,10 @@ h2 {
     }
 
     .app-nav-panel {
-        background: linear-gradient(135deg, #042f2e, #0f4e49) !important;
+        background: linear-gradient(135deg, #0d1b2e, #1e3a5f) !important;
     }
 
     .app-nav-link:hover {
-        background: rgba(20,184,166,.18) !important;
+        background: rgba(30,58,95,.12) !important;
     }
 }

@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    receipt_reader_test,
     sms_mfa_setup,
     sms_otp_verify,
     sms_test_send,
@@ -130,6 +131,7 @@ urlpatterns = [
     path('counterparties/<int:counterparty_id>/edit/', counterparty_edit, name='counterparty_edit'),
     path('export-records/', export_records, name='export_records'),
     path('export/<str:dataset>/', export_data, name='export_data'),
+    path('admin-tools/receipt-reader/', receipt_reader_test, name='receipt_reader_test'),
     path('sms-verify/', sms_otp_verify, name='sms_otp_verify'),
     path('sms-mfa/setup/', sms_mfa_setup, name='sms_mfa_setup'),
     path('sms-mfa/test/', sms_test_send, name='sms_test_send'),
