@@ -58,11 +58,11 @@
         <div class="meta-grid">
             <div class="card">
                 <div class="label">مشتری</div>
-                <div class="value">{{ invoice.customer.get_full_name|default:invoice.customer.username }}</div>
+                <div class="value"><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' invoice.customer.id %}">{{ invoice.customer.get_full_name|default:invoice.customer.username }}</button></div>
             </div>
             <div class="card">
                 <div class="label">نام کاربری</div>
-                <div class="value">{{ invoice.customer.username }}</div>
+                <div class="value"><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' invoice.customer.id %}">{{ invoice.customer.username }}</button></div>
             </div>
             <div class="card">
                 <div class="label">مجموعه</div>
@@ -86,7 +86,7 @@
             </div>
             <div class="card">
                 <div class="label">بارگذاری کننده</div>
-                <div class="value">{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</div>
+                <div class="value">{% if invoice.uploaded_by %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' invoice.uploaded_by.id %}">{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username }}</button>{% else %}-{% endif %}</div>
             </div>
             <div class="card">
                 <div class="label">وضعیت مشاهده</div>

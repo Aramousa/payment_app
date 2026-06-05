@@ -22,6 +22,13 @@ def _role_for_nav(user):
         return 'staff' if user.is_staff else 'customer'
 
 
+def _profile_for_nav(user):
+    try:
+        return user.profile
+    except UserProfile.DoesNotExist:
+        return None
+
+
 def _can_view_invoices_nav(user):
     if user.is_superuser:
         return True
@@ -36,13 +43,14 @@ def _can_view_invoices_nav(user):
 
 
 _GROUP_META = {
-    'main':      {'label': 'صفحات اصلی',    'icon': '🏠', 'order': 0},
-    'documents': {'label': 'بررسی اسناد',   'icon': '📋', 'order': 1},
+    'main':      {'label': 'داشبورد',       'icon': '🏠', 'order': 0},
+    'documents': {'label': 'اسناد',         'icon': '📋', 'order': 1},
     'customers': {'label': 'مشتریان',       'icon': '👥', 'order': 2},
-    'commercial':{'label': 'تجاری',         'icon': '📦', 'order': 3},
-    'finance':   {'label': 'مالی',          'icon': '💰', 'order': 4},
-    'admin':     {'label': 'مدیریت',        'icon': '⚙️', 'order': 5},
-    'account':   {'label': 'حساب من',       'icon': '👤', 'order': 6},
+    'business':  {'label': 'بازرگانی',      'icon': '🏦', 'order': 3},
+    'sales':     {'label': 'فروش',          'icon': '📦', 'order': 4},
+    'finance':   {'label': 'مالی',          'icon': '💰', 'order': 5},
+    'system':    {'label': 'عملیات سیستمی', 'icon': '⚙️', 'order': 6},
+    'account':   {'label': 'حساب من',       'icon': '👤', 'order': 7},
 }
 
 
@@ -78,6 +86,31 @@ def _group_nav_items(items):
     return nav_groups
 
 
+def _business_card_context(user, profile, role_label, display_name, counterparty=None):
+    organization = getattr(profile, 'organization', '') or ''
+    if counterparty and not organization:
+        organization = counterparty.name
+    location_parts = [
+        (getattr(profile, 'city', '') or '').strip(),
+        (getattr(profile, 'province', '') or '').strip(),
+    ]
+    return {
+        'app_nav_card': {
+            'display_name': display_name,
+            'username': user.username,
+            'role_label': role_label,
+            'organization': organization,
+            'phone': getattr(profile, 'phone', '') or '',
+            'mobile': getattr(profile, 'mobile', '') or '',
+            'email': user.email or '',
+            'location': ' / '.join(part for part in location_parts if part),
+            'representative_name': getattr(profile, 'representative_name', '') or '',
+            'representative_mobile': getattr(profile, 'representative_mobile', '') or '',
+            'delegate_sms_to_representative': bool(getattr(profile, 'delegate_sms_to_representative', False)),
+        }
+    }
+
+
 def app_navigation(request):
     user = request.user
     if not user.is_authenticated:
@@ -85,6 +118,7 @@ def app_navigation(request):
 
     role = _role_for_nav(user)
     is_staff_user = user.is_staff or user.is_superuser or role in STAFF_ROLES or role == 'admin'
+    profile = _profile_for_nav(user)
 
     # طرف حساب — منوی اختصاصی
     cp = getattr(user, 'counterparty_account', None)
@@ -101,6 +135,10 @@ def app_navigation(request):
             'app_nav_groups': _group_nav_items(cp_items),
             'app_nav_role_label': role_label,
             'app_nav_user_display': user_display,
+            'app_nav_avatar_url': profile.avatar_url if profile else '',
+            'app_nav_avatar_icon': profile.avatar_icon if profile else '👤',
+            'app_nav_avatar_class': profile.avatar_class if profile else 'avatar-neutral_1',
+            **_business_card_context(user, profile, role_label, user_display, counterparty=cp),
         }
 
     items = [_nav_item('داشبورد', 'submit', 'submit', 'main', '🏠')]
@@ -115,42 +153,39 @@ def app_navigation(request):
             _nav_item('برنامه واریز من',   'customer_daily_payments', 'customer_daily_payments','finance',    '📅'),
         ])
     else:
-        # ── اسناد ───────────────────────────────────────────────
         items.extend([
             _nav_item('صف کاری اسناد',     'submit',           'payment_queue',   'documents', '📥'),
             _nav_item('سوابق اسناد',        'payment_history',  'payment_history', 'documents', '🗂️'),
         ])
-        # ── مشتریان ──────────────────────────────────────────────
-        items.append(_nav_item('لیست مشتریان', 'customers_list', 'customers', 'customers', '👥'))
+        items.append(_nav_item('مشتریان', 'customers_list', 'customers', 'customers', '👥'))
 
-        # ── تجاری ────────────────────────────────────────────────
         COMMERCIAL_ROLES = {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}
-        if user.is_superuser or _can_view_invoices_nav(user):
-            items.append(_nav_item('فاکتورها',     'invoices_dashboard',    'invoices',      'commercial', '🧾'))
-        if user.is_superuser or role in COMMERCIAL_ROLES:
-            items.append(_nav_item('لیست قیمت',    'price_lists',           'price_lists',   'commercial', '💲'))
-            items.append(_nav_item('سفارش‌ها',      'orders',                'orders',        'commercial', '🛒'))
-            items.append(_nav_item('پیش‌فاکتورها',  'proformas',             'proformas',     'commercial', '📝'))
-        if user.is_superuser or role in {'sales', 'sales_manager'}:
-            items.append(_nav_item('داشبورد فروش', 'sales_expert_dashboard', 'sales_dashboard', 'commercial', '📊'))
-
-        # ── مالی ─────────────────────────────────────────────────
         if is_staff_user:
-            items.append(_nav_item('برنامه واریز', 'daily_payment_plans', 'daily_payments', 'finance', '📅'))
-        if user.is_superuser or role == 'finance_manager':
-            items.append(_nav_item('تفویض تأیید نهایی', 'final_approval_delegation', 'delegation', 'finance', '✍️'))
+            items.append(_nav_item('برنامه واریز', 'daily_payment_plans', 'daily_payments', 'business', '📅'))
 
-        # ── مدیریت ───────────────────────────────────────────────
+        if user.is_superuser or role in COMMERCIAL_ROLES:
+            items.append(_nav_item('لیست قیمت', 'price_lists', 'price_lists', 'sales', '💲'))
+            items.append(_nav_item('سفارش‌ها', 'orders', 'orders', 'sales', '🛒'))
+            items.append(_nav_item('پیشنهاد فروش', 'proformas', 'proformas', 'sales', '📝'))
+        if user.is_superuser or _can_view_invoices_nav(user):
+            items.append(_nav_item('فاکتور فروش', 'invoices_dashboard', 'invoices', 'sales', '🧾'))
+        if user.is_superuser or role in {'sales', 'sales_manager'}:
+            items.append(_nav_item('داشبورد فروش', 'sales_expert_dashboard', 'sales_dashboard', 'sales', '📊'))
+
+        if user.is_superuser or role == 'finance_manager':
+            items.append(_nav_item('تفویض تایید اسناد', 'final_approval_delegation', 'delegation', 'finance', '✍️'))
+        if user.is_superuser:
+            items.append(_nav_item('مدیریت طرف حساب‌ها', 'counterparty_manage_list', 'counterparties_full', 'finance', '🏢'))
+
         if user.is_superuser or role == 'sales_manager':
-            items.append(_nav_item('تخصیص مشتریان فروش', 'sales_assignments', 'sales_assignments', 'admin', '🔗'))
+            items.append(_nav_item('تخصیص مشتریان فروش', 'sales_assignments', 'sales_assignments', 'system', '🔗'))
         if user.is_superuser:
             items.extend([
-                _nav_item('مدیریت کاربران',       'users_manage',            'users',              'admin', '👤'),
-                _nav_item('مدیریت طرف حساب‌ها',   'counterparty_manage_list','counterparties_full','admin', '🏢'),
-                _nav_item('تست خوانش فیش',        'receipt_reader_test',     'receipt_reader',     'admin', '🔍'),
+                _nav_item('مدیریت کاربران', 'users_manage', 'users', 'system', '👤'),
+                _nav_item('تست خوانش فیش', 'receipt_reader_test', 'receipt_reader', 'system', '🔍'),
             ])
         elif not user.is_superuser and is_staff_user:
-            items.append(_nav_item('تایید مشخصات', 'users_manage', 'profile_changes', 'admin', '✅'))
+            items.append(_nav_item('تایید مشخصات', 'users_manage', 'profile_changes', 'system', '✅'))
 
     # ── حساب من ──────────────────────────────────────────────────
     items.extend([
@@ -180,6 +215,10 @@ def app_navigation(request):
         'app_nav_groups': _group_nav_items(items),
         'app_nav_role_label': role_label,
         'app_nav_user_display': user.get_full_name().strip() or user.username,
+        'app_nav_avatar_url': profile.avatar_url if profile else '',
+        'app_nav_avatar_icon': profile.avatar_icon if profile else '👤',
+        'app_nav_avatar_class': profile.avatar_class if profile else 'avatar-neutral_1',
+        **_business_card_context(user, profile, role_label, user.get_full_name().strip() or user.username),
     }
 
 

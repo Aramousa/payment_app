@@ -65,7 +65,7 @@
 <body>
     {% include "payments/partials/app_navigation.html" %}
     <div class="top-bar">
-        <h2>اطلاعات مشتری: {{ customer_user.username }}</h2>
+        <h2>اطلاعات مشتری: <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' customer_user.id %}">{{ customer_user.username }}</button></h2>
         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'customers_list' %}{% endif %}" class="back-link">← بازگشت به لیست مشتریان</a>
         </div>
@@ -76,7 +76,7 @@
         <div class="customer-header-grid">
             <div class="customer-header-item">
                 <strong>نام کاربری:</strong>
-                {{ customer_user.username }}
+                <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' customer_user.id %}">{{ customer_user.username }}</button>
             </div>
             <div class="customer-header-item">
                 <strong>نام:</strong>
@@ -105,6 +105,18 @@
             <div class="customer-header-item">
                 <strong>ایمیل:</strong>
                 {{ customer_user.email|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>نماینده:</strong>
+                {{ customer_profile.representative_name|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>موبایل نماینده:</strong>
+                {{ customer_profile.representative_mobile|default:'-' }}
+            </div>
+            <div class="customer-header-item">
+                <strong>تفویض SMS:</strong>
+                {% if customer_profile.delegate_sms_to_representative %}فعال{% else %}غیرفعال{% endif %}
             </div>
             <div class="customer-header-item">
                 <strong>استان:</strong>

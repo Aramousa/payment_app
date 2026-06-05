@@ -45,8 +45,17 @@
 
         {% include "payments/partials/system_messages_popup.html" %}
 
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
+            <div class="profile-avatar-preview">
+                <span class="app-user-avatar {{ request.user.profile.avatar_class }}">
+                    {% if request.user.profile.avatar_url %}
+                        <img src="{{ request.user.profile.avatar_url }}" alt="{{ request.user.get_full_name|default:request.user.username }}">
+                    {% else %}
+                        {{ request.user.profile.avatar_icon }}
+                    {% endif %}
+                </span>
+            </div>
             <div class="form-grid">
                 {% for field in form %}
                     <div class="field-box {% if field.name == 'address' or field.name == 'second_address' %}full-row{% endif %}">

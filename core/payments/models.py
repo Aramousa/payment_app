@@ -64,6 +64,10 @@ def proforma_upload_to(instance, filename):
     return _unique_upload_path(instance, filename, 'proformas', 'proformainvoice')
 
 
+def profile_avatar_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'profile_avatars', 'userprofile')
+
+
 class Counterparty(models.Model):
     STATUS_ACTIVE    = 'active'
     STATUS_INACTIVE  = 'inactive'
@@ -549,6 +553,14 @@ class UserProfile(models.Model):
         # گروه طرف حساب‌ها
         ('counterparty',      'طرف حساب'),
     )
+    AVATAR_PRESET_CHOICES = (
+        ('neutral_1', 'نمایه عمومی ۱'),
+        ('neutral_2', 'نمایه عمومی ۲'),
+        ('male_1', 'نمایه مرد ۱'),
+        ('male_2', 'نمایه مرد ۲'),
+        ('female_1', 'نمایه زن ۱'),
+        ('female_2', 'نمایه زن ۲'),
+    )
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     first_name = models.CharField('نام', max_length=50, blank=True)
@@ -556,6 +568,9 @@ class UserProfile(models.Model):
     phone = models.CharField('شماره تلفن', max_length=20, blank=True)
     mobile = models.CharField('شماره همراه', max_length=20, blank=True)
     second_mobile = models.CharField('شماره همراه دوم', max_length=20, blank=True)
+    representative_name = models.CharField('نام نماینده', max_length=100, blank=True)
+    representative_mobile = models.CharField('موبایل نماینده', max_length=20, blank=True)
+    delegate_sms_to_representative = models.BooleanField('ارسال پیامک به نماینده', default=False)
     organization = models.CharField('نام مجموعه', max_length=100, blank=True)
     city = models.CharField('شهر', max_length=50, blank=True)
     province = models.CharField('استان', max_length=50, blank=True)
@@ -571,6 +586,8 @@ class UserProfile(models.Model):
     can_edit_payment_details = models.BooleanField('دسترسی تکمیل اطلاعات فیش‌ها', default=False)
     accounting_code = models.CharField('کد تفضیلی', max_length=50, blank=True)
     sms_mfa_enabled = models.BooleanField('ورود دو مرحله‌ای با پیامک', default=False)
+    avatar_image = models.ImageField('عکس نمایه', upload_to=profile_avatar_upload_to, blank=True, null=True)
+    avatar_preset = models.CharField('نمایه پیش‌فرض', max_length=20, choices=AVATAR_PRESET_CHOICES, default='neutral_1')
 
     def __str__(self):
         return self.user.username
@@ -578,7 +595,33 @@ class UserProfile(models.Model):
     @property
     def sms_number(self):
         """شماره برای ارسال پیامک — موبایل اول، در غیر این‌صورت شماره تلفن."""
+        if self.delegate_sms_to_representative and self.representative_mobile:
+            return self.representative_mobile.strip()
         return (self.mobile or self.phone or '').strip()
+
+    @property
+    def avatar_url(self):
+        if self.avatar_image:
+            try:
+                return self.avatar_image.url
+            except ValueError:
+                return ''
+        return ''
+
+    @property
+    def avatar_icon(self):
+        return {
+            'neutral_1': '👤',
+            'neutral_2': '◉',
+            'male_1': '👨',
+            'male_2': '♂',
+            'female_1': '👩',
+            'female_2': '♀',
+        }.get(self.avatar_preset, '👤')
+
+    @property
+    def avatar_class(self):
+        return f"avatar-{self.avatar_preset or 'neutral_1'}"
 
 
 class ProfileChangeRequest(models.Model):
@@ -596,6 +639,9 @@ class ProfileChangeRequest(models.Model):
         'email': 'ایمیل',
         'phone': 'شماره تلفن',
         'second_mobile': 'شماره همراه دوم',
+        'representative_name': 'نام نماینده',
+        'representative_mobile': 'موبایل نماینده',
+        'delegate_sms_to_representative': 'ارسال پیامک به نماینده',
         'organization': 'نام مجموعه',
         'address': 'آدرس',
         'second_address': 'آدرس دوم',
@@ -620,11 +666,16 @@ class ProfileChangeRequest(models.Model):
     def change_items(self):
         items = []
         for field_name, values in (self.changes or {}).items():
+            old_value = (values or {}).get('old')
+            new_value = (values or {}).get('new')
+            if field_name == 'delegate_sms_to_representative':
+                old_value = 'بله' if bool(old_value) else 'خیر'
+                new_value = 'بله' if bool(new_value) else 'خیر'
             items.append({
                 'field': field_name,
                 'label': self.FIELD_LABELS.get(field_name, field_name),
-                'old': (values or {}).get('old') or '-',
-                'new': (values or {}).get('new') or '-',
+                'old': old_value or '-',
+                'new': new_value or '-',
             })
         return items
 

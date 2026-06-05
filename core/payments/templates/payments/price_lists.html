@@ -109,14 +109,14 @@
                     <tr>
                         <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ price_list.id }}</span></td>
                         {% if is_staff_user %}
-                            <td>{{ price_list.customer.get_full_name|default:price_list.customer.username }}</td>
+                            <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' price_list.customer.id %}">{{ price_list.customer.get_full_name|default:price_list.customer.username }}</button></td>
                             <td>{{ price_list.customer.profile.organization|default:'-' }}</td>
                             <td>{{ price_list.customer.profile.province|default:'-' }}</td>
                             <td>{{ price_list.customer.profile.city|default:'-' }}</td>
                         {% endif %}
                         <td>{{ price_list.title|default:'-' }}</td>
                         <td>{{ price_list.created_at|jalali_datetime }}</td>
-                        <td>{{ price_list.uploaded_by.get_full_name|default:price_list.uploaded_by.username|default:'-' }}</td>
+                        <td>{% if price_list.uploaded_by %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' price_list.uploaded_by.id %}">{{ price_list.uploaded_by.get_full_name|default:price_list.uploaded_by.username }}</button>{% else %}-{% endif %}</td>
                         {% if is_staff_user %}
                             <td>
                                 {% if price_list.is_seen_by_customer %}

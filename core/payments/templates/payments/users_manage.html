@@ -74,7 +74,7 @@
                 <tbody>
                     {% for change in pending_profile_changes %}
                         <tr>
-                            <td>{{ change.user.get_full_name|default:change.user.username }}</td>
+                            <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' change.user.id %}">{{ change.user.get_full_name|default:change.user.username }}</button></td>
                             <td style="text-align:right;">
                                 {% for item in change.change_items %}
                                     <div>{{ item.label }}: «{{ item.old }}» به «{{ item.new }}»</div>
@@ -113,7 +113,7 @@
         {% if not editing_user %}
             <div class="hint-box">رمز پیشنهادی 5 رقمی: <strong id="suggested-password">{{ password_suggestion }}</strong></div>
         {% endif %}
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="form-grid">
                 {% for field in form %}
@@ -230,8 +230,8 @@
                     <tr>
                         <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ item.id }}</span></td>
                         <td>{{ item.profile.accounting_code|default:'-' }}</td>
-                        <td>{{ item.username }}</td>
-                        <td>{{ item.first_name }} {{ item.last_name }}</td>
+                        <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' item.id %}">{{ item.username }}</button></td>
+                        <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' item.id %}">{{ item.first_name }} {{ item.last_name }}</button></td>
                         <td>
                             {% with cp=item.counterparty_account %}
                             {% if cp %}

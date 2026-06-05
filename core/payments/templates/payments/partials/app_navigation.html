@@ -46,11 +46,18 @@
 
         <details class="app-user-menu">
             <summary>
-                <span class="app-user-avatar">{{ app_nav_user_display|first|default:"ک" }}</span>
-                <span class="app-user-summary">
+                <span class="app-user-avatar {{ app_nav_avatar_class }}">
+                    {% if app_nav_avatar_url %}
+                        <img src="{{ app_nav_avatar_url }}" alt="{{ app_nav_user_display }}">
+                    {% else %}
+                        {{ app_nav_avatar_icon }}
+                    {% endif %}
+                </span>
+                <span class="app-user-summary" data-user-card-trigger role="button" tabindex="0" title="مشاهده کارت کاربر">
                     <span class="app-nav-user-name">{{ app_nav_user_display }}</span>
                     <span class="app-nav-user-role">{{ app_nav_role_label }}</span>
                 </span>
+                <span class="app-user-menu-caret" title="منوی کاربر">⌄</span>
             </summary>
             <div class="app-user-menu-panel">
                 {% for group in app_nav_groups %}
@@ -60,12 +67,13 @@
                         {% endfor %}
                     {% endif %}
                 {% endfor %}
-                <form class="app-nav-logout" method="post" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button type="submit">خروج</button>
-                </form>
             </div>
         </details>
+
+        <form class="app-nav-logout app-top-logout" method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit">خروج</button>
+        </form>
     </div>
 </header>
 
@@ -74,26 +82,115 @@
         <div class="app-nav-links">
             {% for group in app_nav_groups %}
                 {% if group.key != 'account' %}
-                    <section class="app-nav-section">
-                        <div class="sb-group-header">{{ group.label }}</div>
+                    {% if group.key == 'main' or group.key == 'customers' %}
                         {% for item in group.items %}
-                            <a class="app-nav-link app-nav-{{ group.key }}" href="{{ item.url }}">
+                            <a class="app-nav-link app-nav-direct app-nav-{{ group.key }}" href="{{ item.url }}">
                                 <span class="app-nav-icon">{{ item.icon }}</span>
                                 <span class="app-nav-text">{{ item.label }}</span>
                             </a>
                         {% endfor %}
-                    </section>
+                    {% else %}
+                        <details class="app-nav-section app-nav-group" data-group="{{ group.key }}">
+                            <summary class="sb-group-header">
+                                <span>{{ group.icon }}</span>
+                                <span>{{ group.label }}</span>
+                            </summary>
+                            <div class="app-nav-group-panel">
+                                {% for item in group.items %}
+                                    <a class="app-nav-link app-nav-{{ group.key }}" href="{{ item.url }}">
+                                        <span class="app-nav-icon">{{ item.icon }}</span>
+                                        <span class="app-nav-text">{{ item.label }}</span>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    {% endif %}
                 {% endif %}
             {% endfor %}
         </div>
     </div>
 </nav>
 
+<div class="user-card-modal" id="user-card-modal" aria-hidden="true">
+    <div class="user-card-backdrop" data-user-card-close></div>
+    <section class="user-business-card" role="dialog" aria-modal="true" aria-labelledby="user-card-title">
+        <button class="user-card-close" type="button" data-user-card-close aria-label="بستن">×</button>
+        <div class="user-card-ribbon"></div>
+        <div class="user-card-head">
+            <span class="user-card-avatar app-user-avatar {{ app_nav_avatar_class }}" data-card-avatar>
+                {% if app_nav_avatar_url %}
+                    <img src="{{ app_nav_avatar_url }}" alt="{{ app_nav_user_display }}">
+                {% else %}
+                    {{ app_nav_avatar_icon }}
+                {% endif %}
+            </span>
+            <div>
+                <h3 id="user-card-title" data-card-display>{{ app_nav_card.display_name }}</h3>
+                <div class="user-card-role" data-card-role>{{ app_nav_card.role_label }}</div>
+            </div>
+        </div>
+
+        <div class="user-card-body">
+            <div class="user-card-row">
+                <span>نام کاربری</span>
+                <strong dir="ltr" data-card-username>{{ app_nav_card.username }}</strong>
+            </div>
+            <div class="user-card-row">
+                <span>مجموعه</span>
+                <strong data-card-organization>{{ app_nav_card.organization|default:"-" }}</strong>
+            </div>
+            <div class="user-card-row">
+                <span>موبایل</span>
+                <strong dir="ltr" data-card-mobile>{{ app_nav_card.mobile|default:"-" }}</strong>
+            </div>
+            <div class="user-card-row">
+                <span>تلفن</span>
+                <strong dir="ltr" data-card-phone>{{ app_nav_card.phone|default:"-" }}</strong>
+            </div>
+            <div class="user-card-row">
+                <span>ایمیل</span>
+                <strong dir="ltr" data-card-email>{{ app_nav_card.email|default:"-" }}</strong>
+            </div>
+            <div class="user-card-row">
+                <span>موقعیت</span>
+                <strong data-card-location>{{ app_nav_card.location|default:"-" }}</strong>
+            </div>
+            <button type="button" class="user-card-row user-card-representative-toggle" data-representative-toggle>
+                <span>نماینده</span>
+                <strong data-card-representative-summary>
+                    {% if app_nav_card.representative_name or app_nav_card.representative_mobile %}مشاهده اطلاعات{% else %}ثبت نشده{% endif %}
+                </strong>
+            </button>
+            <div class="user-card-representative-panel" data-representative-panel hidden>
+                <div class="user-card-row">
+                    <span>نام نماینده</span>
+                    <strong data-card-representative-name>{{ app_nav_card.representative_name|default:"-" }}</strong>
+                </div>
+                <div class="user-card-row">
+                    <span>موبایل نماینده</span>
+                    <strong dir="ltr" data-card-representative-mobile>{{ app_nav_card.representative_mobile|default:"-" }}</strong>
+                </div>
+                <div class="user-card-row">
+                    <span>تفویض SMS</span>
+                    <strong data-card-representative-sms>{% if app_nav_card.delegate_sms_to_representative %}فعال{% else %}غیرفعال{% endif %}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="user-card-footer">
+            <a href="{% url 'profile_edit' %}" data-card-profile-link>ویرایش نمایه</a>
+            <button type="button" data-user-card-close>بستن</button>
+        </div>
+    </section>
+</div>
+
 <script>
 (function() {
     var sidebar = document.getElementById('app-sidebar');
     var toggle = document.getElementById('sb-toggle');
     var overlay = document.getElementById('sb-overlay');
+    var userCard = document.getElementById('user-card-modal');
+    var userCardTrigger = document.querySelector('[data-user-card-trigger]');
     if (!sidebar) return;
 
     var currentPath = window.location.pathname.replace(/\/$/, '');
@@ -102,6 +199,8 @@
         var path = href.split('?')[0].replace(/\/$/, '');
         if (path && (path === currentPath || (path !== '' && currentPath.indexOf(path + '/') === 0))) {
             link.classList.add('active-link');
+            var group = link.closest('.app-nav-group');
+            if (group) group.classList.add('active-group');
         }
     });
 
@@ -122,8 +221,120 @@
             setOpen(false);
         });
     }
+    document.querySelectorAll('.app-nav-group').forEach(function(group) {
+        group.addEventListener('toggle', function() {
+            if (!group.open) return;
+            document.querySelectorAll('.app-nav-group[open]').forEach(function(other) {
+                if (other !== group) other.removeAttribute('open');
+            });
+        });
+    });
+    function setUserCard(open) {
+        if (!userCard) return;
+        userCard.classList.toggle('open', open);
+        userCard.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+
+    function setText(selector, value) {
+        var el = userCard ? userCard.querySelector(selector) : null;
+        if (el) el.textContent = value || '-';
+    }
+
+    function renderUserCard(data) {
+        if (!userCard || !data) return;
+        setText('[data-card-display]', data.display_name);
+        setText('[data-card-role]', data.role_label);
+        setText('[data-card-username]', data.username);
+        setText('[data-card-organization]', data.organization);
+        setText('[data-card-mobile]', data.mobile);
+        setText('[data-card-phone]', data.phone);
+        setText('[data-card-email]', data.email);
+        setText('[data-card-location]', data.location);
+        setText('[data-card-representative-name]', data.representative_name);
+        setText('[data-card-representative-mobile]', data.representative_mobile);
+        setText('[data-card-representative-sms]', data.delegate_sms_to_representative ? 'فعال' : 'غیرفعال');
+        setText('[data-card-representative-summary]', (data.representative_name && data.representative_name !== '-') || (data.representative_mobile && data.representative_mobile !== '-') ? 'مشاهده اطلاعات' : 'ثبت نشده');
+        var representativePanel = userCard.querySelector('[data-representative-panel]');
+        if (representativePanel) representativePanel.hidden = true;
+
+        var avatar = userCard.querySelector('[data-card-avatar]');
+        if (avatar) {
+            avatar.className = 'user-card-avatar app-user-avatar ' + (data.avatar_class || 'avatar-neutral_1');
+            if (data.avatar_url) {
+                avatar.innerHTML = '<img src="' + data.avatar_url + '" alt="' + (data.display_name || '') + '">';
+            } else {
+                avatar.textContent = data.avatar_icon || '👤';
+            }
+        }
+
+        var profileLink = userCard.querySelector('[data-card-profile-link]');
+        if (profileLink) {
+            profileLink.style.display = data.is_current_user === false ? 'none' : '';
+        }
+    }
+
+    if (userCardTrigger) {
+        userCardTrigger.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            renderUserCard({
+                display_name: '{{ app_nav_card.display_name|escapejs }}',
+                role_label: '{{ app_nav_card.role_label|escapejs }}',
+                username: '{{ app_nav_card.username|escapejs }}',
+                organization: '{{ app_nav_card.organization|default:"-"|escapejs }}',
+                mobile: '{{ app_nav_card.mobile|default:"-"|escapejs }}',
+                phone: '{{ app_nav_card.phone|default:"-"|escapejs }}',
+                email: '{{ app_nav_card.email|default:"-"|escapejs }}',
+                location: '{{ app_nav_card.location|default:"-"|escapejs }}',
+                representative_name: '{{ app_nav_card.representative_name|default:"-"|escapejs }}',
+                representative_mobile: '{{ app_nav_card.representative_mobile|default:"-"|escapejs }}',
+                delegate_sms_to_representative: {% if app_nav_card.delegate_sms_to_representative %}true{% else %}false{% endif %},
+                avatar_url: '{{ app_nav_avatar_url|escapejs }}',
+                avatar_icon: '{{ app_nav_avatar_icon|escapejs }}',
+                avatar_class: '{{ app_nav_avatar_class|escapejs }}',
+                is_current_user: true
+            });
+            setUserCard(true);
+        });
+        userCardTrigger.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setUserCard(true);
+            }
+        });
+    }
+    document.addEventListener('click', async function(event) {
+        var trigger = event.target.closest('[data-user-card-url]');
+        if (!trigger) return;
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+            var response = await fetch(trigger.dataset.userCardUrl, { credentials: 'same-origin' });
+            if (!response.ok) return;
+            var data = await response.json();
+            data.is_current_user = false;
+            renderUserCard(data);
+            setUserCard(true);
+        } catch (error) {
+            console.warn('User card could not be loaded', error);
+        }
+    });
+    document.querySelectorAll('[data-user-card-close]').forEach(function(closeButton) {
+        closeButton.addEventListener('click', function() {
+            setUserCard(false);
+        });
+    });
+    document.querySelectorAll('[data-representative-toggle]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var panel = userCard ? userCard.querySelector('[data-representative-panel]') : null;
+            if (panel) panel.hidden = !panel.hidden;
+        });
+    });
     document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') setOpen(false);
+        if (event.key === 'Escape') {
+            setOpen(false);
+            setUserCard(false);
+        }
     });
 })();
 </script>

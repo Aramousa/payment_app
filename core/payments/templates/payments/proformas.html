@@ -87,7 +87,7 @@
                     <tr>
                         <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ proforma.id }}</span></td>
                         {% if is_staff_user %}
-                            <td>{{ proforma.customer.get_full_name|default:proforma.customer.username }}</td>
+                            <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' proforma.customer.id %}">{{ proforma.customer.get_full_name|default:proforma.customer.username }}</button></td>
                             <td>{{ proforma.customer.profile.organization|default:'-' }}</td>
                         {% endif %}
                         <td>{{ proforma.title|default:'-' }}</td>
@@ -110,7 +110,7 @@
                                 {% endif %}
                             </td>
                         {% endif %}
-                        <td>{{ proforma.issued_by.get_full_name|default:proforma.issued_by.username|default:'-' }}</td>
+                        <td>{% if proforma.issued_by %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' proforma.issued_by.id %}">{{ proforma.issued_by.get_full_name|default:proforma.issued_by.username }}</button>{% else %}-{% endif %}</td>
                         <td>
                             <a class="button-link" href="{% url 'proforma_detail' proforma.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a>
                             {% if can_delete_documents %}

@@ -756,7 +756,7 @@
                 <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ payment.id }}</span></td>
                 {% if is_staff_user %}
                 <td style="white-space:normal;line-height:1.6;">
-                    <div>{{ payment.first_name }} {{ payment.last_name }}</div>
+                    <div>{% if payment.user %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' payment.user.id %}">{{ payment.first_name }} {{ payment.last_name }}</button>{% else %}{{ payment.first_name }} {{ payment.last_name }}{% endif %}</div>
                     {% if payment.organization %}<div style="color:#64748b;font-size:11px;">{{ payment.organization }}</div>{% endif %}
                     {% if payment.city %}<div style="color:#94a3b8;font-size:11px;">{{ payment.city }}</div>{% endif %}
                 </td>

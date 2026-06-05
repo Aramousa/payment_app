@@ -115,7 +115,7 @@
                 <tr>
                     <td>{{ forloop.counter }}</td>
                     <td>
-                        {{ assignment.customer.get_full_name|default:assignment.customer.username }}<br>
+                        <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' assignment.customer.id %}">{{ assignment.customer.get_full_name|default:assignment.customer.username }}</button><br>
                         {{ assignment.customer.profile.organization|default:'-' }}
                     </td>
                     <td class="money">{{ assignment.expected_amount|thousand_sep }}</td>

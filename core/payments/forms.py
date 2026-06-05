@@ -25,6 +25,8 @@ IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.
 DEFAULT_RECEIPT_MAX_UPLOAD_SIZE = 1 * 1024 * 1024
 DEFAULT_INVOICE_MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 IMAGE_RESIZE_MAX_SIDE = 2200
+PROFILE_AVATAR_MAX_UPLOAD_SIZE = 512 * 1024
+PROFILE_AVATAR_MAX_SIDE = 512
 DATE_INPUT_AUTOCOMPLETE_ATTRS = {
     'autocomplete': 'off',
     'autocorrect': 'off',
@@ -273,16 +275,27 @@ class CustomerProfileUpdateForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ['phone', 'second_mobile', 'organization', 'address', 'second_address']
+        fields = [
+            'avatar_image', 'avatar_preset', 'phone', 'second_mobile',
+            'representative_name', 'representative_mobile', 'delegate_sms_to_representative',
+            'organization', 'address', 'second_address',
+        ]
         widgets = {
+            'avatar_image': forms.ClearableFileInput(attrs={'accept': 'image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif'}),
             'phone': forms.TextInput(attrs={'inputmode': 'tel'}),
             'second_mobile': forms.TextInput(attrs={'inputmode': 'tel'}),
+            'representative_mobile': forms.TextInput(attrs={'inputmode': 'tel'}),
             'address': forms.Textarea(attrs={'rows': 3}),
             'second_address': forms.Textarea(attrs={'rows': 3}),
         }
         labels = {
+            'avatar_image': 'عکس نمایه',
+            'avatar_preset': 'نمایه پیش‌فرض',
             'phone': 'شماره تلفن',
             'second_mobile': 'شماره همراه دوم',
+            'representative_name': 'نام نماینده',
+            'representative_mobile': 'موبایل نماینده',
+            'delegate_sms_to_representative': 'ارسال پیامک‌ها به موبایل نماینده',
             'organization': 'نام مجموعه',
             'address': 'آدرس',
             'second_address': 'آدرس دوم',
@@ -299,11 +312,42 @@ class CustomerProfileUpdateForm(forms.ModelForm):
     def clean_email(self):
         return (self.cleaned_data.get('email') or '').strip()
 
+    def clean_avatar_image(self):
+        uploaded = self.cleaned_data.get('avatar_image')
+        if not uploaded:
+            return uploaded
+        ext = os.path.splitext(uploaded.name or '')[1].lower()
+        if ext not in IMAGE_EXTENSIONS:
+            raise ValidationError('فقط فایل تصویری برای عکس نمایه مجاز است.')
+        return _optimize_uploaded_image(uploaded, PROFILE_AVATAR_MAX_UPLOAD_SIZE, max_side=PROFILE_AVATAR_MAX_SIDE)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('delegate_sms_to_representative') and not (cleaned_data.get('representative_mobile') or '').strip():
+            self.add_error('representative_mobile', 'برای تفویض پیامک، ثبت موبایل نماینده لازم است.')
+        return cleaned_data
+
+    def save_avatar_fields(self):
+        changed = False
+        if 'avatar_preset' in self.changed_data:
+            self.instance.avatar_preset = self.cleaned_data.get('avatar_preset') or 'neutral_1'
+            changed = True
+        if 'avatar_image' in self.changed_data:
+            avatar_image = self.cleaned_data.get('avatar_image')
+            self.instance.avatar_image = '' if avatar_image is False else avatar_image
+            changed = True
+        if changed:
+            self.instance.save(update_fields=['avatar_preset', 'avatar_image'])
+        return changed
+
     def changed_profile_fields(self):
         labels = {
             'email': 'ایمیل',
             'phone': 'شماره تلفن',
             'second_mobile': 'شماره همراه دوم',
+            'representative_name': 'نام نماینده',
+            'representative_mobile': 'موبایل نماینده',
+            'delegate_sms_to_representative': 'ارسال پیامک‌ها به موبایل نماینده',
             'organization': 'نام مجموعه',
             'address': 'آدرس',
             'second_address': 'آدرس دوم',
@@ -317,19 +361,28 @@ class CustomerProfileUpdateForm(forms.ModelForm):
             else:
                 old_value = getattr(self.instance, field_name, '') or ''
             new_value = self.cleaned_data.get(field_name) or ''
+            old_display = old_value or '-'
+            new_display = new_value or '-'
+            if field_name == 'delegate_sms_to_representative':
+                old_value = bool(getattr(self.instance, field_name, False))
+                new_value = bool(self.cleaned_data.get(field_name))
+                old_display = 'بله' if old_value else 'خیر'
+                new_display = 'بله' if new_value else 'خیر'
             changes.append({
                 'name': field_name,
                 'field': labels[field_name],
-                'old': old_value or '-',
-                'new': new_value or '-',
+                'old': old_display,
+                'new': new_display,
+                'raw_old': old_value,
+                'raw_new': new_value,
             })
         return changes
 
     def changes_payload(self):
         return {
             item['name']: {
-                'old': '' if item['old'] == '-' else item['old'],
-                'new': '' if item['new'] == '-' else item['new'],
+                'old': item.get('raw_old', '' if item['old'] == '-' else item['old']),
+                'new': item.get('raw_new', '' if item['new'] == '-' else item['new']),
             }
             for item in self.changed_profile_fields()
         }
@@ -1313,11 +1366,20 @@ class UserAccountManagementForm(forms.Form):
     last_name = forms.CharField(label='نام خانوادگی', max_length=50, required=True)
     phone = forms.CharField(label='شماره تماس', max_length=20, required=False)
     mobile = forms.CharField(label='شماره همراه', max_length=20, required=True)
+    representative_name = forms.CharField(label='نام نماینده', max_length=100, required=False)
+    representative_mobile = forms.CharField(label='موبایل نماینده', max_length=20, required=False)
+    delegate_sms_to_representative = forms.BooleanField(label='ارسال پیامک‌ها به موبایل نماینده', required=False)
     province = forms.CharField(label='استان', max_length=50, required=True)
     city = forms.CharField(label='شهر', max_length=50, required=True)
     address = forms.CharField(label='آدرس', required=False, widget=forms.Textarea(attrs={'rows': 2}))
     organization = forms.CharField(label='نام مجموعه', max_length=100, required=True)
     email = forms.EmailField(label='ایمیل', required=False)
+    avatar_image = forms.ImageField(
+        label='عکس نمایه',
+        required=False,
+        widget=forms.ClearableFileInput(attrs={'accept': 'image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif'}),
+    )
+    avatar_preset = forms.ChoiceField(label='نمایه پیش‌فرض', choices=UserProfile.AVATAR_PRESET_CHOICES, required=False)
     password = forms.CharField(label='کلمه عبور', required=True, widget=forms.TextInput(attrs={'dir': 'ltr', 'inputmode': 'latin'}))
     role = forms.ChoiceField(label='نقش', choices=ROLE_CHOICES)
     active_from = jDateField(
@@ -1358,11 +1420,15 @@ class UserAccountManagementForm(forms.Form):
                 'last_name': self.instance.last_name,
                 'phone': getattr(profile, 'phone', ''),
                 'mobile': getattr(profile, 'mobile', ''),
+                'representative_name': getattr(profile, 'representative_name', ''),
+                'representative_mobile': getattr(profile, 'representative_mobile', ''),
+                'delegate_sms_to_representative': getattr(profile, 'delegate_sms_to_representative', False),
                 'province': getattr(profile, 'province', ''),
                 'city': getattr(profile, 'city', ''),
                 'address': getattr(profile, 'address', ''),
                 'organization': getattr(profile, 'organization', ''),
                 'email': self.instance.email,
+                'avatar_preset': getattr(profile, 'avatar_preset', 'neutral_1'),
                 'role': getattr(profile, 'role', 'customer'),
                 'active_from': getattr(profile, 'active_from', None),
                 'valid_until': getattr(profile, 'valid_until', None),
@@ -1385,6 +1451,7 @@ class UserAccountManagementForm(forms.Form):
         role = cleaned_data.get('role')
         mobile = (cleaned_data.get('mobile') or '').strip()
         phone = (cleaned_data.get('phone') or '').strip()
+        representative_mobile = (cleaned_data.get('representative_mobile') or '').strip()
 
         # Check required fields
         first_name = (cleaned_data.get('first_name') or '').strip()
@@ -1423,6 +1490,9 @@ class UserAccountManagementForm(forms.Form):
         if not password and not self.instance:
             self.add_error('password', 'کلمه عبور الزامی است.')
 
+        if cleaned_data.get('delegate_sms_to_representative') and not representative_mobile:
+            self.add_error('representative_mobile', 'برای تفویض پیامک، ثبت موبایل نماینده لازم است.')
+
         # username باید برابر mobile باشد
         cleaned_data['username'] = mobile
 
@@ -1459,6 +1529,15 @@ class UserAccountManagementForm(forms.Form):
                 raise ValidationError('کلمه عبور باید ترکیبی از حداقل دو حالت از حروف کوچک، حروف بزرگ و اعداد باشد.')
         return password
 
+    def clean_avatar_image(self):
+        uploaded = self.cleaned_data.get('avatar_image')
+        if not uploaded:
+            return uploaded
+        ext = os.path.splitext(uploaded.name or '')[1].lower()
+        if ext not in IMAGE_EXTENSIONS:
+            raise ValidationError('فقط فایل تصویری برای عکس نمایه مجاز است.')
+        return _optimize_uploaded_image(uploaded, PROFILE_AVATAR_MAX_UPLOAD_SIZE, max_side=PROFILE_AVATAR_MAX_SIDE)
+
     def save(self):
         instance = self.instance or User()
         # username باید برابر mobile باشد
@@ -1480,6 +1559,9 @@ class UserAccountManagementForm(forms.Form):
         profile.last_name = (self.cleaned_data.get('last_name') or '').strip()
         profile.phone = (self.cleaned_data.get('phone') or '').strip()
         profile.mobile = (self.cleaned_data.get('mobile') or '').strip()
+        profile.representative_name = (self.cleaned_data.get('representative_name') or '').strip()
+        profile.representative_mobile = (self.cleaned_data.get('representative_mobile') or '').strip()
+        profile.delegate_sms_to_representative = self.cleaned_data.get('delegate_sms_to_representative', False)
         profile.province = (self.cleaned_data.get('province') or '').strip()
         profile.city = (self.cleaned_data.get('city') or '').strip()
         profile.address = (self.cleaned_data.get('address') or '').strip()
@@ -1495,5 +1577,8 @@ class UserAccountManagementForm(forms.Form):
         profile.can_upload_invoices = self.cleaned_data.get('can_upload_invoices', False)
         profile.can_edit_payment_details = self.cleaned_data.get('can_edit_payment_details', False)
         profile.accounting_code = (self.cleaned_data.get('accounting_code') or '').strip()
+        profile.avatar_preset = self.cleaned_data.get('avatar_preset') or 'neutral_1'
+        if self.cleaned_data.get('avatar_image'):
+            profile.avatar_image = self.cleaned_data['avatar_image']
         profile.save()
         return instance

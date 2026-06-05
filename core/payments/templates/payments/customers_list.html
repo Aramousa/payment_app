@@ -117,16 +117,16 @@
             </thead>
             <tbody id="customerTableBody">
                 {% for customer in customer_data %}
-                    <tr class="customer-row" data-search="{{ customer.user.username }} {{ customer.profile.first_name|default:'' }} {{ customer.profile.last_name|default:'' }} {{ customer.profile.organization|default:'' }} {{ customer.profile.city|default:'' }} {{ customer.profile.phone|default:'' }} {{ customer.profile.mobile|default:'' }} {{ customer.profile.accounting_code|default:'' }}">
+                    <tr class="customer-row" data-search="{{ customer.user.username }} {{ customer.profile.first_name|default:'' }} {{ customer.profile.last_name|default:'' }} {{ customer.profile.organization|default:'' }} {{ customer.profile.city|default:'' }} {{ customer.profile.phone|default:'' }} {{ customer.profile.mobile|default:'' }} {{ customer.profile.representative_name|default:'' }} {{ customer.profile.representative_mobile|default:'' }} {{ customer.profile.accounting_code|default:'' }}">
                         <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ customer.user.id }}</span></td>
                         <td>
                             {% if customer.profile.accounting_code %}
                             <span class="tbl-badge tbl-badge-green">{{ customer.profile.accounting_code }}</span>
                             {% else %}<span style="color:#94a3b8;font-size:12px;">—</span>{% endif %}
                         </td>
-                        <td>{{ customer.user.username }}</td>
-                        <td>{{ customer.profile.first_name|default:'-' }} {{ customer.profile.last_name|default:'' }}</td>
-                        <td>{% with sa=customer.user.sales_assignment %}{% if sa and sa.sales_user %}{{ sa.sales_user.get_full_name|default:sa.sales_user.username }}{% else %}-{% endif %}{% endwith %}</td>
+                        <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' customer.user.id %}">{{ customer.user.username }}</button></td>
+                        <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' customer.user.id %}">{{ customer.profile.first_name|default:'-' }} {{ customer.profile.last_name|default:'' }}</button></td>
+                        <td>{% with sa=customer.user.sales_assignment %}{% if sa and sa.sales_user %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' sa.sales_user.id %}">{{ sa.sales_user.get_full_name|default:sa.sales_user.username }}</button>{% else %}-{% endif %}{% endwith %}</td>
                         <td>{{ customer.profile.organization|default:'-' }}</td>
                         <td>{{ customer.profile.city|default:'-' }}</td>
                         <td>{{ customer.profile.phone|default:'-' }}</td>

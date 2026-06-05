@@ -65,6 +65,7 @@ from .views import (
     staff_update_status,
     staff_edit_payment_details,
     success,
+    user_business_card,
     user_edit,
     users_manage,
 )
@@ -123,6 +124,7 @@ urlpatterns = [
     path('proformas/<int:proforma_id>/delete/', proforma_delete, name='proforma_delete'),
     path('login-ads/<int:ad_id>/image/', login_ad_image, name='login_ad_image'),
     path('users/', users_manage, name='users_manage'),
+    path('users/<int:user_id>/card/', user_business_card, name='user_business_card'),
     path('users/<int:user_id>/edit/', user_edit, name='user_edit'),
     path('counterparties/', counterparties_manage, name='counterparties_manage'),
     path('counterparties/manage/', counterparty_manage_list, name='counterparty_manage_list'),

@@ -177,7 +177,7 @@
                         {# جزئیات کامل برای کارکنان #}
                         <div class="tl-actors">
                             {% if log.actor_name and log.actor_name != 'سیستم' %}
-                            <span class="tl-actor-badge">👤 {{ log.actor_name }}</span>
+                            <span class="tl-actor-badge">👤 {% if log.actor_id %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' log.actor_id %}">{{ log.actor_name }}</button>{% else %}{{ log.actor_name }}{% endif %}</span>
                             {% if log.actor_role %}<span class="tl-actor-badge">{{ log.actor_role }}</span>{% endif %}
                             {% endif %}
                             {% if log.from_status and log.to_status %}

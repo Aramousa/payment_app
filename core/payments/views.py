@@ -903,7 +903,9 @@ def _customer_list_rows(request):
             Q(city__icontains=filters['q']) |
             Q(province__icontains=filters['q']) |
             Q(phone__icontains=filters['q']) |
-            Q(mobile__icontains=filters['q'])
+            Q(mobile__icontains=filters['q']) |
+            Q(representative_name__icontains=filters['q']) |
+            Q(representative_mobile__icontains=filters['q'])
         )
     if filters['status'] == 'active':
         customers = customers.filter(suspended=False, user__is_active=True)
@@ -2223,6 +2225,8 @@ def _managed_users(query='', role='', status=''):
             Q(email__icontains=query) |
             Q(profile__phone__icontains=query) |
             Q(profile__mobile__icontains=query) |
+            Q(profile__representative_name__icontains=query) |
+            Q(profile__representative_mobile__icontains=query) |
             Q(profile__organization__icontains=query) |
             Q(profile__city__icontains=query) |
             Q(profile__province__icontains=query)
@@ -2688,6 +2692,46 @@ def _can_review_profile_change(user):
     return _user_role(user) in STAFF_ROLES
 
 
+def _user_card_payload(user):
+    profile = getattr(user, 'profile', None)
+    organization = getattr(profile, 'organization', '') or ''
+    counterparty = getattr(user, 'counterparty_account', None)
+    if counterparty and not organization:
+        organization = counterparty.name
+    location = ' / '.join(
+        part for part in [
+            (getattr(profile, 'city', '') or '').strip(),
+            (getattr(profile, 'province', '') or '').strip(),
+        ]
+        if part
+    )
+    role_label = getattr(profile, 'get_role_display', lambda: 'کاربر')()
+    if counterparty:
+        role_label = f'طرف حساب: {counterparty.name}'
+    return {
+        'display_name': user.get_full_name().strip() or user.username,
+        'username': user.username,
+        'role_label': role_label,
+        'organization': organization or '-',
+        'mobile': getattr(profile, 'mobile', '') or '-',
+        'phone': getattr(profile, 'phone', '') or '-',
+        'email': user.email or '-',
+        'location': location or '-',
+        'representative_name': getattr(profile, 'representative_name', '') or '-',
+        'representative_mobile': getattr(profile, 'representative_mobile', '') or '-',
+        'delegate_sms_to_representative': bool(getattr(profile, 'delegate_sms_to_representative', False)),
+        'avatar_url': profile.avatar_url if profile else '',
+        'avatar_icon': profile.avatar_icon if profile else '👤',
+        'avatar_class': profile.avatar_class if profile else 'avatar-neutral_1',
+    }
+
+
+@login_required
+def user_business_card(request, user_id):
+    target_user = get_object_or_404(User.objects.select_related('profile'), id=user_id, is_active=True)
+    return JsonResponse(_user_card_payload(target_user))
+
+
 @login_required
 def profile_edit(request):
     profile = get_object_or_404(UserProfile, user=request.user)
@@ -2699,8 +2743,9 @@ def profile_edit(request):
     )
 
     if request.method == 'POST':
-        form = CustomerProfileUpdateForm(request.POST, instance=profile, user=request.user)
+        form = CustomerProfileUpdateForm(request.POST, request.FILES, instance=profile, user=request.user)
         if form.is_valid():
+            avatar_changed = form.save_avatar_fields()
             changes = form.changed_profile_fields()
             if changes:
                 if pending_change:
@@ -2724,6 +2769,8 @@ def profile_edit(request):
                     f'درخواست تغییر مشخصات کاربر ثبت شد و در انتظار تایید است. {change_text}',
                 )
                 messages.success(request, 'درخواست تغییر مشخصات ثبت شد و تا زمان تایید، به صورت تایید نشده نمایش داده می‌شود.')
+            elif avatar_changed:
+                messages.success(request, 'نمایه کاربری با موفقیت به‌روزرسانی شد.')
             else:
                 messages.info(request, 'تغییری برای ثبت وجود نداشت.')
             return redirect('profile_edit')
@@ -3233,6 +3280,7 @@ def payment_timeline(request, payment_id):
                 'note':        log.note,
                 'jalali_time': _format_jalali_datetime(log.created_at),
                 'action':      log.action,
+                'actor_id':    log.actor_id,
                 'actor_name':  _display_name(log.actor),
                 'actor_role':  _role_title(log.actor),
                 'from_status': dict(PaymentRecord.STATUS_CHOICES).get(log.from_status, log.from_status or ''),
@@ -3484,7 +3532,7 @@ def users_manage(request):
         return HttpResponseForbidden('شما دسترسی ایجاد یا ویرایش کاربران را ندارید.')
 
     if request.method == 'POST':
-        form = UserAccountManagementForm(request.POST, password_suggestion=password_suggestion)
+        form = UserAccountManagementForm(request.POST, request.FILES, password_suggestion=password_suggestion)
         if form.is_valid():
             created_user = form.save()
             _log_system_activity(
@@ -3547,6 +3595,7 @@ def user_edit(request, user_id):
     if request.method == 'POST':
         form = UserAccountManagementForm(
             request.POST,
+            request.FILES,
             instance=managed_user,
             password_suggestion=password_suggestion,
         )
@@ -5107,6 +5156,8 @@ def customers_list(request):
             Q(province__icontains=filters['q']) |
             Q(phone__icontains=filters['q']) |
             Q(mobile__icontains=filters['q']) |
+            Q(representative_name__icontains=filters['q']) |
+            Q(representative_mobile__icontains=filters['q']) |
             Q(accounting_code__icontains=filters['q'])
         )
     if filters['accounting_code']:

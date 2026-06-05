@@ -299,14 +299,14 @@
                     <tr class="summary-row {% if not invoice.is_seen_by_customer %}unseen-row{% endif %}" data-row="{{ invoice.id }}">
                         <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ invoice.id }}</span></td>
                         {% if is_staff_user %}
-                            <td>{{ invoice.customer.get_full_name|default:invoice.customer.username }}</td>
+                            <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' invoice.customer.id %}">{{ invoice.customer.get_full_name|default:invoice.customer.username }}</button></td>
                             <td>{{ invoice.customer.profile.organization|default:'-' }}</td>
                         {% endif %}
                         <td>{{ invoice.invoice_number }}</td>
                         <td>{{ invoice.invoice_date|jalali_date }}</td>
                         <td>{{ invoice.amount|thousand_sep }}</td>
                         <td>{{ invoice.reference_number }}</td>
-                        <td>{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username|default:'-' }}</td>
+                        <td>{% if invoice.uploaded_by %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' invoice.uploaded_by.id %}">{{ invoice.uploaded_by.get_full_name|default:invoice.uploaded_by.username }}</button>{% else %}-{% endif %}</td>
                         <td>
                             {% if invoice.is_seen_by_customer %}
                                 <span class="status-badge status-seen">دیده شده</span>

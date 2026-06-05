@@ -183,13 +183,13 @@ class UploadSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'accounting_code', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'organization', 'city', 'province', 'role', 'active_from', 'valid_until', 'force_password_change', 'suspended')
+    list_display = ('user', 'accounting_code', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'representative_name', 'representative_mobile', 'delegate_sms_to_representative', 'organization', 'city', 'province', 'role', 'avatar_preset', 'active_from', 'valid_until', 'force_password_change', 'suspended')
     list_filter = ('role', 'city', 'province', 'force_password_change', 'suspended')
-    search_fields = ('user__username', 'user__email', 'phone', 'mobile', 'second_mobile', 'organization', 'first_name', 'last_name')
+    search_fields = ('user__username', 'user__email', 'phone', 'mobile', 'second_mobile', 'representative_name', 'representative_mobile', 'organization', 'first_name', 'last_name')
     readonly_fields = ('user',)
     fieldsets = (
         ('اطلاعات کاربر', {
-            'fields': ('user', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'organization')
+            'fields': ('user', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'representative_name', 'representative_mobile', 'delegate_sms_to_representative', 'organization', 'avatar_image', 'avatar_preset')
         }),
         ('اطلاعات تماس', {
             'fields': ('city', 'province', 'address', 'second_address')

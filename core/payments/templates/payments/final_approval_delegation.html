@@ -90,9 +90,9 @@
                 <tbody>
                     {% for d in delegates %}
                     <tr>
-                        <td><strong>{{ d.delegated_user.get_full_name|default:d.delegated_user.username }}</strong></td>
+                        <td><strong><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' d.delegated_user.id %}">{{ d.delegated_user.get_full_name|default:d.delegated_user.username }}</button></strong></td>
                         <td>{{ d.delegated_user.profile.get_role_display }}</td>
-                        <td>{{ d.granted_by.get_full_name|default:d.granted_by.username|default:'—' }}</td>
+                        <td>{% if d.granted_by %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' d.granted_by.id %}">{{ d.granted_by.get_full_name|default:d.granted_by.username }}</button>{% else %}—{% endif %}</td>
                         <td>{{ d.updated_at|jalali_datetime }}</td>
                         <td>
                             {% if d.is_active %}

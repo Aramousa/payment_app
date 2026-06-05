@@ -81,7 +81,7 @@
                 <div class="order-row">
                     <div class="info">
                         <div class="customer-name">
-                            {{ order.customer.get_full_name|default:order.customer.username }}
+                            <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' order.customer.id %}">{{ order.customer.get_full_name|default:order.customer.username }}</button>
                             <span class="tiny">{{ order.customer.profile.organization|default:'' }}</span>
                         </div>
                         <div class="meta">
@@ -125,11 +125,11 @@
                     {% for row in customer_rows %}
                     <tr>
                         <td>
-                            {{ row.customer.get_full_name|default:row.customer.username }}
+                            <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' row.customer.id %}">{{ row.customer.get_full_name|default:row.customer.username }}</button>
                             <br><span class="tiny">{{ row.customer.username }}</span>
                         </td>
                         {% if is_manager %}
-                        <td>{% if row.sales_user %}{{ row.sales_user.get_full_name|default:row.sales_user.username }}{% else %}-{% endif %}</td>
+                        <td>{% if row.sales_user %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' row.sales_user.id %}">{{ row.sales_user.get_full_name|default:row.sales_user.username }}</button>{% else %}-{% endif %}</td>
                         {% endif %}
                         <td>{{ row.profile.organization|default:'-' }}</td>
                         <td>{{ row.profile.city|default:'-' }}</td>

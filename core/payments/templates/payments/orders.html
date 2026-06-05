@@ -170,7 +170,7 @@
                     <tr>
                         <td>{{ order.order_number }}<br><span class="tbl-id-badge">#{{ order.id }}</span></td>
                         {% if is_staff_user %}
-                            <td>{{ order.customer.get_full_name|default:order.customer.username }}<br><span class="tiny">{{ order.customer.profile.organization|default:'-' }}</span></td>
+                            <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' order.customer.id %}">{{ order.customer.get_full_name|default:order.customer.username }}</button><br><span class="tiny">{{ order.customer.profile.organization|default:'-' }}</span></td>
                         {% endif %}
                         <td>{{ order.title|default:'-' }}</td>
                         <td>
@@ -178,7 +178,7 @@
                                 {{ item.product_name }} - {{ item.quantity }} {{ item.unit }}{% if not forloop.last %}<br>{% endif %}
                             {% empty %}-{% endfor %}
                         </td>
-                        <td>{% if order.sales_expert %}{{ order.sales_expert.get_full_name|default:order.sales_expert.username }}{% else %}-{% endif %}</td>
+                        <td>{% if order.sales_expert %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' order.sales_expert.id %}">{{ order.sales_expert.get_full_name|default:order.sales_expert.username }}</button>{% else %}-{% endif %}</td>
                         <td><span class="status {{ order.status }}">{{ order.get_status_display }}</span></td>
                         <td>{{ order.created_at|jalali_datetime }}</td>
                         <td><a class="button-link" href="{% url 'order_detail' order.id %}?next={{ request.get_full_path|urlencode }}">جزئیات</a></td>

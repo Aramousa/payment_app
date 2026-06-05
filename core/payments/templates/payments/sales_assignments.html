@@ -69,7 +69,7 @@
             <tbody>
                 {% for s in expert_stats %}
                 <tr>
-                    <td style="text-align:right;">{{ s.user.get_full_name|default:s.user.username }}</td>
+                    <td style="text-align:right;"><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' s.user.id %}">{{ s.user.get_full_name|default:s.user.username }}</button></td>
                     <td>
                         <span class="tbl-badge tbl-badge-blue">
                             {{ s.customers }}
@@ -132,10 +132,10 @@
             <tbody>
                 {% for row in records %}
                     <tr>
-                        <td>{{ row.customer.get_full_name|default:row.customer.username }}<br><span class="tiny">{{ row.customer.username }}</span></td>
+                        <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' row.customer.id %}">{{ row.customer.get_full_name|default:row.customer.username }}</button><br><span class="tiny">{{ row.customer.username }}</span></td>
                         <td>{{ row.profile.organization|default:'-' }}</td>
                         <td>{{ row.profile.city|default:'-' }} / {{ row.profile.province|default:'-' }}</td>
-                        <td>{% if row.sales_user %}{{ row.sales_user.get_full_name|default:row.sales_user.username }}{% else %}بدون کارشناس{% endif %}</td>
+                        <td>{% if row.sales_user %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' row.sales_user.id %}">{{ row.sales_user.get_full_name|default:row.sales_user.username }}</button>{% else %}بدون کارشناس{% endif %}</td>
                         <td>{{ row.open_orders }}</td>
                         <td>{{ row.updated_at|jalali_datetime|default:'-' }}</td>
                         <td>{{ row.note|default:'-' }}</td>
