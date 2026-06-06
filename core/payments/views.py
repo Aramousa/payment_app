@@ -32,9 +32,9 @@ from django_ratelimit.decorators import ratelimit
 from axes.helpers import get_client_ip_address
 from zoneinfo import ZoneInfo
 
-from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UploadSettings, UserNotification, UserProfile
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationThread, SystemActivityLog, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -176,6 +176,63 @@ def _can_manage_sales_assignments(user):
     if not user or not user.is_authenticated:
         return False
     return user.is_superuser or _user_role(user) == 'sales_manager'
+
+
+def _can_access_reconciliation(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    role = _user_role(user)
+    if role == 'customer':
+        return True
+    try:
+        if user.profile.can_access_reconciliation:
+            return True
+    except UserProfile.DoesNotExist:
+        pass
+    return ReconciliationThread.objects.filter(staff_participants=user).exists()
+
+
+def _reconciliation_threads_for_user(user):
+    qs = (
+        ReconciliationThread.objects
+        .select_related('customer', 'customer__profile', 'created_by')
+        .prefetch_related('staff_participants', 'messages')
+        .order_by('-updated_at', '-id')
+    )
+    if user.is_superuser:
+        return qs
+    if _user_role(user) == 'customer':
+        return qs.filter(customer=user)
+    return qs.filter(staff_participants=user).distinct()
+
+
+def _can_access_reconciliation_thread(user, thread):
+    if user.is_superuser:
+        return True
+    if _user_role(user) == 'customer':
+        return thread.customer_id == user.id
+    return thread.staff_participants.filter(id=user.id).exists()
+
+
+def _reconciliation_document_url(document_type, document_id):
+    if not document_type or not document_id:
+        return ''
+    routes = {
+        ReconciliationThread.DOC_PAYMENT: ('payment_timeline', [document_id]),
+        ReconciliationThread.DOC_ORDER: ('order_detail', [document_id]),
+        ReconciliationThread.DOC_PROFORMA: ('proforma_detail', [document_id]),
+        ReconciliationThread.DOC_INVOICE: ('invoice_detail', [document_id]),
+        ReconciliationThread.DOC_DAILY_PAYMENT: ('daily_payment_plan_detail', [document_id]),
+    }
+    route = routes.get(document_type)
+    if not route:
+        return ''
+    try:
+        return reverse(route[0], args=route[1])
+    except Exception:
+        return ''
 
 
 def _can_view_price_list_history(user):
@@ -3444,6 +3501,83 @@ def _payment_detail_changes_note(before, after, form):
             label = form.fields[field_name].label or field_name
             lines.append(f'{label}: «{old_text or "-"}» به «{new_text or "-"}»')
     return '\n'.join(lines)
+
+
+@login_required
+def reconciliation_center(request):
+    if not _can_access_reconciliation(request.user):
+        return HttpResponseForbidden('شما دسترسی مغایرت‌گیری ندارید.')
+
+    threads_qs = _reconciliation_threads_for_user(request.user)
+    active_thread = None
+    selected_id = request.GET.get('thread')
+    if selected_id:
+        active_thread = get_object_or_404(threads_qs, id=selected_id)
+    else:
+        active_thread = threads_qs.first()
+
+    thread_form = ReconciliationThreadForm(user=request.user)
+    message_form = ReconciliationMessageForm()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'create_thread':
+            thread_form = ReconciliationThreadForm(request.POST, user=request.user)
+            if thread_form.is_valid():
+                thread = thread_form.save(commit=False)
+                if _user_role(request.user) == 'customer':
+                    thread.customer = request.user
+                thread.created_by = request.user
+                thread.save()
+                thread_form.save_m2m()
+                messages.success(request, 'گفتگوی مغایرت‌گیری ایجاد شد.')
+                return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
+        elif action == 'send_message':
+            thread = get_object_or_404(ReconciliationThread, id=request.POST.get('thread_id'))
+            if not _can_access_reconciliation_thread(request.user, thread):
+                return HttpResponseForbidden('شما عضو این گفتگو نیستید.')
+            if thread.status == ReconciliationThread.STATUS_CLOSED:
+                messages.error(request, 'این گفتگو بسته شده است.')
+                return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
+            message_form = ReconciliationMessageForm(request.POST)
+            if message_form.is_valid():
+                message = message_form.save(commit=False)
+                message.thread = thread
+                message.sender = request.user
+                message.save()
+                thread.updated_at = timezone.now()
+                thread.save(update_fields=['updated_at'])
+                return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
+            active_thread = thread
+        elif action in {'close_thread', 'open_thread'}:
+            thread = get_object_or_404(threads_qs, id=request.POST.get('thread_id'))
+            if _user_role(request.user) == 'customer' and not request.user.is_superuser:
+                return HttpResponseForbidden('بستن یا بازکردن گفتگو فقط برای کارشناسان مجاز است.')
+            thread.status = ReconciliationThread.STATUS_CLOSED if action == 'close_thread' else ReconciliationThread.STATUS_OPEN
+            thread.save(update_fields=['status', 'updated_at'])
+            return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
+
+    thread_rows = list(threads_qs[:80])
+    for thread in thread_rows:
+        thread.document_url = _reconciliation_document_url(thread.document_type, thread.document_id)
+        thread.last_message = thread.messages.last()
+
+    active_messages = []
+    if active_thread:
+        active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id)
+        active_messages = list(active_thread.messages.select_related('sender', 'sender__profile'))
+        for message in active_messages:
+            message.document_url = _reconciliation_document_url(message.document_type, message.document_id)
+
+    return render(request, 'payments/reconciliation_center.html', {
+        'threads': thread_rows,
+        'active_thread': active_thread,
+        'active_messages': active_messages,
+        'thread_form': thread_form,
+        'message_form': message_form,
+        'is_customer_user': _user_role(request.user) == 'customer',
+        'can_manage_thread_state': request.user.is_superuser or (_user_role(request.user) != 'customer' and _can_access_reconciliation(request.user)),
+    })
 
 
 @login_required

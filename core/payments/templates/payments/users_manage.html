@@ -148,7 +148,7 @@
             <div class="form-grid">
                 {% for field in form %}
                     {% if field.field.widget.input_type == 'checkbox' %}
-                        <div class="field-box checkbox-field {% if field.name == 'can_view_invoices' or field.name == 'can_upload_invoices' or field.name == 'can_edit_payment_details' or field.name == 'is_active' or field.name == 'suspended' or field.name == 'force_password_change' %}permission-field{% endif %}">
+                        <div class="field-box checkbox-field {% if field.name == 'can_view_invoices' or field.name == 'can_upload_invoices' or field.name == 'can_edit_payment_details' or field.name == 'can_access_reconciliation' or field.name == 'is_active' or field.name == 'suspended' or field.name == 'force_password_change' %}permission-field{% endif %}">
                             {{ field }}
                             <label for="{{ field.id_for_label }}">{{ field.label|safe }}</label>
                             {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}

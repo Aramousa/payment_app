@@ -1,0 +1,173 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>مغایرت‌گیری</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; background: #eef3f8; color: #172033; margin: 0; }
+        .recon-page { max-width: 1380px; margin: 0 auto; padding: 18px; }
+        .recon-shell { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 14px; min-height: calc(100vh - 190px); }
+        .recon-panel { background: #fff; border: 1px solid #dce5f0; border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,.08); overflow: hidden; }
+        .recon-head { align-items: center; border-bottom: 1px solid #edf1f6; display: flex; justify-content: space-between; min-height: 56px; padding: 0 16px; }
+        .recon-head h2, .recon-head h3 { border: 0; font-size: 16px; margin: 0; padding: 0; text-align: right; }
+        .thread-list { display: grid; max-height: calc(100vh - 260px); overflow-y: auto; }
+        .thread-item { border-bottom: 1px solid #edf1f6; color: inherit; display: grid; gap: 5px; padding: 12px 14px; text-decoration: none; }
+        .thread-item:hover, .thread-item.active { background: #eef5ff; }
+        .thread-title { font-weight: 900; }
+        .thread-meta { color: #64748b; font-size: 12px; }
+        .thread-doc { color: #116149; font-size: 12px; font-weight: 800; }
+        .chat-panel { display: grid; grid-template-rows: auto minmax(280px, 1fr) auto; }
+        .chat-title { display: grid; gap: 4px; }
+        .chat-title strong { font-size: 15px; }
+        .chat-subtitle { color: #64748b; font-size: 12px; }
+        .chat-actions { align-items: center; display: flex; gap: 8px; }
+        .status-chip { background: #e8f7ef; border: 1px solid #bce7ce; border-radius: 999px; color: #116149; font-size: 12px; font-weight: 900; padding: 4px 10px; }
+        .status-chip.closed { background: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
+        .chat-feed { background: linear-gradient(180deg, #f7fafc, #eef3f8); display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 18px; }
+        .msg { display: flex; }
+        .msg.mine { justify-content: flex-start; }
+        .msg.other { justify-content: flex-end; }
+        .msg-bubble { border-radius: 12px 12px 12px 4px; box-shadow: 0 4px 14px rgba(15,23,42,.08); max-width: min(620px, 82%); padding: 10px 12px; }
+        .msg.mine .msg-bubble { background: #dcfce7; border: 1px solid #bbf7d0; }
+        .msg.other .msg-bubble { background: #fff; border: 1px solid #e5edf6; }
+        .msg-author { color: #1e3a5f; font-size: 12px; font-weight: 900; margin-bottom: 5px; }
+        .msg-body { font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
+        .msg-time { color: #64748b; font-size: 11px; margin-top: 6px; text-align: left; }
+        .doc-link { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; margin-top: 8px; padding: 5px 8px; text-decoration: none; }
+        .chat-form { background: #fff; border-top: 1px solid #edf1f6; display: grid; gap: 8px; padding: 12px; }
+        .chat-form textarea { min-height: 74px; resize: vertical; }
+        .inline-fields { display: grid; gap: 8px; grid-template-columns: 1fr 120px; }
+        .recon-form { display: grid; gap: 10px; padding: 14px; }
+        .recon-form p { margin: 0; }
+        .recon-form label, .chat-form label { color: #334155; display: block; font-size: 12px; font-weight: 900; margin-bottom: 4px; }
+        .recon-form input, .recon-form select, .chat-form input, .chat-form select, .chat-form textarea { width: 100%; }
+        .primary-btn, .secondary-btn { border: 0; border-radius: 8px; cursor: pointer; font-family: Vazir, sans-serif; font-weight: 900; min-height: 38px; padding: 8px 14px; }
+        .primary-btn { background: #1e3a5f; color: #fff; }
+        .secondary-btn { background: #e8eef6; color: #26364d; }
+        .empty-chat { align-items: center; color: #64748b; display: flex; justify-content: center; min-height: 260px; text-align: center; }
+        .form-errors { color: #b42318; font-size: 12px; font-weight: 800; }
+        @media (max-width: 1100px) { .recon-shell { grid-template-columns: 1fr; } .thread-list { max-height: 260px; } }
+    </style>
+</head>
+<body>
+{% include 'payments/partials/app_navigation.html' %}
+<main class="recon-page">
+    <div class="recon-shell">
+        <aside class="recon-panel">
+            <div class="recon-head"><h3>گفتگوها</h3></div>
+            <div class="thread-list">
+                {% for thread in threads %}
+                    <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}" href="{% url 'reconciliation_center' %}?thread={{ thread.id }}">
+                        <span class="thread-title">{{ thread.title }}</span>
+                        <span class="thread-meta">{{ thread.customer.get_full_name|default:thread.customer.username }}</span>
+                        {% if thread.document_label %}
+                            <span class="thread-doc">{{ thread.document_label }}</span>
+                        {% endif %}
+                        {% if thread.last_message %}
+                            <span class="thread-meta">{{ thread.last_message.body|truncatechars:58 }}</span>
+                        {% endif %}
+                    </a>
+                {% empty %}
+                    <div class="empty-chat">هنوز گفتگویی ثبت نشده است.</div>
+                {% endfor %}
+            </div>
+        </aside>
+
+        <section class="recon-panel chat-panel">
+            <div class="recon-head">
+                {% if active_thread %}
+                    <div class="chat-title">
+                        <strong>{{ active_thread.title }}</strong>
+                        <span class="chat-subtitle">
+                            مشتری: {{ active_thread.customer.get_full_name|default:active_thread.customer.username }}
+                            {% if active_thread.document_label %} | مرجع: {{ active_thread.document_label }}{% endif %}
+                        </span>
+                    </div>
+                    <div class="chat-actions">
+                        {% if active_thread.document_url %}
+                            <a class="secondary-btn" href="{{ active_thread.document_url }}">مشاهده سند</a>
+                        {% endif %}
+                        <span class="status-chip{% if active_thread.status == 'closed' %} closed{% endif %}">{{ active_thread.get_status_display }}</span>
+                    </div>
+                {% else %}
+                    <h2>مغایرت‌گیری</h2>
+                {% endif %}
+            </div>
+
+            <div class="chat-feed">
+                {% if active_thread %}
+                    {% for message in active_messages %}
+                        <article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}">
+                            <div class="msg-bubble">
+                                <div class="msg-author">{{ message.sender.get_full_name|default:message.sender.username }}</div>
+                                <div class="msg-body">{{ message.body }}</div>
+                                {% if message.document_label %}
+                                    {% if message.document_url %}
+                                        <a class="doc-link" href="{{ message.document_url }}">{{ message.document_label }}</a>
+                                    {% else %}
+                                        <span class="doc-link">{{ message.document_label }}</span>
+                                    {% endif %}
+                                {% endif %}
+                                <div class="msg-time">{{ message.created_at|date:"Y/m/d H:i" }}</div>
+                            </div>
+                        </article>
+                    {% empty %}
+                        <div class="empty-chat">اولین پیام این گفتگو را ارسال کنید.</div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-chat">یک گفتگو را انتخاب کنید یا پرونده جدید بسازید.</div>
+                {% endif %}
+            </div>
+
+            {% if active_thread %}
+                <form class="chat-form" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="send_message">
+                    <input type="hidden" name="thread_id" value="{{ active_thread.id }}">
+                    {{ message_form.body.label_tag }} {{ message_form.body }}
+                    <div class="inline-fields">
+                        <p>{{ message_form.document_type.label_tag }} {{ message_form.document_type }}</p>
+                        <p>{{ message_form.document_id.label_tag }} {{ message_form.document_id }}</p>
+                    </div>
+                    {% if message_form.errors %}<div class="form-errors">{{ message_form.errors }}</div>{% endif %}
+                    <button class="primary-btn" type="submit">ارسال پیام</button>
+                </form>
+            {% endif %}
+        </section>
+
+        <aside class="recon-panel">
+            <div class="recon-head"><h3>گفتگوی جدید</h3></div>
+            <form class="recon-form" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_thread">
+                {{ thread_form.as_p }}
+                {% if thread_form.errors %}<div class="form-errors">{{ thread_form.errors }}</div>{% endif %}
+                <button class="primary-btn" type="submit">ایجاد گفتگو</button>
+            </form>
+            {% if active_thread and can_manage_thread_state %}
+                <form class="recon-form" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="thread_id" value="{{ active_thread.id }}">
+                    {% if active_thread.status == 'open' %}
+                        <input type="hidden" name="action" value="close_thread">
+                        <button class="secondary-btn" type="submit">بستن گفتگو</button>
+                    {% else %}
+                        <input type="hidden" name="action" value="open_thread">
+                        <button class="secondary-btn" type="submit">بازکردن گفتگو</button>
+                    {% endif %}
+                </form>
+            {% endif %}
+        </aside>
+    </div>
+</main>
+<script>
+    (function() {
+        var feed = document.querySelector('.chat-feed');
+        if (feed) feed.scrollTop = feed.scrollHeight;
+    })();
+</script>
+</body>
+</html>

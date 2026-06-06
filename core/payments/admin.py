@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, SystemActivityLog, SystemSettings, UploadSettings, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile
 
 
 def format_jalali_datetime(value):
@@ -606,3 +606,26 @@ class ProductCatalogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+
+class ReconciliationMessageInline(admin.TabularInline):
+    model = ReconciliationMessage
+    extra = 0
+    readonly_fields = ('sender', 'body', 'document_type', 'document_id', 'created_at')
+    can_delete = False
+
+
+@admin.register(ReconciliationThread)
+class ReconciliationThreadAdmin(admin.ModelAdmin):
+    list_display = ('title', 'customer', 'status', 'document_type', 'document_id', 'updated_at')
+    list_filter = ('status', 'document_type', 'created_at', 'updated_at')
+    search_fields = ('title', 'customer__username', 'customer__first_name', 'customer__last_name')
+    filter_horizontal = ('staff_participants',)
+    inlines = [ReconciliationMessageInline]
+
+
+@admin.register(ReconciliationMessage)
+class ReconciliationMessageAdmin(admin.ModelAdmin):
+    list_display = ('thread', 'sender', 'created_at')
+    list_filter = ('created_at', 'document_type')
+    search_fields = ('body', 'thread__title', 'sender__username')

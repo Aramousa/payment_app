@@ -584,6 +584,7 @@ class UserProfile(models.Model):
     can_view_invoices = models.BooleanField('دسترسی مشاهده فاکتورها', default=False)
     can_upload_invoices = models.BooleanField('دسترسی بارگذاری فاکتورها', default=False)
     can_edit_payment_details = models.BooleanField('دسترسی تکمیل اطلاعات فیش‌ها', default=False)
+    can_access_reconciliation = models.BooleanField('دسترسی مغایرت‌گیری', default=False)
     accounting_code = models.CharField('کد تفضیلی', max_length=50, blank=True)
     sms_mfa_enabled = models.BooleanField('ورود دو مرحله‌ای با پیامک', default=False)
     avatar_image = models.ImageField('عکس نمایه', upload_to=profile_avatar_upload_to, blank=True, null=True)
@@ -622,6 +623,77 @@ class UserProfile(models.Model):
     @property
     def avatar_class(self):
         return f"avatar-{self.avatar_preset or 'neutral_1'}"
+
+
+class ReconciliationThread(models.Model):
+    STATUS_OPEN = 'open'
+    STATUS_CLOSED = 'closed'
+    STATUS_CHOICES = (
+        (STATUS_OPEN, 'باز'),
+        (STATUS_CLOSED, 'بسته'),
+    )
+
+    DOC_PAYMENT = 'payment'
+    DOC_ORDER = 'order'
+    DOC_PROFORMA = 'proforma'
+    DOC_INVOICE = 'invoice'
+    DOC_DAILY_PAYMENT = 'daily_payment'
+    DOC_OTHER = 'other'
+    DOCUMENT_CHOICES = (
+        (DOC_PAYMENT, 'فیش واریزی'),
+        (DOC_ORDER, 'سفارش'),
+        (DOC_PROFORMA, 'پیشنهاد فروش / پیش‌فاکتور'),
+        (DOC_INVOICE, 'فاکتور فروش'),
+        (DOC_DAILY_PAYMENT, 'برنامه واریز'),
+        (DOC_OTHER, 'سایر'),
+    )
+
+    title = models.CharField('عنوان گفتگو', max_length=160)
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reconciliation_threads', verbose_name='مشتری')
+    staff_participants = models.ManyToManyField(User, related_name='assigned_reconciliation_threads', verbose_name='کارشناسان منتخب')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_reconciliation_threads', verbose_name='ایجادکننده')
+    status = models.CharField('وضعیت', max_length=12, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    document_type = models.CharField('نوع سند مرجع', max_length=24, choices=DOCUMENT_CHOICES, default=DOC_OTHER, blank=True)
+    document_id = models.PositiveIntegerField('شناسه سند مرجع', null=True, blank=True)
+    created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        verbose_name = 'گفتگوی مغایرت‌گیری'
+        verbose_name_plural = 'گفتگوهای مغایرت‌گیری'
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def document_label(self):
+        if not self.document_type or self.document_type == self.DOC_OTHER:
+            return ''
+        return f'{self.get_document_type_display()} #{self.document_id or "-"}'
+
+
+class ReconciliationMessage(models.Model):
+    thread = models.ForeignKey(ReconciliationThread, on_delete=models.CASCADE, related_name='messages', verbose_name='گفتگو')
+    sender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reconciliation_messages', verbose_name='فرستنده')
+    body = models.TextField('متن پیام')
+    document_type = models.CharField('نوع سند ارجاع‌شده', max_length=24, choices=ReconciliationThread.DOCUMENT_CHOICES, default='', blank=True)
+    document_id = models.PositiveIntegerField('شناسه سند ارجاع‌شده', null=True, blank=True)
+    created_at = models.DateTimeField('زمان ارسال', auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        verbose_name = 'پیام مغایرت‌گیری'
+        verbose_name_plural = 'پیام‌های مغایرت‌گیری'
+
+    def __str__(self):
+        return f'{self.thread_id} - {self.sender}'
+
+    @property
+    def document_label(self):
+        if not self.document_type:
+            return ''
+        return f'{self.get_document_type_display()} #{self.document_id or "-"}'
 
 
 class ProfileChangeRequest(models.Model):

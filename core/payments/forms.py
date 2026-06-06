@@ -17,7 +17,7 @@ from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 from PIL import Image, ImageOps
 
-from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, UploadSettings, UserProfile
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, UploadSettings, UserProfile
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
 MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
@@ -1456,6 +1456,7 @@ class UserAccountManagementForm(forms.Form):
     can_view_invoices = forms.BooleanField(label='دسترسی مشاهده فاکتورها', required=False)
     can_upload_invoices = forms.BooleanField(label='دسترسی بارگذاری فاکتورها', required=False)
     can_edit_payment_details = forms.BooleanField(label='دسترسی تکمیل اطلاعات فیش‌ها', required=False)
+    can_access_reconciliation = forms.BooleanField(label='دسترسی مغایرت‌گیری', required=False)
     is_active = forms.BooleanField(label='فعال', required=False, initial=True)
     accounting_code = forms.CharField(label='کد تفضیلی (حسابداری)', max_length=50, required=False)
 
@@ -1494,6 +1495,7 @@ class UserAccountManagementForm(forms.Form):
                 'can_view_invoices': getattr(profile, 'can_view_invoices', False),
                 'can_upload_invoices': getattr(profile, 'can_upload_invoices', False),
                 'can_edit_payment_details': getattr(profile, 'can_edit_payment_details', False),
+                'can_access_reconciliation': getattr(profile, 'can_access_reconciliation', False),
                 'accounting_code': getattr(profile, 'accounting_code', ''),
             })
 
@@ -1633,9 +1635,106 @@ class UserAccountManagementForm(forms.Form):
         profile.can_view_invoices = self.cleaned_data.get('can_view_invoices', False)
         profile.can_upload_invoices = self.cleaned_data.get('can_upload_invoices', False)
         profile.can_edit_payment_details = self.cleaned_data.get('can_edit_payment_details', False)
+        profile.can_access_reconciliation = self.cleaned_data.get('can_access_reconciliation', False)
         profile.accounting_code = (self.cleaned_data.get('accounting_code') or '').strip()
         profile.avatar_preset = self.cleaned_data.get('avatar_preset') or 'neutral_1'
         if self.cleaned_data.get('avatar_image'):
             profile.avatar_image = self.cleaned_data['avatar_image']
         profile.save()
         return instance
+
+
+def _reconciliation_staff_queryset(customer_visible_only=False):
+    qs = (
+        User.objects
+        .filter(is_active=True, profile__suspended=False)
+        .exclude(profile__role='customer')
+        .select_related('profile')
+        .order_by('first_name', 'last_name', 'username')
+    )
+    if customer_visible_only:
+        qs = qs.filter(profile__can_access_reconciliation=True)
+    return qs
+
+
+def _reconciliation_customer_queryset():
+    return (
+        User.objects
+        .filter(is_active=True, profile__role='customer', profile__suspended=False)
+        .select_related('profile')
+        .order_by('first_name', 'last_name', 'username')
+    )
+
+
+class ReconciliationThreadForm(forms.ModelForm):
+    customer = forms.ModelChoiceField(
+        label='مشتری',
+        queryset=User.objects.none(),
+        required=False,
+    )
+    staff_participants = forms.ModelMultipleChoiceField(
+        label='کارشناسان گفتگو',
+        queryset=User.objects.none(),
+        required=True,
+        widget=forms.SelectMultiple(attrs={'size': 6}),
+    )
+
+    class Meta:
+        model = ReconciliationThread
+        fields = ['title', 'customer', 'staff_participants', 'document_type', 'document_id']
+        labels = {
+            'title': 'عنوان مغایرت',
+            'document_type': 'نوع سند مرجع',
+            'document_id': 'شناسه سند',
+        }
+        widgets = {
+            'document_id': forms.NumberInput(attrs={'min': 1, 'placeholder': 'مثلا 125'}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        is_customer = bool(user and _role_for_user(user) == 'customer')
+        self.fields['staff_participants'].queryset = _reconciliation_staff_queryset(customer_visible_only=is_customer)
+        self.fields['customer'].queryset = _reconciliation_customer_queryset()
+        if is_customer:
+            self.fields.pop('customer', None)
+
+    def clean_staff_participants(self):
+        staff = self.cleaned_data.get('staff_participants')
+        if not staff:
+            raise ValidationError('حداقل یک کارشناس منتخب را انتخاب کنید.')
+        return staff
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.user and _role_for_user(self.user) != 'customer' and not cleaned_data.get('customer'):
+            self.add_error('customer', 'انتخاب مشتری الزامی است.')
+        document_type = cleaned_data.get('document_type')
+        document_id = cleaned_data.get('document_id')
+        if document_type and document_type != ReconciliationThread.DOC_OTHER and not document_id:
+            self.add_error('document_id', 'برای لینک کردن سند، شناسه سند را وارد کنید.')
+        return cleaned_data
+
+
+class ReconciliationMessageForm(forms.ModelForm):
+    class Meta:
+        model = ReconciliationMessage
+        fields = ['body', 'document_type', 'document_id']
+        labels = {
+            'body': 'پیام',
+            'document_type': 'ارجاع به سند',
+            'document_id': 'شناسه سند',
+        }
+        widgets = {
+            'body': forms.Textarea(attrs={'rows': 3, 'placeholder': 'پیام خود را بنویسید...'}),
+            'document_id': forms.NumberInput(attrs={'min': 1, 'placeholder': 'شناسه سند'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        document_type = cleaned_data.get('document_type')
+        document_id = cleaned_data.get('document_id')
+        if document_type and not document_id:
+            self.add_error('document_id', 'شناسه سند ارجاع‌شده را وارد کنید.')
+        return cleaned_data

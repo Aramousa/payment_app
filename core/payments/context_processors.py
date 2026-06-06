@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.conf import settings
 from zoneinfo import ZoneInfo
 
-from .models import LoginAdvertisement, PaymentRecord, InvoiceRecord, UserProfile
+from .models import LoginAdvertisement, PaymentRecord, InvoiceRecord, ReconciliationThread, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
@@ -40,6 +40,19 @@ def _can_view_invoices_nav(user):
         return bool(user.profile.can_view_invoices or user.profile.can_upload_invoices)
     except UserProfile.DoesNotExist:
         return False
+
+
+def _can_access_reconciliation_nav(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        if user.profile.role == 'customer' or bool(user.profile.can_access_reconciliation):
+            return True
+    except UserProfile.DoesNotExist:
+        pass
+    return ReconciliationThread.objects.filter(staff_participants=user).exists()
 
 
 _GROUP_META = {
@@ -151,6 +164,7 @@ def app_navigation(request):
             _nav_item('پیش فاکتور',      'proformas',              'proformas',               'main', '📝'),
             _nav_item('فاکتور فروش',     'invoices_dashboard',     'invoices',                'main', '🧾'),
             _nav_item('برنامه واریز',    'customer_daily_payments','customer_daily_payments', 'main', '📅'),
+            _nav_item('مغایرت‌گیری',      'reconciliation_center',  'reconciliation',          'main', '💬'),
         ])
     else:
         items.extend([
@@ -176,6 +190,8 @@ def app_navigation(request):
             items.append(_nav_item('تفویض تایید اسناد', 'final_approval_delegation', 'delegation', 'finance', '✍️'))
         if user.is_superuser:
             items.append(_nav_item('مدیریت طرف حساب‌ها', 'counterparty_manage_list', 'counterparties_full', 'finance', '🏢'))
+        if user.is_superuser or _can_access_reconciliation_nav(user):
+            items.append(_nav_item('مغایرت‌گیری', 'reconciliation_center', 'reconciliation', 'finance', '💬'))
 
         if user.is_superuser or role == 'sales_manager':
             items.append(_nav_item('تخصیص مشتریان فروش', 'sales_assignments', 'sales_assignments', 'system', '🔗'))
