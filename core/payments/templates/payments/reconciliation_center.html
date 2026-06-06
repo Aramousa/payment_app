@@ -44,6 +44,7 @@
         .recon-form p { margin: 0; }
         .recon-form label, .chat-form label { color: #334155; display: block; font-size: 12px; font-weight: 900; margin-bottom: 4px; }
         .recon-form input, .recon-form select, .chat-form input, .chat-form select, .chat-form textarea { width: 100%; }
+        .select-search { background: #f8fafc; border: 1px solid #d7e2ee; border-radius: 7px; font-family: Vazir, sans-serif; margin-bottom: 6px; min-height: 34px; padding: 7px 9px; width: 100%; }
         .primary-btn, .secondary-btn { border: 0; border-radius: 8px; cursor: pointer; font-family: Vazir, sans-serif; font-weight: 900; min-height: 38px; padding: 8px 14px; }
         .primary-btn { background: #1e3a5f; color: #fff; }
         .secondary-btn { background: #e8eef6; color: #26364d; }
@@ -167,6 +168,22 @@
     (function() {
         var feed = document.querySelector('.chat-feed');
         if (feed) feed.scrollTop = feed.scrollHeight;
+        document.querySelectorAll('#id_customer, #id_staff_participants').forEach(function(select) {
+            var search = document.createElement('input');
+            search.type = 'search';
+            search.className = 'select-search';
+            search.placeholder = select.id === 'id_customer' ? 'جستجوی مشتری...' : 'جستجوی کارشناس...';
+            var options = Array.prototype.map.call(select.options, function(option) {
+                return { option: option, text: (option.textContent || '').toLowerCase() };
+            });
+            select.parentNode.insertBefore(search, select);
+            search.addEventListener('input', function() {
+                var value = search.value.trim().toLowerCase();
+                options.forEach(function(item) {
+                    item.option.hidden = value && item.text.indexOf(value) === -1;
+                });
+            });
+        });
     })();
 </script>
 </body>

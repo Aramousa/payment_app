@@ -9,7 +9,7 @@
 
 <header class="app-top-header" role="banner">
     <div class="app-top-brand">
-        <img class="app-shell-logo" src="{% static 'logo/logo-top.png' %}" alt="VISIUN">
+        <img class="app-shell-logo" src="{% if app_nav_logo_url %}{{ app_nav_logo_url }}{% else %}{% static 'logo/logo-top.png' %}{% endif %}" alt="VISIUN">
     </div>
 
     <div class="app-top-context">
@@ -43,6 +43,16 @@
                 </div>
             </div>
         </div>
+
+        <a class="message-envelope"
+           href="{% url 'reconciliation_center' %}"
+           title="پیام‌های مغایرت‌گیری"
+           data-message-feed-url="{% url 'reconciliation_messages_feed' %}"
+           data-message-poll-ms="30000">
+            <span class="message-envelope-icon" aria-hidden="true">✉</span>
+            <span class="message-envelope-label">پیام‌ها</span>
+            <span class="message-envelope-badge{% if app_nav_reconciliation_unread|default:0 == 0 %} zero{% endif %}" data-message-count>{{ app_nav_reconciliation_unread|default:0 }}</span>
+        </a>
 
         <details class="app-user-menu">
             <summary>
@@ -330,6 +340,27 @@
             if (panel) panel.hidden = !panel.hidden;
         });
     });
+    var envelope = document.querySelector('[data-message-feed-url]');
+    async function refreshMessageEnvelope() {
+        if (!envelope) return;
+        try {
+            var response = await fetch(envelope.dataset.messageFeedUrl, { credentials: 'same-origin' });
+            if (!response.ok) return;
+            var data = await response.json();
+            var badge = envelope.querySelector('[data-message-count]');
+            var count = Number(data.unread_count || 0);
+            if (badge) {
+                badge.textContent = count;
+                badge.classList.toggle('zero', count === 0);
+            }
+        } catch (error) {
+            console.warn('Message counter could not be loaded', error);
+        }
+    }
+    if (envelope) {
+        refreshMessageEnvelope();
+        window.setInterval(refreshMessageEnvelope, Number(envelope.dataset.messagePollMs || 30000));
+    }
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             setOpen(false);

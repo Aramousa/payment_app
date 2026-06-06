@@ -68,6 +68,10 @@ def profile_avatar_upload_to(instance, filename):
     return _unique_upload_path(instance, filename, 'profile_avatars', 'userprofile')
 
 
+def system_logo_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'system_branding', 'systemlogo')
+
+
 class Counterparty(models.Model):
     STATUS_ACTIVE    = 'active'
     STATUS_INACTIVE  = 'inactive'
@@ -694,6 +698,20 @@ class ReconciliationMessage(models.Model):
         if not self.document_type:
             return ''
         return f'{self.get_document_type_display()} #{self.document_id or "-"}'
+
+
+class ReconciliationReadState(models.Model):
+    thread = models.ForeignKey(ReconciliationThread, on_delete=models.CASCADE, related_name='read_states', verbose_name='گفتگو')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reconciliation_read_states', verbose_name='کاربر')
+    last_read_at = models.DateTimeField('آخرین زمان خواندن', default=timezone.now)
+
+    class Meta:
+        unique_together = [('thread', 'user')]
+        verbose_name = 'وضعیت خواندن مغایرت‌گیری'
+        verbose_name_plural = 'وضعیت خواندن مغایرت‌گیری'
+
+    def __str__(self):
+        return f'{self.thread_id} - {self.user}'
 
 
 class ProfileChangeRequest(models.Model):
@@ -1374,6 +1392,13 @@ class SystemSettings(models.Model):
         default=30,
         help_text='پس از این مدت بی‌فعالیت، کاربر به‌صورت خودکار خارج می‌شود.',
     )
+    system_logo = models.ImageField(
+        'لوگوی سامانه',
+        upload_to=system_logo_upload_to,
+        blank=True,
+        null=True,
+        help_text='فرمت مجاز: PNG/JPG/WEBP، حداکثر 512KB، حداکثر 600×220 پیکسل.',
+    )
 
     # ─── تنظیمات پیامک ──────────────────────────────────────────────────────
     SMS_PROVIDER_KAVENEGAR = 'kavenegar'
@@ -1432,6 +1457,15 @@ class SystemSettings(models.Model):
 
     def __str__(self):
         return 'تنظیمات سیستم'
+
+    @property
+    def system_logo_url(self):
+        if self.system_logo:
+            try:
+                return self.system_logo.url
+            except ValueError:
+                return ''
+        return ''
 
 
 class SMSOTPCode(models.Model):

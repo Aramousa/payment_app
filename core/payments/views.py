@@ -32,9 +32,9 @@ from django_ratelimit.decorators import ratelimit
 from axes.helpers import get_client_ip_address
 from zoneinfo import ZoneInfo
 
-from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, UserAccountManagementForm
+from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationThread, SystemActivityLog, UploadSettings, UserNotification, UserProfile
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -233,6 +233,29 @@ def _reconciliation_document_url(document_type, document_id):
         return reverse(route[0], args=route[1])
     except Exception:
         return ''
+
+
+def _reconciliation_unread_count(user):
+    if not user or not user.is_authenticated or not _can_access_reconciliation(user):
+        return 0
+    count = 0
+    for thread in _reconciliation_threads_for_user(user).prefetch_related('read_states'):
+        state = next((item for item in thread.read_states.all() if item.user_id == user.id), None)
+        messages_qs = thread.messages.exclude(sender_id=user.id)
+        if state:
+            messages_qs = messages_qs.filter(created_at__gt=state.last_read_at)
+        count += messages_qs.count()
+    return count
+
+
+def _mark_reconciliation_thread_read(thread, user):
+    if not user or not user.is_authenticated:
+        return
+    ReconciliationReadState.objects.update_or_create(
+        thread=thread,
+        user=user,
+        defaults={'last_read_at': timezone.now()},
+    )
 
 
 def _can_view_price_list_history(user):
@@ -2155,6 +2178,28 @@ def notifications_feed(request):
 
 
 @login_required
+def reconciliation_messages_feed(request):
+    if not _can_access_reconciliation(request.user):
+        return JsonResponse({'unread_count': 0, 'items': []})
+    threads = _reconciliation_threads_for_user(request.user)[:5]
+    items = []
+    for thread in threads:
+        last_message = thread.messages.exclude(sender_id=request.user.id).order_by('-created_at').first()
+        if not last_message:
+            continue
+        items.append({
+            'thread_id': thread.id,
+            'title': thread.title,
+            'message': last_message.body[:120],
+            'url': f"{reverse('reconciliation_center')}?thread={thread.id}",
+        })
+    return JsonResponse({
+        'unread_count': _reconciliation_unread_count(request.user),
+        'items': items,
+    })
+
+
+@login_required
 @require_POST
 def notifications_mark_read(request):
     queryset = UserNotification.objects.filter(user=request.user, is_read=False)
@@ -3504,6 +3549,26 @@ def _payment_detail_changes_note(before, after, form):
 
 
 @login_required
+def system_logo_settings(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('فقط مدیر سیستم امکان تغییر لوگوی سامانه را دارد.')
+    settings_obj = SystemSettings.load()
+    if request.method == 'POST':
+        form = SystemLogoSettingsForm(request.POST, request.FILES, instance=settings_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'تنظیمات لوگوی سامانه ذخیره شد.')
+            return redirect('system_logo_settings')
+        messages.error(request, 'ذخیره لوگو انجام نشد. لطفا خطاها را بررسی کنید.')
+    else:
+        form = SystemLogoSettingsForm(instance=settings_obj)
+    return render(request, 'payments/system_logo_settings.html', {
+        'form': form,
+        'settings_obj': settings_obj,
+    })
+
+
+@login_required
 def reconciliation_center(request):
     if not _can_access_reconciliation(request.user):
         return HttpResponseForbidden('شما دسترسی مغایرت‌گیری ندارید.')
@@ -3564,6 +3629,7 @@ def reconciliation_center(request):
 
     active_messages = []
     if active_thread:
+        _mark_reconciliation_thread_read(active_thread, request.user)
         active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id)
         active_messages = list(active_thread.messages.select_related('sender', 'sender__profile'))
         for message in active_messages:

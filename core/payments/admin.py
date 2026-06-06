@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile
 
 
 def format_jalali_datetime(value):
@@ -629,3 +629,10 @@ class ReconciliationMessageAdmin(admin.ModelAdmin):
     list_display = ('thread', 'sender', 'created_at')
     list_filter = ('created_at', 'document_type')
     search_fields = ('body', 'thread__title', 'sender__username')
+
+
+@admin.register(ReconciliationReadState)
+class ReconciliationReadStateAdmin(admin.ModelAdmin):
+    list_display = ('thread', 'user', 'last_read_at')
+    list_filter = ('last_read_at',)
+    search_fields = ('thread__title', 'user__username')

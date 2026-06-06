@@ -239,6 +239,53 @@ h3 {
     display: none;  /* وقتی صفر است مخفی می‌شود */
 }
 
+.message-envelope {
+    align-items: center;
+    background: #eef5ff !important;
+    border: 1px solid #cfe0f6 !important;
+    border-radius: 8px !important;
+    color: #1e3a5f !important;
+    display: inline-flex;
+    font-family: Vazir, sans-serif !important;
+    font-size: 12px;
+    font-weight: 900;
+    gap: 6px;
+    min-height: 38px;
+    padding: 7px 11px;
+    position: relative;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.message-envelope:hover {
+    background: #e4f0ff !important;
+    border-color: #bcd4f1 !important;
+    color: #172033 !important;
+}
+
+.message-envelope-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.message-envelope-badge {
+    align-items: center;
+    background: #b42318;
+    border-radius: 999px;
+    color: #fff;
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 900;
+    height: 20px;
+    justify-content: center;
+    min-width: 20px;
+    padding: 0 5px;
+}
+
+.message-envelope-badge.zero {
+    display: none;
+}
+
 /* ─── محتوای هر notification ─────────────────────────────────── */
 .notification-item {
     display: flex !important;

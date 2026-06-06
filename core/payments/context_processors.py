@@ -2,9 +2,10 @@ from django.utils import timezone
 
 from django.urls import reverse
 from django.conf import settings
+from django.db.models import Q
 from zoneinfo import ZoneInfo
 
-from .models import LoginAdvertisement, PaymentRecord, InvoiceRecord, ReconciliationThread, UserProfile
+from .models import LoginAdvertisement, PaymentRecord, InvoiceRecord, ReconciliationThread, SystemSettings, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
@@ -53,6 +54,27 @@ def _can_access_reconciliation_nav(user):
     except UserProfile.DoesNotExist:
         pass
     return ReconciliationThread.objects.filter(staff_participants=user).exists()
+
+
+def _reconciliation_unread_count_nav(user):
+    if not _can_access_reconciliation_nav(user):
+        return 0
+    count = 0
+    threads = (
+        ReconciliationThread.objects
+        .filter(Q(customer=user) | Q(staff_participants=user))
+        .prefetch_related('read_states')
+        .distinct()
+    )
+    if user.is_superuser:
+        threads = ReconciliationThread.objects.prefetch_related('read_states').all()
+    for thread in threads:
+        state = next((item for item in thread.read_states.all() if item.user_id == user.id), None)
+        messages = thread.messages.exclude(sender_id=user.id)
+        if state:
+            messages = messages.filter(created_at__gt=state.last_read_at)
+        count += messages.count()
+    return count
 
 
 _GROUP_META = {
@@ -132,6 +154,10 @@ def app_navigation(request):
     role = _role_for_nav(user)
     is_staff_user = user.is_staff or user.is_superuser or role in STAFF_ROLES or role == 'admin'
     profile = _profile_for_nav(user)
+    try:
+        app_logo_url = SystemSettings.load().system_logo_url
+    except Exception:
+        app_logo_url = ''
 
     # طرف حساب — منوی اختصاصی
     cp = getattr(user, 'counterparty_account', None)
@@ -151,6 +177,8 @@ def app_navigation(request):
             'app_nav_avatar_url': profile.avatar_url if profile else '',
             'app_nav_avatar_icon': profile.avatar_icon if profile else '👤',
             'app_nav_avatar_class': profile.avatar_class if profile else 'avatar-neutral_1',
+            'app_nav_reconciliation_unread': _reconciliation_unread_count_nav(user),
+            'app_nav_logo_url': app_logo_url,
             **_business_card_context(user, profile, role_label, user_display, counterparty=cp),
         }
 
@@ -198,6 +226,7 @@ def app_navigation(request):
         if user.is_superuser:
             items.extend([
                 _nav_item('مدیریت کاربران', 'users_manage', 'users', 'system', '👤'),
+                _nav_item('تنظیم لوگو', 'system_logo_settings', 'system_logo_settings', 'system', '🖼'),
                 _nav_item('تست خوانش فیش', 'receipt_reader_test', 'receipt_reader', 'system', '🔍'),
             ])
         elif not user.is_superuser and is_staff_user:
@@ -234,6 +263,8 @@ def app_navigation(request):
         'app_nav_avatar_url': profile.avatar_url if profile else '',
         'app_nav_avatar_icon': profile.avatar_icon if profile else '👤',
         'app_nav_avatar_class': profile.avatar_class if profile else 'avatar-neutral_1',
+        'app_nav_reconciliation_unread': _reconciliation_unread_count_nav(user),
+        'app_nav_logo_url': app_logo_url,
         **_business_card_context(user, profile, role_label, user.get_full_name().strip() or user.username),
     }
 

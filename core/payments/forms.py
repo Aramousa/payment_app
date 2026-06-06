@@ -17,7 +17,7 @@ from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 from PIL import Image, ImageOps
 
-from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, UploadSettings, UserProfile
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, SystemSettings, UploadSettings, UserProfile
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
 MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
@@ -1738,3 +1738,58 @@ class ReconciliationMessageForm(forms.ModelForm):
         if document_type and not document_id:
             self.add_error('document_id', 'شناسه سند ارجاع‌شده را وارد کنید.')
         return cleaned_data
+
+
+class SystemLogoSettingsForm(forms.ModelForm):
+    ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+    MAX_SIZE_BYTES = 512 * 1024
+    MAX_WIDTH = 600
+    MAX_HEIGHT = 220
+    MIN_WIDTH = 120
+    MIN_HEIGHT = 32
+
+    clear_logo = forms.BooleanField(label='حذف لوگوی سفارشی و استفاده از لوگوی پیش‌فرض', required=False)
+
+    class Meta:
+        model = SystemSettings
+        fields = ['system_logo', 'clear_logo']
+        labels = {'system_logo': 'لوگوی شرکت'}
+        widgets = {
+            'system_logo': forms.ClearableFileInput(attrs={
+                'accept': 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp',
+            }),
+        }
+        help_texts = {
+            'system_logo': 'فرمت مجاز: PNG، JPG یا WEBP. حجم حداکثر 512KB. ابعاد پیشنهادی حداکثر 600×220 پیکسل.',
+        }
+
+    def clean_system_logo(self):
+        uploaded = self.cleaned_data.get('system_logo')
+        if not uploaded:
+            return uploaded
+        ext = os.path.splitext(uploaded.name or '')[1].lower()
+        if ext not in self.ALLOWED_EXTENSIONS:
+            raise ValidationError('فرمت لوگو باید PNG، JPG یا WEBP باشد.')
+        if uploaded.size and uploaded.size > self.MAX_SIZE_BYTES:
+            raise ValidationError('حجم لوگو باید حداکثر 512KB باشد.')
+        try:
+            uploaded.seek(0)
+            image = Image.open(uploaded)
+            image.verify()
+            width, height = image.size
+            uploaded.seek(0)
+        except Exception:
+            raise ValidationError('فایل لوگو معتبر نیست یا قابل خواندن نمی‌باشد.')
+        if width > self.MAX_WIDTH or height > self.MAX_HEIGHT:
+            raise ValidationError('ابعاد لوگو باید حداکثر 600×220 پیکسل باشد.')
+        if width < self.MIN_WIDTH or height < self.MIN_HEIGHT:
+            raise ValidationError('ابعاد لوگو بسیار کوچک است. حداقل اندازه مجاز 120×32 پیکسل است.')
+        return uploaded
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.cleaned_data.get('clear_logo'):
+            instance.system_logo = None
+        if commit:
+            instance.save()
+        return instance
