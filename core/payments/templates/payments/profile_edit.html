@@ -13,8 +13,142 @@
         .note { background: #eef6fd; color: #174463; border-radius: 8px; padding: 10px; margin-bottom: 14px; font-size: 13px; }
         .form-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
         .field-box.full-row { grid-column: 1 / -1; }
+        .field-box { position: relative; }
+        
+        /* Default label style */
         label { display: block; margin-bottom: 5px; }
-        input, textarea { width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        
+        /* Inline-checkbox labels (checkbox + text on one line) */
+        label.inline-checkbox {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Clearable file input (Django) - keep filename link, checkbox and label inline */
+        .clearable-file-input,
+        .clearable-file-input p {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: nowrap; /* prevent label from wrapping under the checkbox */
+            margin: 0;
+        }
+        .clearable-file-input p a,
+        .clearable-file-input a {
+            max-width: 260px;
+            display: inline-block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .clearable-file-input label,
+        .clearable-file-input p label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            cursor: pointer;
+        }
+        .clearable-file-input input[type="checkbox"] {
+            order: 0;
+            margin: 0 6px 0 0; /* small left margin in RTL context */
+        }
+        .clear-checkbox-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+        }
+        /* Ensure checkbox label (sibling) sits inline with the checkbox */
+        .clearable-file-input input[type="checkbox"] + label,
+        .clearable-file-input p input[type="checkbox"] + label {
+            display: inline-flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            margin-inline-start: 8px !important; /* logical spacing between checkbox and label */
+        }
+        .clearable-file-input p { line-height: 1; }
+
+        /* Regular text inputs and file inputs */
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="password"],
+        input[type="date"],
+        input[type="number"],
+        input[type="file"],
+        textarea {
+            width: 100%;
+            padding: 9px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        
+        /* Checkbox styling */
+        input[type="checkbox"] {
+            width: auto !important;
+            cursor: pointer;
+            margin: 0;
+            flex: 0 0 auto;
+        }
+
+        .field-box.checkbox-field {
+            align-items: center;
+            background: #f8fbff;
+            border: 1px solid #e2eaf4;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            min-height: 42px;
+            padding: 8px 10px;
+        }
+        .field-box.checkbox-field input[type="checkbox"] {
+            height: 16px;
+            margin: 0 !important;
+            position: static !important;
+            width: 16px !important;
+        }
+        .field-box.checkbox-field label {
+            align-items: center;
+            color: #24344d;
+            cursor: pointer;
+            display: inline-flex;
+            font-weight: 700;
+            line-height: 1.8;
+            margin: 0 !important;
+        }
+        .field-box.checkbox-field .errorlist {
+            flex-basis: 100%;
+        }
+        .field-box.avatar-image-field {
+            line-height: 2;
+        }
+        .field-box.avatar-image-field br {
+            display: block;
+            content: "";
+            margin-top: 6px;
+        }
+        .field-box.avatar-image-field input[type="file"] {
+            display: block;
+            margin-top: 8px;
+        }
+        .field-box.avatar-image-field input[type="checkbox"] {
+            display: inline-block !important;
+            height: 16px;
+            margin: 0 10px 0 4px !important;
+            position: static !important;
+            vertical-align: middle;
+            width: 16px !important;
+        }
+        .field-box.avatar-image-field input[type="checkbox"] + label {
+            display: inline-flex !important;
+            align-items: center;
+            margin: 0 !important;
+            vertical-align: middle;
+        }
+        
         ul.errorlist { margin: 0 0 8px 0; color: #c62828; }
         .actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
         button, .back-link { border: none; border-radius: 6px; padding: 9px 12px; cursor: pointer; text-decoration: none; display: inline-block; }
@@ -47,22 +181,38 @@
 
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
+            <input type="hidden" name="avatar_crop_x" value="0">
+            <input type="hidden" name="avatar_crop_y" value="0">
+            <input type="hidden" name="avatar_crop_width" value="0">
+            <input type="hidden" name="avatar_crop_height" value="0">
             <div class="profile-avatar-preview">
-                <span class="app-user-avatar {{ request.user.profile.avatar_class }}">
+                <span class="app-user-avatar {{ request.user.profile.avatar_class }}" id="profile-avatar-preview-box">
                     {% if request.user.profile.avatar_url %}
                         <img src="{{ request.user.profile.avatar_url }}" alt="{{ request.user.get_full_name|default:request.user.username }}">
                     {% else %}
                         {{ request.user.profile.avatar_icon }}
                     {% endif %}
                 </span>
+                <div class="profile-avatar-preview-hint">
+                    <strong>پیش‌نمایش نمایه</strong>
+                    <p>فایل جدید را انتخاب کنید و تصویر را برای نمایش بهتر در کادر به سمت چپ یا راست جابجا کنید.</p>
+                </div>
             </div>
             <div class="form-grid">
                 {% for field in form %}
-                    <div class="field-box {% if field.name == 'address' or field.name == 'second_address' %}full-row{% endif %}">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
-                        {{ field }}
-                        {{ field.errors }}
-                    </div>
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="field-box checkbox-field">
+                            {{ field }}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
+                            {{ field.errors }}
+                        </div>
+                    {% else %}
+                        <div class="field-box {% if field.name == 'address' or field.name == 'second_address' %}full-row{% endif %}{% if field.name == 'avatar_image' %} avatar-image-field{% endif %}">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
+                            {{ field }}
+                            {{ field.errors }}
+                        </div>
+                    {% endif %}
                 {% endfor %}
             </div>
             <div class="actions">

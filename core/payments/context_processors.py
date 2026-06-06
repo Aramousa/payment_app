@@ -124,7 +124,7 @@ def app_navigation(request):
     cp = getattr(user, 'counterparty_account', None)
     if cp and not is_staff_user:
         cp_items = [
-            _nav_item('داشبورد طرف حساب', 'counterparty_dashboard', 'cp_dashboard'),
+            _nav_item('داشبورد', 'counterparty_dashboard', 'cp_dashboard'),
             _nav_item('ویرایش مشخصات', 'profile_edit', 'profile', 'account'),
             _nav_item('تغییر رمز عبور', 'profile_password_change', 'password', 'account'),
         ]
@@ -145,12 +145,12 @@ def app_navigation(request):
 
     if role == 'customer':
         items.extend([
-            _nav_item('ثبت فیش جدید',    'payment_create',        'payment_create',         'main',       '📤'),
-            _nav_item('فاکتورها',          'invoices_dashboard',     'invoices',               'commercial', '🧾'),
-            _nav_item('لیست قیمت',         'price_lists',            'price_lists',            'commercial', '💲'),
-            _nav_item('سفارش‌ها',           'orders',                 'orders',                 'commercial', '🛒'),
-            _nav_item('پیش‌فاکتورها',       'proformas',              'proformas',              'commercial', '📝'),
-            _nav_item('برنامه واریز من',   'customer_daily_payments', 'customer_daily_payments','finance',    '📅'),
+            _nav_item('ثبت فیش',        'payment_create',         'payment_create',          'main', '📤'),
+            _nav_item('لیست قیمت',      'price_lists',            'price_lists',             'main', '💲'),
+            _nav_item('سفارش گذاری',     'orders',                 'orders',                  'main', '🛒'),
+            _nav_item('پیش فاکتور',      'proformas',              'proformas',               'main', '📝'),
+            _nav_item('فاکتور فروش',     'invoices_dashboard',     'invoices',                'main', '🧾'),
+            _nav_item('برنامه واریز',    'customer_daily_payments','customer_daily_payments', 'main', '📅'),
         ])
     else:
         items.extend([

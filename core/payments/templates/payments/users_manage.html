@@ -24,7 +24,37 @@
         .full-row { grid-column: 1 / -1; }
         .field-box { display: flex; flex-direction: column; gap: 4px; }
         input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 8px 10px; margin: 0; font-family: inherit; font-size: 13px; }
+        input[type="checkbox"] { width: 16px !important; height: 16px; margin: 0 !important; flex: 0 0 auto; cursor: pointer; }
         label { font-size: 12px; color: #243447; }
+        .field-box.checkbox-field {
+            align-items: center;
+            background: #f8fbff;
+            border: 1px solid #e1e9f3;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            min-height: 42px;
+            padding: 9px 10px;
+        }
+        .field-box.checkbox-field label {
+            color: #243447;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.8;
+            margin: 0;
+        }
+        .field-box.checkbox-field .field-error {
+            flex-basis: 100%;
+        }
+        .field-box.checkbox-field.permission-field {
+            background: #fff8e6;
+            border-color: #f2d58c;
+        }
+        .field-box.checkbox-field.permission-field label {
+            color: #704b00;
+        }
         .hint-box { background: #eef6ff; border: 1px solid #cfe2ff; color: #124b91; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
         .field-error { color: #c62828; font-size: 11px; }
 
@@ -117,11 +147,19 @@
             {% csrf_token %}
             <div class="form-grid">
                 {% for field in form %}
-                    <div class="field-box {% if field.name == 'address' %}full-row{% endif %}">
-                        <label for="{{ field.id_for_label }}">{{ field.label|safe }}</label>
-                        {{ field }}
-                        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-                    </div>
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="field-box checkbox-field {% if field.name == 'can_view_invoices' or field.name == 'can_upload_invoices' or field.name == 'can_edit_payment_details' or field.name == 'is_active' or field.name == 'suspended' or field.name == 'force_password_change' %}permission-field{% endif %}">
+                            {{ field }}
+                            <label for="{{ field.id_for_label }}">{{ field.label|safe }}</label>
+                            {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="field-box {% if field.name == 'address' %}full-row{% endif %}">
+                            <label for="{{ field.id_for_label }}">{{ field.label|safe }}</label>
+                            {{ field }}
+                            {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endif %}
                 {% endfor %}
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:14px;">

@@ -87,8 +87,8 @@ h3 {
 
 .app-shell-logo {
     display: block;
-    height: 48px;
-    max-width: 138px;
+    height: 56px;
+    max-width: 180px;
     object-fit: contain;
 }
 
@@ -1230,8 +1230,8 @@ tr.detail-row {
     }
 
     .app-shell-logo {
-        height: 42px;
-        max-width: 118px;
+        height: 48px;
+        max-width: 150px;
     }
 
     .app-nav-side {
@@ -1354,8 +1354,8 @@ body {
 }
 
 .app-shell-logo {
-    height: 40px !important;
-    max-width: 160px !important;
+    height: 48px !important;
+    max-width: 170px !important;
 }
 
 /* ─── دکمه موبایل ────────────────────────────────────────── */
@@ -1718,9 +1718,9 @@ body:not(:has(.app-shell-nav)) {
     border: 1px solid #edf1f6;
     border-radius: 8px !important;
     box-shadow: none !important;
-    height: 38px !important;
-    max-width: 150px !important;
-    padding: 4px 8px;
+    height: 46px !important;
+    max-width: 170px !important;
+    padding: 6px 10px;
 }
 
 .app-top-context {
@@ -1922,15 +1922,181 @@ body:not(:has(.app-shell-nav)) {
 .profile-avatar-preview {
     align-items: center;
     display: flex;
-    justify-content: center;
-    margin: 0 0 16px;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: flex-start;
+    margin: 0 0 18px;
 }
 
 .profile-avatar-preview .app-user-avatar {
-    flex-basis: 72px;
-    font-size: 28px;
-    height: 72px;
-    width: 72px;
+    flex-basis: 92px;
+    font-size: 36px;
+    height: 92px;
+    width: 92px;
+    overflow: hidden;
+    position: relative;
+}
+
+.profile-avatar-controls {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.profile-avatar-controls button {
+    background: #f3f6fb;
+    border: 1px solid #d1dce6;
+    border-radius: 8px;
+    color: #172033;
+    cursor: pointer;
+    min-height: 34px;
+    min-width: 34px;
+    padding: 0 10px;
+}
+
+.profile-avatar-controls button:hover {
+    background: #e7eff9;
+}
+
+.profile-avatar-controls .avatar-zoom-label {
+    color: #3d4b5d;
+    font-size: 13px;
+    min-width: 48px;
+    text-align: center;
+}
+
+.profile-avatar-preview-hint {
+    max-width: 520px;
+    color: #3d4b5d;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.profile-avatar-preview-hint {
+    max-width: 520px;
+    color: #3d4b5d;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.profile-avatar-preview-hint p {
+    margin: 6px 0 0;
+}
+
+.profile-avatar-preview .app-user-avatar img {
+    transition: transform 0.12s ease-out;
+}
+
+.profile-avatar-cropper-overlay {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    inset: 0;
+    position: fixed;
+    z-index: 650;
+}
+
+.profile-avatar-cropper-backdrop {
+    background: rgba(15, 23, 42, 0.72);
+    inset: 0;
+    position: absolute;
+}
+
+.profile-avatar-cropper-dialog {
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.25);
+    max-width: 620px;
+    min-width: 320px;
+    overflow: hidden;
+    padding: 18px;
+    position: relative;
+    width: min(100%, 620px);
+    z-index: 1;
+}
+
+.profile-avatar-cropper-dialog h2 {
+    font-size: 18px;
+    margin: 0 0 14px;
+}
+
+.avatar-cropper-viewer {
+    background: #eef2f8;
+    border-radius: 16px;
+    height: 340px;
+    overflow: hidden;
+    position: relative;
+}
+
+.avatar-cropper-image {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    user-select: none;
+}
+
+.avatar-cropper-mask {
+    border: 3px solid rgba(255, 255, 255, 0.92);
+    border-radius: 16px;
+    box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.16);
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+}
+
+.avatar-cropper-controls,
+.avatar-cropper-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.avatar-cropper-controls button,
+.avatar-cropper-actions button,
+.avatar-cropper-close {
+    background: #f3f6fb;
+    border: 1px solid #d1dce6;
+    border-radius: 10px;
+    color: #172033;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 10px 14px;
+}
+
+.avatar-cropper-close {
+    font-size: 24px;
+    height: 40px;
+    line-height: 1;
+    position: absolute;
+    right: 16px;
+    top: 16px;
+    padding: 0 10px;
+}
+
+.avatar-cropper-close:hover,
+.avatar-cropper-controls button:hover,
+.avatar-cropper-actions button:hover {
+    background: #e8eff9;
+}
+
+.avatar-zoom-label {
+    color: #3d4b5d;
+    font-size: 14px;
+    min-width: 48px;
+    text-align: center;
+}
+
+.avatar-cropper-actions {
+    justify-content: flex-end;
+}
+
+.avatar-cropper-actions button {
+    min-width: 110px;
 }
 
 .user-card-modal {
@@ -1979,6 +2145,7 @@ body:not(:has(.app-shell-nav)) {
     box-shadow: none !important;
     color: #fff !important;
     display: inline-flex;
+    font-family: Vazir, sans-serif !important;
     font-size: 22px !important;
     height: 32px;
     justify-content: center;
@@ -2103,6 +2270,7 @@ body:not(:has(.app-shell-nav)) {
 .user-card-footer a,
 .user-card-footer button {
     border-radius: 7px !important;
+    font-family: Vazir, sans-serif !important;
     font-size: 12px !important;
     font-weight: 800 !important;
     min-height: 34px;
@@ -2615,6 +2783,26 @@ body:has(.app-shell-nav) {
     body:has(.app-shell-nav) {
         padding-top: var(--app-header-height) !important;
     }
+}
+
+/* Hide full file path in file input display, showing only filename */
+input[type="file"] ~ p a {
+    max-width: 100%;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Ensure file names don't interfere with layout */
+.field-box p {
+    margin-top: 8px;
+    margin-bottom: 0;
+    font-size: 13px;
+    color: var(--app-muted);
+}
+
+@media (max-width: 760px) {
 
     .app-top-header {
         grid-template-columns: minmax(120px, 1fr) auto !important;
@@ -3035,5 +3223,260 @@ h2 {
 
     .app-nav-link:hover {
         background: rgba(30,58,95,.12) !important;
+    }
+}
+
+/* Horizontal top navigation with dropdown submenus. */
+:root {
+    --app-menu-height: 82px;
+}
+
+.app-top-brand {
+    display: flex !important;
+}
+
+.app-top-brand .app-shell-logo {
+    display: block !important;
+}
+
+body:has(.app-shell-nav) {
+    padding-top: calc(var(--app-header-height) + var(--app-menu-height) + 14px) !important;
+}
+
+.app-shell-nav {
+    height: var(--app-menu-height) !important;
+    overflow: visible !important;
+}
+
+.app-shell-nav .app-nav-panel {
+    height: 100% !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+}
+
+.app-shell-nav .app-nav-links {
+    align-content: center !important;
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    justify-content: flex-start !important;
+    min-height: var(--app-menu-height) !important;
+    overflow: visible !important;
+    text-align: center !important;
+    width: 100% !important;
+}
+
+.app-shell-nav .app-nav-section {
+    align-items: center !important;
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    position: relative;
+}
+
+.app-shell-nav .app-nav-section + .app-nav-section {
+    border-right: 1px solid rgba(255,255,255,.12);
+    margin-right: 2px !important;
+    padding-right: 10px !important;
+}
+
+.app-shell-nav .sb-group-header {
+    align-items: center !important;
+    background: rgba(255,255,255,.08) !important;
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 8px !important;
+    color: #e7edf6 !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    gap: 7px !important;
+    min-height: 36px !important;
+    padding: 7px 11px !important;
+    justify-content: center !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+.app-shell-nav .sb-group-header:hover,
+.app-shell-nav .app-nav-group[open] > .sb-group-header,
+.app-shell-nav .app-nav-group.active-group > .sb-group-header {
+    background: #fff !important;
+    border-color: #fff !important;
+    color: #172033 !important;
+}
+
+.app-shell-nav .app-nav-direct,
+.app-shell-nav .app-nav-direct .app-nav-icon,
+.app-shell-nav .app-nav-direct .app-nav-text {
+    color: #e7edf6 !important;
+}
+
+.app-shell-nav .app-nav-direct {
+    align-items: center !important;
+    background: rgba(255,255,255,.08) !important;
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    gap: 6px !important;
+    grid-template-columns: none !important;
+    min-height: 36px !important;
+    padding: 7px 10px !important;
+    justify-content: center !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+.app-shell-nav .app-nav-direct:hover,
+.app-shell-nav .app-nav-direct:hover .app-nav-icon,
+.app-shell-nav .app-nav-direct:hover .app-nav-text {
+    background: rgba(255,255,255,.16) !important;
+    border-color: rgba(255,255,255,.28) !important;
+    color: #fff !important;
+}
+
+.app-shell-nav .app-nav-direct.active-link,
+.app-shell-nav .app-nav-direct.active-link .app-nav-icon,
+.app-shell-nav .app-nav-direct.active-link .app-nav-text,
+.app-shell-nav .app-nav-direct.active-link:hover,
+.app-shell-nav .app-nav-direct.active-link:hover .app-nav-icon,
+.app-shell-nav .app-nav-direct.active-link:hover .app-nav-text {
+    background: #fff !important;
+    border-color: #fff !important;
+    color: #172033 !important;
+}
+
+.app-shell-nav .app-nav-group-panel {
+    background: #fff !important;
+    border: 1px solid #dce5f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 18px 38px rgba(15,23,42,.18) !important;
+    display: grid !important;
+    gap: 3px !important;
+    min-width: 210px !important;
+    padding: 7px !important;
+    position: absolute !important;
+    left: 50% !important;
+    right: auto !important;
+    top: calc(100% + 8px) !important;
+    transform: translateX(-50%) !important;
+    z-index: 360 !important;
+}
+
+.app-shell-nav .app-nav-group:not([open]) .app-nav-group-panel {
+    display: none !important;
+}
+
+.app-shell-nav .app-nav-group-panel .app-nav-link {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 7px !important;
+    color: #24344d !important;
+    display: flex !important;
+    font-size: 12px !important;
+    gap: 7px !important;
+    min-height: 34px !important;
+    padding: 7px 9px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+.app-shell-nav .app-nav-group-panel .app-nav-link .app-nav-icon,
+.app-shell-nav .app-nav-group-panel .app-nav-link .app-nav-text {
+    color: inherit !important;
+}
+
+.app-shell-nav .app-nav-group-panel .app-nav-link:hover,
+.app-shell-nav .app-nav-group-panel .app-nav-link.active-link {
+    background: #eef5ff !important;
+    border-color: #d8e6f7 !important;
+    color: #172033 !important;
+}
+
+@media (min-width: 761px) {
+    .app-nav-toggle,
+    .sb-overlay {
+        display: none !important;
+    }
+
+    .app-top-brand {
+        display: flex !important;
+    }
+
+    .app-shell-nav {
+        transform: none !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+    }
+}
+
+@media (max-width: 760px) {
+    body:has(.app-shell-nav) {
+        padding-top: var(--app-header-height) !important;
+    }
+
+    .app-shell-nav {
+        height: calc(100vh - var(--app-header-height)) !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        align-content: stretch !important;
+        align-items: stretch !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+        min-height: 0 !important;
+        text-align: center !important;
+    }
+
+    .app-shell-nav .app-nav-section {
+        align-items: stretch !important;
+        display: grid !important;
+        gap: 3px !important;
+    }
+
+    .app-shell-nav .app-nav-section + .app-nav-section {
+        border-right: 0;
+        margin-right: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .app-shell-nav .sb-group-header {
+        justify-content: center !important;
+        padding: 8px 16px 4px !important;
+        text-align: center !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        border-color: transparent !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        gap: 7px !important;
+        justify-content: center !important;
+        min-height: 38px !important;
+        padding: 7px 14px 7px 10px !important;
+        text-align: center !important;
+    }
+
+    .app-shell-nav .app-nav-group-panel {
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        min-width: 0 !important;
+        padding: 3px 0 0 !important;
+        position: static !important;
+        transform: none !important;
     }
 }

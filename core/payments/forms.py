@@ -213,6 +213,40 @@ def _optimize_uploaded_image(uploaded, max_size_bytes, max_side=IMAGE_RESIZE_MAX
     return uploaded
 
 
+def _crop_uploaded_image(uploaded, crop_rect):
+    if not crop_rect:
+        return uploaded
+
+    try:
+        uploaded.seek(0)
+        image = Image.open(uploaded)
+        image = ImageOps.exif_transpose(image)
+        left, top, right, bottom = crop_rect
+        left = max(0, int(round(left)))
+        top = max(0, int(round(top)))
+        right = min(image.width, int(round(right)))
+        bottom = min(image.height, int(round(bottom)))
+        if right > left and bottom > top:
+            image = image.crop((left, top, right, bottom))
+        image.thumbnail((PROFILE_AVATAR_MAX_SIDE, PROFILE_AVATAR_MAX_SIDE), Image.Resampling.LANCZOS)
+        image = _flatten_for_jpeg(image)
+
+        output = BytesIO()
+        image.save(output, format='JPEG', quality=92, optimize=True, progressive=True)
+        output.seek(0)
+        return SimpleUploadedFile(
+            _optimized_image_name(uploaded.name),
+            output.getvalue(),
+            content_type='image/jpeg',
+        )
+    except Exception:
+        try:
+            uploaded.seek(0)
+        except Exception:
+            pass
+        return uploaded
+
+
 class BankNameAutocompleteWidget(forms.TextInput):
     """
     Custom widget for bank name autocomplete field.
@@ -319,7 +353,30 @@ class CustomerProfileUpdateForm(forms.ModelForm):
         ext = os.path.splitext(uploaded.name or '')[1].lower()
         if ext not in IMAGE_EXTENSIONS:
             raise ValidationError('فقط فایل تصویری برای عکس نمایه مجاز است.')
-        return _optimize_uploaded_image(uploaded, PROFILE_AVATAR_MAX_UPLOAD_SIZE, max_side=PROFILE_AVATAR_MAX_SIDE)
+
+        def float_value(name):
+            value = self.data.get(name)
+            if value is None or value == '':
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        crop_x = float_value('avatar_crop_x')
+        crop_y = float_value('avatar_crop_y')
+        crop_width = float_value('avatar_crop_width')
+        crop_height = float_value('avatar_crop_height')
+        crop_rect = None
+        if crop_x is not None or crop_y is not None or crop_width is not None or crop_height is not None:
+            if crop_x is None or crop_y is None or crop_width is None or crop_height is None:
+                raise ValidationError('مقادیر برش عکس نمایه نامعتبر است.')
+            if crop_width <= 0 or crop_height <= 0:
+                raise ValidationError('مقادیر برش عکس نمایه نامعتبر است.')
+            crop_rect = (crop_x, crop_y, crop_x + crop_width, crop_y + crop_height)
+
+        cropped = _crop_uploaded_image(uploaded, crop_rect)
+        return _optimize_uploaded_image(cropped, PROFILE_AVATAR_MAX_UPLOAD_SIZE, max_side=PROFILE_AVATAR_MAX_SIDE)
 
     def clean(self):
         cleaned_data = super().clean()
