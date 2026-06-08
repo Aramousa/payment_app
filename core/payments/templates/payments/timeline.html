@@ -102,6 +102,29 @@
         .receipt-doc-pdf { font-size: 30px; line-height: 1; }
         .receipt-doc-caption { display: block; padding: 8px 10px; font-size: 12px; font-weight: 700; text-align: center; }
         .receipt-doc-empty { color: #94a3b8; font-size: 13px; }
+
+        /* پیش‌نمایش سند در پاپ‌آپ — دقیقاً مطابق با استایل پیش‌نمایش در صفحهٔ فرم سند */
+        .preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+        .preview-overlay.open { display: flex; }
+        .preview-box { background: #fff; border-radius: 10px; max-width: 92vw; max-height: 92vh; width: 980px; padding: 10px; position: relative; }
+        .preview-frame { width: 100%; height: 78vh; border: 0; }
+        .preview-image { max-width: 100%; max-height: 78vh; display: block; margin: 0 auto; }
+        .preview-hint { font-size: 12px; color: #666; text-align: center; margin-top: 8px; }
+        .rot-btn { color:#fff;border:none;border-radius:5px;padding:5px 11px;cursor:pointer;font-family:Vazir,sans-serif;font-size:13px; }
+        .rot-btn:disabled { opacity:.5;cursor:not-allowed; }
+
+        /* نوار ابزار یکپارچهٔ پیش‌نمایش سند: گروه «چرخش» و گروه «سند» (دانلود/چاپ) با ظاهر هماهنگ با سبک دکمه‌های برنامه */
+        .preview-toolbar { display: none; flex-wrap: wrap; align-items: center; justify-content: center; gap: 18px; margin-top: 12px; padding: 10px 16px; background: #f8fafc; border: 1px solid #dbe3ee; border-radius: 8px; font-family: Vazir, sans-serif; }
+        .preview-toolbar.open { display: flex; }
+        .preview-toolbar-group { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+        .preview-toolbar-group.hidden { display: none; }
+        .preview-toolbar-group:not(:first-child) { padding-right: 18px; border-right: 1px solid #dbe3ee; }
+        .preview-toolbar-label { font-size: 12px; font-weight: 700; color: var(--app-secondary); margin-left: 2px; }
+        .preview-toolbar-status { font-size: 12px; color: var(--app-secondary); min-width: 64px; }
+        .preview-toolbar input[type="number"] { width: 84px; height: 30px; text-align: center; direction: ltr; border: 1px solid #dbe3ee; border-radius: var(--app-radius-sm); padding: 4px 8px; font-family: Vazir, sans-serif; font-size: 12px; box-sizing: border-box; }
+        @media (max-width: 640px) {
+            .preview-toolbar-group:not(:first-child) { padding-right: 0; border-right: 0; border-top: 1px solid #dbe3ee; padding-top: 10px; width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -157,7 +180,7 @@
                     {% if receipts %}
                         {% for receipt in receipts %}
                             {% with file_name=receipt.image.name|lower %}
-                                <a href="{% url 'receipt_file' receipt.id %}" target="_blank" rel="noopener" class="receipt-doc-link" title="مشاهده سند {{ forloop.counter }} در تب جدید">
+                                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-doc-link receipt-preview-link" title="مشاهده سند {{ forloop.counter }}">
                                     <span class="receipt-doc-media">
                                         {% if '.pdf' in file_name %}
                                             <span class="receipt-doc-pdf">📄 PDF</span>
@@ -165,13 +188,13 @@
                                             <img src="{% url 'receipt_file' receipt.id %}" alt="تصویر سند {{ forloop.counter }}" loading="lazy">
                                         {% endif %}
                                     </span>
-                                    <span class="receipt-doc-caption">سند {{ forloop.counter }} — مشاهده در تب جدید</span>
+                                    <span class="receipt-doc-caption">سند {{ forloop.counter }}</span>
                                 </a>
                             {% endwith %}
                         {% endfor %}
                     {% elif payment.receipt_image %}
                         {% with file_name=payment.receipt_image.name|lower %}
-                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" target="_blank" rel="noopener" class="receipt-doc-link" title="مشاهده سند در تب جدید">
+                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-doc-link receipt-preview-link" title="مشاهده سند">
                                 <span class="receipt-doc-media">
                                     {% if '.pdf' in file_name %}
                                         <span class="receipt-doc-pdf">📄 PDF</span>
@@ -179,7 +202,7 @@
                                         <img src="{% url 'legacy_payment_receipt_file' payment.id %}" alt="تصویر سند" loading="lazy">
                                     {% endif %}
                                 </span>
-                                <span class="receipt-doc-caption">سند — مشاهده در تب جدید</span>
+                                <span class="receipt-doc-caption">سند</span>
                             </a>
                         {% endwith %}
                     {% else %}
@@ -312,6 +335,31 @@
         </div>
     </div>
 
+    <div id="previewOverlay" class="preview-overlay" tabindex="-1">
+        <div class="preview-box" id="previewBox">
+            <img id="previewImage" class="preview-image app-zoomable-image" alt="پیش نمایش سند" style="display:none;">
+            <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
+            {% if is_staff_user %}
+            <div id="previewToolbar" class="preview-toolbar">
+                <div id="rotateControls" class="preview-toolbar-group">
+                    <span class="preview-toolbar-label">چرخش</span>
+                    <button type="button" class="rot-btn button-link outline sm" data-deg="-90">↺ 90°</button>
+                    <button type="button" class="rot-btn button-link outline sm" data-deg="90">↻ 90°</button>
+                    <input id="rotateCustomDeg" type="number" min="-359" max="359" step="1" placeholder="درجه دلخواه">
+                    <button type="button" id="rotateCustomBtn" class="button-link outline sm">اعمال</button>
+                    <span id="rotateStatus" class="preview-toolbar-status"></span>
+                </div>
+                <div id="previewActions" class="preview-toolbar-group">
+                    <span class="preview-toolbar-label">سند</span>
+                    <button type="button" id="previewDownloadBtn" class="button-link outline sm">⬇ دانلود</button>
+                    <button type="button" id="previewPrintBtn" class="button-link outline sm">🖨 چاپ</button>
+                </div>
+            </div>
+            {% endif %}
+            <div class="preview-hint">برای بستن، روی پس زمینه کلیک کنید یا کلید ورود را بزنید.</div>
+        </div>
+    </div>
+
     <script>
     (function () {
         const textarea = document.getElementById('note-input');
@@ -325,6 +373,279 @@
                 counter.classList.toggle('warn', len > 900);
             });
         }
+    })();
+    </script>
+
+    <script>
+    (function () {
+        const overlay = document.getElementById('previewOverlay');
+        if (!overlay) return;
+
+        const previewBox = document.getElementById('previewBox');
+        const previewImage = document.getElementById('previewImage');
+        const previewFrame = document.getElementById('previewFrame');
+        const previewToolbar = document.getElementById('previewToolbar');
+        const rotateControls = document.getElementById('rotateControls');
+        const rotateStatus = document.getElementById('rotateStatus');
+        const previewDownloadBtn = document.getElementById('previewDownloadBtn');
+        const previewPrintBtn = document.getElementById('previewPrintBtn');
+        let pdfBlobUrl = '';
+        let activeReceiptId = null;
+        let activePreviewUrl = null;
+        let activeFileName = '';
+        let activeDownloadName = '';
+
+        // برای نام‌گذاری فایل دانلودشده: کاراکترهای غیرمجاز در نام فایل را با فاصله جایگزین می‌کند
+        function sanitizeFileNamePart(text) {
+            return (text || '').replace(/[\\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function fileExtensionFromName(name) {
+            const match = /\.([a-zA-Z0-9]{1,8})(?:[?#]|$)/.exec((name || '').split('/').pop() || '');
+            return match ? match[1].toLowerCase() : 'jpg';
+        }
+
+        function setPreviewImageVisible(visible) {
+            const imageViewport = previewImage.closest('.app-image-zoom-viewport');
+            if (imageViewport) {
+                imageViewport.style.display = visible ? 'flex' : 'none';
+            }
+            previewImage.style.display = visible ? 'block' : 'none';
+        }
+
+        function closePreview() {
+            overlay.classList.remove('open');
+            setPreviewImageVisible(false);
+            previewImage.src = '';
+            previewFrame.style.display = 'none';
+            previewFrame.src = '';
+            if (pdfBlobUrl) {
+                URL.revokeObjectURL(pdfBlobUrl);
+                pdfBlobUrl = '';
+            }
+            if (previewToolbar) previewToolbar.classList.remove('open');
+            if (rotateControls) rotateControls.classList.add('hidden');
+            activeReceiptId = null;
+            activePreviewUrl = null;
+            activeFileName = '';
+            activeDownloadName = '';
+        }
+
+        async function openPreview(url, fileName, receiptId, customerName, docNumber) {
+            activePreviewUrl = url;
+            activeReceiptId = receiptId || null;
+            activeFileName = fileName || '';
+            const namePart = sanitizeFileNamePart(customerName);
+            const numberPart = sanitizeFileNamePart(docNumber);
+            activeDownloadName = [namePart, numberPart].filter(Boolean).join(' ') || 'سند';
+            let isPdf = false;
+            try {
+                const parsed = new URL(fileName || url, window.location.origin);
+                isPdf = /\.pdf$/i.test(parsed.pathname || '');
+            } catch (e) {
+                isPdf = /\.pdf(\?|#|$)/i.test((fileName || url || '').toLowerCase());
+            }
+            if (isPdf) {
+                try {
+                    const res = await fetch(url, { credentials: 'same-origin' });
+                    if (!res.ok) throw new Error('pdf_fetch_failed');
+                    const blob = await res.blob();
+                    pdfBlobUrl = URL.createObjectURL(blob);
+                    previewFrame.src = pdfBlobUrl;
+                } catch (e) {
+                    window.open(url, '_blank', 'noopener');
+                    return;
+                }
+                previewFrame.style.display = 'block';
+                setPreviewImageVisible(false);
+                previewImage.src = '';
+                if (previewToolbar) previewToolbar.classList.remove('open');
+                if (rotateControls) rotateControls.classList.add('hidden');
+            } else {
+                previewImage.src = url;
+                setPreviewImageVisible(true);
+                if (window.AppImageZoom) {
+                    window.AppImageZoom.reset(previewImage);
+                }
+                previewFrame.style.display = 'none';
+                previewFrame.src = '';
+                // گروه «چرخش» فقط برای اسنادی که شناسه دارند (قابل چرخش از سرور) نمایش داده می‌شود؛
+                // گروه «دانلود/چاپ» برای هر تصویری در دسترس است
+                if (rotateControls) {
+                    rotateControls.classList.toggle('hidden', !activeReceiptId);
+                    if (activeReceiptId && rotateStatus) rotateStatus.textContent = '';
+                }
+                if (previewToolbar) previewToolbar.classList.add('open');
+            }
+            overlay.classList.add('open');
+            overlay.focus();
+        }
+
+        async function doRotate(degrees) {
+            if (!activeReceiptId || !degrees) return;
+            const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (!csrf) return;
+
+            // غیرفعال کردن همه دکمه‌های چرخش
+            const allRotBtns = document.querySelectorAll('.rot-btn, #rotateCustomBtn');
+            allRotBtns.forEach(function(b) { b.disabled = true; });
+            if (rotateStatus) rotateStatus.textContent = 'در حال چرخش…';
+
+            try {
+                const resp = await fetch('/receipts/' + activeReceiptId + '/rotate/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRFToken': csrf.value, 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'degrees=' + encodeURIComponent(degrees),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    previewImage.src = activePreviewUrl + '?t=' + Date.now();
+                    const dir = degrees > 0 ? 'راست' : 'چپ';
+                    if (rotateStatus) rotateStatus.textContent = Math.abs(degrees) + '° ' + dir + ' ✓';
+                } else {
+                    if (rotateStatus) rotateStatus.textContent = data.error || 'خطا در چرخش';
+                }
+            } catch (e) {
+                if (rotateStatus) rotateStatus.textContent = 'خطای شبکه';
+            } finally {
+                allRotBtns.forEach(function(b) { b.disabled = false; });
+            }
+        }
+
+        // دکمه‌های ثابت
+        document.querySelectorAll('.rot-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                doRotate(parseFloat(btn.getAttribute('data-deg')));
+            });
+        });
+
+        // دکمه درجه دلخواه
+        const rotateCustomBtn = document.getElementById('rotateCustomBtn');
+        const rotateCustomDeg = document.getElementById('rotateCustomDeg');
+        if (rotateCustomBtn && rotateCustomDeg) {
+            rotateCustomBtn.addEventListener('click', function() {
+                const val = parseFloat(rotateCustomDeg.value);
+                if (isNaN(val) || val === 0) {
+                    if (rotateStatus) rotateStatus.textContent = 'یک عدد وارد کنید';
+                    return;
+                }
+                if (val <= -360 || val >= 360) {
+                    if (rotateStatus) rotateStatus.textContent = 'درجه باید بین 359- و 359 باشد';
+                    return;
+                }
+                doRotate(val);
+            });
+            rotateCustomDeg.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') rotateCustomBtn.click();
+            });
+        }
+
+        document.querySelectorAll('.receipt-preview-link').forEach(function (link) {
+            link.addEventListener('click', async function (event) {
+                event.preventDefault();
+                const receiptId = link.getAttribute('data-receipt-id') || null;
+                const customerName = link.getAttribute('data-customer-name') || '';
+                const docNumber = link.getAttribute('data-doc-number') || '';
+                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId, customerName, docNumber);
+            });
+        });
+
+        // دانلود تصویر سند با نام «نام و نام‌خانوادگی مشتری + شماره سند»
+        async function downloadDocumentImage(imageUrl, fileName, downloadName, button) {
+            if (!imageUrl) return;
+            if (button) button.disabled = true;
+            try {
+                const resp = await fetch(imageUrl, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error('download_failed');
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = (downloadName || 'سند') + '.' + fileExtensionFromName(fileName);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                window.open(imageUrl, '_blank', 'noopener');
+            } finally {
+                if (button) button.disabled = false;
+            }
+        }
+
+        // چاپ تصویر سند از طریق یک iframe مخفی (بدون باز شدن پنجره جدید و بدون مسدود شدن توسط popup-blocker)
+        function printDocumentImage(imageUrl) {
+            if (!imageUrl) return;
+            const printFrame = document.createElement('iframe');
+            printFrame.style.cssText = 'position:fixed;right:-10000px;bottom:0;width:0;height:0;border:0;';
+            document.body.appendChild(printFrame);
+
+            function cleanup() {
+                if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+            }
+
+            const frameDoc = printFrame.contentWindow.document;
+            frameDoc.open();
+            frameDoc.write(
+                '<!DOCTYPE html><html><head><meta charset="utf-8"><title>چاپ سند</title>' +
+                '<style>html,body{margin:0;padding:0;height:100%;}' +
+                'body{display:flex;align-items:center;justify-content:center;}' +
+                'img{max-width:100%;max-height:100vh;}' +
+                '@media print{img{max-width:100%;max-height:100%;}}</style></head>' +
+                '<body><img id="print-doc-image" src="' + imageUrl + '"></body></html>'
+            );
+            frameDoc.close();
+
+            const frameImage = frameDoc.getElementById('print-doc-image');
+            function triggerPrint() {
+                try {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                } finally {
+                    setTimeout(cleanup, 1000);
+                }
+            }
+            if (frameImage.complete) {
+                triggerPrint();
+            } else {
+                frameImage.addEventListener('load', triggerPrint);
+                frameImage.addEventListener('error', cleanup);
+            }
+        }
+
+        // دکمه‌های دانلود/چاپ داخل پیش‌نمایش بزرگ
+        if (previewDownloadBtn) {
+            previewDownloadBtn.addEventListener('click', function () {
+                if (!activePreviewUrl || previewImage.style.display === 'none') return;
+                downloadDocumentImage(previewImage.src || activePreviewUrl, activeFileName, activeDownloadName, previewDownloadBtn);
+            });
+        }
+        if (previewPrintBtn) {
+            previewPrintBtn.addEventListener('click', function () {
+                if (!previewImage.src || previewImage.style.display === 'none') return;
+                printDocumentImage(previewImage.src);
+            });
+        }
+
+        overlay.addEventListener('click', function (event) {
+            if (event.target === overlay) {
+                closePreview();
+            }
+        });
+
+        previewBox.addEventListener('click', function (event) {
+            if (event.target === previewBox) {
+                closePreview();
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (!overlay.classList.contains('open')) return;
+            if (event.key === 'Enter' || event.key === 'Escape') {
+                closePreview();
+            }
+        });
     })();
     </script>
     <script src="{% static 'js/app-ui.js' %}"></script>
