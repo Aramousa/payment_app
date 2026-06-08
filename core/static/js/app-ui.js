@@ -1110,6 +1110,23 @@
         });
     }
 
+    // فیلدهای متنی به‌صورت پیش‌فرض با Enter فرم را ارسال می‌کنند؛ select ها این رفتار را ندارند —
+    // این تابع همان رفتار را برای select های داخل فرم‌های دارای دکمه ارسال (مثل فیلترها) اضافه می‌کند
+    function enhanceSelectSubmitOnEnter() {
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' || event.defaultPrevented) return;
+            var target = event.target;
+            if (!target || target.tagName !== 'SELECT') return;
+            var form = target.form;
+            if (!form) return;
+            var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+            if (!submitBtn) return;
+            event.preventDefault();
+            if (form.requestSubmit) form.requestSubmit(submitBtn);
+            else form.submit();
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         localStorage.removeItem('paymentAppTheme');
         document.documentElement.removeAttribute('data-theme');
@@ -1126,6 +1143,7 @@
         enhanceAvatarUploadPreview();
         enhanceNotifications();
         enhanceZoomableImages();
+        enhanceSelectSubmitOnEnter();
         
         // Run displayOnlyFileNameInFileInputs again after a short delay
         // to catch dynamically rendered elements
