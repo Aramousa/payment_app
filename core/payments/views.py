@@ -395,6 +395,20 @@ def _safe_next_url(request, default=''):
     return default
 
 
+def _return_link_label(request, default_label):
+    # وقتی کاربر از طریق گفتگوی مغایرت‌گیری به این صفحه آمده، دکمه «بازگشت»
+    # او را به همان گفتگو برمی‌گرداند نه مقصد پیش‌فرض، پس برچسب باید همین را نشان بدهد.
+    next_url = (request.POST.get('next') or request.GET.get('next') or '').strip()
+    if next_url:
+        try:
+            recon_path = reverse('reconciliation_center')
+        except Exception:
+            recon_path = ''
+        if recon_path and next_url.startswith(recon_path):
+            return 'بازگشت به گفتگو'
+    return default_label
+
+
 def _file_response(field_file, as_attachment=False):
     if not field_file:
         raise Http404
@@ -2557,6 +2571,7 @@ def daily_payment_plan_detail(request, plan_id):
     plan = get_object_or_404(DailyPaymentPlan.objects.select_related('created_by'), id=plan_id)
     can_manage = _can_manage_daily_payments(request.user)
     return_url = _safe_next_url(request, default=f"{reverse('daily_payment_plans')}?date={_format_jalali_date(plan.deposit_date)}")
+    return_label = _return_link_label(request, 'بازگشت به برنامه ها')
     detail_url = f"{request.path}?{urlencode({'next': return_url})}"
 
     if request.method == 'POST':
@@ -2615,6 +2630,7 @@ def daily_payment_plan_detail(request, plan_id):
         'can_manage_daily_payments': can_manage,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
         'return_url': return_url,
+        'return_label': return_label,
         'export_dataset': 'daily_assignments',
         'export_fields': DAILY_ASSIGNMENT_EXPORT_FIELDS,
         'export_extra_params': {'plan_id': plan.id},
@@ -3477,7 +3493,10 @@ def edit_payment(request, payment_id):
 
 @login_required
 def payment_timeline(request, payment_id):
-    payment = get_object_or_404(PaymentRecord.objects.select_related('user', 'counterparty'), id=payment_id)
+    payment = get_object_or_404(
+        PaymentRecord.objects.select_related('user', 'counterparty').prefetch_related('receipts'),
+        id=payment_id,
+    )
     is_staff_user = _is_staff_user(request.user)
     if not is_staff_user and payment.user_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده تاریخچه اسناد خودتان وجود دارد.')
@@ -3527,6 +3546,7 @@ def payment_timeline(request, payment_id):
         'is_staff_user': is_staff_user,
         'can_add_note': can_add_note,
         'return_url': _safe_next_url(request),
+        'return_label': _return_link_label(request, 'بازگشت'),
     })
 
 
@@ -4271,6 +4291,7 @@ def proforma_detail(request, proforma_id):
         'is_expired': proforma.valid_until < today,
         'logs': logs,
         'return_url': _safe_next_url(request, default=reverse('proformas')),
+        'return_label': _return_link_label(request, 'بازگشت'),
     })
 
 
@@ -4283,6 +4304,7 @@ def invoice_detail(request, invoice_id):
     is_staff_user = _is_staff_user(request.user)
     just_marked_seen = False
     return_url = _safe_next_url(request)
+    return_label = _return_link_label(request, 'بازگشت به فاکتورها')
 
     # Staff needs permission to view invoices
     if is_staff_user and not _can_view_invoices(request.user):
@@ -4323,6 +4345,7 @@ def invoice_detail(request, invoice_id):
         'customer_profile': customer_profile,
         'just_marked_seen': just_marked_seen,
         'return_url': return_url,
+        'return_label': return_label,
     })
 
 
@@ -4763,6 +4786,7 @@ def order_detail(request, order_id):
         'is_staff_user': is_staff,
         'can_manage_orders': can_manage,
         'return_url': _safe_next_url(request, default=reverse('orders')),
+        'return_label': _return_link_label(request, 'بازگشت'),
         'logs': order.logs.all() if is_staff else order.logs.exclude(action=CustomerOrderLog.ACTION_ASSIGNED),
         'proformas': proformas,
         'has_approved_proforma': has_approved_proforma,

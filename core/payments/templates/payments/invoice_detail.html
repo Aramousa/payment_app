@@ -36,7 +36,7 @@
     {% include "payments/partials/app_navigation.html" %}
     <div class="box">
         <div class="actions">
-            <a class="button-link" href="{% if return_url %}{{ return_url }}{% else %}{% url 'invoices_dashboard' %}{% endif %}">بازگشت به فاکتورها</a>
+            <a class="button-link" href="{% if return_url %}{{ return_url }}{% else %}{% url 'invoices_dashboard' %}{% endif %}">{{ return_label|default:'بازگشت به فاکتورها' }}</a>
             <a class="button-link" href="#file-preview">مشاهده فایل فاکتور</a>
             <a class="button-link download-link" href="{% url 'invoice_file' invoice.id %}?download=1" download>دانلود فایل فاکتور</a>
             {% if can_delete_documents %}

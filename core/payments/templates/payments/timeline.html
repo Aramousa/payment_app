@@ -89,6 +89,19 @@
                            font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; }
         .locked-notice { background: #fef9c3; border: 1px solid #fde047; border-radius: 8px;
                          padding: 10px 14px; font-size: 13px; color: #713f12; }
+
+        /* سند بارگذاری‌شده */
+        .receipt-doc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 220px)); gap: 12px; }
+        .receipt-doc-link { display: block; border: 1px solid #dbe3ee; border-radius: 8px; overflow: hidden;
+                            background: #f8fafc; color: #1e3a5f; text-decoration: none;
+                            transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+        .receipt-doc-link:hover { border-color: #1e3a5f; box-shadow: 0 8px 20px rgba(30,58,95,.14); transform: translateY(-1px); }
+        .receipt-doc-media { width: 100%; aspect-ratio: 16 / 11; display: flex; align-items: center;
+                             justify-content: center; background: #eef2f8; }
+        .receipt-doc-media img { width: 100%; height: 100%; object-fit: contain; display: block; background: #fff; }
+        .receipt-doc-pdf { font-size: 30px; line-height: 1; }
+        .receipt-doc-caption { display: block; padding: 8px 10px; font-size: 12px; font-weight: 700; text-align: center; }
+        .receipt-doc-empty { color: #94a3b8; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -133,6 +146,46 @@
                 <strong>مبلغ:</strong> {{ payment.amount|floatformat:0 }} ریال
                 {% if payment.pay_date %} &nbsp;|&nbsp; <strong>تاریخ:</strong> {{ payment.pay_date|jalali_date }}{% endif %}
                 {% if payment.tracking_code %} &nbsp;|&nbsp; <strong>کد پیگیری:</strong> {{ payment.tracking_code }}{% endif %}
+            </div>
+        </div>
+
+        <!-- سند بارگذاری‌شده -->
+        <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">📎 سند بارگذاری‌شده</h3>
+            <div class="receipt-doc-grid">
+                {% with receipts=payment.receipts.all %}
+                    {% if receipts %}
+                        {% for receipt in receipts %}
+                            {% with file_name=receipt.image.name|lower %}
+                                <a href="{% url 'receipt_file' receipt.id %}" target="_blank" rel="noopener" class="receipt-doc-link" title="مشاهده سند {{ forloop.counter }} در تب جدید">
+                                    <span class="receipt-doc-media">
+                                        {% if '.pdf' in file_name %}
+                                            <span class="receipt-doc-pdf">📄 PDF</span>
+                                        {% else %}
+                                            <img src="{% url 'receipt_file' receipt.id %}" alt="تصویر سند {{ forloop.counter }}" loading="lazy">
+                                        {% endif %}
+                                    </span>
+                                    <span class="receipt-doc-caption">سند {{ forloop.counter }} — مشاهده در تب جدید</span>
+                                </a>
+                            {% endwith %}
+                        {% endfor %}
+                    {% elif payment.receipt_image %}
+                        {% with file_name=payment.receipt_image.name|lower %}
+                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" target="_blank" rel="noopener" class="receipt-doc-link" title="مشاهده سند در تب جدید">
+                                <span class="receipt-doc-media">
+                                    {% if '.pdf' in file_name %}
+                                        <span class="receipt-doc-pdf">📄 PDF</span>
+                                    {% else %}
+                                        <img src="{% url 'legacy_payment_receipt_file' payment.id %}" alt="تصویر سند" loading="lazy">
+                                    {% endif %}
+                                </span>
+                                <span class="receipt-doc-caption">سند — مشاهده در تب جدید</span>
+                            </a>
+                        {% endwith %}
+                    {% else %}
+                        <div class="receipt-doc-empty">سندی بارگذاری نشده است.</div>
+                    {% endif %}
+                {% endwith %}
             </div>
         </div>
 
@@ -255,7 +308,7 @@
         {% endif %}
 
         <div style="margin-top:12px;">
-            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}" class="back-link">← بازگشت</a>
+            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}" class="back-link">← {{ return_label|default:'بازگشت' }}</a>
         </div>
     </div>
 

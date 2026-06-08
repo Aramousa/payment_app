@@ -77,7 +77,7 @@
         <!-- هدر -->
         <div class="top-actions">
             <h2 style="margin:0;">سفارش {{ order.order_number }}</h2>
-            <a class="button-link alt" href="{{ return_url }}">← بازگشت</a>
+            <a class="button-link alt" href="{{ return_url }}">← {{ return_label|default:'بازگشت' }}</a>
         </div>
 
         <!-- نوار پیشرفت -->

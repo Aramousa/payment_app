@@ -39,7 +39,7 @@
     <div class="top-bar">
         <h2>جزئیات برنامه واریز روزانه</h2>
         <div>
-            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'daily_payment_plans' %}{% endif %}" class="button-link alt">بازگشت به برنامه ها</a>
+            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'daily_payment_plans' %}{% endif %}" class="button-link alt">{{ return_label|default:'بازگشت به برنامه ها' }}</a>
             <a href="{% url 'submit' %}" class="button-link alt">صفحه اصلی</a>
         </div>
     </div>
