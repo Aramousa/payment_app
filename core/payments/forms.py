@@ -24,6 +24,18 @@ MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
 DEFAULT_RECEIPT_MAX_UPLOAD_SIZE = 1 * 1024 * 1024
 DEFAULT_INVOICE_MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+RECONCILIATION_ATTACHMENT_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+# فرمت‌های اجرایی، اسکریپتی و نصب‌کننده که ریسک امنیتی دارند و در پیوست گفتگو مجاز نیستند
+RECONCILIATION_BLOCKED_ATTACHMENT_EXTENSIONS = {
+    '.exe', '.com', '.bat', '.cmd', '.msi', '.msix', '.msixbundle', '.msp', '.mst',
+    '.scr', '.pif', '.cpl', '.dll', '.sys', '.drv', '.vxd', '.gadget', '.application',
+    '.js', '.jse', '.vb', '.vbs', '.vbe', '.ws', '.wsc', '.wsf', '.wsh',
+    '.ps1', '.ps1xml', '.ps2', '.psc1', '.psc2', '.msh', '.msh1', '.msh2',
+    '.lnk', '.inf', '.reg', '.scf', '.hta', '.jar', '.jnlp',
+    '.php', '.php3', '.php4', '.php5', '.phtml', '.asp', '.aspx', '.jsp', '.jspx',
+    '.cgi', '.pl', '.py', '.rb', '.sh',
+    '.apk', '.app', '.command', '.dmg', '.run', '.bin', '.action', '.workflow', '.out',
+}
 IMAGE_RESIZE_MAX_SIDE = 2200
 PROFILE_AVATAR_MAX_UPLOAD_SIZE = 512 * 1024
 PROFILE_AVATAR_MAX_SIDE = 512
@@ -1720,16 +1732,33 @@ class ReconciliationThreadForm(forms.ModelForm):
 class ReconciliationMessageForm(forms.ModelForm):
     class Meta:
         model = ReconciliationMessage
-        fields = ['body', 'document_type', 'document_id']
+        fields = ['body', 'attachment', 'document_type', 'document_id']
         labels = {
             'body': 'پیام',
+            'attachment': 'پیوست فایل',
             'document_type': 'ارجاع به سند',
             'document_id': 'شناسه سند',
         }
         widgets = {
             'body': forms.Textarea(attrs={'rows': 3, 'placeholder': 'پیام خود را بنویسید...'}),
+            'attachment': forms.ClearableFileInput(attrs={'class': 'chat-attachment-input'}),
             'document_id': forms.NumberInput(attrs={'min': 1, 'placeholder': 'شناسه سند'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['body'].required = False
+
+    def clean_attachment(self):
+        uploaded = self.cleaned_data.get('attachment')
+        if not uploaded:
+            return uploaded
+        ext = os.path.splitext(uploaded.name or '')[1].lower()
+        if ext in RECONCILIATION_BLOCKED_ATTACHMENT_EXTENSIONS:
+            raise ValidationError('این نوع فایل به دلیل ریسک امنیتی قابل ارسال نیست.')
+        if uploaded.size and uploaded.size > RECONCILIATION_ATTACHMENT_MAX_UPLOAD_SIZE:
+            raise ValidationError(f'حجم فایل باید حداکثر {_size_label(RECONCILIATION_ATTACHMENT_MAX_UPLOAD_SIZE)} باشد.')
+        return uploaded
 
     def clean(self):
         cleaned_data = super().clean()
@@ -1737,6 +1766,8 @@ class ReconciliationMessageForm(forms.ModelForm):
         document_id = cleaned_data.get('document_id')
         if document_type and not document_id:
             self.add_error('document_id', 'شناسه سند ارجاع‌شده را وارد کنید.')
+        if not (cleaned_data.get('body') or '').strip() and not cleaned_data.get('attachment'):
+            raise ValidationError('برای ارسال، نوشتن متن پیام یا پیوست‌کردن فایل الزامی است.')
         return cleaned_data
 
 

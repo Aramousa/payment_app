@@ -20,8 +20,8 @@
         .thread-filter-actions { align-items: center; display: flex; gap: 10px; }
         .thread-filter-actions .apply-btn { background: #1e3a5f; border: 0; border-radius: 8px; color: #fff; cursor: pointer; flex: 1; font-family: Vazir, sans-serif; font-weight: 900; min-height: 36px; padding: 6px 12px; }
         .thread-filter-actions .apply-btn:hover { background: #16284a; }
-        .thread-filter-actions .clear-btn { color: #64748b; font-size: 12px; font-weight: 800; text-decoration: none; white-space: nowrap; }
-        .thread-filter-actions .clear-btn:hover { color: #b42318; text-decoration: underline; }
+        .thread-filter-actions .clear-btn { align-items: center; background: #6c757d; border-radius: 8px; color: #fff; display: inline-flex; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 800; justify-content: center; min-height: 36px; padding: 6px 14px; text-decoration: none; white-space: nowrap; }
+        .thread-filter-actions .clear-btn:hover { background: #5a6268; color: #fff; }
         .thread-list { display: grid; max-height: calc(100vh - 340px); overflow-y: auto; }
         .thread-item { border-bottom: 1px solid #edf1f6; color: inherit; display: grid; gap: 5px; padding: 12px 14px; text-decoration: none; }
         .thread-item:hover, .thread-item.active { background: #eef5ff; }
@@ -53,9 +53,17 @@
         .msg-body { font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
         .msg-time { color: #64748b; font-size: 11px; margin-top: 6px; text-align: left; }
         .doc-link { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; margin-top: 8px; padding: 5px 8px; text-decoration: none; }
+        .msg-attachment { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; gap: 5px; margin-top: 8px; padding: 5px 9px; text-decoration: none; }
+        .msg-attachment:hover { background: #dbeafe; }
         .chat-form { background: #fff; border-top: 1px solid #edf1f6; display: grid; gap: 8px; padding: 12px; }
         .chat-input-row { align-items: end; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) 44px; }
         .chat-form textarea { min-height: 74px; resize: vertical; }
+        .chat-attachment-row { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+        .chat-attachment-row input[type="file"] { display: none; }
+        .chat-attachment-label { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #1e3a5f; cursor: pointer; font-size: 12px; font-weight: 800; padding: 6px 11px; white-space: nowrap; }
+        .chat-attachment-label:hover { background: #dbeafe; }
+        .chat-attachment-name { color: #64748b; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-attachment-clear { background: transparent; border: 0; color: #b91c1c; cursor: pointer; font-size: 12px; font-weight: 800; padding: 0; }
         .send-icon-btn { align-items: center; background: #22c55e; border: 0; border-radius: 50%; color: #fff; cursor: pointer; display: inline-flex; font-family: Arial, sans-serif; font-size: 22px; font-weight: 900; height: 42px; justify-content: center; line-height: 1; padding: 0; transform: rotate(180deg); width: 42px; }
         .send-icon-btn:hover { background: #16a34a; }
         .inline-fields { display: grid; gap: 8px; grid-template-columns: 1fr 120px; }
@@ -170,7 +178,10 @@
                                 {% else %}
                                     <div class="msg-author">کاربر حذف‌شده</div>
                                 {% endif %}
-                                <div class="msg-body">{{ message.body }}</div>
+                                {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
+                                {% if message.attachment %}
+                                    <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">📎 {{ message.attachment_display_name|truncatechars:42 }}</a>
+                                {% endif %}
                                 {% if message.document_label %}
                                     {% if message.document_url %}
                                         <a class="doc-link" href="{{ message.document_url }}">{{ message.document_label }}</a>
@@ -193,7 +204,7 @@
                 {% if active_thread.status == 'closed' %}
                     <div class="chat-closed-notice">این گفتگو بسته شده است و امکان ارسال پیام جدید وجود ندارد.</div>
                 {% else %}
-                    <form class="chat-form" method="post">
+                    <form class="chat-form" method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="send_message">
                         <input type="hidden" name="thread_id" value="{{ active_thread.id }}">
@@ -201,6 +212,12 @@
                         <div class="chat-input-row">
                             {{ message_form.body }}
                             <button class="send-icon-btn" type="submit" title="ارسال" aria-label="ارسال پیام">➤</button>
+                        </div>
+                        <div class="chat-attachment-row">
+                            <label class="chat-attachment-label" for="{{ message_form.attachment.id_for_label }}">📎 پیوست فایل</label>
+                            {{ message_form.attachment }}
+                            <span class="chat-attachment-name" data-chat-attachment-name></span>
+                            <button class="chat-attachment-clear" type="button" data-chat-attachment-clear hidden>حذف پیوست</button>
                         </div>
                         <div class="inline-fields">
                             <p>{{ message_form.document_type.label_tag }} {{ message_form.document_type }}</p>
@@ -259,11 +276,31 @@
         });
         var chatForm = document.querySelector('.chat-form');
         var messageBox = chatForm ? chatForm.querySelector('textarea[name="body"]') : null;
+        var attachmentInput = chatForm ? chatForm.querySelector('input[name="attachment"]') : null;
+        var attachmentNameEl = chatForm ? chatForm.querySelector('[data-chat-attachment-name]') : null;
+        var attachmentClearBtn = chatForm ? chatForm.querySelector('[data-chat-attachment-clear]') : null;
+        var hasContentToSend = function() {
+            var hasText = !!(messageBox && messageBox.value.trim());
+            var hasFile = !!(attachmentInput && attachmentInput.files && attachmentInput.files.length);
+            return hasText || hasFile;
+        };
+        if (attachmentInput && attachmentNameEl && attachmentClearBtn) {
+            attachmentInput.addEventListener('change', function() {
+                var file = attachmentInput.files && attachmentInput.files[0];
+                attachmentNameEl.textContent = file ? file.name : '';
+                attachmentClearBtn.hidden = !file;
+            });
+            attachmentClearBtn.addEventListener('click', function() {
+                attachmentInput.value = '';
+                attachmentNameEl.textContent = '';
+                attachmentClearBtn.hidden = true;
+            });
+        }
         if (chatForm && messageBox) {
             messageBox.addEventListener('keydown', function(event) {
                 if (event.key !== 'Enter' || event.shiftKey) return;
                 event.preventDefault();
-                if (!messageBox.value.trim()) return;
+                if (!hasContentToSend()) return;
                 if (chatForm.requestSubmit) {
                     chatForm.requestSubmit();
                 } else {

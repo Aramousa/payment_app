@@ -18,7 +18,7 @@ def _safe_upload_extension(filename):
 
 
 def _upload_actor_id(instance):
-    for attr in ('user', 'customer', 'uploaded_by', 'issued_by', 'requested_by'):
+    for attr in ('user', 'customer', 'sender', 'uploaded_by', 'issued_by', 'requested_by'):
         value = getattr(instance, f'{attr}_id', None)
         if value:
             return value
@@ -50,6 +50,10 @@ def payment_receipt_upload_to(instance, filename):
 
 def invoice_attachment_upload_to(instance, filename):
     return _unique_upload_path(instance, filename, 'invoices', 'invoicerecord')
+
+
+def reconciliation_attachment_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'reconciliation_attachments', 'reconciliationmessage')
 
 
 def invoice_extraction_upload_to(instance, filename):
@@ -683,7 +687,9 @@ class ReconciliationThread(models.Model):
 class ReconciliationMessage(models.Model):
     thread = models.ForeignKey(ReconciliationThread, on_delete=models.CASCADE, related_name='messages', verbose_name='گفتگو')
     sender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reconciliation_messages', verbose_name='فرستنده')
-    body = models.TextField('متن پیام')
+    body = models.TextField('متن پیام', blank=True)
+    attachment = models.FileField('فایل پیوست', upload_to=reconciliation_attachment_upload_to, null=True, blank=True)
+    attachment_name = models.CharField('نام فایل پیوست', max_length=255, blank=True)
     document_type = models.CharField('نوع سند ارجاع‌شده', max_length=24, choices=ReconciliationThread.DOCUMENT_CHOICES, default='', blank=True)
     document_id = models.PositiveIntegerField('شناسه سند ارجاع‌شده', null=True, blank=True)
     created_at = models.DateTimeField('زمان ارسال', auto_now_add=True)
@@ -701,6 +707,12 @@ class ReconciliationMessage(models.Model):
         if not self.document_type:
             return ''
         return f'{self.get_document_type_display()} #{self.document_id or "-"}'
+
+    @property
+    def attachment_display_name(self):
+        if not self.attachment:
+            return ''
+        return self.attachment_name or self.attachment.name.rsplit('/', 1)[-1]
 
 
 class ReconciliationReadState(models.Model):

@@ -409,18 +409,19 @@ def _return_link_label(request, default_label):
     return default_label
 
 
-def _file_response(field_file, as_attachment=False):
+def _file_response(field_file, as_attachment=False, filename=None):
     if not field_file:
         raise Http404
     try:
         field_file.open('rb')
     except FileNotFoundError as exc:
         raise Http404 from exc
-    content_type, _ = mimetypes.guess_type(field_file.name)
+    download_name = filename or field_file.name.rsplit('/', 1)[-1]
+    content_type, _ = mimetypes.guess_type(download_name)
     return FileResponse(
         field_file,
         as_attachment=as_attachment,
-        filename=field_file.name.rsplit('/', 1)[-1],
+        filename=download_name,
         content_type=content_type or 'application/octet-stream',
     )
 
@@ -1464,6 +1465,42 @@ def _notify_invoice_created(invoice, actor):
     )
 
 
+def _invoice_staff_notification_users(exclude_user=None):
+    role_filter = (
+        Q(is_superuser=True)
+        | Q(profile__role__in={'sales', 'sales_manager', 'commercial_manager', 'finance_manager'})
+        | Q(profile__can_view_invoices=True)
+    )
+    users = User.objects.filter(role_filter, is_active=True).distinct()
+    if exclude_user and exclude_user.is_authenticated:
+        users = users.exclude(id=exclude_user.id)
+    return users
+
+
+def _notify_payment_customer_note(payment, actor, note_text):
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else '-')
+    _notify_users(
+        _staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor),
+        'یادداشت جدید مشتری روی فیش',
+        f'{customer_name} یک توضیح جدید روی فیش واریزی ثبت کرد: «{note_text[:120]}»',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+    )
+
+
+def _notify_invoice_customer_note(invoice, actor):
+    customer_name = invoice.customer.get_full_name().strip() or invoice.customer.username
+    _notify_users(
+        _invoice_staff_notification_users(exclude_user=actor),
+        'یادداشت جدید مشتری روی فاکتور',
+        f'{customer_name} یک یادداشت جدید روی فاکتور ثبت کرد.',
+        reverse('invoice_detail', args=[invoice.id]),
+        category=UserNotification.CATEGORY_INVOICE,
+        actor=actor,
+    )
+
+
 def _role_title(user):
     if not user:
         return 'کاربر'
@@ -2310,6 +2347,22 @@ def reconciliation_messages_feed(request):
         'unread_count': _reconciliation_unread_count(request.user),
         'items': items,
     })
+
+
+_RECONCILIATION_INLINE_ATTACHMENT_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.pdf'}
+
+
+@login_required
+def reconciliation_attachment_download(request, message_id):
+    message = get_object_or_404(ReconciliationMessage.objects.select_related('thread'), id=message_id)
+    if not _can_access_reconciliation_thread(request.user, message.thread):
+        return HttpResponseForbidden('شما به این پیوست دسترسی ندارید.')
+    if not message.attachment:
+        raise Http404
+    name = message.attachment_name or message.attachment.name
+    ext = os.path.splitext(name)[1].lower()
+    as_attachment = request.GET.get('download') == '1' or ext not in _RECONCILIATION_INLINE_ATTACHMENT_EXTENSIONS
+    return _file_response(message.attachment, as_attachment=as_attachment, filename=message.attachment_name or None)
 
 
 @login_required
@@ -3573,6 +3626,7 @@ def add_payment_note(request, payment_id):
         messages.error(request, 'توضیح حداکثر ۱۰۰۰ کاراکتر می‌تواند باشد.')
     else:
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_CUSTOMER_NOTE, note=note_text)
+        _notify_payment_customer_note(payment, request.user, note_text)
         messages.success(request, 'توضیح شما با موفقیت در روال فیش ثبت شد.')
 
     return redirect(timeline_url)
@@ -3738,11 +3792,14 @@ def reconciliation_center(request):
             if thread.status == ReconciliationThread.STATUS_CLOSED:
                 messages.error(request, 'این گفتگو بسته شده است.')
                 return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
-            message_form = ReconciliationMessageForm(request.POST)
+            message_form = ReconciliationMessageForm(request.POST, request.FILES)
             if message_form.is_valid():
                 message = message_form.save(commit=False)
                 message.thread = thread
                 message.sender = request.user
+                uploaded = message_form.cleaned_data.get('attachment')
+                if uploaded:
+                    message.attachment_name = uploaded.name
                 message.save()
                 thread.updated_at = timezone.now()
                 thread.save(update_fields=['updated_at'])
@@ -4325,9 +4382,13 @@ def invoice_detail(request, invoice_id):
     if request.method == 'POST':
         if is_staff_user:
             return HttpResponseForbidden('ثبت یادداشت فقط برای مشتری فعال است.')
+        previous_note = (invoice.customer_note or '').strip()
         form = InvoiceCustomerNoteForm(request.POST, instance=invoice)
         if form.is_valid():
             form.save()
+            new_note = (form.cleaned_data.get('customer_note') or '').strip()
+            if new_note and new_note != previous_note:
+                _notify_invoice_customer_note(invoice, request.user)
             messages.success(request, 'یادداشت شما ذخیره شد.')
             redirect_url = request.path
             if return_url:
