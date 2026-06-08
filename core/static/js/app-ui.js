@@ -861,6 +861,11 @@
         return '';
     }
 
+    function getCsrfToken() {
+        var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return input ? input.value : getCookie('csrftoken');
+    }
+
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, function (char) {
             return {
@@ -927,7 +932,7 @@
                 if (!readUrl || !nid || link.dataset.notifRead === '1') return Promise.resolve(null);
                 link.dataset.notifRead = '1';
                 var body = 'id=' + encodeURIComponent(nid);
-                var csrfToken = getCookie('csrftoken');
+                var csrfToken = getCsrfToken();
                 if (options.useBeacon !== false && navigator.sendBeacon) {
                     var formData = new FormData();
                     formData.append('id', nid);
@@ -1043,7 +1048,7 @@
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: {
-                            'X-CSRFToken': getCookie('csrftoken'),
+                            'X-CSRFToken': getCsrfToken(),
                             'Content-Type': 'application/x-www-form-urlencoded'
                         },
                         body: ''

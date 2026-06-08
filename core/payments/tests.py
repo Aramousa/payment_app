@@ -715,7 +715,7 @@ class InvoiceFlowTests(TestCase):
             tracking_code='CP-LEGACY',
             status=PaymentRecord.STATUS_APPROVED,
         )
-        UserNotification.objects.create(
+        notification = UserNotification.objects.create(
             user=self.commercial_user,
             title='✅ تایید فیش توسط طرف حساب',
             message=f'فیش #{payment.id} توسط «CP Alpha» تایید شد.',
@@ -729,6 +729,11 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload['items'][0]['url'], reverse('payment_timeline', args=[payment.id]))
+
+        response = self.client.get(reverse('payment_timeline', args=[payment.id]))
+        self.assertEqual(response.status_code, 200)
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
 
     def test_customer_sees_commercial_and_final_approval_as_distinct_statuses(self):
         commercial_payment = PaymentRecord.objects.create(

@@ -2,6 +2,7 @@ import jdatetime
 import logging
 import mimetypes
 import random
+import re
 import uuid
 from openpyxl import Workbook
 from urllib.parse import urlencode
@@ -1360,9 +1361,18 @@ def _mark_notifications_read_for_url(user, url):
     if not path:
         return 0
 
+    condition = Q(url=path) | Q(url__startswith=f'{path}?')
+    payment_match = re.search(r'/payments/(\d+)/timeline/?$', path)
+    if payment_match:
+        condition |= Q(
+            url=reverse('submit'),
+            title__contains='طرف حساب',
+            message__contains=f'#{payment_match.group(1)}',
+        )
+
     now = timezone.now()
     return UserNotification.objects.filter(
-        Q(url=path) | Q(url__startswith=f'{path}?'),
+        condition,
         user=user,
         is_read=False,
     ).update(is_read=True, read_at=now)
