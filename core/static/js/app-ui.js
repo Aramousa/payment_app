@@ -921,20 +921,31 @@
                 }).join('');
             }
 
-            function markNotificationRead(link) {
+            function markNotificationRead(link, options) {
+                options = options || {};
                 var nid = link.dataset.notifId;
-                if (!readUrl || !nid || link.dataset.notifRead === '1') return;
+                if (!readUrl || !nid || link.dataset.notifRead === '1') return Promise.resolve(null);
                 link.dataset.notifRead = '1';
+                var body = 'id=' + encodeURIComponent(nid);
+                var csrfToken = getCookie('csrftoken');
+                if (options.useBeacon !== false && navigator.sendBeacon) {
+                    var formData = new FormData();
+                    formData.append('id', nid);
+                    formData.append('csrfmiddlewaretoken', csrfToken);
+                    if (navigator.sendBeacon(readUrl, formData)) {
+                        return Promise.resolve(null);
+                    }
+                }
                 // keepalive: درخواست با وجود انتقال صفحه (کلیک روی لینک) ناتمام نمی‌ماند و قطع نمی‌شود
-                fetch(readUrl, {
+                return fetch(readUrl, {
                     method: 'POST',
                     credentials: 'same-origin',
-                    keepalive: true,
+                    keepalive: options.keepalive !== false,
                     headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
+                        'X-CSRFToken': csrfToken,
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: 'id=' + encodeURIComponent(nid)
+                    body: body
                 }).then(function (response) {
                     return response.ok ? response.json() : null;
                 }).then(function (data) {
@@ -948,7 +959,13 @@
             if (list) {
                 list.addEventListener('click', function (event) {
                     var link = event.target.closest('[data-notif-id]');
-                    if (link) markNotificationRead(link);
+                    if (!link) return;
+                    var targetUrl = link.getAttribute('href');
+                    if (!targetUrl) return;
+                    event.preventDefault();
+                    markNotificationRead(link, { useBeacon: false, keepalive: false }).finally(function () {
+                        window.location.href = targetUrl;
+                    });
                 });
             }
 

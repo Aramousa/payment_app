@@ -1344,12 +1344,28 @@ def _notification_payload(notification):
         'id':         notification.id,
         'title':      notification.title,
         'message':    notification.message,
-        'url':        notification.url or reverse('submit'),
+        'url':        notification.resolved_url,
         'category':   notification.category,
         'icon':       icon,
         'time_label': time_label,
         'created_at': _format_jalali_datetime(notification.created_at),
     }
+
+
+def _mark_notifications_read_for_url(user, url):
+    if not user.is_authenticated or not url:
+        return 0
+
+    path = url.split('?', 1)[0]
+    if not path:
+        return 0
+
+    now = timezone.now()
+    return UserNotification.objects.filter(
+        Q(url=path) | Q(url__startswith=f'{path}?'),
+        user=user,
+        is_read=False,
+    ).update(is_read=True, read_at=now)
 
 
 def _notify_users(users, title, message, url='', category=UserNotification.CATEGORY_SYSTEM, actor=None, sms_message=None):
@@ -2592,6 +2608,7 @@ def daily_payment_plan_detail(request, plan_id):
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدهای شرکت قابل دسترسی است.')
 
     plan = get_object_or_404(DailyPaymentPlan.objects.select_related('created_by'), id=plan_id)
+    _mark_notifications_read_for_url(request.user, request.path)
     can_manage = _can_manage_daily_payments(request.user)
     return_url = _safe_next_url(request, default=f"{reverse('daily_payment_plans')}?date={_format_jalali_date(plan.deposit_date)}")
     return_label = _return_link_label(request, 'بازگشت به برنامه ها')
@@ -3523,6 +3540,10 @@ def payment_timeline(request, payment_id):
     if not is_staff_user and payment.user_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده تاریخچه اسناد خودتان وجود دارد.')
 
+    _mark_notifications_read_for_url(request.user, request.path)
+    if not is_staff_user and payment.customer_seen_at is None:
+        payment.customer_seen_at = timezone.now()
+        payment.save(update_fields=['customer_seen_at'])
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده تاریخچه')
     raw_logs = payment.activity_logs.select_related('actor', 'actor__profile').all()
 
@@ -4248,6 +4269,7 @@ def proforma_detail(request, proforma_id):
     if not _can_access_proforma(request.user, proforma):
         return HttpResponseForbidden('فقط امکان مشاهده پیش فاکتورهای خودتان وجود دارد.')
 
+    _mark_notifications_read_for_url(request.user, request.path)
     is_staff_user = _is_staff_user(request.user)
     if not is_staff_user:
         if proforma.customer_seen_at is None:
@@ -4343,6 +4365,7 @@ def invoice_detail(request, invoice_id):
     if not is_staff_user and invoice.customer_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده فاکتورهای خودتان وجود دارد.')
 
+    _mark_notifications_read_for_url(request.user, request.path)
     if not is_staff_user and invoice.customer_seen_at is None:
         invoice.customer_seen_at = timezone.now()
         invoice.save(update_fields=['customer_seen_at'])
@@ -4386,6 +4409,7 @@ def invoice_file(request, invoice_id):
         return HttpResponseForbidden('امکان حذف فاکتور این مشتری برای شما وجود ندارد.')
     if not _can_access_invoice(request.user, invoice):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فاکتورهای خودتان وجود دارد.')
+    _mark_notifications_read_for_url(request.user, request.path)
     return _file_response(invoice.attachment, as_attachment=request.GET.get('download') == '1')
 
 
@@ -4400,6 +4424,7 @@ def price_list_file(request, price_list_id):
     latest = PriceList.objects.filter(customer=request.user).order_by('-created_at', '-id').first()
     if not latest or price_list.customer_id != request.user.id or latest.batch_id != price_list.batch_id:
         return HttpResponseForbidden('فقط امکان مشاهده آخرین لیست قیمت خودتان وجود دارد.')
+    _mark_notifications_read_for_url(request.user, request.path)
     if price_list.customer_seen_at is None:
         price_list.customer_seen_at = timezone.now()
         price_list.save(update_fields=['customer_seen_at'])
@@ -4411,6 +4436,7 @@ def proforma_file(request, proforma_id):
     proforma = get_object_or_404(ProformaInvoice.objects.select_related('customer'), id=proforma_id)
     if not _can_access_proforma(request.user, proforma):
         return HttpResponseForbidden('فقط امکان مشاهده فایل پیش فاکتورهای خودتان وجود دارد.')
+    _mark_notifications_read_for_url(request.user, request.path)
     if not _is_staff_user(request.user):
         if proforma.customer_seen_at is None:
             proforma.customer_seen_at = timezone.now()
@@ -4739,6 +4765,7 @@ def order_detail(request, order_id):
     if not _orders_for_user(request.user).filter(id=order.id).exists():
         return HttpResponseForbidden('امکان مشاهده این سفارش برای شما وجود ندارد.')
 
+    _mark_notifications_read_for_url(request.user, request.path)
     can_manage = _can_manage_orders(request.user)
     status_form = StaffOrderUpdateForm(instance=order) if can_manage else None
     proforma_form = OrderProformaUploadForm() if can_manage else None
@@ -5116,7 +5143,7 @@ def counterparty_approve_payment(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '✅ تایید فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» تایید شد.' + (f' توضیح: {note}' if note else ''),
-        reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
     )
     messages.success(request, f'✅ فیش #{payment_id} با موفقیت تایید شد.')
     return redirect('counterparty_dashboard')
@@ -5155,7 +5182,7 @@ def counterparty_return_payment_cp(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '⚠ عودت فیش از طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» عودت داده شد. دلیل: {note}',
-        reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
     )
     messages.warning(request, f'⚠ فیش #{payment_id} به بازرگانی عودت داده شد.')
     return redirect('counterparty_dashboard')
@@ -5191,7 +5218,7 @@ def counterparty_reject_payment_cp(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '🚫 رد فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» رد/ابطال شد. دلیل: {note}',
-        reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
     )
     messages.error(request, f'🚫 فیش #{payment_id} رد/ابطال شد.')
     return redirect('counterparty_dashboard')

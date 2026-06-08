@@ -12,7 +12,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from .forms import DailyPaymentAssignmentForm, InvoiceUploadForm, PriceListUploadForm, ProformaInvoiceForm
-from .models import CustomerOrder, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
+from .models import Counterparty, CustomerOrder, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -164,6 +164,101 @@ class InvoiceFlowTests(TestCase):
             {'attachment': SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf')},
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_invoice_detail_marks_related_notifications_read(self):
+        invoice = InvoiceRecord.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.commercial_user,
+            amount=2500000,
+            invoice_number='INV-NOTIF',
+            reference_number='REF-NOTIF',
+            attachment=SimpleUploadedFile('invoice.pdf', b'%PDF-1.4 sample', content_type='application/pdf'),
+        )
+        detail_url = reverse('invoice_detail', args=[invoice.id])
+        plain_notification = UserNotification.objects.create(
+            user=self.customer_user,
+            title='Invoice',
+            message='Invoice created',
+            url=detail_url,
+            category=UserNotification.CATEGORY_INVOICE,
+        )
+        query_notification = UserNotification.objects.create(
+            user=self.customer_user,
+            title='Invoice with next',
+            message='Invoice created',
+            url=f'{detail_url}?next=/invoices/',
+            category=UserNotification.CATEGORY_INVOICE,
+        )
+        other_notification = UserNotification.objects.create(
+            user=self.customer_user,
+            title='Other',
+            message='Other document',
+            url=reverse('submit'),
+            category=UserNotification.CATEGORY_SYSTEM,
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(detail_url)
+
+        self.assertEqual(response.status_code, 200)
+        invoice.refresh_from_db()
+        plain_notification.refresh_from_db()
+        query_notification.refresh_from_db()
+        other_notification.refresh_from_db()
+        self.assertIsNotNone(invoice.customer_seen_at)
+        self.assertTrue(plain_notification.is_read)
+        self.assertTrue(query_notification.is_read)
+        self.assertFalse(other_notification.is_read)
+        self.assertEqual(UserNotification.objects.filter(user=self.customer_user, is_read=False).count(), 1)
+
+    def test_payment_timeline_marks_notification_read_and_payment_seen(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            amount=1000000,
+        )
+        notification = UserNotification.objects.create(
+            user=self.customer_user,
+            title='Payment',
+            message='Payment updated',
+            url=reverse('payment_timeline', args=[payment.id]),
+            category=UserNotification.CATEGORY_PAYMENT,
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('payment_timeline', args=[payment.id]))
+
+        self.assertEqual(response.status_code, 200)
+        payment.refresh_from_db()
+        notification.refresh_from_db()
+        self.assertIsNotNone(payment.customer_seen_at)
+        self.assertTrue(notification.is_read)
+        self.assertIsNotNone(notification.read_at)
+
+    def test_price_list_file_marks_related_notification_read(self):
+        price_list = PriceList.objects.create(
+            customer=self.customer_user,
+            uploaded_by=self.commercial_user,
+            title='Spring prices',
+            file=SimpleUploadedFile('prices.pdf', b'%PDF-1.4 sample', content_type='application/pdf'),
+        )
+        notification = UserNotification.objects.create(
+            user=self.customer_user,
+            title='Price list',
+            message='New price list',
+            url=reverse('price_list_file', args=[price_list.id]),
+            category=UserNotification.CATEGORY_SYSTEM,
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('price_list_file', args=[price_list.id]))
+
+        self.assertEqual(response.status_code, 200)
+        price_list.refresh_from_db()
+        notification.refresh_from_db()
+        self.assertIsNotNone(price_list.customer_seen_at)
+        self.assertTrue(notification.is_read)
 
     def test_invoice_image_parse_preview_suggests_form_fields(self):
         self.client.login(username='commercial1', password='pass1234')
@@ -566,6 +661,74 @@ class InvoiceFlowTests(TestCase):
         response = self.client.post(reverse('notifications_mark_read'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(UserNotification.objects.filter(user=self.customer_user, is_read=False).count(), 0)
+
+    def test_counterparty_approval_notification_links_to_payment_and_marks_read_on_view(self):
+        counterparty_user = User.objects.create_user(username='counterparty1', password='pass1234')
+        counterparty_user.profile.role = 'counterparty'
+        counterparty_user.profile.force_password_change = False
+        counterparty_user.profile.save()
+        counterparty = Counterparty.objects.create(name='CP Alpha', user=counterparty_user)
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            counterparty=counterparty,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='CP-APPROVE',
+            status=PaymentRecord.STATUS_APPROVED,
+        )
+
+        self.client.login(username='counterparty1', password='pass1234')
+        response = self.client.post(reverse('counterparty_approve_payment', args=[payment.id]), {'note': 'ok'})
+        self.assertEqual(response.status_code, 302)
+
+        notification = UserNotification.objects.get(
+            user=self.commercial_user,
+            title='✅ تایید فیش توسط طرف حساب',
+        )
+        self.assertEqual(notification.url, reverse('payment_timeline', args=[payment.id]))
+        self.assertEqual(notification.category, UserNotification.CATEGORY_PAYMENT)
+
+        self.client.logout()
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(notification.url)
+
+        self.assertEqual(response.status_code, 200)
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
+        self.assertEqual(UserNotification.objects.filter(user=self.commercial_user, is_read=False).count(), 0)
+
+    def test_legacy_counterparty_notification_submit_url_resolves_to_payment_timeline(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='CP-LEGACY',
+            status=PaymentRecord.STATUS_APPROVED,
+        )
+        UserNotification.objects.create(
+            user=self.commercial_user,
+            title='✅ تایید فیش توسط طرف حساب',
+            message=f'فیش #{payment.id} توسط «CP Alpha» تایید شد.',
+            url=reverse('submit'),
+            category=UserNotification.CATEGORY_SYSTEM,
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('notifications_feed'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['items'][0]['url'], reverse('payment_timeline', args=[payment.id]))
 
     def test_customer_sees_commercial_and_final_approval_as_distinct_statuses(self):
         commercial_payment = PaymentRecord.objects.create(

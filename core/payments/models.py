@@ -1,10 +1,12 @@
 import uuid
 import os
+import re
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
+from django.urls import reverse
 from django.utils import timezone
 from django_jalali.db import models as jmodels
 
@@ -955,6 +957,15 @@ class UserNotification(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.title}"
+
+    @property
+    def resolved_url(self):
+        url = self.url or reverse('submit')
+        if url == reverse('submit') and 'طرف حساب' in (self.title or ''):
+            match = re.search(r'#(\d+)', self.message or '')
+            if match:
+                return reverse('payment_timeline', args=[int(match.group(1))])
+        return url
 
 
 class InvoiceRecord(models.Model):
