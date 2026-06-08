@@ -1455,10 +1455,11 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
     elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED, PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
         recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
 
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
     _notify_users(
         recipients,
         'تغییر وضعیت فیش',
-        f'وضعیت فیش به «{status_text}» تغییر کرد.',
+        f'وضعیت فیش #{payment.id} مشتری {customer_name} به «{status_text}» تغییر کرد.',
         reverse('payment_timeline', args=[payment.id]),
         category=UserNotification.CATEGORY_PAYMENT,
         actor=actor,
@@ -1470,10 +1471,11 @@ def _notify_payment_edited(payment, actor, title='ویرایش فیش واریز
     if payment.user_id and (not actor or payment.user_id != actor.id):
         recipients.append(payment.user)
     recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
     _notify_users(
         recipients,
         title,
-        'اطلاعات فیش واریزی بروزرسانی شد.',
+        f'اطلاعات فیش #{payment.id} مشتری {customer_name} بروزرسانی شد.',
         reverse('payment_timeline', args=[payment.id]),
         category=UserNotification.CATEGORY_PAYMENT,
         actor=actor,
@@ -1481,10 +1483,11 @@ def _notify_payment_edited(payment, actor, title='ویرایش فیش واریز
 
 
 def _notify_invoice_created(invoice, actor):
+    invoice_ref = invoice.invoice_number or f'#{invoice.id}'
     _notify_users(
         [invoice.customer],
         'فاکتور جدید',
-        'یک فاکتور جدید برای شما ثبت شد.',
+        f'فاکتور {invoice_ref} برای شما ثبت شد.',
         reverse('invoice_detail', args=[invoice.id]),
         category=UserNotification.CATEGORY_INVOICE,
         actor=actor,
@@ -3172,8 +3175,9 @@ def finance_bulk_final_approve(request):
                           from_status=old_status, to_status=payment.status,
                           note=note or 'تأیید نهایی گروهی')
             if payment.user:
+                customer_name = f"{payment.first_name} {payment.last_name}".strip() or payment.user.username
                 _notify_users([payment.user], 'تأیید نهایی سند',
-                              f'سند #{pid} تأیید نهایی شد.',
+                              f'سند #{pid} مشتری {customer_name} تأیید نهایی شد.',
                               reverse('submit'), category=UserNotification.CATEGORY_SYSTEM,
                               actor=request.user)
             approved += 1
@@ -3255,10 +3259,11 @@ def delegate_final_approval(request, payment_id):
         payment.final_approval_delegated_to = delegate_user
         payment.save(update_fields=['final_approval_delegated_to'])
         # اطلاع‌رسانی به کاربر تفویض‌شده
+        customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
         _notify_users(
             [delegate_user],
             '📋 تفویض اختیار تأیید نهایی',
-            f'اختیار تأیید نهایی سند #{payment_id} به شما تفویض شد.',
+            f'اختیار تأیید نهایی سند #{payment_id} مشتری {customer_name} به شما تفویض شد.',
             reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
         )
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
@@ -3290,10 +3295,11 @@ def finance_unified_action(request, payment_id):
         payment.save(update_fields=['finance_status', 'finance_registered_at', 'finance_registered_by'])
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_REGISTERED, note=note)
         if payment.ready_for_final_approval:
+            customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
             _notify_users(
                 list(_staff_notification_users({'finance_manager'})),
                 '✅ سند آماده تأیید نهایی',
-                f'سند #{payment_id} هم ثبت بازرگانی و هم ثبت مالی دارد.',
+                f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد.',
                 reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
             )
         messages.success(request, f'ثبت مالی سند #{payment_id} انجام شد.')
@@ -3345,10 +3351,11 @@ def finance_register_payment(request, payment_id):
 
     # اگر هر دو فلگ آماده شد، به مدیر مالی اطلاع بده
     if payment.ready_for_final_approval:
+        customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
         _notify_users(
             list(_staff_notification_users({'finance_manager'})),
             '✅ سند آماده تأیید نهایی',
-            f'سند #{payment_id} هم ثبت بازرگانی و هم ثبت مالی دارد و آماده تأیید نهایی است.',
+            f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد و آماده تأیید نهایی است.',
             reverse('submit'),
             category=UserNotification.CATEGORY_SYSTEM,
             actor=request.user,
@@ -3379,10 +3386,11 @@ def finance_final_approve(request, payment_id):
                   from_status=old_status, to_status=payment.status,
                   note=note or '')
 
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
     _notify_users(
         [payment.user] if payment.user else [],
         'تأیید نهایی سند',
-        f'سند #{payment_id} توسط مدیر مالی تأیید نهایی شد.',
+        f'سند #{payment_id} مشتری {customer_name} توسط مدیر مالی تأیید نهایی شد.',
         reverse('submit'),
         category=UserNotification.CATEGORY_SYSTEM,
         actor=request.user,

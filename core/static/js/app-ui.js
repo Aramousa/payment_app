@@ -894,6 +894,37 @@
             var storageKey = 'paymentAppNotificationLastSeen:' + userId;
             var lastSeenId = Number(localStorage.getItem(storageKey) || '0');
             var firstPoll = true;
+            var soundMuteKey = 'notifSoundMuted:' + userId;
+            var soundToggleBtn = bell.querySelector('.notification-sound-toggle');
+
+            function isSoundMuted() {
+                try { return localStorage.getItem(soundMuteKey) === '1'; } catch (e) { return false; }
+            }
+            function setSoundMuted(muted) {
+                try { localStorage.setItem(soundMuteKey, muted ? '1' : '0'); } catch (e) {}
+            }
+            function updateSoundToggleUI() {
+                if (!soundToggleBtn) return;
+                var muted = isSoundMuted();
+                soundToggleBtn.textContent = muted ? '🔇 صدا خاموش' : '🔔 صدا روشن';
+                soundToggleBtn.classList.toggle('secondary', muted);
+            }
+            function playNotificationSound() {
+                if (isSoundMuted()) return;
+                try {
+                    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 520;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.5);
+                } catch (e) {}
+            }
 
             function setOpen(open) {
                 bell.classList.toggle('open', open);
@@ -999,6 +1030,7 @@
                     items.slice().sort(function (a, b) { return a.id - b.id; }).forEach(function (item) {
                         if (item.id > lastSeenId && !firstPoll) {
                             showBrowserNotification(item);
+                            playNotificationSound();
                         }
                         if (item.id > lastSeenId) {
                             lastSeenId = item.id;
@@ -1011,6 +1043,15 @@
                 } catch (error) {
                     firstPoll = false;
                 }
+            }
+
+            if (soundToggleBtn) {
+                updateSoundToggleUI();
+                soundToggleBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    setSoundMuted(!isSoundMuted());
+                    updateSoundToggleUI();
+                });
             }
 
             if (trigger) {
