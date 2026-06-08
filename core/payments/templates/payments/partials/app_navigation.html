@@ -34,7 +34,7 @@
                 </div>
                 <div class="notification-list">
                     {% for item in unread_notifications.items %}
-                        <a class="notification-item" href="{{ item.url }}">
+                        <a class="notification-item" href="{{ item.url }}" data-notif-id="{{ item.id }}">
                             <strong>{{ item.title }}:</strong> {{ item.message }}
                         </a>
                     {% empty %}

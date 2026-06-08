@@ -919,29 +919,36 @@
                         '</span>' +
                         '</a>';
                 }).join('');
+            }
 
-                // کلیک روی هر item → read شدن همان notification و به‌روزرسانی فوری شمارنده
-                list.querySelectorAll('[data-notif-id]').forEach(function (link) {
-                    link.addEventListener('click', function () {
-                        var nid = link.dataset.notifId;
-                        if (!readUrl || !nid || link.dataset.notifRead === '1') return;
-                        link.dataset.notifRead = '1';
-                        // keepalive: درخواست با وجود انتقال صفحه (کلیک روی لینک) ناتمام نمی‌ماند
-                        fetch(readUrl, {
-                            method: 'POST',
-                            credentials: 'same-origin',
-                            keepalive: true,
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            },
-                            body: 'id=' + encodeURIComponent(nid)
-                        }).then(function (response) {
-                            return response.ok ? response.json() : null;
-                        }).then(function (data) {
-                            if (data && typeof data.unread_count === 'number') updateBadge(data.unread_count);
-                        }).catch(function () { /* silent */ });
-                    });
+            function markNotificationRead(link) {
+                var nid = link.dataset.notifId;
+                if (!readUrl || !nid || link.dataset.notifRead === '1') return;
+                link.dataset.notifRead = '1';
+                // keepalive: درخواست با وجود انتقال صفحه (کلیک روی لینک) ناتمام نمی‌ماند و قطع نمی‌شود
+                fetch(readUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    keepalive: true,
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'id=' + encodeURIComponent(nid)
+                }).then(function (response) {
+                    return response.ok ? response.json() : null;
+                }).then(function (data) {
+                    if (data && typeof data.unread_count === 'number') updateBadge(data.unread_count);
+                }).catch(function () { /* silent */ });
+            }
+
+            // delegation روی کانتینر لیست: هم آیتم‌هایی که سرور هنگام بارگذاری صفحه رندر کرده
+            // و هم آیتم‌هایی که بعداً با poll جایگزین می‌شوند را پوشش می‌دهد — بدون نیاز به
+            // اتصال مجدد هندلر به ازای هر رندر (و بدون رقابت زمانی با اولین poll)
+            if (list) {
+                list.addEventListener('click', function (event) {
+                    var link = event.target.closest('[data-notif-id]');
+                    if (link) markNotificationRead(link);
                 });
             }
 
@@ -985,28 +992,14 @@
             }
 
             if (trigger) {
-                trigger.addEventListener('click', async function (event) {
+                trigger.addEventListener('click', function (event) {
                     event.preventDefault();
                     event.stopPropagation();
                     var wasOpen = bell.classList.contains('open');
                     setOpen(!wasOpen);
-                    // باز کردن → mark all as read بعد از ۲ ثانیه (کاربر دید)
-                    if (!wasOpen && readUrl) {
-                        setTimeout(async function () {
-                            try {
-                                await fetch(readUrl, {
-                                    method: 'POST',
-                                    credentials: 'same-origin',
-                                    headers: {
-                                        'X-CSRFToken': getCookie('csrftoken'),
-                                        'Content-Type': 'application/x-www-form-urlencoded'
-                                    },
-                                    body: ''
-                                });
-                                await poll();
-                            } catch (e) { /* silent */ }
-                        }, 2000);
-                    }
+                    // باز شدن → فقط تازه‌سازی فهرست؛ خوانده‌شدن صرفاً با کلیک روی هر مورد یا
+                    // دکمهٔ «خوانده شد» انجام می‌شود تا وضعیت شمارنده برای کاربر قابل پیش‌بینی بماند
+                    if (!wasOpen) poll();
                 });
             }
             bell.addEventListener('click', function (event) {
