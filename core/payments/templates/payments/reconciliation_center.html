@@ -27,18 +27,23 @@
         .status-chip { background: #e8f7ef; border: 1px solid #bce7ce; border-radius: 999px; color: #116149; font-size: 12px; font-weight: 900; padding: 4px 10px; }
         .status-chip.closed { background: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
         .chat-feed { background: linear-gradient(180deg, #f7fafc, #eef3f8); display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 18px; }
-        .msg { display: flex; }
+        .msg { display: flex; gap: 8px; }
         .msg.mine { justify-content: flex-start; }
         .msg.other { justify-content: flex-end; }
+        .msg-avatar { align-self: flex-end; flex: 0 0 34px; font-size: 15px; height: 34px; width: 34px; }
         .msg-bubble { border-radius: 12px 12px 12px 4px; box-shadow: 0 4px 14px rgba(15,23,42,.08); max-width: min(620px, 82%); padding: 10px 12px; }
         .msg.mine .msg-bubble { background: #dcfce7; border: 1px solid #bbf7d0; }
         .msg.other .msg-bubble { background: #fff; border: 1px solid #e5edf6; }
-        .msg-author { color: #1e3a5f; font-size: 12px; font-weight: 900; margin-bottom: 5px; }
+        .msg-author { background: transparent; border: 0; color: #1e3a5f; cursor: pointer; font-family: Vazir, sans-serif; font-size: 12px; font-weight: 900; margin: 0 0 5px; padding: 0; text-align: right; }
+        .msg-author:hover { color: #0f766e; text-decoration: underline; }
         .msg-body { font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
         .msg-time { color: #64748b; font-size: 11px; margin-top: 6px; text-align: left; }
         .doc-link { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; margin-top: 8px; padding: 5px 8px; text-decoration: none; }
         .chat-form { background: #fff; border-top: 1px solid #edf1f6; display: grid; gap: 8px; padding: 12px; }
+        .chat-input-row { align-items: end; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) 44px; }
         .chat-form textarea { min-height: 74px; resize: vertical; }
+        .send-icon-btn { align-items: center; background: #22c55e; border: 0; border-radius: 50%; color: #fff; cursor: pointer; display: inline-flex; font-family: Arial, sans-serif; font-size: 22px; font-weight: 900; height: 42px; justify-content: center; line-height: 1; padding: 0; transform: rotate(180deg); width: 42px; }
+        .send-icon-btn:hover { background: #16a34a; }
         .inline-fields { display: grid; gap: 8px; grid-template-columns: 1fr 120px; }
         .recon-form { display: grid; gap: 10px; padding: 14px; }
         .recon-form p { margin: 0; }
@@ -102,8 +107,23 @@
                 {% if active_thread %}
                     {% for message in active_messages %}
                         <article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}">
+                            {% if message.sender %}
+                                <span class="msg-avatar app-user-avatar {{ message.sender.profile.avatar_class }}">
+                                    {% if message.sender.profile.avatar_url %}
+                                        <img src="{{ message.sender.profile.avatar_url }}" alt="{{ message.sender.get_full_name|default:message.sender.username }}">
+                                    {% else %}
+                                        {{ message.sender.profile.avatar_icon }}
+                                    {% endif %}
+                                </span>
+                            {% endif %}
                             <div class="msg-bubble">
-                                <div class="msg-author">{{ message.sender.get_full_name|default:message.sender.username }}</div>
+                                {% if message.sender %}
+                                    <button class="msg-author" type="button" data-user-card-url="{% url 'user_business_card' message.sender.id %}">
+                                        {{ message.sender.get_full_name|default:message.sender.username }}
+                                    </button>
+                                {% else %}
+                                    <div class="msg-author">کاربر حذف‌شده</div>
+                                {% endif %}
                                 <div class="msg-body">{{ message.body }}</div>
                                 {% if message.document_label %}
                                     {% if message.document_url %}
@@ -128,13 +148,16 @@
                     {% csrf_token %}
                     <input type="hidden" name="action" value="send_message">
                     <input type="hidden" name="thread_id" value="{{ active_thread.id }}">
-                    {{ message_form.body.label_tag }} {{ message_form.body }}
+                    {{ message_form.body.label_tag }}
+                    <div class="chat-input-row">
+                        {{ message_form.body }}
+                        <button class="send-icon-btn" type="submit" title="ارسال" aria-label="ارسال پیام">➤</button>
+                    </div>
                     <div class="inline-fields">
                         <p>{{ message_form.document_type.label_tag }} {{ message_form.document_type }}</p>
                         <p>{{ message_form.document_id.label_tag }} {{ message_form.document_id }}</p>
                     </div>
                     {% if message_form.errors %}<div class="form-errors">{{ message_form.errors }}</div>{% endif %}
-                    <button class="primary-btn" type="submit">ارسال پیام</button>
                 </form>
             {% endif %}
         </section>
@@ -184,6 +207,20 @@
                 });
             });
         });
+        var chatForm = document.querySelector('.chat-form');
+        var messageBox = chatForm ? chatForm.querySelector('textarea[name="body"]') : null;
+        if (chatForm && messageBox) {
+            messageBox.addEventListener('keydown', function(event) {
+                if (event.key !== 'Enter' || event.shiftKey) return;
+                event.preventDefault();
+                if (!messageBox.value.trim()) return;
+                if (chatForm.requestSubmit) {
+                    chatForm.requestSubmit();
+                } else {
+                    chatForm.submit();
+                }
+            });
+        }
     })();
 </script>
 </body>

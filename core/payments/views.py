@@ -586,8 +586,8 @@ def _can_delegate_final_approval(role, is_system_admin=False):
 def _records_for_user(user):
     qs = PaymentRecord.objects.select_related('counterparty', 'user').prefetch_related('receipts', 'activity_logs')
     if _is_staff_user(user):
-        return qs.order_by('-id')
-    return qs.filter(user=user).order_by('-id')
+        return qs.order_by('-created_at', '-id')
+    return qs.filter(user=user).order_by('-created_at', '-id')
 
 
 def _active_payment_records_for_user(user):
@@ -1221,6 +1221,43 @@ def _log_activity(payment, actor, action, from_status='', to_status='', note='')
     )
 
 
+PAYMENT_CUSTOMER_EDIT_BLOCKING_ACTIONS = {
+    PaymentActivityLog.ACTION_EDITED,
+    PaymentActivityLog.ACTION_STATUS_CHANGED,
+    PaymentActivityLog.ACTION_FINANCE_REGISTERED,
+    PaymentActivityLog.ACTION_FINAL_APPROVED,
+    PaymentActivityLog.ACTION_CP_APPROVED,
+    PaymentActivityLog.ACTION_CP_RETURNED,
+    PaymentActivityLog.ACTION_CP_REJECTED,
+}
+
+
+def _payment_has_non_customer_operation(payment):
+    if payment.status != PaymentRecord.STATUS_PENDING:
+        return True
+    if payment.finance_status == PaymentRecord.FINANCE_STATUS_APPROVED:
+        return True
+    if payment.finance_registered_at or payment.finance_registered_by_id:
+        return True
+    if payment.counterparty_status:
+        return True
+
+    logs = getattr(payment, '_prefetched_objects_cache', {}).get('activity_logs')
+    if logs is None:
+        logs = payment.activity_logs.select_related('actor').all()
+    for log in logs:
+        if log.action not in PAYMENT_CUSTOMER_EDIT_BLOCKING_ACTIONS:
+            continue
+        if log.actor_id and log.actor_id == payment.user_id:
+            continue
+        return True
+    return False
+
+
+def _can_customer_edit_payment(payment):
+    return not _payment_has_non_customer_operation(payment)
+
+
 def _notification_payload(notification):
     # آیکون بر اساس دسته‌بندی
     icon_map = {
@@ -1563,6 +1600,7 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         ) if staff_role else False
         payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
         payment.can_edit_details = bool(can_edit_payment_details)
+        payment.can_customer_edit = _can_customer_edit_payment(payment)
 
         # فلگ‌های مستقل مالی
         payment.can_finance_register = _can_finance_register(
@@ -1635,6 +1673,8 @@ def _apply_record_filters(records, request, is_staff_user):
         'payer_bank_name': (request.GET.get('payer_bank_name') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
         'pay_date': (request.GET.get('pay_date') or '').strip(),
+        'pay_date_from': (request.GET.get('pay_date_from') or '').strip(),
+        'pay_date_to': (request.GET.get('pay_date_to') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
         'counterparty':    (request.GET.get('counterparty') or '').strip(),
         'cp_status':       (request.GET.get('cp_status') or '').strip(),
@@ -1679,12 +1719,26 @@ def _apply_record_filters(records, request, is_staff_user):
     parsed_date = _parse_jalali_date(filters['pay_date'])
     if parsed_date:
         records = records.filter(pay_date=parsed_date)
+    else:
+        parsed_date_from = _parse_jalali_date(filters['pay_date_from'])
+        parsed_date_to = _parse_jalali_date(filters['pay_date_to'])
+        if parsed_date_from and parsed_date_to and parsed_date_to < parsed_date_from:
+            parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+            filters['pay_date_from'], filters['pay_date_to'] = filters['pay_date_to'], filters['pay_date_from']
+        if parsed_date_from:
+            records = records.filter(pay_date__gte=parsed_date_from)
+        if parsed_date_to:
+            records = records.filter(pay_date__lte=parsed_date_to)
 
     valid_statuses = {choice[0] for choice in PaymentRecord.STATUS_CHOICES}
     if is_staff_user:
         if filters['status'] == 'finance_ok':
             # فیلتر ثبت مالی — فلگ مستقل مالی
             records = records.filter(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
+        elif filters['status'] == PaymentRecord.STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING:
+            records = records.filter(
+                status=PaymentRecord.STATUS_APPROVED,
+            ).filter(Q(finance_status__isnull=True) | Q(finance_status=''))
         elif filters['status'] in valid_statuses:
             records = records.filter(status=filters['status'])
     else:
@@ -1739,6 +1793,7 @@ def _apply_record_sort(records, request):
         'tracking_code': 'tracking_code',
         'amount': 'amount',
         'payer_bank_name': 'payer_bank_name',
+        'created_at': 'created_at',
         'status': 'status',
     }
     current_sort = (request.GET.get('sort') or '').strip()
@@ -1751,7 +1806,7 @@ def _apply_record_sort(records, request):
         prefix = '' if current_dir == 'asc' else '-'
         records = records.order_by(f'{prefix}{sort_field}', '-id')
     else:
-        records = records.order_by('-id')
+        records = records.order_by('-created_at', '-id')
         current_sort = ''
         current_dir = 'desc'
 
@@ -2351,6 +2406,8 @@ def _apply_invoice_filters(records, request, is_staff_user):
         'reference_number': (request.GET.get('reference_number') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
         'invoice_date': (request.GET.get('invoice_date') or '').strip(),
+        'invoice_date_from': (request.GET.get('invoice_date_from') or '').strip(),
+        'invoice_date_to': (request.GET.get('invoice_date_to') or '').strip(),
         'seen': (request.GET.get('seen') or '').strip(),
     }
 
@@ -2376,6 +2433,16 @@ def _apply_invoice_filters(records, request, is_staff_user):
     parsed_date = _parse_jalali_date(filters['invoice_date'])
     if parsed_date:
         records = records.filter(invoice_date=parsed_date)
+    else:
+        parsed_date_from = _parse_jalali_date(filters['invoice_date_from'])
+        parsed_date_to = _parse_jalali_date(filters['invoice_date_to'])
+        if parsed_date_from and parsed_date_to and parsed_date_to < parsed_date_from:
+            parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+            filters['invoice_date_from'], filters['invoice_date_to'] = filters['invoice_date_to'], filters['invoice_date_from']
+        if parsed_date_from:
+            records = records.filter(invoice_date__gte=parsed_date_from)
+        if parsed_date_to:
+            records = records.filter(invoice_date__lte=parsed_date_to)
 
     if filters['seen'] == 'seen':
         records = records.filter(customer_seen_at__isnull=False)
@@ -3310,8 +3377,9 @@ def edit_payment(request, payment_id):
     if payment.user_id != request.user.id:
         return HttpResponseForbidden('فقط امکان ویرایش اسناد ثبت شده توسط خودتان وجود دارد.')
 
-    if payment.status != PaymentRecord.STATUS_INCOMPLETE:
-        return HttpResponseForbidden('فقط اسناد با وضعیت «ناقص» قابل ویرایش هستند.')
+    if not _can_customer_edit_payment(payment):
+        messages.error(request, 'این سند توسط واحدهای سازمانی ثبت یا بررسی شده است و قابل ویرایش نیست.')
+        return redirect(return_url or 'submit')
 
     profile = None
     try:
@@ -3338,6 +3406,7 @@ def edit_payment(request, payment_id):
             payment.finance_status = None
             payment.finance_registered_at = None
             payment.finance_registered_by = None
+            payment.created_at = timezone.now()
             payment.save()
             _save_receipts(payment, form)
             _log_activity(
@@ -3345,7 +3414,8 @@ def edit_payment(request, payment_id):
                 from_status=from_status, to_status=payment.status,
                 note='رفع نقص توسط مشتری - ثبت مالی ابطال شد',
             )
-            _notify_payment_edited(payment, request.user)
+            _notify_payment_edited(payment, request.user, title='ویرایش فیش توسط مشتری')
+            messages.success(request, 'سند با موفقیت ویرایش شد و برای بررسی مجدد در صف قرار گرفت.')
             return redirect(return_url or 'submit')
     else:
         form = PaymentRecordForm(instance=payment, initial=initial_data)

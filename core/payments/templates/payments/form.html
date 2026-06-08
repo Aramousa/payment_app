@@ -132,6 +132,10 @@
         th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; vertical-align: top; }
         th { background-color: #007bff; color: white; }
         .sort-link { color: #fff; text-decoration: none; }
+        .date-sort-head { display: flex; flex-direction: column; gap: 4px; align-items: center; line-height: 1.5; }
+        .date-sort-head-row { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+        .date-sort-head .sort-link { display: inline-block; font-size: 12px; }
+        .date-sort-static { color: #fff; font-size: 12px; font-weight: 700; }
 
         tr.summary-row { cursor: pointer; }
         tr.summary-row:hover { background: #f5f9ff; }
@@ -150,6 +154,16 @@
 
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; text-align: right; }
         .detail-card { background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; padding: 10px; }
+        .receipt-thumb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 560px)); gap: 14px; margin-top: 10px; justify-content: start; }
+        .receipt-thumb-link { display: block; border: 1px solid #dbe3ee; border-radius: 8px; overflow: hidden; background: #f8fafc; color: #1e3a5f; text-decoration: none; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+        .receipt-thumb-link:hover { border-color: #1e3a5f; box-shadow: 0 8px 20px rgba(30,58,95,.14); transform: translateY(-1px); }
+        .receipt-thumb-media { width: 100%; aspect-ratio: 16 / 11; display: flex; align-items: center; justify-content: center; background: #eef2f8; }
+        .receipt-thumb-media img { width: 100%; height: 100%; object-fit: contain; display: block; background: #fff; }
+        .receipt-thumb-pdf { font-size: 34px; line-height: 1; }
+        .receipt-thumb-caption { display: block; padding: 9px 10px; font-size: 13px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        @media (max-width: 700px) {
+            .receipt-thumb-grid { grid-template-columns: 1fr; }
+        }
 
         .staff-action textarea { min-height: 58px; }
         .staff-action button { border: none; border-radius: 5px; padding: 8px 10px; background: #1e3a5f; color: #fff; cursor: pointer; width: 100%; }
@@ -400,10 +414,10 @@
                                 <span>{{ payment.tracking_code|default:'بدون کد پیگیری' }}</span>
                                 <span>{{ payment.amount|thousand_sep }} ریال</span>
                             </div>
-                            <div class="dashboard-row-meta">تاریخ: {{ payment.pay_date|default:'-' }} | وضعیت: {{ payment.customer_status_label }}</div>
+                            <div class="dashboard-row-meta">تاریخ: {{ payment.pay_date|jalali_date|default:'-' }} | پیگیری: {{ payment.tracking_code|default:'-' }} | ثبت: {{ payment.created_at|jalali_datetime }}</div>
                             <div class="dashboard-actions">
                                 <a class="button-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
-                                {% if payment.status == 'incomplete' %}
+                                {% if payment.can_customer_edit %}
                                     <a class="button-link" href="{% url 'edit_payment' payment.id %}?next={{ request.get_full_path|urlencode }}">ویرایش</a>
                                 {% endif %}
                             </div>
@@ -676,7 +690,9 @@
                 <div><label for="payer_bank_name_filter">نام بانک</label><input id="payer_bank_name_filter" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}" class="bank-autocomplete-input" data-bank-type="payer" autocomplete="off"></div>
             {% endif %}
             <div><label for="amount_filter">مبلغ (ریال)</label><input id="amount_filter" class="amount-input" type="text" inputmode="numeric" dir="ltr" name="amount" value="{{ filters.amount }}"></div>
-            <div><label for="pay_date_filter">تاریخ (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
+            <div><label for="pay_date_filter">تاریخ دقیق (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
+            <div><label for="pay_date_from_filter">از تاریخ</label><input id="pay_date_from_filter" class="jalali-date" type="text" name="pay_date_from" value="{{ filters.pay_date_from }}"></div>
+            <div><label for="pay_date_to_filter">تا تاریخ</label><input id="pay_date_to_filter" class="jalali-date" type="text" name="pay_date_to" value="{{ filters.pay_date_to }}"></div>
             <input type="hidden" name="page" value="{{ page_obj.number }}">
             <div>
                 <label for="status">وضعیت</label>
@@ -732,7 +748,22 @@
                 <th style="width:120px;">واریز به</th>
                 {% endif %}
                 <th style="width:120px;">پرداخت</th>
-                <th style="width:100px;">تاریخ / پیگیری</th>
+                <th style="width:115px;">
+                    <div class="date-sort-head">
+                        <div class="date-sort-head-row">
+                            <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=pay_date&dir={% if current_sort == 'pay_date' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                                تاریخ واریز{% if current_sort == 'pay_date' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                            </a>
+                        </div>
+                        <div class="date-sort-head-row">
+                            <span class="date-sort-static">شماره پیگیری</span>
+                            <span class="date-sort-static">/</span>
+                            <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=created_at&dir={% if current_sort == 'created_at' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                                تاریخ ثبت{% if current_sort == 'created_at' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                            </a>
+                        </div>
+                    </div>
+                </th>
                 <th style="width:100px;">
                     <a class="sort-link" href="{% url records_url_name %}?{% if sort_base_query %}{{ sort_base_query }}&{% endif %}sort=amount&dir={% if current_sort == 'amount' and current_sort_dir == 'asc' %}desc{% else %}asc{% endif %}">
                         مبلغ (ریال){% if current_sort == 'amount' %} {% if current_sort_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
@@ -780,6 +811,7 @@
                 <td style="white-space:normal;line-height:1.6;">
                     <div>{{ payment.pay_date|jalali_date }}</div>
                     <div style="display:inline-block;margin-top:2px;padding:1px 6px;font-size:12px;font-family:monospace;color:#1e3a5f;background:#eef2f8;border:1px solid #c7d2e8;border-radius:4px;letter-spacing:.3px;">{{ payment.tracking_code|default:'-' }}</div>
+                    <div style="color:#64748b;font-size:11px;margin-top:3px;">ثبت: {{ payment.created_at|jalali_datetime }}</div>
                 </td>
                 <td>{{ payment.amount|thousand_sep }}</td>
                 <td style="white-space:normal;line-height:1.8;">
@@ -804,7 +836,7 @@
                 </td>
                 <td>
                     {% if not is_staff_user %}
-                        {% if payment.status == 'incomplete' %}
+                        {% if payment.can_customer_edit %}
                             <a class="edit-link" href="{% url 'edit_payment' payment.id %}?next={{ request.get_full_path|urlencode }}">ویرایش</a>
                         {% endif %}
                         <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
@@ -885,14 +917,36 @@
 
                         <div class="detail-card">
                             <strong>اسناد</strong>
-                            <div>
+                            <div class="receipt-thumb-grid">
                                 {% with receipts=payment.receipts.all %}
                                     {% if receipts %}
                                         {% for receipt in receipts %}
-                                            <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                                            {% with file_name=receipt.image.name|lower %}
+                                                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
+                                                    <span class="receipt-thumb-media">
+                                                        {% if '.pdf' in file_name %}
+                                                            <span class="receipt-thumb-pdf">PDF</span>
+                                                        {% else %}
+                                                            <img src="{% url 'receipt_file' receipt.id %}" alt="تصویر سند {{ forloop.counter }}" loading="lazy">
+                                                        {% endif %}
+                                                    </span>
+                                                    <span class="receipt-thumb-caption">سند {{ forloop.counter }}</span>
+                                                </a>
+                                            {% endwith %}
                                         {% endfor %}
                                     {% elif payment.receipt_image %}
-                                        <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" class="receipt-preview-link">مشاهده</a>
+                                        {% with file_name=payment.receipt_image.name|lower %}
+                                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
+                                                <span class="receipt-thumb-media">
+                                                    {% if '.pdf' in file_name %}
+                                                        <span class="receipt-thumb-pdf">PDF</span>
+                                                    {% else %}
+                                                        <img src="{% url 'legacy_payment_receipt_file' payment.id %}" alt="تصویر سند" loading="lazy">
+                                                    {% endif %}
+                                                </span>
+                                                <span class="receipt-thumb-caption">سند</span>
+                                            </a>
+                                        {% endwith %}
                                     {% else %}
                                         -
                                     {% endif %}

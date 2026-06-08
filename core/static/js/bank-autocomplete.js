@@ -34,6 +34,7 @@
             this.debounceTimer = null;
             this.minChars = 1;
             this.debounceDelay = 300;
+            this.suppressNextFocus = false;
 
             this.setupHTML();
             this.attachListeners();
@@ -171,6 +172,10 @@
         }
 
         onFocus(event) {
+            if (this.suppressNextFocus) {
+                this.suppressNextFocus = false;
+                return;
+            }
             const value = this.input.value.trim();
             if (value.length >= this.minChars) {
                 this.showSuggestions();
@@ -253,6 +258,7 @@
             this.input.value = value;
             this.hideSuggestions();
             this.selectedIndex = -1;
+            this.suppressNextFocus = true;
             this.input.focus();
             this.input.dispatchEvent(new Event('change', { bubbles: true }));
         }

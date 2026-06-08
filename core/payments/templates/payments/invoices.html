@@ -239,8 +239,16 @@
                 <input id="amount-filter" class="amount-input" type="text" inputmode="numeric" dir="ltr" name="amount" value="{{ filters.amount }}">
             </div>
             <div>
-                <label for="invoice-date-filter">تاریخ فاکتور</label>
+                <label for="invoice-date-filter">تاریخ دقیق فاکتور</label>
                 <input id="invoice-date-filter" class="jalali-date" type="text" name="invoice_date" value="{{ filters.invoice_date }}">
+            </div>
+            <div>
+                <label for="invoice-date-from-filter">از تاریخ</label>
+                <input id="invoice-date-from-filter" class="jalali-date" type="text" name="invoice_date_from" value="{{ filters.invoice_date_from }}">
+            </div>
+            <div>
+                <label for="invoice-date-to-filter">تا تاریخ</label>
+                <input id="invoice-date-to-filter" class="jalali-date" type="text" name="invoice_date_to" value="{{ filters.invoice_date_to }}">
             </div>
             <input type="hidden" name="page" value="{{ page_obj.number }}">
             <div>

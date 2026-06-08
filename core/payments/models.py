@@ -306,9 +306,12 @@ class PaymentRecord(models.Model):
         (STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
     ]
 
+    STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING = 'commercial_approved_finance_pending'
+
     # گزینه‌های فیلتر اضافی برای پنل کارکنان (شامل فلگ مستقل مالی)
     STAFF_FILTER_CHOICES = STATUS_CHOICES + [
         ('finance_ok', 'ثبت مالی'),
+        (STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING, 'ثبت بازرگانی / در بررسی مالی'),
     ]
 
     CUSTOMER_VISIBLE_LABELS = {
