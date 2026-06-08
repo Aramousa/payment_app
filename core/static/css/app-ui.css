@@ -88,7 +88,7 @@ h3 {
 .app-shell-logo {
     display: block;
     height: 56px;
-    max-width: 180px;
+    max-width: 240px;
     object-fit: contain;
 }
 
@@ -1815,9 +1815,9 @@ body:not(:has(.app-shell-nav)) {
     border: 1px solid #edf1f6;
     border-radius: 8px !important;
     box-shadow: none !important;
-    height: 46px !important;
-    max-width: 170px !important;
-    padding: 6px 10px;
+    height: 50px !important;
+    max-width: 250px !important;
+    padding: 4px 8px;
 }
 
 .app-top-context {
