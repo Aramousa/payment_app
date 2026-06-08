@@ -192,7 +192,7 @@
                 {% endif %}
             {% endfor %}
             <label for="payments-per-page-select">تعداد نمایش</label>
-            <select id="payments-per-page-select" class="per-page-select" name="payments_per_page" onchange="this.form.submit()">
+            <select id="payments-per-page-select" class="per-page-select" name="payments_per_page" data-table-prefs-for="customer-payments" onchange="this.form.submit()">
                 <option value="10" {% if request.GET.payments_per_page == '10' or not request.GET.payments_per_page %}selected{% endif %}>10</option>
                 <option value="20" {% if request.GET.payments_per_page == '20' %}selected{% endif %}>20</option>
                 <option value="50" {% if request.GET.payments_per_page == '50' %}selected{% endif %}>50</option>
@@ -202,7 +202,7 @@
         </form>
     </div>
     {% if payments %}
-        <table>
+        <table data-table-prefs="customer-payments">
             <thead>
                 <tr>
                     <th>ردیف</th>
@@ -339,7 +339,7 @@
                     {% endif %}
                 {% endfor %}
                 <label for="invoice-per-page-select">تعداد نمایش</label>
-                <select id="invoice-per-page-select" class="per-page-select" name="invoice_per_page" onchange="this.form.submit()">
+                <select id="invoice-per-page-select" class="per-page-select" name="invoice_per_page" data-table-prefs-for="customer-invoices" onchange="this.form.submit()">
                     <option value="10" {% if request.GET.invoice_per_page == '10' or not request.GET.invoice_per_page %}selected{% endif %}>10</option>
                     <option value="20" {% if request.GET.invoice_per_page == '20' %}selected{% endif %}>20</option>
                     <option value="50" {% if request.GET.invoice_per_page == '50' %}selected{% endif %}>50</option>
@@ -354,7 +354,7 @@
             شما دسترسی مشاهده فاکتورها را ندارید. برای مشاهده جزئیات فاکتورها باید دسترسی مربوطه در حساب کاربری شما فعال شود.
         </div>
     {% elif invoices %}
-        <table>
+        <table data-table-prefs="customer-invoices">
             <thead>
                 <tr>
                     <th>ردیف</th>

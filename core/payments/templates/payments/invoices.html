@@ -273,7 +273,7 @@
                     {% endif %}
                 {% endfor %}
                 <label for="per-page-select">تعداد نمایش</label>
-                <select id="per-page-select" class="per-page-select" name="per_page" onchange="this.form.submit()">
+                <select id="per-page-select" class="per-page-select" name="per_page" data-table-prefs-for="invoices-list" onchange="this.form.submit()">
                     <option value="10" {% if request.GET.per_page == '10' or not request.GET.per_page %}selected{% endif %}>10</option>
                     <option value="20" {% if request.GET.per_page == '20' %}selected{% endif %}>20</option>
                     <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
@@ -285,7 +285,7 @@
 
         {% include "payments/partials/export_panel.html" %}
 
-        <table>
+        <table data-table-prefs="invoices-list">
             <thead>
                 <tr>
                     <th>ردیف</th>

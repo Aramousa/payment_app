@@ -3577,3 +3577,56 @@ body:has(.app-shell-nav) {
         transform: none !important;
     }
 }
+
+
+/* ─── column prefs toggle (app-table-prefs.js) ─── */
+.col-prefs-wrap {
+    display: inline-block;
+    margin-bottom: 8px;
+    position: relative;
+}
+.col-prefs-btn {
+    gap: 4px;
+}
+.col-prefs-panel {
+    background: #fff;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
+    min-width: 190px;
+    padding: 4px 0 6px;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 1200;
+}
+.col-prefs-header {
+    border-bottom: 1px solid var(--app-border);
+    color: var(--app-secondary, #52606d);
+    font-family: Vazir, sans-serif;
+    font-size: 11px;
+    font-weight: 900;
+    padding: 6px 12px 5px;
+}
+.col-prefs-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+.col-prefs-item {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-family: Vazir, sans-serif;
+    font-size: 13px;
+    gap: 8px;
+    padding: 5px 12px;
+}
+.col-prefs-item:hover {
+    background: var(--app-primary-light, #eef2f8);
+}
+.col-prefs-item input[type="checkbox"] {
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 15px;
+    width: 15px;
+}

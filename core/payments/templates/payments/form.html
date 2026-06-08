@@ -736,7 +736,7 @@
                 {% endif %}
             {% endfor %}
             <label for="per-page-select">تعداد نمایش</label>
-            <select id="per-page-select" class="per-page-select" name="per_page" onchange="this.form.submit()">
+            <select id="per-page-select" class="per-page-select" name="per_page" data-table-prefs-for="payment-queue" onchange="this.form.submit()">
                 <option value="10" {% if request.GET.per_page == '10' or not request.GET.per_page %}selected{% endif %}>10</option>
                 <option value="20" {% if request.GET.per_page == '20' %}selected{% endif %}>20</option>
                 <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
@@ -754,7 +754,7 @@
     </form>
     {% endif %}
 
-    <table>
+    <table data-table-prefs="payment-queue">
         <thead>
             <tr>
                 {% if can_bulk_final_approve %}<th style="width:28px;padding:5px 6px !important;"><input type="checkbox" id="select-all-cb" title="انتخاب همه"></th>{% endif %}
