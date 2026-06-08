@@ -25,7 +25,12 @@
         .thread-list { display: grid; max-height: calc(100vh - 340px); overflow-y: auto; }
         .thread-item { border-bottom: 1px solid #edf1f6; color: inherit; display: grid; gap: 5px; padding: 12px 14px; text-decoration: none; }
         .thread-item:hover, .thread-item.active { background: #eef5ff; }
+        .thread-item.closed { background: #f8fafc; }
+        .thread-item.closed:hover, .thread-item.closed.active { background: #eef5ff; }
+        .thread-title-row { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
         .thread-title { font-weight: 900; }
+        .thread-item.closed .thread-title { color: #6b7280; }
+        .thread-status-chip { background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 999px; color: #6b7280; flex-shrink: 0; font-size: 10px; font-weight: 900; padding: 2px 9px; white-space: nowrap; }
         .thread-meta { color: #64748b; font-size: 12px; }
         .thread-doc { color: #116149; font-size: 12px; font-weight: 800; }
         .chat-panel { display: grid; grid-template-rows: auto minmax(280px, 1fr) auto; }
@@ -100,8 +105,11 @@
             </form>
             <div class="thread-list">
                 {% for thread in threads %}
-                    <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}" href="{% querystring thread=thread.id %}">
-                        <span class="thread-title">{{ thread.title }}</span>
+                    <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}{% if thread.status == 'closed' %} closed{% endif %}" href="{% querystring thread=thread.id %}">
+                        <span class="thread-title-row">
+                            <span class="thread-title">{{ thread.title }}</span>
+                            {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
+                        </span>
                         <span class="thread-meta">{{ thread.customer.get_full_name|default:thread.customer.username }}</span>
                         {% if thread.document_label %}
                             <span class="thread-doc">{{ thread.document_label }}</span>
