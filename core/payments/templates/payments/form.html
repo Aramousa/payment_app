@@ -161,6 +161,11 @@
         .receipt-thumb-media img { width: 100%; height: 100%; object-fit: contain; display: block; background: #fff; }
         .receipt-thumb-pdf { font-size: 34px; line-height: 1; }
         .receipt-thumb-caption { display: block; padding: 9px 10px; font-size: 13px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .receipt-thumb-card { display: flex; flex-direction: column; }
+        .receipt-thumb-actions { display: flex; gap: 6px; justify-content: center; padding: 0 10px 9px; }
+        .receipt-thumb-action-btn { flex: 1; border: 1px solid #dbe3ee; border-radius: 6px; background: #fff; color: #1e3a5f; font-size: 13px; font-family: Vazir, sans-serif; padding: 5px 8px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+        .receipt-thumb-action-btn:hover { border-color: #1e3a5f; background: #eef2f8; }
+        .receipt-thumb-action-btn:disabled { opacity: .5; cursor: default; }
         @media (max-width: 700px) {
             .receipt-thumb-grid { grid-template-columns: 1fr; }
         }
@@ -922,30 +927,46 @@
                                     {% if receipts %}
                                         {% for receipt in receipts %}
                                             {% with file_name=receipt.image.name|lower %}
-                                                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
-                                                    <span class="receipt-thumb-media">
-                                                        {% if '.pdf' in file_name %}
-                                                            <span class="receipt-thumb-pdf">PDF</span>
-                                                        {% else %}
-                                                            <img src="{% url 'receipt_file' receipt.id %}" alt="تصویر سند {{ forloop.counter }}" loading="lazy">
-                                                        {% endif %}
-                                                    </span>
-                                                    <span class="receipt-thumb-caption">سند {{ forloop.counter }}</span>
-                                                </a>
+                                                <div class="receipt-thumb-card">
+                                                    <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
+                                                        <span class="receipt-thumb-media">
+                                                            {% if '.pdf' in file_name %}
+                                                                <span class="receipt-thumb-pdf">PDF</span>
+                                                            {% else %}
+                                                                <img src="{% url 'receipt_file' receipt.id %}" alt="تصویر سند {{ forloop.counter }}" loading="lazy">
+                                                            {% endif %}
+                                                        </span>
+                                                        <span class="receipt-thumb-caption">سند {{ forloop.counter }}</span>
+                                                    </a>
+                                                    {% if is_staff_user and '.pdf' not in file_name %}
+                                                    <div class="receipt-thumb-actions">
+                                                        <button type="button" class="receipt-thumb-action-btn receipt-thumb-download" data-image-url="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود سند {{ forloop.counter }}">⬇ دانلود</button>
+                                                        <button type="button" class="receipt-thumb-action-btn receipt-thumb-print" data-image-url="{% url 'receipt_file' receipt.id %}" title="چاپ سند {{ forloop.counter }}">🖨 چاپ</button>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
                                             {% endwith %}
                                         {% endfor %}
                                     {% elif payment.receipt_image %}
                                         {% with file_name=payment.receipt_image.name|lower %}
-                                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
-                                                <span class="receipt-thumb-media">
-                                                    {% if '.pdf' in file_name %}
-                                                        <span class="receipt-thumb-pdf">PDF</span>
-                                                    {% else %}
-                                                        <img src="{% url 'legacy_payment_receipt_file' payment.id %}" alt="تصویر سند" loading="lazy">
-                                                    {% endif %}
-                                                </span>
-                                                <span class="receipt-thumb-caption">سند</span>
-                                            </a>
+                                            <div class="receipt-thumb-card">
+                                                <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
+                                                    <span class="receipt-thumb-media">
+                                                        {% if '.pdf' in file_name %}
+                                                            <span class="receipt-thumb-pdf">PDF</span>
+                                                        {% else %}
+                                                            <img src="{% url 'legacy_payment_receipt_file' payment.id %}" alt="تصویر سند" loading="lazy">
+                                                        {% endif %}
+                                                    </span>
+                                                    <span class="receipt-thumb-caption">سند</span>
+                                                </a>
+                                                {% if is_staff_user and '.pdf' not in file_name %}
+                                                <div class="receipt-thumb-actions">
+                                                    <button type="button" class="receipt-thumb-action-btn receipt-thumb-download" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود سند">⬇ دانلود</button>
+                                                    <button type="button" class="receipt-thumb-action-btn receipt-thumb-print" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" title="چاپ سند">🖨 چاپ</button>
+                                                </div>
+                                                {% endif %}
+                                            </div>
                                         {% endwith %}
                                     {% else %}
                                         -
@@ -1593,74 +1614,110 @@
         });
 
         // دانلود تصویر سند با نام «نام و نام‌خانوادگی مشتری + شماره سند»
-        if (previewDownloadBtn) {
-            previewDownloadBtn.addEventListener('click', async function () {
-                if (!activePreviewUrl || previewImage.style.display === 'none') return;
-                const original = previewDownloadBtn.textContent;
-                previewDownloadBtn.disabled = true;
-                previewDownloadBtn.textContent = 'در حال آماده‌سازی…';
-                try {
-                    const resp = await fetch(previewImage.src || activePreviewUrl, { credentials: 'same-origin' });
-                    if (!resp.ok) throw new Error('download_failed');
-                    const blob = await resp.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = activeDownloadName + '.' + fileExtensionFromName(activeFileName);
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
-                    URL.revokeObjectURL(blobUrl);
-                } catch (e) {
-                    window.open(activePreviewUrl, '_blank', 'noopener');
-                } finally {
-                    previewDownloadBtn.disabled = false;
-                    previewDownloadBtn.textContent = original;
-                }
-            });
+        // (تابع عمومی — هم از داخل پیش‌نمایش بزرگ و هم مستقیماً از روی هر بندانگشتی صدا زده می‌شود)
+        async function downloadDocumentImage(imageUrl, fileName, downloadName, button) {
+            if (!imageUrl) return;
+            if (button) button.disabled = true;
+            try {
+                const resp = await fetch(imageUrl, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error('download_failed');
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = (downloadName || 'سند') + '.' + fileExtensionFromName(fileName);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                window.open(imageUrl, '_blank', 'noopener');
+            } finally {
+                if (button) button.disabled = false;
+            }
         }
 
         // چاپ تصویر سند از طریق یک iframe مخفی (بدون باز شدن پنجره جدید و بدون مسدود شدن توسط popup-blocker)
+        // (تابع عمومی — هم از داخل پیش‌نمایش بزرگ و هم مستقیماً از روی هر بندانگشتی صدا زده می‌شود)
+        function printDocumentImage(imageUrl) {
+            if (!imageUrl) return;
+            const printFrame = document.createElement('iframe');
+            printFrame.style.cssText = 'position:fixed;right:-10000px;bottom:0;width:0;height:0;border:0;';
+            document.body.appendChild(printFrame);
+
+            function cleanup() {
+                if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+            }
+
+            const frameDoc = printFrame.contentWindow.document;
+            frameDoc.open();
+            frameDoc.write(
+                '<!DOCTYPE html><html><head><meta charset="utf-8"><title>چاپ سند</title>' +
+                '<style>html,body{margin:0;padding:0;height:100%;}' +
+                'body{display:flex;align-items:center;justify-content:center;}' +
+                'img{max-width:100%;max-height:100vh;}' +
+                '@media print{img{max-width:100%;max-height:100%;}}</style></head>' +
+                '<body><img id="print-doc-image" src="' + imageUrl + '"></body></html>'
+            );
+            frameDoc.close();
+
+            const frameImage = frameDoc.getElementById('print-doc-image');
+            function triggerPrint() {
+                try {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                } finally {
+                    setTimeout(cleanup, 1000);
+                }
+            }
+            if (frameImage.complete) {
+                triggerPrint();
+            } else {
+                frameImage.addEventListener('load', triggerPrint);
+                frameImage.addEventListener('error', cleanup);
+            }
+        }
+
+        function downloadNameFromAttrs(el) {
+            const namePart = sanitizeFileNamePart(el.getAttribute('data-customer-name'));
+            const numberPart = sanitizeFileNamePart(el.getAttribute('data-doc-number'));
+            return [namePart, numberPart].filter(Boolean).join(' ') || 'سند';
+        }
+
+        // دکمه‌های دانلود/چاپ داخل پیش‌نمایش بزرگ
+        if (previewDownloadBtn) {
+            previewDownloadBtn.addEventListener('click', function () {
+                if (!activePreviewUrl || previewImage.style.display === 'none') return;
+                downloadDocumentImage(previewImage.src || activePreviewUrl, activeFileName, activeDownloadName, previewDownloadBtn);
+            });
+        }
         if (previewPrintBtn) {
             previewPrintBtn.addEventListener('click', function () {
                 if (!previewImage.src || previewImage.style.display === 'none') return;
-                const printFrame = document.createElement('iframe');
-                printFrame.style.cssText = 'position:fixed;right:-10000px;bottom:0;width:0;height:0;border:0;';
-                document.body.appendChild(printFrame);
-
-                function cleanup() {
-                    if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
-                }
-
-                const frameDoc = printFrame.contentWindow.document;
-                frameDoc.open();
-                frameDoc.write(
-                    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>چاپ سند</title>' +
-                    '<style>html,body{margin:0;padding:0;height:100%;}' +
-                    'body{display:flex;align-items:center;justify-content:center;}' +
-                    'img{max-width:100%;max-height:100vh;}' +
-                    '@media print{img{max-width:100%;max-height:100%;}}</style></head>' +
-                    '<body><img id="print-doc-image" src="' + previewImage.src + '"></body></html>'
-                );
-                frameDoc.close();
-
-                const frameImage = frameDoc.getElementById('print-doc-image');
-                function triggerPrint() {
-                    try {
-                        printFrame.contentWindow.focus();
-                        printFrame.contentWindow.print();
-                    } finally {
-                        setTimeout(cleanup, 1000);
-                    }
-                }
-                if (frameImage.complete) {
-                    triggerPrint();
-                } else {
-                    frameImage.addEventListener('load', triggerPrint);
-                    frameImage.addEventListener('error', cleanup);
-                }
+                printDocumentImage(previewImage.src);
             });
         }
+
+        // دکمه‌های دانلود/چاپ مستقیماً روی هر بندانگشتی سند — بدون نیاز به باز کردن پیش‌نمایش
+        document.querySelectorAll('.receipt-thumb-download').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                downloadDocumentImage(
+                    button.getAttribute('data-image-url'),
+                    button.getAttribute('data-file-name'),
+                    downloadNameFromAttrs(button),
+                    button
+                );
+            });
+        });
+        document.querySelectorAll('.receipt-thumb-print').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                printDocumentImage(button.getAttribute('data-image-url'));
+            });
+        });
 
         overlay.addEventListener('click', function (event) {
             if (event.target === overlay) {
