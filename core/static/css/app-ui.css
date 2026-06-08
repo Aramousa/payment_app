@@ -239,6 +239,49 @@ h3 {
     display: none;  /* وقتی صفر است مخفی می‌شود */
 }
 
+/* Keep Persian date pickers isolated from page/table styles. */
+.datepicker-container {
+    direction: ltr !important;
+    overflow: visible !important;
+    z-index: 1000000 !important;
+}
+
+.datepicker-plot-area {
+    box-sizing: border-box !important;
+    min-width: 260px !important;
+    overflow: visible !important;
+    width: 260px !important;
+    z-index: 1000000 !important;
+}
+
+.datepicker-plot-area table {
+    border-collapse: collapse !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+
+.datepicker-plot-area th,
+.datepicker-plot-area td {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #333 !important;
+    line-height: normal !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    white-space: normal !important;
+}
+
+.datepicker-plot-area .datepicker-day-view .table-days td,
+.datepicker-plot-area .datepicker-day-view .table-days td span {
+    height: 30px !important;
+    line-height: 30px !important;
+}
+
 .message-envelope {
     align-items: center;
     background: #eef5ff !important;

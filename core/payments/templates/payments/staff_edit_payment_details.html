@@ -11,7 +11,7 @@
     <script src="{% static 'js/jquery.min.js' %}"></script>
     <script src="{% static 'js/persian-date.min.js' %}"></script>
     <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
-    <script src="{% static 'js/bank-autocomplete.js' %}?v=3"></script>
+    <script src="{% static 'js/bank-autocomplete.js' %}?v=4"></script>
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
         .box { max-width: 980px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
@@ -59,6 +59,7 @@
         $('.jalali-date').persianDatepicker({
             format: 'YYYY/MM/DD',
             observer: true,
+            autoClose: true,
             initialValue: false
         });
         document.querySelectorAll('.amount-input').forEach(function (el) {

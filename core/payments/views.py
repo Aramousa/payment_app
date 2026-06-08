@@ -216,7 +216,7 @@ def _can_access_reconciliation_thread(user, thread):
     return thread.staff_participants.filter(id=user.id).exists()
 
 
-def _reconciliation_document_url(document_type, document_id):
+def _reconciliation_document_url(document_type, document_id, thread_id=None):
     if not document_type or not document_id:
         return ''
     routes = {
@@ -230,9 +230,15 @@ def _reconciliation_document_url(document_type, document_id):
     if not route:
         return ''
     try:
-        return reverse(route[0], args=route[1])
+        url = reverse(route[0], args=route[1])
     except Exception:
         return ''
+    if thread_id:
+        # با ارسال آدرس گفتگو به‌عنوان next، دکمه «بازگشت» در صفحه سند
+        # کاربر را به همین گفتگو برمی‌گرداند نه صفحه پیش‌فرض.
+        next_url = f"{reverse('reconciliation_center')}?thread={thread_id}"
+        url = f"{url}?{urlencode({'next': next_url})}"
+    return url
 
 
 def _reconciliation_unread_count(user):
@@ -256,6 +262,44 @@ def _mark_reconciliation_thread_read(thread, user):
         user=user,
         defaults={'last_read_at': timezone.now()},
     )
+
+
+def _apply_reconciliation_filters(threads, request):
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'status': (request.GET.get('status') or '').strip(),
+        'document_type': (request.GET.get('document_type') or '').strip(),
+    }
+
+    query = filters['q']
+    if query:
+        # هر کلمه به‌صورت مستقل با فیلدهای مختلف مقایسه می‌شود تا جستجوی نام کامل
+        # (که در دیتابیس به‌صورت نام و نام‌خانوادگی جدا ذخیره شده) هم کار کند.
+        condition = Q()
+        for word in query.split():
+            word_condition = (
+                Q(title__icontains=word) |
+                Q(customer__first_name__icontains=word) |
+                Q(customer__last_name__icontains=word) |
+                Q(customer__username__icontains=word) |
+                Q(customer__profile__organization__icontains=word) |
+                Q(messages__body__icontains=word)
+            )
+            digits = word.replace(',', '')
+            if digits.isdigit():
+                word_condition |= Q(document_id=int(digits)) | Q(messages__document_id=int(digits))
+            condition &= word_condition
+        threads = threads.filter(condition).distinct()
+
+    valid_statuses = {choice[0] for choice in ReconciliationThread.STATUS_CHOICES}
+    if filters['status'] in valid_statuses:
+        threads = threads.filter(status=filters['status'])
+
+    valid_doc_types = {choice[0] for choice in ReconciliationThread.DOCUMENT_CHOICES}
+    if filters['document_type'] in valid_doc_types:
+        threads = threads.filter(document_type=filters['document_type'])
+
+    return threads, filters
 
 
 def _can_view_price_list_history(user):
@@ -3692,21 +3736,25 @@ def reconciliation_center(request):
             thread.save(update_fields=['status', 'updated_at'])
             return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
 
-    thread_rows = list(threads_qs[:80])
+    filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
+    thread_rows = list(filtered_threads_qs[:80])
     for thread in thread_rows:
-        thread.document_url = _reconciliation_document_url(thread.document_type, thread.document_id)
+        thread.document_url = _reconciliation_document_url(thread.document_type, thread.document_id, thread.id)
         thread.last_message = thread.messages.last()
 
     active_messages = []
     if active_thread:
         _mark_reconciliation_thread_read(active_thread, request.user)
-        active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id)
+        active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id, active_thread.id)
         active_messages = list(active_thread.messages.select_related('sender', 'sender__profile'))
         for message in active_messages:
-            message.document_url = _reconciliation_document_url(message.document_type, message.document_id)
+            message.document_url = _reconciliation_document_url(message.document_type, message.document_id, active_thread.id)
 
     return render(request, 'payments/reconciliation_center.html', {
         'threads': thread_rows,
+        'thread_filters': thread_filters,
+        'document_type_choices': ReconciliationThread.DOCUMENT_CHOICES,
+        'status_choices': ReconciliationThread.STATUS_CHOICES,
         'active_thread': active_thread,
         'active_messages': active_messages,
         'thread_form': thread_form,
