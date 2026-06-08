@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import Q
 from zoneinfo import ZoneInfo
 
-from .models import LoginAdvertisement, ReconciliationThread, SystemSettings, UserNotification, UserProfile
+from .models import FinalApprovalDelegate, LoginAdvertisement, ReconciliationThread, SystemSettings, UserNotification, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
@@ -41,6 +41,12 @@ def _can_view_invoices_nav(user):
         return bool(user.profile.can_view_invoices or user.profile.can_upload_invoices)
     except UserProfile.DoesNotExist:
         return False
+
+
+def _can_see_pending_final_nav(user, role):
+    if user.is_superuser or role == 'finance_manager':
+        return True
+    return FinalApprovalDelegate.objects.filter(delegated_user=user, is_active=True).exists()
 
 
 def _can_access_reconciliation_nav(user):
@@ -195,10 +201,10 @@ def app_navigation(request):
             _nav_item('مغایرت‌گیری',      'reconciliation_center',  'reconciliation',          'main', '💬'),
         ])
     else:
-        items.extend([
-            _nav_item('صف کاری اسناد',     'submit',           'payment_queue',   'documents', '📥'),
-            _nav_item('سوابق اسناد',        'payment_history',  'payment_history', 'documents', '🗂️'),
-        ])
+        items.append(_nav_item('صف کاری اسناد', 'submit', 'payment_queue', 'documents', '📥'))
+        if _can_see_pending_final_nav(user, role):
+            items.append(_nav_item('در انتظار تأیید نهایی', 'pending_final_approval', 'pending_final', 'documents', '⏳'))
+        items.append(_nav_item('سوابق اسناد', 'payment_history', 'payment_history', 'documents', '🗂️'))
         items.append(_nav_item('مشتریان', 'customers_list', 'customers', 'customers', '👥'))
 
         COMMERCIAL_ROLES = {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}

@@ -618,6 +618,27 @@ def _can_finance_register(role, payment, is_system_admin=False):
     )
 
 
+def _ready_for_final_q():
+    """معادل ORM خاصیت ready_for_final_approval — برای فیلتر سراسری"""
+    return Q(
+        status=PaymentRecord.STATUS_APPROVED,
+        finance_status=PaymentRecord.FINANCE_STATUS_APPROVED,
+    ) & (Q(counterparty_id__isnull=True) | Q(counterparty_status=PaymentRecord.CP_STATUS_APPROVED))
+
+
+def _can_see_pending_final_approval(user):
+    """آیا کاربر به صفحه «در انتظار تأیید نهایی» دسترسی دارد؟"""
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    role = _user_role(user)
+    if role == 'finance_manager':
+        return True
+    from .models import FinalApprovalDelegate
+    return FinalApprovalDelegate.objects.filter(delegated_user=user, is_active=True).exists()
+
+
 def _can_final_approve(role, payment, is_system_admin=False, user=None):
     """
     آیا تأیید نهایی مجاز است؟
@@ -652,8 +673,14 @@ def _records_for_user(user):
 
 def _active_payment_records_for_user(user):
     records = _records_for_user(user)
-    if not _is_staff_user(user) or user.is_superuser:
-        return records
+    if not _is_staff_user(user):
+        return records  # مشتریان: همه فیش‌های خودشان
+
+    ready_q = _ready_for_final_q()
+
+    if user.is_superuser:
+        # ادمین: همه به‌جز آماده‌تأیید‌نهایی (→ صف جداگانه) و تأیید‌نهایی‌شده (→ سوابق)
+        return records.exclude(ready_q).exclude(status=PaymentRecord.STATUS_FINAL_APPROVED)
 
     role = _department_role(_user_role(user))
     if role == 'commercial':
@@ -669,18 +696,17 @@ def _active_payment_records_for_user(user):
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
             PaymentRecord.STATUS_APPROVED,
             PaymentRecord.STATUS_INCOMPLETE,
-        ])
+        ]).exclude(ready_q)  # آماده‌تأیید‌نهایی → صف تأیید نهایی
     if role == 'data_entry':
         return records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_REJECTED,
-        ])
+        ]).exclude(ready_q)
     if role == 'sales':
-        # کارشناس فروش فقط فیش‌های مشتریان خودش را می‌بیند
         filtered = records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_REJECTED,
-        ])
+        ]).exclude(ready_q)
         return _customer_limited_queryset_for_user(filtered, user, customer_field='user')
     return records.none()
 
@@ -2918,6 +2944,76 @@ def payment_history(request):
         'customer_debt': None,
         'active_daily_assignment': None,
         'expired_daily_assignment': None,
+    })
+
+
+@login_required
+def pending_final_approval_queue(request):
+    """صف «در انتظار تأیید نهایی» — فقط مدیر مالی و کاربران تفویض‌شده"""
+    if not _can_see_pending_final_approval(request.user):
+        return HttpResponseForbidden('دسترسی به این بخش فقط برای مدیر مالی و کاربران تفویض‌شده مجاز است.')
+
+    staff_role = _user_role(request.user)
+    is_system_admin = request.user.is_superuser
+
+    records = (
+        PaymentRecord.objects
+        .filter(_ready_for_final_q())
+        .select_related('counterparty', 'user')
+        .prefetch_related('receipts', 'activity_logs')
+        .order_by('-created_at', '-id')
+    )
+    records, active_filters = _apply_record_filters(records, request, True)
+    records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
+    records = _enrich_records(
+        records,
+        staff_role=staff_role,
+        is_system_admin=is_system_admin,
+        can_edit_payment_details=_can_edit_payment_details(request.user),
+        acting_user=request.user,
+    )
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+    return render(request, 'payments/form.html', {
+        'form': PaymentRecordForm(),
+        'records': page_obj,
+        'page_obj': page_obj,
+        'page_base_query': page_base_query,
+        'is_staff_user': True,
+        'filters': active_filters,
+        'status_choices': PaymentRecord.STAFF_FILTER_CHOICES,
+        'counterparties': Counterparty.objects.all(),
+        'staff_user_role': staff_role,
+        'staff_role_label': _staff_role_label(staff_role),
+        'can_manage_counterparties': is_system_admin,
+        'can_export_records': is_system_admin or staff_role in {'finance', 'finance_manager'},
+        'is_system_admin': is_system_admin,
+        'user_display_name': user_display_name,
+        'source_profiles': [],
+        'destination_profiles': [],
+        'current_sort': current_sort,
+        'current_sort_dir': current_sort_dir,
+        'sort_base_query': sort_base_query,
+        'is_history_mode': False,
+        'is_pending_final_mode': True,
+        'records_url_name': 'pending_final_approval',
+        'export_dataset': 'payments',
+        'export_fields': PAYMENT_EXPORT_FIELDS,
+        'customer_info': {},
+        'customer_debt': None,
+        'active_daily_assignment': None,
+        'expired_daily_assignment': None,
+        'show_payment_form': False,
+        'finance_users': list(User.objects.filter(
+            profile__role__in=['finance', 'finance_manager'], is_active=True
+        ).select_related('profile')),
+        'can_bulk_final_approve': (
+            _can_delegate_final_approval(staff_role, is_system_admin) or
+            _can_final_approve(staff_role, PaymentRecord(), is_system_admin, user=request.user)
+        ),
+        'cp_returned_count': 0,
     })
 
 

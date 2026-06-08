@@ -324,10 +324,14 @@
             {% if is_staff_user %}
                 <a href="{% url 'customers_list' %}" class="button-link">لیست مشتریان</a>
                 <a href="{% url 'daily_payment_plans' %}" class="button-link">واریز روزانه</a>
-                {% if is_history_mode %}
+                {% if is_history_mode or is_pending_final_mode %}
                     <a href="{% url 'submit' %}" class="button-link">صف کاری اسناد</a>
-                {% else %}
+                {% endif %}
+                {% if not is_history_mode %}
                     <a href="{% url 'payment_history' %}" class="button-link">سوابق اسناد</a>
+                {% endif %}
+                {% if not is_pending_final_mode and is_staff_user %}
+                    <a href="{% url 'pending_final_approval' %}" class="button-link">در انتظار تأیید نهایی</a>
                 {% endif %}
             {% endif %}
             {% if request.user.is_superuser %}
@@ -648,11 +652,11 @@
         {{ destination_profiles|json_script:"destination-profiles-data" }}
         {% endif %}
     {% else %}
-        <h2>{% if is_history_mode %}سوابق اسناد{% else %}بررسی اسناد ارسالی{% endif %}</h2>
+        <h2>{% if is_pending_final_mode %}در انتظار تأیید نهایی{% elif is_history_mode %}سوابق اسناد{% else %}بررسی اسناد ارسالی{% endif %}</h2>
     {% endif %}
 
     {% if is_staff_user or show_payment_form or is_history_mode %}
-    <h2>{% if show_payment_form %}لیست فیش‌های واریزی{% elif is_history_mode %}سوابق واریزی ها{% else %}گزارش واریزی ها{% endif %}{% if is_staff_user %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
+    <h2>{% if show_payment_form %}لیست فیش‌های واریزی{% elif is_pending_final_mode %}در انتظار تأیید نهایی{% elif is_history_mode %}سوابق واریزی ها{% else %}گزارش واریزی ها{% endif %}{% if is_staff_user and not is_pending_final_mode %}{% if staff_role_label == 'مالی' or staff_role_label == 'بازرگانی' %} - {{ staff_role_label }}{% endif %}{% endif %}</h2>
 
     {% if cp_returned_count %}
     <div style="max-width:1200px;margin:0 auto 14px;background:#fff8e6;border:1px solid #f0c05a;border-right:4px solid #d97706;border-radius:8px;padding:12px 16px;display:flex;gap:10px;align-items:center;font-size:13px;color:#7a4f00;">
