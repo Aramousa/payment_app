@@ -282,6 +282,13 @@ h3 {
     line-height: 30px !important;
 }
 
+/* فونت date picker را با فونت کلی برنامه (Vazir) هماهنگ می‌کند —
+   کتابخانه به‌صورت پیش‌فرض از tahoma با شورت‌هند font استفاده می‌کند */
+.datepicker-container,
+.datepicker-container * {
+    font-family: Vazir, sans-serif !important;
+}
+
 .message-envelope {
     align-items: center;
     background: #eef5ff !important;
