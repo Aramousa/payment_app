@@ -920,22 +920,27 @@
                         '</a>';
                 }).join('');
 
-                // کلیک روی هر item → read شدن همان notification
+                // کلیک روی هر item → read شدن همان notification و به‌روزرسانی فوری شمارنده
                 list.querySelectorAll('[data-notif-id]').forEach(function (link) {
-                    link.addEventListener('click', async function () {
+                    link.addEventListener('click', function () {
                         var nid = link.dataset.notifId;
-                        if (!readUrl || !nid) return;
-                        try {
-                            await fetch(readUrl, {
-                                method: 'POST',
-                                credentials: 'same-origin',
-                                headers: {
-                                    'X-CSRFToken': getCookie('csrftoken'),
-                                    'Content-Type': 'application/x-www-form-urlencoded'
-                                },
-                                body: 'id=' + encodeURIComponent(nid)
-                            });
-                        } catch (e) { /* silent */ }
+                        if (!readUrl || !nid || link.dataset.notifRead === '1') return;
+                        link.dataset.notifRead = '1';
+                        // keepalive: درخواست با وجود انتقال صفحه (کلیک روی لینک) ناتمام نمی‌ماند
+                        fetch(readUrl, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            keepalive: true,
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken'),
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: 'id=' + encodeURIComponent(nid)
+                        }).then(function (response) {
+                            return response.ok ? response.json() : null;
+                        }).then(function (data) {
+                            if (data && typeof data.unread_count === 'number') updateBadge(data.unread_count);
+                        }).catch(function () { /* silent */ });
                     });
                 });
             }

@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import Q
 from zoneinfo import ZoneInfo
 
-from .models import LoginAdvertisement, PaymentRecord, InvoiceRecord, ReconciliationThread, SystemSettings, UserProfile
+from .models import LoginAdvertisement, ReconciliationThread, SystemSettings, UserNotification, UserProfile
 
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
@@ -286,56 +286,18 @@ def login_ads(request):
 
 def unread_notifications(request):
     """
-    Context processor to provide unread document counts for the notification bell.
+    Context processor providing the unread in-app notification badge/list for the
+    nav bell. Sourced from UserNotification so it matches /api/notifications/ —
+    the JS poller overwrites this on load, but the first paint must agree with it.
     """
-    unread_counts = {
-        'payments': 0,
-        'invoices': 0,
-        'total': 0,
-        'items': [],
-    }
+    empty = {'total': 0, 'items': []}
 
     if not request.user.is_authenticated:
-        return {'unread_notifications': unread_counts}
+        return {'unread_notifications': empty}
 
-    try:
-        profile = request.user.profile
-    except UserProfile.DoesNotExist:
-        return {'unread_notifications': unread_counts}
-
-    role = profile.role
-
-    if role == 'customer':
-        # For customers: count documents they haven't seen
-        unread_counts['payments'] = PaymentRecord.objects.filter(
-            user=request.user,
-            customer_seen_at__isnull=True
-        ).count()
-
-        unread_counts['invoices'] = InvoiceRecord.objects.filter(
-            customer=request.user,
-            customer_seen_at__isnull=True
-        ).count()
-
-    elif role in ('finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales_manager', 'staff'):
-        # For staff: count documents created today that haven't been seen by anyone
-        # Or count documents with recent status changes
-        from django.utils import timezone
-        from datetime import timedelta
-
-        today = timezone.localdate(timezone=DISPLAY_TIME_ZONE)
-        tomorrow = today + timedelta(days=1)
-
-        # Count recent payments (created today)
-        unread_counts['payments'] = PaymentRecord.objects.filter(
-            created_at__date=today
-        ).count()
-
-        # Count recent invoices
-        unread_counts['invoices'] = InvoiceRecord.objects.filter(
-            created_at__date=today
-        ).count()
-
-    unread_counts['total'] = unread_counts['payments'] + unread_counts['invoices']
-
-    return {'unread_notifications': unread_counts}
+    notifications = UserNotification.objects.filter(user=request.user, is_read=False)
+    items = [
+        {'id': n.id, 'title': n.title, 'message': n.message, 'url': n.url or reverse('submit')}
+        for n in notifications[:5]
+    ]
+    return {'unread_notifications': {'total': notifications.count(), 'items': items}}

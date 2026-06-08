@@ -2265,35 +2265,6 @@ def _delete_file_field(file_field):
             logger.debug('Could not delete file %s from storage.', getattr(file_field, 'name', ''))
 
 
-def _dashboard_notifications_for_user(user):
-    if not user or not user.is_authenticated:
-        return {'payments': 0, 'invoices': 0, 'events': 0, 'total': 0, 'items': []}
-
-    if _is_staff_user(user):
-        payments_count = _active_payment_records_for_user(user).count()
-        invoices_count = _invoice_records_for_user(user).count() if _can_view_invoices(user) else 0
-    else:
-        payments_count = PaymentRecord.objects.filter(
-            user=user,
-            status=PaymentRecord.STATUS_INCOMPLETE,
-        ).count()
-        invoices_count = InvoiceRecord.objects.filter(
-            customer=user,
-            customer_seen_at__isnull=True,
-        ).count()
-    notification_qs = UserNotification.objects.filter(user=user, is_read=False)
-    event_count = notification_qs.count()
-    items = [_notification_payload(item) for item in notification_qs[:5]]
-
-    return {
-        'payments': payments_count,
-        'invoices': invoices_count,
-        'events': event_count,
-        'total': event_count,
-        'items': items,
-    }
-
-
 def _invoice_customer_rows():
     rows = []
     profiles = _active_customer_profiles().order_by(
@@ -2319,10 +2290,8 @@ def _invoice_customer_rows():
 @login_required
 def notifications_feed(request):
     notifications = UserNotification.objects.filter(user=request.user, is_read=False)[:10]
-    latest_id = UserNotification.objects.filter(user=request.user).order_by('-id').values_list('id', flat=True).first() or 0
     return JsonResponse({
         'unread_count': UserNotification.objects.filter(user=request.user, is_read=False).count(),
-        'latest_id': latest_id,
         'items': [_notification_payload(notification) for notification in notifications],
     })
 
@@ -2373,7 +2342,8 @@ def notifications_mark_read(request):
     if notification_id:
         queryset = queryset.filter(id=notification_id)
     updated = queryset.update(is_read=True, read_at=timezone.now())
-    return JsonResponse({'ok': True, 'updated': updated})
+    unread_count = UserNotification.objects.filter(user=request.user, is_read=False).count()
+    return JsonResponse({'ok': True, 'updated': updated, 'unread_count': unread_count})
 
 
 def _customer_debt_summary(user):
@@ -2861,7 +2831,6 @@ def create_payment(request):
         'active_daily_assignment': active_daily_assignment,
         'expired_daily_assignment': expired_daily_assignment,
         'show_payment_form': show_payment_form,
-        'unread_notifications': _dashboard_notifications_for_user(request.user),
         'finance_users': list(User.objects.filter(profile__role__in=['finance', 'finance_manager'], is_active=True).select_related('profile')) if is_staff_user else [],
         'can_bulk_final_approve': _can_delegate_final_approval(staff_role, is_system_admin) or _can_final_approve(staff_role, PaymentRecord(), is_system_admin, user=request.user),
         'cp_returned_count': PaymentRecord.objects.filter(
