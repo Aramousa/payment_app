@@ -922,7 +922,7 @@
                                     {% if receipts %}
                                         {% for receipt in receipts %}
                                             {% with file_name=receipt.image.name|lower %}
-                                                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
+                                                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
                                                     <span class="receipt-thumb-media">
                                                         {% if '.pdf' in file_name %}
                                                             <span class="receipt-thumb-pdf">PDF</span>
@@ -936,7 +936,7 @@
                                         {% endfor %}
                                     {% elif payment.receipt_image %}
                                         {% with file_name=payment.receipt_image.name|lower %}
-                                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
+                                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
                                                 <span class="receipt-thumb-media">
                                                     {% if '.pdf' in file_name %}
                                                         <span class="receipt-thumb-pdf">PDF</span>
@@ -1177,6 +1177,10 @@
             <img id="previewImage" class="preview-image app-zoomable-image" alt="پیش نمایش سند" style="display:none;">
             <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
             {% if is_staff_user %}
+            <div id="previewActions" style="display:none;gap:8px;justify-content:center;margin-top:10px;font-family:Vazir,sans-serif;">
+                <button type="button" id="previewDownloadBtn" class="button-link alt sm">⬇ دانلود</button>
+                <button type="button" id="previewPrintBtn" class="button-link alt sm">🖨 چاپ</button>
+            </div>
             <div id="rotateControls" style="display:none;margin-top:10px;font-family:Vazir,sans-serif;">
                 <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;">
                     <button type="button" class="rot-btn button-link" data-deg="-90">↺ 90°</button>
@@ -1425,9 +1429,24 @@
         const flashOverlay = document.getElementById('flashOverlay');
         const rotateControls = document.getElementById('rotateControls');
         const rotateStatus = document.getElementById('rotateStatus');
+        const previewActions = document.getElementById('previewActions');
+        const previewDownloadBtn = document.getElementById('previewDownloadBtn');
+        const previewPrintBtn = document.getElementById('previewPrintBtn');
         let pdfBlobUrl = '';
         let activeReceiptId = null;
         let activePreviewUrl = null;
+        let activeFileName = '';
+        let activeDownloadName = '';
+
+        // برای نام‌گذاری فایل دانلودشده: کاراکترهای غیرمجاز در نام فایل را با فاصله جایگزین می‌کند
+        function sanitizeFileNamePart(text) {
+            return (text || '').replace(/[\\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function fileExtensionFromName(name) {
+            const match = /\.([a-zA-Z0-9]{1,8})(?:[?#]|$)/.exec((name || '').split('/').pop() || '');
+            return match ? match[1].toLowerCase() : 'jpg';
+        }
 
         function setPreviewImageVisible(visible) {
             const imageViewport = previewImage.closest('.app-image-zoom-viewport');
@@ -1448,13 +1467,20 @@
                 pdfBlobUrl = '';
             }
             if (rotateControls) rotateControls.style.display = 'none';
+            if (previewActions) previewActions.style.display = 'none';
             activeReceiptId = null;
             activePreviewUrl = null;
+            activeFileName = '';
+            activeDownloadName = '';
         }
 
-        async function openPreview(url, fileName, receiptId) {
+        async function openPreview(url, fileName, receiptId, customerName, docNumber) {
             activePreviewUrl = url;
             activeReceiptId = receiptId || null;
+            activeFileName = fileName || '';
+            const namePart = sanitizeFileNamePart(customerName);
+            const numberPart = sanitizeFileNamePart(docNumber);
+            activeDownloadName = [namePart, numberPart].filter(Boolean).join(' ') || 'سند';
             let isPdf = false;
             try {
                 const parsed = new URL(fileName || url, window.location.origin);
@@ -1477,6 +1503,7 @@
                 setPreviewImageVisible(false);
                 previewImage.src = '';
                 if (rotateControls) rotateControls.style.display = 'none';
+                if (previewActions) previewActions.style.display = 'none';
             } else {
                 previewImage.src = url;
                 setPreviewImageVisible(true);
@@ -1489,6 +1516,7 @@
                     rotateControls.style.display = 'flex';
                     if (rotateStatus) rotateStatus.textContent = '';
                 }
+                if (previewActions) previewActions.style.display = 'flex';
             }
             overlay.classList.add('open');
             overlay.focus();
@@ -1558,9 +1586,81 @@
             link.addEventListener('click', async function (event) {
                 event.preventDefault();
                 const receiptId = link.getAttribute('data-receipt-id') || null;
-                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId);
+                const customerName = link.getAttribute('data-customer-name') || '';
+                const docNumber = link.getAttribute('data-doc-number') || '';
+                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId, customerName, docNumber);
             });
         });
+
+        // دانلود تصویر سند با نام «نام و نام‌خانوادگی مشتری + شماره سند»
+        if (previewDownloadBtn) {
+            previewDownloadBtn.addEventListener('click', async function () {
+                if (!activePreviewUrl || previewImage.style.display === 'none') return;
+                const original = previewDownloadBtn.textContent;
+                previewDownloadBtn.disabled = true;
+                previewDownloadBtn.textContent = 'در حال آماده‌سازی…';
+                try {
+                    const resp = await fetch(previewImage.src || activePreviewUrl, { credentials: 'same-origin' });
+                    if (!resp.ok) throw new Error('download_failed');
+                    const blob = await resp.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = activeDownloadName + '.' + fileExtensionFromName(activeFileName);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(blobUrl);
+                } catch (e) {
+                    window.open(activePreviewUrl, '_blank', 'noopener');
+                } finally {
+                    previewDownloadBtn.disabled = false;
+                    previewDownloadBtn.textContent = original;
+                }
+            });
+        }
+
+        // چاپ تصویر سند از طریق یک iframe مخفی (بدون باز شدن پنجره جدید و بدون مسدود شدن توسط popup-blocker)
+        if (previewPrintBtn) {
+            previewPrintBtn.addEventListener('click', function () {
+                if (!previewImage.src || previewImage.style.display === 'none') return;
+                const printFrame = document.createElement('iframe');
+                printFrame.style.cssText = 'position:fixed;right:-10000px;bottom:0;width:0;height:0;border:0;';
+                document.body.appendChild(printFrame);
+
+                function cleanup() {
+                    if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+                }
+
+                const frameDoc = printFrame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(
+                    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>چاپ سند</title>' +
+                    '<style>html,body{margin:0;padding:0;height:100%;}' +
+                    'body{display:flex;align-items:center;justify-content:center;}' +
+                    'img{max-width:100%;max-height:100vh;}' +
+                    '@media print{img{max-width:100%;max-height:100%;}}</style></head>' +
+                    '<body><img id="print-doc-image" src="' + previewImage.src + '"></body></html>'
+                );
+                frameDoc.close();
+
+                const frameImage = frameDoc.getElementById('print-doc-image');
+                function triggerPrint() {
+                    try {
+                        printFrame.contentWindow.focus();
+                        printFrame.contentWindow.print();
+                    } finally {
+                        setTimeout(cleanup, 1000);
+                    }
+                }
+                if (frameImage.complete) {
+                    triggerPrint();
+                } else {
+                    frameImage.addEventListener('load', triggerPrint);
+                    frameImage.addEventListener('error', cleanup);
+                }
+            });
+        }
 
         overlay.addEventListener('click', function (event) {
             if (event.target === overlay) {
