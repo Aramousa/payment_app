@@ -1796,7 +1796,7 @@ body:not(:has(.app-shell-nav)) {
     box-shadow: 0 8px 22px rgba(15,23,42,.07);
     display: grid;
     gap: 14px;
-    grid-template-columns: 176px minmax(160px, 1fr) auto;
+    grid-template-columns: 264px minmax(160px, 1fr) auto;
     height: var(--app-header-height);
     inset: 0 0 auto 0;
     padding: 0 18px;
@@ -1808,6 +1808,7 @@ body:not(:has(.app-shell-nav)) {
     align-items: center;
     display: flex;
     height: 100%;
+    overflow: hidden;
 }
 
 .app-top-brand .app-shell-logo {
