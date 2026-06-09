@@ -750,8 +750,8 @@
         </form>
     </div>
 
-    {# فرم standalone تأیید نهایی گروهی — فقط برای مجازین #}
-    {% if can_bulk_final_approve %}
+    {# فرم standalone تأیید نهایی گروهی — فقط در صفحه تأیید نهایی #}
+    {% if is_pending_final_mode and can_bulk_final_approve %}
     <form id="bulk-approve-form" method="post" action="{% url 'finance_bulk_final_approve' %}" style="display:none;">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -761,7 +761,7 @@
     <table data-table-prefs="payment-queue">
         <thead>
             <tr>
-                {% if can_bulk_final_approve %}<th style="width:28px;padding:5px 6px !important;"><input type="checkbox" id="select-all-cb" title="انتخاب همه"></th>{% endif %}
+                {% if is_pending_final_mode and can_bulk_final_approve %}<th style="width:28px;padding:5px 6px !important;"><input type="checkbox" id="select-all-cb" title="انتخاب همه"></th>{% endif %}
                 <th style="width:70px;">ردیف</th>
                 {% if is_staff_user %}
                 <th style="width:160px;">مشتری</th>
@@ -797,7 +797,7 @@
             {% for payment in records %}
             <tr class="summary-row{% if payment.cp_needs_act %} cp-returned-row{% endif %}" data-row="{{ payment.id }}"
                 {% if payment.cp_needs_act %}style="background:#fffbeb;"{% endif %}>
-                {% if can_bulk_final_approve %}
+                {% if is_pending_final_mode and can_bulk_final_approve %}
                 <td onclick="event.stopPropagation()">
                     {% if payment.ready_for_final_approval %}
                     <input type="checkbox" name="payment_ids" value="{{ payment.id }}" class="bulk-cb" style="width:16px;height:16px;accent-color:#16a34a;">
@@ -863,7 +863,7 @@
                     {% else %}
                         {# ─── ستون اقدام — فقط نشانگر وضعیت + دکمه جزئیات ─── #}
                         <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
-                            {% if payment.can_commercial_act or payment.can_finance_register or payment.can_final_approve %}
+                            {% if payment.can_commercial_act or payment.can_finance_register or (is_pending_final_mode and payment.can_final_approve) %}
                             <span class="tbl-badge tbl-badge-yellow">نیاز به اقدام</span>
                             {% elif staff_user_role != 'data_entry' %}
                             <span style="color:#94a3b8;font-size:12px;" title="قفل">🔒</span>
@@ -1007,10 +1007,10 @@
                         </div>
 
                         {% if is_staff_user and staff_user_role != 'data_entry' %}
-                        <div class="detail-card" style="{% if payment.staff_can_act or payment.can_finance_register or payment.can_final_approve %}border:2px solid #fde68a;background:#fffef0;{% endif %}">
+                        <div class="detail-card" style="{% if payment.staff_can_act or payment.can_finance_register or (is_pending_final_mode and payment.can_final_approve) %}border:2px solid #fde68a;background:#fffef0;{% endif %}">
                             <strong style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
                                 ⚙ اقدام روی سند
-                                {% if payment.can_commercial_act or payment.can_finance_register or payment.can_final_approve %}
+                                {% if payment.can_commercial_act or payment.can_finance_register or (is_pending_final_mode and payment.can_final_approve) %}
                                 <span style="background:#fef9c3;color:#854d0e;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;">نیاز به اقدام</span>
                                 {% endif %}
                             </strong>
@@ -1031,7 +1031,7 @@
                                 <div style="margin-top:6px;color:#94a3b8;font-size:11px;">
                                     {% if payment.status == 'approved' and not payment.is_finance_registered %}
                                     ⚡ ثبت بازرگانی — در انتظار ثبت مالی
-                                    {% elif payment.ready_for_final_approval %}
+                                    {% elif is_pending_final_mode and payment.ready_for_final_approval %}
                                     ✅ هر دو فلگ تکمیل — آماده تأیید نهایی
                                     {% elif payment.status == 'final_approved' %}
                                     🔒 سند تأیید نهایی شده — قفل
@@ -1043,7 +1043,7 @@
                                 </div>
                             </div>
 
-                            {% if not payment.can_commercial_act and not payment.can_finance_register and not payment.can_final_approve %}
+                            {% if not payment.can_commercial_act and not payment.can_finance_register and not (is_pending_final_mode and payment.can_final_approve) %}
                             <div class="tiny" style="color:#94a3b8;">🔒 در این مرحله امکان اقدام برای نقش شما وجود ندارد.</div>
 
                             {% else %}
@@ -1092,8 +1092,8 @@
                             </div>
                             {% endif %}
 
-                            {# ── بخش تأیید نهایی — فقط برای مدیر مالی / تفویض‌شده ── #}
-                            {% if payment.can_final_approve or payment.can_delegate %}
+                            {# ── بخش تأیید نهایی — فقط در صفحه تأیید نهایی ── #}
+                            {% if is_pending_final_mode and (payment.can_final_approve or payment.can_delegate) %}
                             <div style="margin-bottom:6px;">
                                 <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:6px;">✅ تأیید نهایی</div>
 
@@ -1165,8 +1165,8 @@
         </tbody>
     </table>
 
-    {# نوار پایین — فقط برای مجازین #}
-    {% if can_bulk_final_approve %}
+    {# نوار پایین — فقط در صفحه تأیید نهایی #}
+    {% if is_pending_final_mode and can_bulk_final_approve %}
         <div id="bulk-bar" style="display:none;position:sticky;bottom:0;background:#f0fdf4;border-top:2px solid #16a34a;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:10;">
             <span id="bulk-count" style="font-size:13px;font-weight:700;color:#15803d;">۰ سند انتخاب‌شده</span>
             <input type="text" id="bulk-note-input" placeholder="توضیح (اختیاری)"
