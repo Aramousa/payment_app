@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile
+from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile
 import os
 
 
@@ -45,7 +45,6 @@ logger = logging.getLogger(__name__)
 DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 STATUS_FLAG_META = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('بررسی بازرگانی', 'flag-blue'),
-    PaymentRecord.STATUS_FINANCE_REVIEW: ('رویت مالی', 'flag-orange'),
     PaymentRecord.STATUS_APPROVED: ('ثبت بازرگانی', 'flag-orange'),
     PaymentRecord.STATUS_FINAL_APPROVED: ('تایید نهایی', 'flag-green'),
     PaymentRecord.STATUS_REJECTED: ('رد شده', 'flag-red'),
@@ -54,11 +53,9 @@ STATUS_FLAG_META = {
 }
 STATUS_PROGRESS_FLOWS = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW],
-    PaymentRecord.STATUS_FINANCE_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FINANCE_REVIEW],
-    PaymentRecord.STATUS_APPROVED: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FINANCE_REVIEW, PaymentRecord.STATUS_APPROVED],
+    PaymentRecord.STATUS_APPROVED: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_APPROVED],
     PaymentRecord.STATUS_FINAL_APPROVED: [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
-        PaymentRecord.STATUS_FINANCE_REVIEW,
         PaymentRecord.STATUS_APPROVED,
         PaymentRecord.STATUS_FINAL_APPROVED,
     ],
@@ -619,11 +616,27 @@ def _can_finance_register(role, payment, is_system_admin=False):
 
 
 def _ready_for_final_q():
-    """معادل ORM خاصیت ready_for_final_approval — برای فیلتر سراسری"""
-    return Q(
-        status=PaymentRecord.STATUS_APPROVED,
-        finance_status=PaymentRecord.FINANCE_STATUS_APPROVED,
-    ) & (Q(counterparty_id__isnull=True) | Q(counterparty_status=PaymentRecord.CP_STATUS_APPROVED))
+    """فیلتر ORM اسناد در انتظار تأیید نهایی — از روی فلگ ذخیره‌شده"""
+    return Q(pending_final_approval=True)
+
+
+def _sync_pending_final_flag(payment):
+    """
+    همگام‌سازی فلگ pending_final_approval با وضعیت واقعی سند.
+    شیء payment را در حافظه آپدیت می‌کند؛ ذخیره توسط فراخواننده انجام می‌شود.
+    """
+    should_be = (
+        payment.status == PaymentRecord.STATUS_APPROVED
+        and payment.finance_status == PaymentRecord.FINANCE_STATUS_APPROVED
+        and (payment.counterparty_id is None or payment.counterparty_status == PaymentRecord.CP_STATUS_APPROVED)
+    )
+    if should_be and not payment.pending_final_approval:
+        payment.pending_final_approval = True
+        if not payment.pending_final_approval_since:
+            payment.pending_final_approval_since = timezone.now()
+    elif not should_be and payment.pending_final_approval:
+        payment.pending_final_approval = False
+        payment.pending_final_approval_since = None
 
 
 def _can_see_pending_final_approval(user):
@@ -679,8 +692,8 @@ def _active_payment_records_for_user(user):
     ready_q = _ready_for_final_q()
 
     if user.is_superuser:
-        # ادمین: همه به‌جز آماده‌تأیید‌نهایی (→ صف جداگانه) و تأیید‌نهایی‌شده (→ سوابق)
-        return records.exclude(ready_q).exclude(status=PaymentRecord.STATUS_FINAL_APPROVED)
+        # ادمین: همه به‌جز در‌انتظار‌تأیید‌نهایی (→ صف جداگانه) و تأیید‌نهایی‌شده (→ سوابق)
+        return records.filter(pending_final_approval=False).exclude(status=PaymentRecord.STATUS_FINAL_APPROVED)
 
     role = _department_role(_user_role(user))
     if role == 'commercial':
@@ -696,17 +709,17 @@ def _active_payment_records_for_user(user):
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
             PaymentRecord.STATUS_APPROVED,
             PaymentRecord.STATUS_INCOMPLETE,
-        ]).exclude(ready_q)  # آماده‌تأیید‌نهایی → صف تأیید نهایی
+        ], pending_final_approval=False)
     if role == 'data_entry':
         return records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_REJECTED,
-        ]).exclude(ready_q)
+        ]).filter(pending_final_approval=False)
     if role == 'sales':
         filtered = records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_REJECTED,
-        ]).exclude(ready_q)
+        ]).filter(pending_final_approval=False)
         return _customer_limited_queryset_for_user(filtered, user, customer_field='user')
     return records.none()
 
@@ -1708,7 +1721,6 @@ def _customer_visible_logs(logs):
 def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_payment_details=False, acting_user=None):
     status_order = [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
-        PaymentRecord.STATUS_FINANCE_REVIEW,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
         PaymentRecord.STATUS_APPROVED,
         PaymentRecord.STATUS_FINAL_APPROVED,
@@ -1896,7 +1908,6 @@ def _apply_record_filters(records, request, is_staff_user):
             PaymentRecord.STATUS_PENDING: [
                 PaymentRecord.STATUS_PENDING,
                 PaymentRecord.STATUS_COMMERCIAL_REVIEW,
-                PaymentRecord.STATUS_FINANCE_REVIEW,
                 PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
             ],
             PaymentRecord.STATUS_FINAL_APPROVED: [
@@ -2958,10 +2969,10 @@ def pending_final_approval_queue(request):
 
     records = (
         PaymentRecord.objects
-        .filter(_ready_for_final_q())
+        .filter(pending_final_approval=True)
         .select_related('counterparty', 'user')
         .prefetch_related('receipts', 'activity_logs')
-        .order_by('-created_at', '-id')
+        .order_by('pending_final_approval_since', 'id')
     )
     records, active_filters = _apply_record_filters(records, request, True)
     records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
@@ -3266,7 +3277,9 @@ def finance_bulk_final_approve(request):
                 continue
             old_status = payment.status
             payment.status = PaymentRecord.STATUS_FINAL_APPROVED
-            payment.save(update_fields=['status'])
+            payment.pending_final_approval = False
+            payment.pending_final_approval_since = None
+            payment.save(update_fields=['status', 'pending_final_approval', 'pending_final_approval_since'])
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINAL_APPROVED,
                           from_status=old_status, to_status=payment.status,
                           note=note or 'تأیید نهایی گروهی')
@@ -3388,15 +3401,19 @@ def finance_unified_action(request, payment_id):
         payment.finance_status = PaymentRecord.FINANCE_STATUS_APPROVED
         payment.finance_registered_at = timezone.now()
         payment.finance_registered_by = request.user
-        payment.save(update_fields=['finance_status', 'finance_registered_at', 'finance_registered_by'])
+        _sync_pending_final_flag(payment)
+        payment.save(update_fields=[
+            'finance_status', 'finance_registered_at', 'finance_registered_by',
+            'pending_final_approval', 'pending_final_approval_since',
+        ])
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_REGISTERED, note=note)
-        if payment.ready_for_final_approval:
+        if payment.pending_final_approval:
             customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
             _notify_users(
                 list(_staff_notification_users({'finance_manager'})),
                 '✅ سند آماده تأیید نهایی',
                 f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد.',
-                reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+                reverse('pending_final_approval'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
             )
         messages.success(request, f'ثبت مالی سند #{payment_id} انجام شد.')
 
@@ -3412,7 +3429,12 @@ def finance_unified_action(request, payment_id):
         payment.finance_status = None
         payment.finance_registered_at = None
         payment.finance_registered_by = None
-        payment.save(update_fields=['status', 'finance_status', 'finance_registered_at', 'finance_registered_by', 'updated_at'] if hasattr(PaymentRecord, 'updated_at') else ['status', 'finance_status', 'finance_registered_at', 'finance_registered_by'])
+        payment.pending_final_approval = False
+        payment.pending_final_approval_since = None
+        payment.save(update_fields=[
+            'status', 'finance_status', 'finance_registered_at', 'finance_registered_by',
+            'pending_final_approval', 'pending_final_approval_since',
+        ])
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
                       from_status=old_status, to_status=payment.status,
                       note=note or 'عودت به بازرگانی توسط مالی')
@@ -3440,19 +3462,22 @@ def finance_register_payment(request, payment_id):
     payment.finance_status = PaymentRecord.FINANCE_STATUS_APPROVED
     payment.finance_registered_at = timezone.now()
     payment.finance_registered_by = request.user
-    payment.save(update_fields=['finance_status', 'finance_registered_at', 'finance_registered_by'])
+    _sync_pending_final_flag(payment)
+    payment.save(update_fields=[
+        'finance_status', 'finance_registered_at', 'finance_registered_by',
+        'pending_final_approval', 'pending_final_approval_since',
+    ])
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_REGISTERED,
                   note=note or '')
 
-    # اگر هر دو فلگ آماده شد، به مدیر مالی اطلاع بده
-    if payment.ready_for_final_approval:
+    if payment.pending_final_approval:
         customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
         _notify_users(
             list(_staff_notification_users({'finance_manager'})),
             '✅ سند آماده تأیید نهایی',
             f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد و آماده تأیید نهایی است.',
-            reverse('submit'),
+            reverse('pending_final_approval'),
             category=UserNotification.CATEGORY_SYSTEM,
             actor=request.user,
         )
@@ -3476,7 +3501,9 @@ def finance_final_approve(request, payment_id):
     note = (request.POST.get('note') or '').strip()
     old_status = payment.status
     payment.status = PaymentRecord.STATUS_FINAL_APPROVED
-    payment.save(update_fields=['status', 'updated_at'] if hasattr(PaymentRecord, 'updated_at') else ['status'])
+    payment.pending_final_approval = False
+    payment.pending_final_approval_since = None
+    payment.save(update_fields=['status', 'pending_final_approval', 'pending_final_approval_since'])
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINAL_APPROVED,
                   from_status=old_status, to_status=payment.status,
@@ -3536,19 +3563,19 @@ def staff_update_status(request, payment_id):
 
     # Finance can hard-lock records on terminal decisions.
     if request.user.is_superuser:
-        payment.locked_by_finance = False
+        payment.is_locked = False
     elif department_role == 'finance' and target_status in {
         PaymentRecord.STATUS_FINAL_APPROVED,
         PaymentRecord.STATUS_REJECTED,
         PaymentRecord.STATUS_INCOMPLETE,
     }:
-        payment.locked_by_finance = True
+        payment.is_locked = True
 
     selected_counterparty = form.cleaned_data['counterparty']
     if selected_counterparty and department_role in {'commercial', 'staff'}:
         payment.counterparty = selected_counterparty
 
-    update_fields = ['status', 'last_staff_note', 'counterparty', 'locked_by_finance']
+    update_fields = ['status', 'last_staff_note', 'counterparty', 'is_locked']
 
     # هر بار که سند از حالت ناقص خارج می‌شود، ثبت مالی قبلی ابطال می‌شود
     REACTIVATE_FROM_INCOMPLETE = {
@@ -3561,7 +3588,12 @@ def staff_update_status(request, payment_id):
         payment.finance_status = None
         payment.finance_registered_at = None
         payment.finance_registered_by = None
-        update_fields += ['finance_status', 'finance_registered_at', 'finance_registered_by']
+        payment.pending_final_approval = False
+        payment.pending_final_approval_since = None
+        update_fields += [
+            'finance_status', 'finance_registered_at', 'finance_registered_by',
+            'pending_final_approval', 'pending_final_approval_since',
+        ]
 
     payment.save(update_fields=update_fields)
 
@@ -3614,11 +3646,13 @@ def edit_payment(request, payment_id):
             payment.phone = initial_data['phone']
             from_status = payment.status
             payment.status = PaymentRecord.STATUS_PENDING
-            payment.locked_by_finance = False
+            payment.is_locked = False
             # وقتی مشتری رفع نقص می‌کند، ثبت مالی قبلی ابطال می‌شود تا مالی مجدداً بررسی کند
             payment.finance_status = None
             payment.finance_registered_at = None
             payment.finance_registered_by = None
+            payment.pending_final_approval = False
+            payment.pending_final_approval_since = None
             payment.created_at = timezone.now()
             payment.save()
             _save_receipts(payment, form)
@@ -5171,7 +5205,7 @@ def counterparty_dashboard(request):
             _field('payer_bank_name', 'بانک واریز کننده', lambda p: p.payer_bank_name),
             _field('beneficiary_account_number', 'شماره حساب مقصد', lambda p: p.beneficiary_account_number),
             _field('status', 'وضعیت', lambda p: p.get_status_display()),
-            _field('cp_approved', 'تایید طرف حساب', lambda p: _format_jalali_datetime(p.counterparty_approved_at) if p.counterparty_approved_at else 'تایید نشده'),
+            _field('cp_approved', 'تایید طرف حساب', lambda p: _format_jalali_datetime(p.counterparty_decided_at) if p.counterparty_decided_at and p.counterparty_status == PaymentRecord.CP_STATUS_APPROVED else 'تایید نشده'),
             _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime(p.created_at)),
         ]
         return _export_response(
@@ -5241,12 +5275,11 @@ def counterparty_approve_payment(request, payment_id):
     payment.counterparty_note = note
     payment.counterparty_decided_at = now
     payment.counterparty_decided_by = request.user
-    payment.counterparty_approved_at = now
-    payment.counterparty_approved_by = request.user
+    _sync_pending_final_flag(payment)
     payment.save(update_fields=[
         'counterparty_status', 'counterparty_note',
         'counterparty_decided_at', 'counterparty_decided_by',
-        'counterparty_approved_at', 'counterparty_approved_by',
+        'pending_final_approval', 'pending_final_approval_since',
     ])
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_CP_APPROVED,
@@ -5352,9 +5385,17 @@ def counterparty_return_payment(request, payment_id):
         return redirect(_safe_next_url(request) or 'submit')
 
     note = (request.POST.get('note') or '').strip()
-    payment.counterparty_approved_at = None
-    payment.counterparty_approved_by = None
-    payment.save(update_fields=['counterparty_approved_at', 'counterparty_approved_by'])
+    payment.counterparty_status = None
+    payment.counterparty_note = None
+    payment.counterparty_decided_at = None
+    payment.counterparty_decided_by = None
+    payment.pending_final_approval = False
+    payment.pending_final_approval_since = None
+    payment.save(update_fields=[
+        'counterparty_status', 'counterparty_note',
+        'counterparty_decided_at', 'counterparty_decided_by',
+        'pending_final_approval', 'pending_final_approval_since',
+    ])
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_CP_RETURNED,
                   note=note or 'بازگشت از تایید طرف حساب توسط بازرگانی')
@@ -5995,4 +6036,433 @@ def receipt_reader_test(request):
         'claude_enabled':   bool(getattr(settings, 'ANTHROPIC_API_KEY', '')),
         'ocrspace_enabled': bool(getattr(settings, 'OCRSPACE_API_KEY', '')),
     })
+
+
+# ─── پلتفرم درخواست نمایندگی ─────────────────────────────────────────────────
+
+import hashlib as _hashlib
+import random as _random
+import string as _string
+
+
+def _agency_generate_tracking():
+    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    return ''.join(_random.choices(chars, k=8))
+
+
+def _agency_gen_otp():
+    return ''.join(_random.choices(_string.digits, k=6))
+
+
+def _agency_hash(code):
+    return _hashlib.sha256(code.encode()).hexdigest()
+
+
+def _agency_otp_send(phone, otp_code):
+    from .sms_service import send_sms
+    msg = f'کد تأیید درخواست نمایندگی: {otp_code}\nاعتبار: ۵ دقیقه'
+    send_sms(phone, msg, purpose='agency_otp')
+
+
+def _agency_normalize_phone(phone):
+    p = (phone or '').strip().replace(' ', '').replace('-', '')
+    if p.startswith('+98'):
+        p = '0' + p[3:]
+    if p.startswith('98') and len(p) == 12:
+        p = '0' + p[2:]
+    return p
+
+
+def _agency_phone_valid(phone):
+    p = _agency_normalize_phone(phone)
+    return p.startswith('09') and len(p) == 11 and p.isdigit()
+
+
+def _agency_can_apply(phone):
+    """آیا این شماره درخواست فعال (non-final) دارد؟"""
+    from .models import AgencyApplication
+    return not AgencyApplication.objects.filter(
+        phone=phone,
+        status__in=[AgencyApplication.STATUS_PENDING, AgencyApplication.STATUS_REVIEWING, AgencyApplication.STATUS_INFO_NEEDED],
+    ).exists()
+
+
+def _agency_log(application, actor, action, note=''):
+    from .models import AgencyApplicationLog
+    AgencyApplicationLog.objects.create(application=application, actor=actor, action=action, note=note)
+
+
+def _agency_notify_sms(phone, message):
+    from .sms_service import send_sms
+    send_sms(phone, message, purpose='agency_notify')
+
+
+def _agency_create_user(application):
+    """ایجاد کاربر جدید برای متقاضی تأییدشده — برگرداندن (user, password)."""
+    from django.contrib.auth.models import User
+    base = 'agent_' + _agency_normalize_phone(application.phone)[-8:]
+    username = base
+    counter = 1
+    while User.objects.filter(username=username).exists():
+        username = f'{base}_{counter}'
+        counter += 1
+    password = ''.join(_random.choices(_string.ascii_letters + _string.digits, k=10))
+    user = User.objects.create_user(
+        username=username,
+        password=password,
+        first_name=application.first_name,
+        last_name=application.last_name,
+        email=application.email or '',
+    )
+    try:
+        from .models import UserProfile
+        UserProfile.objects.create(
+            user=user,
+            role='sales',
+            phone=application.phone,
+            mobile=application.phone,
+        )
+    except Exception:
+        pass
+    return user, password
+
+
+def agency_register_phone(request):
+    """مرحله ۱: ورود شماره موبایل و ارسال کد تأیید."""
+    if request.method == 'POST':
+        phone = _agency_normalize_phone(request.POST.get('phone', ''))
+        if not _agency_phone_valid(phone):
+            return render(request, 'payments/agency_register.html', {'error': 'شماره موبایل معتبر نیست (مثال: ۰۹۱۲۳۴۵۶۷۸۹)'})
+
+        # rate limit: max 3 OTP per session
+        sent_count = request.session.get('agency_otp_count', 0)
+        if sent_count >= 5:
+            return render(request, 'payments/agency_register.html', {'error': 'تعداد درخواست کد تأیید از حد مجاز گذشته است. لطفاً بعداً تلاش کنید.'})
+
+        if not _agency_can_apply(phone):
+            return render(request, 'payments/agency_register.html', {
+                'error': 'این شماره موبایل یک درخواست فعال دارد. برای پیگیری از بخش «استعلام وضعیت» استفاده کنید.',
+                'track_url': reverse('agency_track'),
+            })
+
+        otp = _agency_gen_otp()
+        request.session['agency_reg_phone'] = phone
+        request.session['agency_reg_otp_hash'] = _agency_hash(otp)
+        request.session['agency_reg_otp_expires'] = (timezone.now() + timezone.timedelta(minutes=5)).isoformat()
+        request.session['agency_reg_verified'] = False
+        request.session['agency_otp_count'] = sent_count + 1
+        request.session.modified = True
+
+        _agency_otp_send(phone, otp)
+        return redirect(reverse('agency_verify'))
+
+    return render(request, 'payments/agency_register.html', {})
+
+
+def agency_register_verify(request):
+    """مرحله ۲: تأیید کد OTP."""
+    phone = request.session.get('agency_reg_phone')
+    if not phone:
+        return redirect(reverse('agency_register'))
+
+    error = ''
+    if request.method == 'POST':
+        code = (request.POST.get('otp') or '').strip()
+        stored_hash = request.session.get('agency_reg_otp_hash', '')
+        expires_str = request.session.get('agency_reg_otp_expires', '')
+
+        try:
+            expires = timezone.datetime.fromisoformat(expires_str)
+            if timezone.is_naive(expires):
+                expires = timezone.make_aware(expires)
+        except Exception:
+            expires = timezone.now() - timezone.timedelta(minutes=1)
+
+        if timezone.now() > expires:
+            error = 'کد منقضی شده است. لطفاً کد جدید درخواست کنید.'
+        elif not code or _agency_hash(code) != stored_hash:
+            error = 'کد وارد شده اشتباه است.'
+        else:
+            request.session['agency_reg_verified'] = True
+            request.session.modified = True
+            return redirect(reverse('agency_apply'))
+
+    return render(request, 'payments/agency_verify.html', {
+        'phone': phone,
+        'error': error,
+    })
+
+
+def agency_register_apply(request):
+    """مرحله ۳: تکمیل فرم درخواست نمایندگی."""
+    if not request.session.get('agency_reg_verified'):
+        return redirect(reverse('agency_register'))
+
+    phone = request.session.get('agency_reg_phone', '')
+    error = ''
+    form_data = {}
+
+    if request.method == 'POST':
+        form_data = request.POST
+        required = ['first_name', 'last_name', 'national_id', 'province', 'city',
+                    'home_address', 'business_address', 'activity_domain', 'services_offered']
+        missing = [f for f in required if not request.POST.get(f, '').strip()]
+        if missing:
+            error = 'لطفاً تمامی فیلدهای ستاره‌دار را تکمیل کنید.'
+        else:
+            from .models import AgencyApplication
+            tracking = _agency_generate_tracking()
+            while AgencyApplication.objects.filter(tracking_code=tracking).exists():
+                tracking = _agency_generate_tracking()
+
+            app = AgencyApplication.objects.create(
+                phone=phone,
+                phone_verified=True,
+                email=request.POST.get('email', '').strip(),
+                first_name=request.POST.get('first_name', '').strip(),
+                last_name=request.POST.get('last_name', '').strip(),
+                national_id=request.POST.get('national_id', '').strip(),
+                province=request.POST.get('province', '').strip(),
+                city=request.POST.get('city', '').strip(),
+                home_address=request.POST.get('home_address', '').strip(),
+                business_address=request.POST.get('business_address', '').strip(),
+                activity_domain=request.POST.get('activity_domain', '').strip(),
+                services_offered=request.POST.get('services_offered', '').strip(),
+                years_experience=int(request.POST.get('years_experience') or 0),
+                has_business_license='has_business_license' in request.POST,
+                referrer_name=request.POST.get('referrer_name', '').strip(),
+                referrer_phone=_agency_normalize_phone(request.POST.get('referrer_phone', '')),
+                motivation=request.POST.get('motivation', '').strip(),
+                tracking_code=tracking,
+                submitted_at=timezone.now(),
+            )
+            _agency_log(app, None, AgencyApplicationLog.ACTION_SUBMITTED, 'ثبت درخواست توسط متقاضی')
+
+            # اعلان به مدیر فروش
+            from .models import UserNotification
+            _notify_users(
+                list(_staff_notification_users({'sales_manager'})),
+                '🤝 درخواست نمایندگی جدید',
+                f'درخواست نمایندگی از {app.full_name} — {app.city} ثبت شد.',
+                reverse('agency_application_detail', args=[app.pk]),
+                category=UserNotification.CATEGORY_SYSTEM,
+            )
+
+            # پیامک تأیید به متقاضی
+            _agency_notify_sms(phone, f'درخواست نمایندگی شما با موفقیت ثبت شد.\nکد پیگیری: {tracking}\nبرای استعلام وضعیت از این کد استفاده کنید.')
+
+            # پاکسازی session
+            for key in ('agency_reg_phone', 'agency_reg_otp_hash', 'agency_reg_otp_expires', 'agency_reg_verified', 'agency_otp_count'):
+                request.session.pop(key, None)
+
+            return redirect(reverse('agency_success', args=[tracking]))
+
+    return render(request, 'payments/agency_apply.html', {
+        'phone': phone,
+        'error': error,
+        'form_data': form_data,
+    })
+
+
+def agency_register_success(request, tracking_code):
+    """صفحه تأیید ثبت موفق درخواست."""
+    from .models import AgencyApplication
+    app = get_object_or_404(AgencyApplication, tracking_code=tracking_code)
+    return render(request, 'payments/agency_success.html', {'app': app})
+
+
+def agency_application_track(request):
+    """استعلام وضعیت درخواست نمایندگی با کد پیگیری یا شماره موبایل."""
+    from .models import AgencyApplication
+    result = None
+    error = ''
+    if request.method == 'POST':
+        q = request.POST.get('query', '').strip()
+        phone = _agency_normalize_phone(q)
+        try:
+            if q.upper().replace(' ', '') and len(q) <= 10 and not q.startswith('0'):
+                result = AgencyApplication.objects.filter(tracking_code=q.upper()).first()
+            elif _agency_phone_valid(phone):
+                result = AgencyApplication.objects.filter(phone=phone).order_by('-created_at').first()
+            if not result:
+                error = 'درخواستی با این مشخصات یافت نشد.'
+        except Exception:
+            error = 'خطا در جستجو.'
+    return render(request, 'payments/agency_track.html', {'result': result, 'error': error})
+
+
+# ─── ویوهای کارشناس / مدیر ────────────────────────────────────────────────────
+
+def _can_manage_agency(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    role = _user_role(user)
+    return role in {'sales_manager', 'commercial_manager', 'sales'}
+
+
+@login_required
+def agency_applications_list(request):
+    """لیست درخواست‌های نمایندگی — برای مدیر و کارشناس فروش."""
+    if not _can_manage_agency(request.user):
+        return HttpResponseForbidden('دسترسی ممنوع است.')
+
+    from .models import AgencyApplication
+    qs = AgencyApplication.objects.select_related('assigned_to', 'reviewed_by', 'created_user')
+
+    status_f = request.GET.get('status', '')
+    city_f   = request.GET.get('city', '')
+    search_f = request.GET.get('q', '')
+
+    if status_f:
+        qs = qs.filter(status=status_f)
+    if city_f:
+        qs = qs.filter(city__icontains=city_f)
+    if search_f:
+        qs = qs.filter(
+            Q(first_name__icontains=search_f) | Q(last_name__icontains=search_f) |
+            Q(phone__icontains=search_f) | Q(tracking_code__icontains=search_f)
+        )
+
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs, 25)
+    page = paginator.get_page(request.GET.get('page', 1))
+
+    status_counts = [
+        (val, label, AgencyApplication.objects.filter(status=val).count())
+        for val, label in AgencyApplication.STATUS_CHOICES
+    ]
+    return render(request, 'payments/agency_applications.html', {
+        'page': page,
+        'status_choices': AgencyApplication.STATUS_CHOICES,
+        'status_filter': status_f,
+        'city_filter': city_f,
+        'search': search_f,
+        'status_counts': status_counts,
+    })
+
+
+@login_required
+def agency_application_detail(request, app_id):
+    """جزئیات یک درخواست نمایندگی."""
+    if not _can_manage_agency(request.user):
+        return HttpResponseForbidden('دسترسی ممنوع است.')
+
+    from .models import AgencyApplication
+    app = get_object_or_404(AgencyApplication.objects.select_related('assigned_to', 'reviewed_by', 'created_user').prefetch_related('logs__actor'), id=app_id)
+
+    staff_users = list(User.objects.filter(
+        profile__role__in=['sales', 'sales_manager', 'commercial_manager'],
+        is_active=True,
+    ).select_related('profile'))
+
+    return render(request, 'payments/agency_application_detail.html', {
+        'app': app,
+        'staff_users': staff_users,
+    })
+
+
+@login_required
+@require_POST
+def agency_application_action(request, app_id):
+    """تغییر وضعیت درخواست نمایندگی — تأیید / رد / شروع بررسی / درخواست اطلاعات."""
+    if not _can_manage_agency(request.user):
+        return HttpResponseForbidden('دسترسی ممنوع است.')
+
+    from .models import AgencyApplication, AgencyApplicationLog, UserNotification
+    app = get_object_or_404(AgencyApplication, id=app_id)
+    action = request.POST.get('action', '')
+    note   = (request.POST.get('note') or '').strip()
+
+    if action == 'assign':
+        uid = request.POST.get('assign_to')
+        if uid:
+            try:
+                app.assigned_to = User.objects.get(id=int(uid))
+                app.save(update_fields=['assigned_to', 'updated_at'])
+                _agency_log(app, request.user, AgencyApplicationLog.ACTION_ASSIGNED, f'تخصیص به {app.assigned_to.get_full_name() or app.assigned_to.username}')
+                messages.success(request, 'درخواست تخصیص داده شد.')
+            except User.DoesNotExist:
+                messages.error(request, 'کاربر یافت نشد.')
+        return redirect(reverse('agency_application_detail', args=[app_id]))
+
+    if action == 'reviewing':
+        app.status = AgencyApplication.STATUS_REVIEWING
+        app.reviewed_by = request.user
+        app.save(update_fields=['status', 'reviewed_by', 'updated_at'])
+        _agency_log(app, request.user, AgencyApplicationLog.ACTION_REVIEWING, note)
+        _agency_notify_sms(app.phone, f'درخواست نمایندگی شما (کد: {app.tracking_code}) در دست بررسی کارشناسان ما است.')
+        messages.success(request, 'وضعیت به «در حال بررسی» تغییر کرد.')
+
+    elif action == 'info_needed':
+        if not note:
+            messages.error(request, 'لطفاً توضیح درخواست اطلاعات را وارد کنید.')
+            return redirect(reverse('agency_application_detail', args=[app_id]))
+        app.status = AgencyApplication.STATUS_INFO_NEEDED
+        app.info_request_note = note
+        app.save(update_fields=['status', 'info_request_note', 'updated_at'])
+        _agency_log(app, request.user, AgencyApplicationLog.ACTION_INFO_NEEDED, note)
+        _agency_notify_sms(app.phone, f'درخواست نمایندگی شما (کد: {app.tracking_code}) نیاز به اطلاعات تکمیلی دارد:\n{note}')
+        messages.info(request, 'درخواست اطلاعات تکمیلی ثبت شد.')
+
+    elif action == 'note':
+        if note:
+            app.staff_note = note
+            app.save(update_fields=['staff_note', 'updated_at'])
+            _agency_log(app, request.user, AgencyApplicationLog.ACTION_NOTE, note)
+            messages.success(request, 'یادداشت ثبت شد.')
+
+    elif action == 'reject':
+        reason = note or (request.POST.get('rejection_reason') or '').strip()
+        app.status = AgencyApplication.STATUS_REJECTED
+        app.rejection_reason = reason
+        app.reviewed_by = request.user
+        app.reviewed_at = timezone.now()
+        app.save(update_fields=['status', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'updated_at'])
+        _agency_log(app, request.user, AgencyApplicationLog.ACTION_REJECTED, reason)
+        sms_text = f'درخواست نمایندگی شما (کد: {app.tracking_code}) پس از بررسی تأیید نشد.'
+        if reason:
+            sms_text += f'\nدلیل: {reason}'
+        _agency_notify_sms(app.phone, sms_text)
+        messages.warning(request, 'درخواست رد شد.')
+
+    elif action == 'approve':
+        if app.status == AgencyApplication.STATUS_APPROVED:
+            messages.info(request, 'این درخواست قبلاً تأیید شده است.')
+            return redirect(reverse('agency_application_detail', args=[app_id]))
+
+        user, password = _agency_create_user(app)
+        app.status = AgencyApplication.STATUS_APPROVED
+        app.created_user = user
+        app.reviewed_by = request.user
+        app.reviewed_at = timezone.now()
+        if note:
+            app.staff_note = note
+        app.save(update_fields=['status', 'created_user', 'reviewed_by', 'reviewed_at', 'staff_note', 'updated_at'])
+        _agency_log(app, request.user, AgencyApplicationLog.ACTION_APPROVED, note)
+
+        sms_text = (
+            f'تبریک! درخواست نمایندگی شما (کد: {app.tracking_code}) تأیید شد.\n'
+            f'اطلاعات ورود به سامانه:\n'
+            f'نام کاربری: {user.username}\n'
+            f'رمز عبور: {password}\n'
+            f'پس از ورود، رمز عبور خود را تغییر دهید.'
+        )
+        _agency_notify_sms(app.phone, sms_text)
+
+        _notify_users(
+            [request.user],
+            '✅ تأیید نمایندگی',
+            f'درخواست {app.full_name} تأیید و کاربر {user.username} ایجاد شد.',
+            reverse('agency_application_detail', args=[app.pk]),
+            category=UserNotification.CATEGORY_SYSTEM,
+            actor=request.user,
+        )
+        messages.success(request, f'درخواست تأیید شد. کاربر {user.username} ایجاد شد و اطلاعات ورود برای متقاضی پیامک شد.')
+
+    else:
+        messages.error(request, 'عملیات نامعتبر است.')
+
+    return redirect(reverse('agency_application_detail', args=[app_id]))
 

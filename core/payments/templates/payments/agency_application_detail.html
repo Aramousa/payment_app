@@ -1,0 +1,199 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>درخواست نمایندگی — {{ app.full_name }}</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f7fb; padding: 20px; }
+        .wrap { max-width: 1100px; margin: 0 auto; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .top-bar h2 { font-size: 18px; font-weight: 800; color: #172033; margin: 0; }
+        .btn-link { display: inline-block; background: #1e3a5f; color: #fff; border-radius: 6px; padding: 7px 14px; text-decoration: none; font-size: 13px; }
+        .btn-link.alt { background: #6c757d; }
+        .layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 22px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
+        .card h3 { font-size: 14px; font-weight: 700; color: #1e3a5f; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+        .info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; gap: 12px; }
+        .info-row:last-child { border-bottom: none; }
+        .info-row .lbl { color: #64748b; min-width: 110px; flex-shrink: 0; }
+        .info-row .val { font-weight: 600; color: #172033; }
+        .flag-chip { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; color: #fff; }
+        .flag-gray   { background: #6b7280; }
+        .flag-blue   { background: #1e88e5; }
+        .flag-yellow { background: #f59e0b; color: #111; }
+        .flag-green  { background: #16a34a; }
+        .flag-red    { background: #dc2626; }
+        .action-form { margin-bottom: 10px; }
+        .note-area { width: 100%; padding: 9px 12px; border: 1.5px solid #d1d5db; border-radius: 7px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 65px; outline: none; margin-bottom: 6px; }
+        .note-area:focus { border-color: #2563eb; }
+        .act-btn { display: block; width: 100%; padding: 9px; border-radius: 7px; border: none; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; }
+        .act-btn.blue   { background: #eff6ff; color: #1d4ed8; }
+        .act-btn.yellow { background: #fefce8; color: #854d0e; }
+        .act-btn.green  { background: #f0fdf4; color: #15803d; border: 1.5px solid #86efac; }
+        .act-btn.red    { background: #fef2f2; color: #b91c1c; }
+        .act-btn:hover  { opacity: .85; }
+        select.assign-sel { width: 100%; padding: 9px 12px; border: 1.5px solid #d1d5db; border-radius: 7px; font-family: inherit; font-size: 13px; margin-bottom: 6px; outline: none; }
+        .log-list { padding: 0; list-style: none; }
+        .log-item { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; }
+        .log-item:last-child { border-bottom: none; }
+        .log-dot { width: 9px; height: 9px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; margin-top: 4px; }
+        .log-dot.approved { background: #16a34a; }
+        .log-dot.rejected { background: #dc2626; }
+        .log-dot.reviewing { background: #1e88e5; }
+        .log-txt { font-size: 13px; font-weight: 600; color: #172033; }
+        .log-note { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .log-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+        .alert { border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 12px; }
+        .alert-yellow { background: #fefce8; border: 1px solid #fde047; color: #713f12; }
+        .alert-red    { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        .alert-green  { background: #f0fdf4; border: 1px solid #86efac; color: #14532d; }
+        .divider { border: none; border-top: 1px solid #e2e8f0; margin: 10px 0; }
+        @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+{% include "payments/partials/app_navigation.html" %}
+<div class="wrap">
+    <div class="top-bar">
+        <div>
+            <a href="{% url 'agency_applications' %}" class="btn-link alt" style="margin-bottom:8px;display:inline-block;">← بازگشت</a>
+            <h2>{{ app.full_name }} &nbsp;<span class="flag-chip {{ app.status_class }}">{{ app.get_status_display }}</span></h2>
+        </div>
+    </div>
+
+    <div class="layout">
+        <div>
+            <div class="card">
+                <h3>👤 مشخصات فردی</h3>
+                <div class="info-row"><span class="lbl">کد پیگیری</span><span class="val" dir="ltr">{{ app.tracking_code }}</span></div>
+                <div class="info-row"><span class="lbl">موبایل</span><span class="val" dir="ltr">{{ app.phone }}</span></div>
+                <div class="info-row"><span class="lbl">کد ملی</span><span class="val">{{ app.national_id|default:"—" }}</span></div>
+                <div class="info-row"><span class="lbl">ایمیل</span><span class="val">{{ app.email|default:"—" }}</span></div>
+                <div class="info-row"><span class="lbl">تاریخ ثبت</span><span class="val">{{ app.created_at|date:"Y/m/d H:i" }}</span></div>
+                {% if app.reviewed_at %}<div class="info-row"><span class="lbl">تاریخ بررسی</span><span class="val">{{ app.reviewed_at|date:"Y/m/d H:i" }}</span></div>{% endif %}
+            </div>
+
+            <div class="card">
+                <h3>📍 موقعیت</h3>
+                <div class="info-row"><span class="lbl">استان / شهر</span><span class="val">{{ app.province }} / {{ app.city }}</span></div>
+                <div class="info-row"><span class="lbl">آدرس سکونت</span><span class="val">{{ app.home_address }}</span></div>
+                <div class="info-row"><span class="lbl">آدرس فعالیت</span><span class="val">{{ app.business_address }}</span></div>
+            </div>
+
+            <div class="card">
+                <h3>💼 پروفایل کاری</h3>
+                <div class="info-row"><span class="lbl">حوزه فعالیت</span><span class="val">{{ app.activity_domain }}</span></div>
+                <div class="info-row"><span class="lbl">سابقه کاری</span><span class="val">{{ app.years_experience }} سال</span></div>
+                <div class="info-row"><span class="lbl">جواز کسب</span><span class="val">{% if app.has_business_license %}✅ دارد{% else %}❌ ندارد{% endif %}</span></div>
+                <div class="info-row"><span class="lbl">خدمات قابل ارائه</span><span class="val" style="white-space:pre-line;">{{ app.services_offered }}</span></div>
+                {% if app.motivation %}<div class="info-row"><span class="lbl">انگیزه</span><span class="val" style="white-space:pre-line;">{{ app.motivation }}</span></div>{% endif %}
+            </div>
+
+            {% if app.referrer_name or app.referrer_phone %}
+            <div class="card">
+                <h3>🔗 معرف</h3>
+                <div class="info-row"><span class="lbl">نام معرف</span><span class="val">{{ app.referrer_name|default:"—" }}</span></div>
+                <div class="info-row"><span class="lbl">موبایل معرف</span><span class="val" dir="ltr">{{ app.referrer_phone|default:"—" }}</span></div>
+            </div>
+            {% endif %}
+
+            {% if app.status == 'info_needed' and app.info_request_note %}
+            <div class="alert alert-yellow">📋 <strong>درخواست اطلاعات تکمیلی:</strong><br>{{ app.info_request_note }}</div>
+            {% endif %}
+            {% if app.rejection_reason %}
+            <div class="alert alert-red">❌ <strong>دلیل رد:</strong><br>{{ app.rejection_reason }}</div>
+            {% endif %}
+            {% if app.created_user %}
+            <div class="alert alert-green">✅ <strong>کاربر ایجادشده:</strong> نام کاربری: <code>{{ app.created_user.username }}</code></div>
+            {% endif %}
+
+            <div class="card">
+                <h3>📜 تاریخچه</h3>
+                <ul class="log-list">
+                {% for log in app.logs.all %}
+                    <li class="log-item">
+                        <div class="log-dot {{ log.action }}"></div>
+                        <div>
+                            <div class="log-txt">{{ log.get_action_display }}</div>
+                            {% if log.note %}<div class="log-note">{{ log.note }}</div>{% endif %}
+                            <div class="log-meta">{{ log.created_at|date:"Y/m/d H:i" }}{% if log.actor %} — {{ log.actor.get_full_name|default:log.actor.username }}{% endif %}</div>
+                        </div>
+                    </li>
+                {% empty %}
+                    <li style="font-size:13px;color:#94a3b8;">لاگی ثبت نشده.</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div>
+            {% if app.status != 'approved' and app.status != 'rejected' %}
+            <div class="card">
+                <h3>⚙️ عملیات</h3>
+
+                {% if app.status == 'pending' %}
+                <form class="action-form" method="post" action="{% url 'agency_application_action' app.id %}">
+                    {% csrf_token %}<input type="hidden" name="action" value="reviewing">
+                    <button type="submit" class="act-btn blue">🔍 شروع بررسی</button>
+                </form>
+                {% endif %}
+
+                <form class="action-form" method="post" action="{% url 'agency_application_action' app.id %}">
+                    {% csrf_token %}<input type="hidden" name="action" value="info_needed">
+                    <textarea class="note-area" name="note" placeholder="توضیح اطلاعات مورد نیاز..."></textarea>
+                    <button type="submit" class="act-btn yellow">📋 درخواست اطلاعات تکمیلی</button>
+                </form>
+
+                <hr class="divider">
+
+                <form class="action-form" method="post" action="{% url 'agency_application_action' app.id %}"
+                      onsubmit="return confirm('تأیید می‌کنید؟ یک کاربر جدید ایجاد و اطلاعات ورود پیامک می‌شود.')">
+                    {% csrf_token %}<input type="hidden" name="action" value="approve">
+                    <textarea class="note-area" name="note" placeholder="یادداشت اختیاری..."></textarea>
+                    <button type="submit" class="act-btn green">✅ تأیید و ایجاد کاربر</button>
+                </form>
+
+                <form class="action-form" method="post" action="{% url 'agency_application_action' app.id %}"
+                      onsubmit="return confirm('آیا این درخواست را رد می‌کنید؟')">
+                    {% csrf_token %}<input type="hidden" name="action" value="reject">
+                    <textarea class="note-area" name="note" placeholder="دلیل رد (اختیاری)..."></textarea>
+                    <button type="submit" class="act-btn red">❌ رد درخواست</button>
+                </form>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <h3>👤 تخصیص به کارشناس</h3>
+                <form method="post" action="{% url 'agency_application_action' app.id %}">
+                    {% csrf_token %}<input type="hidden" name="action" value="assign">
+                    <select name="assign_to" class="assign-sel">
+                        <option value="">— انتخاب کارشناس —</option>
+                        {% for u in staff_users %}
+                        <option value="{{ u.id }}" {% if app.assigned_to_id == u.id %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="act-btn blue">تخصیص</button>
+                </form>
+                {% if app.assigned_to %}
+                <p style="font-size:12px;color:#64748b;margin-top:6px;">مسئول فعلی: <strong>{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</strong></p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h3>📝 یادداشت داخلی</h3>
+                <form method="post" action="{% url 'agency_application_action' app.id %}">
+                    {% csrf_token %}<input type="hidden" name="action" value="note">
+                    <textarea class="note-area" name="note" placeholder="یادداشت داخلی — برای متقاضی نمایش داده نمی‌شود">{{ app.staff_note }}</textarea>
+                    <button type="submit" class="act-btn blue">ذخیره یادداشت</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

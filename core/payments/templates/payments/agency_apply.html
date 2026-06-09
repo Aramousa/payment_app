@@ -1,0 +1,159 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فرم درخواست نمایندگی</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; min-height: 100vh; background: #f4f7fb; padding: 24px 16px; }
+        .page-wrap { max-width: 760px; margin: 0 auto; }
+        .page-header { text-align: center; margin-bottom: 32px; }
+        .page-header .icon { font-size: 48px; }
+        .page-header h1 { font-size: 24px; font-weight: 800; color: #172033; margin: 8px 0 4px; }
+        .page-header p { color: #64748b; font-size: 14px; }
+        .steps { display: flex; justify-content: center; gap: 8px; margin-bottom: 32px; }
+        .step { width: 40px; height: 6px; border-radius: 3px; background: #e2e8f0; }
+        .step.done { background: #16a34a; }
+        .step.active { background: #2563eb; }
+        .card { background: #fff; border-radius: 14px; padding: 28px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(15,23,42,.06); }
+        .section-title { font-size: 15px; font-weight: 700; color: #1e3a5f; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-grid .full { grid-column: 1 / -1; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 5px; }
+        .req { color: #ef4444; }
+        input[type=text], input[type=tel], input[type=email], input[type=number], select, textarea {
+            width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
+            font-family: inherit; font-size: 14px; outline: none; transition: border .2s; background: #fff;
+        }
+        input:focus, select:focus, textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+        textarea { resize: vertical; min-height: 80px; }
+        .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+        .checkbox-row input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+        .checkbox-row label { margin: 0; cursor: pointer; font-weight: 400; }
+        .error-box { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; }
+        .phone-badge { display: inline-flex; align-items: center; gap: 6px; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 6px; padding: 4px 10px; font-size: 13px; margin-bottom: 16px; }
+        .submit-btn { width: 100%; padding: 14px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer; transition: background .2s; }
+        .submit-btn:hover { background: #1d4ed8; }
+        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } .form-grid .full { grid-column: 1; } }
+    </style>
+</head>
+<body>
+<div class="page-wrap">
+    <div class="page-header">
+        <div class="icon">📋</div>
+        <h1>فرم درخواست نمایندگی</h1>
+        <p>لطفاً اطلاعات خود را با دقت تکمیل کنید.</p>
+    </div>
+    <div class="steps">
+        <div class="step done"></div>
+        <div class="step done"></div>
+        <div class="step active"></div>
+    </div>
+
+    {% if error %}<div class="error-box">{{ error }}</div>{% endif %}
+
+    <div class="phone-badge">✅ موبایل تأیید شده: {{ phone }}</div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="card">
+            <div class="section-title">👤 مشخصات فردی</div>
+            <div class="form-grid">
+                <div>
+                    <label>نام <span class="req">*</span></label>
+                    <input type="text" name="first_name" value="{{ form_data.first_name|default:'' }}" required>
+                </div>
+                <div>
+                    <label>نام خانوادگی <span class="req">*</span></label>
+                    <input type="text" name="last_name" value="{{ form_data.last_name|default:'' }}" required>
+                </div>
+                <div>
+                    <label>کد ملی <span class="req">*</span></label>
+                    <input type="text" name="national_id" value="{{ form_data.national_id|default:'' }}" maxlength="10" inputmode="numeric" required>
+                </div>
+                <div>
+                    <label>ایمیل</label>
+                    <input type="email" name="email" value="{{ form_data.email|default:'' }}" placeholder="اختیاری">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">📍 موقعیت جغرافیایی</div>
+            <div class="form-grid">
+                <div>
+                    <label>استان <span class="req">*</span></label>
+                    <input type="text" name="province" value="{{ form_data.province|default:'' }}" required>
+                </div>
+                <div>
+                    <label>شهر <span class="req">*</span></label>
+                    <input type="text" name="city" value="{{ form_data.city|default:'' }}" required>
+                </div>
+                <div class="full">
+                    <label>آدرس محل سکونت <span class="req">*</span></label>
+                    <textarea name="home_address" required>{{ form_data.home_address|default:'' }}</textarea>
+                </div>
+                <div class="full">
+                    <label>آدرس محل فعالیت (محل احتمالی نمایندگی) <span class="req">*</span></label>
+                    <textarea name="business_address" required>{{ form_data.business_address|default:'' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">💼 پروفایل کاری</div>
+            <div class="form-grid">
+                <div class="full">
+                    <label>حوزه فعالیت <span class="req">*</span></label>
+                    <input type="text" name="activity_domain" value="{{ form_data.activity_domain|default:'' }}" placeholder="مثال: فروش تجهیزات الکترونیک، نمایندگی خدمات پس از فروش" required>
+                </div>
+                <div class="full">
+                    <label>خدمات قابل ارائه <span class="req">*</span></label>
+                    <textarea name="services_offered" placeholder="لیست خدماتی که می‌توانید ارائه دهید را بنویسید..." required>{{ form_data.services_offered|default:'' }}</textarea>
+                </div>
+                <div>
+                    <label>سابقه کاری (سال)</label>
+                    <input type="number" name="years_experience" value="{{ form_data.years_experience|default:'0' }}" min="0" max="50">
+                </div>
+                <div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="has_license" name="has_business_license" {% if form_data.has_business_license %}checked{% endif %}>
+                        <label for="has_license">جواز کسب معتبر دارم</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">🔗 معرف</div>
+            <div class="form-grid">
+                <div>
+                    <label>نام معرف</label>
+                    <input type="text" name="referrer_name" value="{{ form_data.referrer_name|default:'' }}" placeholder="اختیاری">
+                </div>
+                <div>
+                    <label>موبایل معرف</label>
+                    <input type="tel" name="referrer_phone" value="{{ form_data.referrer_phone|default:'' }}" placeholder="09xxxxxxxxx">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">✍️ انگیزه و توضیحات</div>
+            <div class="form-grid">
+                <div class="full">
+                    <label>دلایل و انگیزه برای اخذ نمایندگی</label>
+                    <textarea name="motivation" rows="4" placeholder="توضیح دهید چرا متقاضی نمایندگی هستید و چه توانمندی‌هایی دارید...">{{ form_data.motivation|default:'' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="submit-btn">ثبت درخواست نمایندگی</button>
+    </form>
+</div>
+</body>
+</html>

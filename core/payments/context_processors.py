@@ -219,6 +219,8 @@ def app_navigation(request):
             items.append(_nav_item('فاکتور فروش', 'invoices_dashboard', 'invoices', 'sales', '🧾'))
         if user.is_superuser or role in {'sales', 'sales_manager'}:
             items.append(_nav_item('داشبورد فروش', 'sales_expert_dashboard', 'sales_dashboard', 'sales', '📊'))
+        if user.is_superuser or role in {'sales_manager', 'sales', 'commercial_manager'}:
+            items.append(_nav_item('درخواست‌های نمایندگی', 'agency_applications', 'agency', 'sales', '🤝'))
 
         if user.is_superuser or role == 'finance_manager':
             items.append(_nav_item('تفویض تایید اسناد', 'final_approval_delegation', 'delegation', 'finance', '✍️'))

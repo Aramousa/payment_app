@@ -1,0 +1,50 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تأیید شماره موبایل — درخواست نمایندگی</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Vazir, sans-serif; direction: rtl; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0d1b2e 0%, #1a2f4e 50%, #1e3a5f 100%); padding: 20px; }
+        .card { background: #fff; border-radius: 18px; padding: 40px 36px; max-width: 420px; width: 100%; box-shadow: 0 24px 60px rgba(0,0,0,.35); text-align: center; }
+        .icon { font-size: 48px; margin-bottom: 16px; }
+        h1 { font-size: 20px; font-weight: 800; color: #172033; margin-bottom: 8px; }
+        .phone-display { background: #f0f4ff; color: #2563eb; font-size: 18px; font-weight: 700; padding: 8px 18px; border-radius: 8px; direction: ltr; display: inline-block; margin-bottom: 20px; }
+        p { color: #64748b; font-size: 13px; margin-bottom: 24px; line-height: 1.6; }
+        .steps { display: flex; justify-content: center; gap: 8px; margin-bottom: 28px; }
+        .step { width: 32px; height: 6px; border-radius: 3px; background: #e2e8f0; }
+        .step.done { background: #16a34a; }
+        .step.active { background: #2563eb; }
+        .otp-input { width: 100%; padding: 14px; border: 2px solid #d1d5db; border-radius: 10px; font-family: inherit; font-size: 24px; text-align: center; direction: ltr; letter-spacing: 8px; outline: none; transition: border .2s; }
+        .otp-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+        .error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; text-align: right; }
+        button[type=submit] { width: 100%; padding: 13px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: background .2s; }
+        button[type=submit]:hover { background: #1d4ed8; }
+        .resend-link { display: block; margin-top: 14px; font-size: 13px; color: #64748b; }
+        .resend-link a { color: #2563eb; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">📱</div>
+    <h1>کد تأیید را وارد کنید</h1>
+    <div class="phone-display">{{ phone }}</div>
+    <p>کد ۶ رقمی ارسال‌شده به شماره بالا را وارد کنید.</p>
+    <div class="steps">
+        <div class="step done"></div>
+        <div class="step active"></div>
+        <div class="step"></div>
+    </div>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <input class="otp-input" type="text" name="otp" maxlength="6" placeholder="------" inputmode="numeric" autofocus autocomplete="one-time-code">
+        <button type="submit">تأیید و ادامه</button>
+    </form>
+    <span class="resend-link"><a href="{% url 'agency_register' %}">ارسال مجدد کد</a></span>
+</div>
+</body>
+</html>

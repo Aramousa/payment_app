@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پیگیری درخواست نمایندگی</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Vazir, sans-serif; direction: rtl; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0d1b2e 0%, #1a2f4e 50%, #1e3a5f 100%); padding: 20px; }
+        .card { background: #fff; border-radius: 18px; padding: 40px 36px; max-width: 480px; width: 100%; box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+        .icon { text-align: center; font-size: 48px; margin-bottom: 16px; }
+        h1 { font-size: 20px; font-weight: 800; color: #172033; text-align: center; margin-bottom: 8px; }
+        p { color: #64748b; font-size: 14px; text-align: center; margin-bottom: 24px; line-height: 1.6; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+        input[type=text] { width: 100%; padding: 12px 14px; border: 1.5px solid #d1d5db; border-radius: 10px; font-family: inherit; font-size: 15px; outline: none; transition: border .2s; }
+        input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+        button[type=submit] { width: 100%; padding: 13px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: background .2s; }
+        button:hover { background: #1d4ed8; }
+        .error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+        .result-card { margin-top: 24px; border: 1.5px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+        .result-header { padding: 14px 18px; font-weight: 700; font-size: 15px; }
+        .status-pending     { background: #f8fafc; color: #64748b; }
+        .status-reviewing   { background: #eff6ff; color: #1d4ed8; }
+        .status-info_needed { background: #fefce8; color: #854d0e; }
+        .status-approved    { background: #f0fdf4; color: #15803d; }
+        .status-rejected    { background: #fef2f2; color: #b91c1c; }
+        .result-body { padding: 16px 18px; }
+        .result-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; gap: 12px; }
+        .result-row:last-child { border-bottom: none; }
+        .result-row .lbl { color: #64748b; flex-shrink: 0; }
+        .result-row .val { font-weight: 600; color: #172033; text-align: left; }
+        .info-note { background: #fefce8; border: 1px solid #fde047; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #713f12; margin-top: 12px; }
+        .reject-reason { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #991b1b; margin-top: 12px; }
+        .back-link { text-align: center; margin-top: 20px; font-size: 13px; }
+        .back-link a { color: #2563eb; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">🔍</div>
+    <h1>پیگیری درخواست نمایندگی</h1>
+    <p>کد پیگیری ۸ حرفی یا شماره موبایل خود را وارد کنید.</p>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <label for="query">کد پیگیری یا شماره موبایل</label>
+        <input type="text" id="query" name="query" placeholder="ABCD1234 یا 09123456789" autofocus>
+        <button type="submit">جستجو</button>
+    </form>
+
+    {% if result %}
+    <div class="result-card">
+        <div class="result-header status-{{ result.status }}">
+            وضعیت: {{ result.get_status_display }}
+        </div>
+        <div class="result-body">
+            <div class="result-row"><span class="lbl">متقاضی</span><span class="val">{{ result.full_name }}</span></div>
+            <div class="result-row"><span class="lbl">کد پیگیری</span><span class="val" dir="ltr">{{ result.tracking_code }}</span></div>
+            <div class="result-row"><span class="lbl">شهر / استان</span><span class="val">{{ result.city }} / {{ result.province }}</span></div>
+            <div class="result-row"><span class="lbl">تاریخ ثبت</span><span class="val">{{ result.created_at|date:"Y/m/d" }}</span></div>
+            {% if result.reviewed_at %}
+            <div class="result-row"><span class="lbl">تاریخ بررسی</span><span class="val">{{ result.reviewed_at|date:"Y/m/d" }}</span></div>
+            {% endif %}
+            {% if result.status == 'info_needed' and result.info_request_note %}
+            <div class="info-note">📋 <strong>نیاز به اطلاعات تکمیلی:</strong><br>{{ result.info_request_note }}</div>
+            {% endif %}
+            {% if result.status == 'rejected' and result.rejection_reason %}
+            <div class="reject-reason">❌ <strong>دلیل رد:</strong><br>{{ result.rejection_reason }}</div>
+            {% endif %}
+            {% if result.status == 'approved' %}
+            <div class="info-note" style="background:#f0fdf4;border-color:#86efac;color:#14532d;">✅ <strong>تبریک!</strong> درخواست شما تأیید شده است. اطلاعات ورود از طریق پیامک ارسال شده.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="back-link"><a href="{% url 'agency_register' %}">ثبت درخواست جدید</a></div>
+</div>
+</body>
+</html>

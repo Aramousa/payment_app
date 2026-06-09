@@ -295,7 +295,6 @@ class UploadSettings(models.Model):
 class PaymentRecord(models.Model):
     STATUS_PENDING = 'pending'
     STATUS_COMMERCIAL_REVIEW = 'commercial_review'
-    STATUS_FINANCE_REVIEW = 'finance_review'
     STATUS_APPROVED = 'approved'
     STATUS_FINAL_APPROVED = 'final_approved'
     STATUS_REJECTED = 'rejected'
@@ -323,7 +322,6 @@ class PaymentRecord(models.Model):
     CUSTOMER_VISIBLE_LABELS = {
         STATUS_PENDING: 'در حال بررسی',
         STATUS_COMMERCIAL_REVIEW: 'در حال بررسی',
-        STATUS_FINANCE_REVIEW: 'در حال بررسی',
         STATUS_RETURNED_TO_COMMERCIAL: 'در حال بررسی',
         STATUS_APPROVED: 'ثبت بازرگانی',
         STATUS_FINAL_APPROVED: 'تایید نهایی',
@@ -386,7 +384,9 @@ class PaymentRecord(models.Model):
     receipt_image = models.ImageField(upload_to=payment_record_receipt_upload_to, blank=True, null=True)
     daily_assignment = models.ForeignKey('DailyPaymentAssignment', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
-    locked_by_finance = models.BooleanField(default=False)
+    is_locked = models.BooleanField('قفل پایانی', default=False)
+    pending_final_approval = models.BooleanField('در انتظار تأیید نهایی', default=False, db_index=True)
+    pending_final_approval_since = models.DateTimeField('زمان آماده‌شدن برای تأیید نهایی', null=True, blank=True)
     last_staff_note = models.TextField('آخرین توضیح کارشناس', blank=True)
     customer_notes = models.TextField('توضیحات مشتری', blank=True, help_text='توضیحات یا نکات مشتری در مورد این واریزی')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -414,15 +414,6 @@ class PaymentRecord(models.Model):
         related_name='counterparty_decisions',
         verbose_name='تصمیم‌گیرنده طرف حساب',
     )
-    # فیلدهای قدیمی — برای سازگاری با کد قبلی
-    counterparty_approved_at = models.DateTimeField('زمان تایید (قدیمی)', null=True, blank=True)
-    counterparty_approved_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='counterparty_approvals',
-        verbose_name='تایید شده توسط (قدیمی)',
-    )
-
     @property
     def is_counterparty_approved(self):
         return self.counterparty_status == self.CP_STATUS_APPROVED
@@ -454,7 +445,7 @@ class PaymentRecord(models.Model):
     @property
     def commercial_status_label(self):
         """عنوان فلگ بازرگانی / فروش بر اساس وضعیت سند."""
-        if self.status in {self.STATUS_PENDING, self.STATUS_FINANCE_REVIEW}:
+        if self.status == self.STATUS_PENDING:
             return 'بررسی بازرگانی'
         if self.status == self.STATUS_COMMERCIAL_REVIEW:
             return 'بررسی بازرگانی'
@@ -473,7 +464,7 @@ class PaymentRecord(models.Model):
     @property
     def commercial_flag_class(self):
         """رنگ فلگ بازرگانی / فروش."""
-        if self.status in {self.STATUS_PENDING, self.STATUS_FINANCE_REVIEW}:
+        if self.status == self.STATUS_PENDING:
             return 'flag-gray'      # خاکستری — بررسی اولیه
         if self.status == self.STATUS_COMMERCIAL_REVIEW:
             return 'flag-blue'      # آبی — در حال بررسی
@@ -521,7 +512,6 @@ class PaymentRecord(models.Model):
     def status_flag_class(self):
         return {
             self.STATUS_COMMERCIAL_REVIEW: 'flag-blue',
-            self.STATUS_FINANCE_REVIEW: 'flag-orange',
             self.STATUS_APPROVED: 'flag-orange',
             self.STATUS_FINAL_APPROVED: 'flag-green',
             self.STATUS_REJECTED: 'flag-red',
@@ -531,8 +521,6 @@ class PaymentRecord(models.Model):
 
     @property
     def customer_flag_class(self):
-        if self.status == self.STATUS_FINANCE_REVIEW:
-            return 'flag-orange'
         if self.status in {self.STATUS_PENDING, self.STATUS_COMMERCIAL_REVIEW, self.STATUS_RETURNED_TO_COMMERCIAL}:
             return 'flag-gray'
         if self.status == self.STATUS_APPROVED:
@@ -1582,3 +1570,131 @@ class FinalApprovalDelegate(models.Model):
 
     def __str__(self):
         return f"{self.delegated_user.get_full_name() or self.delegated_user.username} ({'فعال' if self.is_active else 'غیرفعال'})"
+
+
+# ─── پلتفرم درخواست نمایندگی ──────────────────────────────────────────────────
+
+class AgencyApplication(models.Model):
+    STATUS_PENDING     = 'pending'
+    STATUS_REVIEWING   = 'reviewing'
+    STATUS_INFO_NEEDED = 'info_needed'
+    STATUS_APPROVED    = 'approved'
+    STATUS_REJECTED    = 'rejected'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING,     'در انتظار بررسی'),
+        (STATUS_REVIEWING,   'در حال بررسی'),
+        (STATUS_INFO_NEEDED, 'نیاز به اطلاعات تکمیلی'),
+        (STATUS_APPROVED,    'تأیید شده'),
+        (STATUS_REJECTED,    'رد شده'),
+    ]
+
+    STATUS_CLASS = {
+        STATUS_PENDING:     'flag-gray',
+        STATUS_REVIEWING:   'flag-blue',
+        STATUS_INFO_NEEDED: 'flag-yellow',
+        STATUS_APPROVED:    'flag-green',
+        STATUS_REJECTED:    'flag-red',
+    }
+
+    # ارتباط
+    phone          = models.CharField('شماره موبایل', max_length=20, db_index=True)
+    phone_verified = models.BooleanField('موبایل تأیید شده', default=False)
+    email          = models.EmailField('ایمیل', blank=True)
+
+    # مشخصات فردی
+    first_name  = models.CharField('نام', max_length=50)
+    last_name   = models.CharField('نام خانوادگی', max_length=50)
+    national_id = models.CharField('کد ملی', max_length=10, blank=True)
+
+    # موقعیت جغرافیایی
+    province         = models.CharField('استان', max_length=50)
+    city             = models.CharField('شهر', max_length=50)
+    home_address     = models.TextField('آدرس محل سکونت')
+    business_address = models.TextField('آدرس محل فعالیت')
+
+    # پروفایل کاری
+    activity_domain      = models.CharField('حوزه فعالیت', max_length=100)
+    services_offered     = models.TextField('خدمات قابل ارائه')
+    years_experience     = models.PositiveSmallIntegerField('سابقه کاری (سال)', default=0)
+    has_business_license = models.BooleanField('جواز کسب دارم', default=False)
+
+    # معرف
+    referrer_name  = models.CharField('نام معرف', max_length=100, blank=True)
+    referrer_phone = models.CharField('موبایل معرف', max_length=20, blank=True)
+
+    # انگیزه
+    motivation = models.TextField('دلایل و انگیزه', blank=True)
+
+    # پیگیری
+    tracking_code = models.CharField('کد پیگیری', max_length=10, unique=True, db_index=True)
+
+    # وضعیت
+    status = models.CharField('وضعیت', max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+
+    # پردازش کارشناس
+    assigned_to      = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_agency_apps', verbose_name='مسئول بررسی')
+    reviewed_by      = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_agency_apps', verbose_name='بررسی‌کننده')
+    staff_note       = models.TextField('یادداشت داخلی', blank=True)
+    rejection_reason = models.TextField('دلیل رد', blank=True)
+    info_request_note = models.TextField('توضیح درخواست اطلاعات', blank=True)
+
+    # کاربر ایجادشده پس از تأیید
+    created_user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='from_agency_application', verbose_name='کاربر ایجادشده')
+
+    # زمان‌ها
+    created_at   = models.DateTimeField('تاریخ ثبت', auto_now_add=True)
+    submitted_at = models.DateTimeField('تاریخ ارسال', null=True, blank=True)
+    reviewed_at  = models.DateTimeField('تاریخ بررسی', null=True, blank=True)
+    updated_at   = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        verbose_name = 'درخواست نمایندگی'
+        verbose_name_plural = 'درخواست‌های نمایندگی'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.first_name} {self.last_name} — {self.phone} — {self.get_status_display()}'
+
+    @property
+    def full_name(self):
+        return f'{self.first_name} {self.last_name}'.strip()
+
+    @property
+    def status_class(self):
+        return self.STATUS_CLASS.get(self.status, 'flag-gray')
+
+    @property
+    def is_active(self):
+        return self.status not in {self.STATUS_APPROVED, self.STATUS_REJECTED}
+
+
+class AgencyApplicationLog(models.Model):
+    ACTION_SUBMITTED   = 'submitted'
+    ACTION_REVIEWING   = 'reviewing'
+    ACTION_INFO_NEEDED = 'info_needed'
+    ACTION_APPROVED    = 'approved'
+    ACTION_REJECTED    = 'rejected'
+    ACTION_NOTE        = 'note'
+    ACTION_ASSIGNED    = 'assigned'
+
+    ACTION_CHOICES = [
+        (ACTION_SUBMITTED,   'ارسال درخواست'),
+        (ACTION_REVIEWING,   'شروع بررسی'),
+        (ACTION_INFO_NEEDED, 'درخواست اطلاعات تکمیلی'),
+        (ACTION_APPROVED,    'تأیید'),
+        (ACTION_REJECTED,    'رد'),
+        (ACTION_NOTE,        'یادداشت'),
+        (ACTION_ASSIGNED,    'تخصیص'),
+    ]
+
+    application = models.ForeignKey(AgencyApplication, on_delete=models.CASCADE, related_name='logs')
+    actor       = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='کاربر')
+    action      = models.CharField('عملیات', max_length=20, choices=ACTION_CHOICES)
+    note        = models.TextField('یادداشت', blank=True)
+    created_at  = models.DateTimeField('زمان', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'لاگ درخواست نمایندگی'
+        verbose_name_plural = 'لاگ‌های درخواست نمایندگی'
+        ordering = ['created_at']

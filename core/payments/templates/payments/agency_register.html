@@ -1,0 +1,58 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ثبت درخواست نمایندگی</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Vazir, sans-serif; direction: rtl; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0d1b2e 0%, #1a2f4e 50%, #1e3a5f 100%); padding: 20px; }
+        .card { background: #fff; border-radius: 18px; padding: 40px 36px; max-width: 460px; width: 100%; box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+        .logo { text-align: center; margin-bottom: 28px; }
+        .logo span { font-size: 48px; }
+        h1 { font-size: 22px; font-weight: 800; color: #172033; text-align: center; margin-bottom: 8px; }
+        .subtitle { color: #64748b; font-size: 14px; text-align: center; margin-bottom: 28px; line-height: 1.6; }
+        .steps { display: flex; justify-content: center; gap: 8px; margin-bottom: 28px; }
+        .step { width: 32px; height: 6px; border-radius: 3px; background: #e2e8f0; }
+        .step.active { background: #2563eb; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+        input[type=text], input[type=tel] { width: 100%; padding: 12px 14px; border: 1.5px solid #d1d5db; border-radius: 10px; font-family: inherit; font-size: 15px; direction: ltr; transition: border .2s; outline: none; }
+        input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+        .error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+        .track-link { font-size: 13px; color: #2563eb; }
+        button[type=submit] { width: 100%; padding: 13px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 18px; transition: background .2s; }
+        button[type=submit]:hover { background: #1d4ed8; }
+        .footer-links { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
+        .footer-links a { color: #2563eb; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="logo"><span>🤝</span></div>
+    <h1>ثبت درخواست نمایندگی</h1>
+    <p class="subtitle">برای عضوگیری نمایندگی فروش و خدمات، ابتدا شماره موبایل خود را وارد کنید.</p>
+    <div class="steps">
+        <div class="step active"></div>
+        <div class="step"></div>
+        <div class="step"></div>
+    </div>
+    {% if error %}
+        <div class="error">
+            {{ error }}
+            {% if track_url %}<br><a class="track-link" href="{{ track_url }}">استعلام وضعیت درخواست</a>{% endif %}
+        </div>
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <label for="phone">شماره موبایل</label>
+        <input type="tel" id="phone" name="phone" placeholder="09123456789" maxlength="11" required autofocus>
+        <button type="submit">ارسال کد تأیید</button>
+    </form>
+    <div class="footer-links">
+        <a href="{% url 'agency_track' %}">پیگیری درخواست قبلی</a>
+    </div>
+</div>
+</body>
+</html>

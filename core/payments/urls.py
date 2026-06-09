@@ -1,5 +1,13 @@
 from django.urls import path
 from .views import (
+    agency_application_action,
+    agency_application_detail,
+    agency_applications_list,
+    agency_application_track,
+    agency_register_apply,
+    agency_register_phone,
+    agency_register_success,
+    agency_register_verify,
     receipt_reader_test,
     sms_mfa_setup,
     sms_otp_verify,
@@ -76,6 +84,16 @@ from .views import (
 )
 
 urlpatterns = [
+    # ─── پلتفرم درخواست نمایندگی (عمومی) ───────────────────────────────────────
+    path('agency/', agency_register_phone, name='agency_register'),
+    path('agency/verify/', agency_register_verify, name='agency_verify'),
+    path('agency/apply/', agency_register_apply, name='agency_apply'),
+    path('agency/track/', agency_application_track, name='agency_track'),
+    path('agency/success/<str:tracking_code>/', agency_register_success, name='agency_success'),
+    # ─── مدیریت نمایندگی (کارشناس/مدیر فروش) ──────────────────────────────────
+    path('sales/agency/', agency_applications_list, name='agency_applications'),
+    path('sales/agency/<int:app_id>/', agency_application_detail, name='agency_application_detail'),
+    path('sales/agency/<int:app_id>/action/', agency_application_action, name='agency_application_action'),
     path('submit/', create_payment, name='submit'),
     path('submit/new/', create_payment, name='payment_create'),
     path('my-daily-payments/', customer_daily_payments, name='customer_daily_payments'),

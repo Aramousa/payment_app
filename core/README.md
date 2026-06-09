@@ -249,5 +249,135 @@ python manage.py runserver
 - خروجی استخراج به JSON تبدیل می‌شود تا مقدارهای فرم قابل استفاده باشند.
 - Redis/RQ فعلا پیاده‌سازی نشده و پردازش به‌صورت مستقیم انجام می‌شود؛ در مرحله عملیاتی می‌توان worker queue اضافه کرد.
 
+---
 
+## گردش کار اسناد (Document Workflow)
+
+هر سند (PaymentRecord) از لحظه ثبت تا تأیید نهایی از مسیر زیر عبور می‌کند:
+
+```
+مشتری ثبت می‌کند
+        │
+        ▼
+  [status=pending]
+  صف کاری اسناد — همه کارکنان
+        │
+        │ بازرگانی بررسی می‌کند
+        ▼
+[status=commercial_review]
+        │
+        │ بازرگانی ثبت می‌کند
+        ▼
+  [status=approved]  ◄──────────────────────────────────────────┐
+  ┌────────────────────────────────────────────────────────┐    │
+  │  سه مسیر موازی و مستقل در این مرحله:                   │    │
+  │  ۱. مالی ثبت مالی انجام می‌دهد → finance_status=ok      │    │
+  │  ۲. طرف حساب (اگر دارد) تأیید می‌کند → cp_status=ok     │    │
+  │  (هر دو می‌توانند در هر ترتیبی انجام شوند)              │    │
+  └───────────────────┬────────────────────────────────────┘    │
+                      │ هر سه شرط تکمیل شد                       │
+                      ▼                                          │
+         [pending_final_approval=True]                           │
+         صف «در انتظار تأیید نهایی»                               │
+         فقط مدیر مالی یا تفویض‌شده می‌بیند                       │
+                      │                                          │
+                      │ مدیر مالی تأیید نهایی می‌کند              │
+                      ▼                                          │
+         [status=final_approved]                                 │
+         pending_final_approval=False                            │
+         سوابق اسناد — خارج از صف کاری                           │
+                                                                 │
+  ─── مسیرهای برگشت ────────────────────────────────────────────┘
+  • مالی عودت می‌دهد ← status=returned_commercial، finance_status=None، pending_final=False
+  • بازرگانی رد می‌کند ← status=rejected (پایانی)
+  • کارکنان ناقص می‌کنند ← status=incomplete (مشتری باید رفع نقص کند)
+  • مشتری رفع نقص می‌کند ← status=pending، finance_status=None، pending_final=False
+```
+
+### شرط ورود به صف تأیید نهایی
+
+```python
+should_be_pending_final = (
+    status == 'approved'
+    and finance_status == 'finance_ok'
+    and (counterparty is None or counterparty_status == 'cp_approved')
+)
+```
+
+این شرط توسط `_sync_pending_final_flag(payment)` در هر عملیاتی که وضعیت سند را تغییر می‌دهد محاسبه و در فیلد `pending_final_approval` ذخیره می‌شود.
+
+---
+
+## سیستم فلگ‌گذاری (Flag System)
+
+### فیلدهای وضعیت روی مدل `PaymentRecord`
+
+| فیلد | نوع | مقادیر | توضیح |
+|------|-----|--------|-------|
+| `status` | CharField | ← جدول زیر | مسیر اصلی بازرگانی |
+| `finance_status` | CharField (nullable) | `None` / `'finance_ok'` | فلگ مستقل مالی |
+| `counterparty_status` | CharField (nullable) | `'cp_approved'` / `'cp_returned'` / `'cp_rejected'` | تصمیم طرف حساب |
+| `pending_final_approval` | BooleanField (indexed) | `True` / `False` | فلگ محاسبه‌شده: آماده تأیید نهایی |
+| `pending_final_approval_since` | DateTimeField (nullable) | زمان | زمان ورود به صف تأیید نهایی |
+| `is_locked` | BooleanField | `True` / `False` | قفل پایانی پس از رد یا تأیید نهایی |
+
+### مقادیر `status`
+
+| مقدار | برچسب | رنگ فلگ | توضیح |
+|-------|-------|---------|-------|
+| `pending` | در حال بررسی | خاکستری | ثبت‌شده، در صف اولیه |
+| `commercial_review` | بررسی بازرگانی | آبی | بازرگانی در حال بررسی |
+| `approved` | ثبت بازرگانی | نارنجی | بازرگانی تأیید کرده؛ مالی و طرف حساب در انتظار |
+| `final_approved` | تأیید نهایی | سبز | تأیید نهایی مدیر مالی — پایانی |
+| `rejected` | رد شده | قرمز | رد شده — پایانی |
+| `incomplete` | ناقص | زرد | نیاز به رفع نقص توسط مشتری |
+| `returned_commercial` | عودت به بازرگانی | بنفش | مالی به بازرگانی برگرداند |
+
+### توزیع اسناد بین صفحات
+
+| صفحه | فیلتر ORM | دسترسی |
+|------|-----------|--------|
+| **صف کاری اسناد** | `pending_final_approval=False` و خارج از `final_approved` / `rejected` | همه کارکنان (فیلتر بر اساس نقش) |
+| **در انتظار تأیید نهایی** | `pending_final_approval=True` | فقط `finance_manager` و تفویض‌شده‌ها |
+| **سوابق اسناد** | `status=final_approved` یا `status=rejected` | همه کارکنان |
+
+### قوانین دسترسی به عملیات
+
+| عملیات | مجاز برای | شرط سند |
+|--------|----------|---------|
+| بررسی و تأیید بازرگانی | `commercial`, `commercial_manager`, `superuser` | `status` در `[pending, commercial_review, returned_commercial]` |
+| رد سند | `commercial`, `commercial_manager`, `superuser` | هر وضعیتی |
+| ناقص کردن | `commercial`, `commercial_manager`, `finance`, `superuser` | هر وضعیتی |
+| ثبت مالی | `finance`, `finance_manager`, `superuser` | سند رد یا تأیید نهایی نشده باشد |
+| عودت به بازرگانی | `finance`, `finance_manager`, `superuser` | `status=approved` |
+| تأیید نهایی | `finance_manager`, تفویض‌شده فعال، `superuser` | `pending_final_approval=True` (هر سه شرط تکمیل) |
+| ویرایش سند (رفع نقص) | `customer` (مالک) | `status=incomplete` |
+
+### همگام‌سازی فلگ (sync rule)
+
+تابع `_sync_pending_final_flag(payment)` در **تمام** ویوهایی که وضعیت سند را تغییر می‌دهند فراخوانی می‌شود:
+
+| ویو | تغییر | اثر روی فلگ |
+|-----|-------|------------|
+| `finance_unified_action` (finance_register) | `finance_status=ok` | اگر بقیه شرایط هم برقرار باشند، `pending_final=True` |
+| `finance_register_payment` | `finance_status=ok` | همان بالا |
+| `finance_unified_action` (return_to_commercial) | `status=returned_commercial`, `finance_status=None` | `pending_final=False` |
+| `counterparty_approve_payment` | `counterparty_status=cp_approved` | اگر بقیه شرایط هم برقرار باشند، `pending_final=True` |
+| `counterparty_return_payment` | `counterparty_status=None` | `pending_final=False` |
+| `finance_final_approve` | `status=final_approved` | `pending_final=False` |
+| `finance_bulk_final_approve` | `status=final_approved` (گروهی) | `pending_final=False` |
+| `edit_payment` (رفع نقص مشتری) | `status=pending`, `finance_status=None` | `pending_final=False` |
+| `staff_update_status` (reactivate از incomplete) | `finance_status=None` | `pending_final=False` |
+
+### اعلان (Notification) تأیید نهایی
+
+وقتی `pending_final_approval` برای اولین بار `True` می‌شود، یک اعلان به همه کاربران با نقش `finance_manager` ارسال می‌شود و لینک به صفحه «در انتظار تأیید نهایی» (`/finance/pending-final-approval/`) اشاره می‌کند.
+
+### تفویض اختیار تأیید نهایی
+
+مدیر مالی می‌تواند از طریق مدل `FinalApprovalDelegate` دسترسی تأیید نهایی را به کاربر دیگری تفویض کند:
+
+- صفحه مدیریت: `/finance/delegation/`
+- کاربر تفویض‌شده منوی «در انتظار تأیید نهایی» را می‌بیند و می‌تواند تأیید نهایی انجام دهد.
+- هر delegate می‌تواند غیرفعال (`is_active=False`) شود بدون اینکه حذف شود.
 

@@ -93,7 +93,7 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         'beneficiary_account_owner',
         'formatted_amount',
         'status',
-        'locked_by_finance',
+        'is_locked',
         'pay_date',
         'city',
         'counterparty',
