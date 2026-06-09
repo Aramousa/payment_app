@@ -1,0 +1,208 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>درخواست گارانتی — {{ claim.tracking_code }}</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f7fb; }
+        .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
+        .back-btn { display: inline-block; background: #6c757d; color: #fff; border-radius: 7px; padding: 7px 14px; text-decoration: none; font-size: 13px; margin-bottom: 16px; }
+        .card { background: #fff; border-radius: 12px; padding: 20px 22px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
+        .card h3 { font-size: 14px; font-weight: 700; color: #1e3a5f; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+        .info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; gap: 12px; }
+        .info-row:last-child { border-bottom: none; }
+        .info-row .lbl { color: #64748b; min-width: 130px; flex-shrink: 0; }
+        .info-row .val { font-weight: 600; color: #172033; }
+        .flag-chip { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; color: #fff; }
+        .flag-gray   { background: #6b7280; }
+        .flag-blue   { background: #1e88e5; }
+        .flag-yellow { background: #f59e0b; color: #111; }
+        .flag-green  { background: #16a34a; }
+        .flag-red    { background: #dc2626; }
+        .flag-orange { background: #f97316; }
+        .alert { border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 14px; }
+        .alert-yellow { background: #fefce8; border: 1px solid #fde047; color: #713f12; }
+        .alert-green  { background: #f0fdf4; border: 1px solid #86efac; color: #14532d; }
+        .alert-red    { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        .alert-blue   { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+        /* timeline */
+        .tl-list { list-style: none; padding: 0; margin: 0; }
+        .tl-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .tl-item:last-child { border-bottom: none; }
+        .tl-dot { width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; margin-top: 4px; }
+        .tl-dot.submitted   { background: #6b7280; }
+        .tl-dot.reviewing   { background: #1e88e5; }
+        .tl-dot.info_needed { background: #f59e0b; }
+        .tl-dot.approved    { background: #16a34a; }
+        .tl-dot.in_progress { background: #1e88e5; }
+        .tl-dot.resolved    { background: #16a34a; }
+        .tl-dot.rejected    { background: #dc2626; }
+        .tl-dot.customer_reply { background: #7c3aed; }
+        .tl-dot.file        { background: #0891b2; }
+        .tl-dot.rated       { background: #f59e0b; }
+        .tl-action { font-size: 13px; font-weight: 600; color: #172033; }
+        .tl-note { font-size: 12px; color: #374151; margin-top: 3px; white-space: pre-line; }
+        .tl-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+        /* reply form */
+        textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; outline: none; box-sizing: border-box; }
+        textarea:focus { border-color: #2563eb; }
+        .act-btn { display: block; width: 100%; padding: 10px; border-radius: 8px; border: none; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; margin-top: 8px; }
+        .act-btn.blue   { background: #eff6ff; color: #1d4ed8; }
+        .act-btn.green  { background: #f0fdf4; color: #15803d; border: 1.5px solid #86efac; }
+        .act-btn.purple { background: #f5f3ff; color: #6d28d9; }
+        /* files */
+        .files-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+        .file-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 6px; background: #f8fafc; }
+        .file-item:hover { background: #eff6ff; }
+        /* rating */
+        .stars { display: flex; gap: 6px; margin: 8px 0; }
+        .stars label { font-size: 28px; cursor: pointer; color: #d1d5db; }
+        .stars input[type=radio] { display: none; }
+        .stars input[type=radio]:checked ~ label,
+        .stars label:hover,
+        .stars label:hover ~ label { color: #f59e0b; }
+        code { font-size: 11px; letter-spacing: 1.5px; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+{% include "payments/partials/app_navigation.html" %}
+<div class="wrap">
+    <a href="{% url 'warranty_my_claims' %}" class="back-btn">← بازگشت به لیست</a>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-blue">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+
+    {% if claim.status == 'info_needed' and claim.info_request_note %}
+    <div class="alert alert-yellow">
+        📋 <strong>اطلاعات تکمیلی مورد نیاز:</strong><br>{{ claim.info_request_note }}
+    </div>
+    {% endif %}
+    {% if claim.status == 'rejected' and claim.rejection_reason %}
+    <div class="alert alert-red">❌ <strong>دلیل رد:</strong> {{ claim.rejection_reason }}</div>
+    {% endif %}
+    {% if claim.status == 'resolved' %}
+    <div class="alert alert-green">
+        ✅ <strong>درخواست رفع شد</strong>
+        {% if claim.resolution_type %}— {{ claim.get_resolution_type_display }}{% endif %}
+        {% if claim.resolution_note %}: {{ claim.resolution_note }}{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h3>📋 اطلاعات درخواست
+            <span class="flag-chip {{ claim.status_class }}" style="float:left;">{{ claim.get_status_display }}</span>
+        </h3>
+        <div class="info-row"><span class="lbl">کد پیگیری</span><span class="val"><code>{{ claim.tracking_code }}</code></span></div>
+        <div class="info-row"><span class="lbl">قطعه / محصول</span><span class="val">{{ claim.part_name }}{% if claim.part_model %} — {{ claim.part_model }}{% endif %}</span></div>
+        <div class="info-row"><span class="lbl">شماره سریال</span><span class="val" dir="ltr">{{ claim.serial_number }}</span></div>
+        <div class="info-row"><span class="lbl">تاریخ خرید</span><span class="val">{{ claim.purchase_date|date:"Y/m/d" }}</span></div>
+        {% if claim.invoice_number %}<div class="info-row"><span class="lbl">شماره فاکتور</span><span class="val" dir="ltr">{{ claim.invoice_number }}</span></div>{% endif %}
+        <div class="info-row"><span class="lbl">تاریخ ثبت درخواست</span><span class="val">{{ claim.created_at|date:"Y/m/d H:i" }}</span></div>
+        {% if claim.due_date and claim.is_open %}
+        <div class="info-row"><span class="lbl">موعد پاسخ‌دهی</span>
+            <span class="val" style="{% if claim.is_overdue %}color:#dc2626;{% endif %}">
+                {{ claim.due_date|date:"Y/m/d" }}{% if claim.is_overdue %} ⏰ تأخیر{% endif %}
+            </span>
+        </div>
+        {% endif %}
+        <div class="info-row"><span class="lbl">شرح مشکل</span><span class="val" style="white-space:pre-line;">{{ claim.defect_description }}</span></div>
+        {% if claim.customer_reply %}<div class="info-row"><span class="lbl">توضیح تکمیلی شما</span><span class="val" style="white-space:pre-line;">{{ claim.customer_reply }}</span></div>{% endif %}
+    </div>
+
+    {% if files %}
+    <div class="card">
+        <h3>🖼️ فایل‌ها و تصاویر</h3>
+        <div class="files-grid">
+            {% for f in files %}
+            <a href="{{ f.file.url }}" target="_blank" class="file-item">
+                📎 {{ f.description|default:"فایل" }} ({{ f.uploaded_at|date:"y/m/d" }})
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if claim.status == 'info_needed' %}
+    <div class="card">
+        <h3>💬 پاسخ به درخواست اطلاعات</h3>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reply">
+            <textarea name="reply" placeholder="پاسخ خود را اینجا بنویسید..."></textarea>
+            <div style="margin-top:8px;">
+                <label style="font-size:12px;font-weight:600;color:#374151;">فایل تکمیلی (اختیاری)</label>
+                <input type="file" name="photos" multiple accept="image/*,.pdf" style="margin-top:4px;">
+            </div>
+            <button type="submit" class="act-btn blue" style="margin-top:10px;">📤 ارسال پاسخ</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if claim.is_open %}
+    <div class="card">
+        <h3>📎 بارگذاری فایل تکمیلی</h3>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_file">
+            <input type="file" name="photos" multiple accept="image/*,.pdf,.mp4,.mov">
+            <button type="submit" class="act-btn purple" style="margin-top:10px;">📤 بارگذاری فایل</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if claim.status in 'resolved closed' and not claim.customer_rating %}
+    <div class="card">
+        <h3>⭐ رضایت‌سنجی</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="rate">
+            <p style="font-size:13px;color:#374151;margin-bottom:8px;">خدمات گارانتی دریافت‌شده را ارزیابی کنید:</p>
+            <div class="stars" style="flex-direction:row-reverse;justify-content:flex-end;">
+                {% for i in "54321" %}
+                <input type="radio" name="rating" id="star{{ i }}" value="{{ i }}">
+                <label for="star{{ i }}">★</label>
+                {% endfor %}
+            </div>
+            <textarea name="feedback" placeholder="نظر و پیشنهاد (اختیاری)" style="min-height:60px;margin-top:8px;"></textarea>
+            <button type="submit" class="act-btn green" style="margin-top:8px;">⭐ ثبت امتیاز</button>
+        </form>
+    </div>
+    {% elif claim.customer_rating %}
+    <div class="card">
+        <h3>⭐ امتیاز شما</h3>
+        <p style="font-size:22px;margin:0;">
+            {% for i in "12345" %}{% if forloop.counter <= claim.customer_rating %}★{% else %}☆{% endif %}{% endfor %}
+            <span style="font-size:14px;color:#374151;margin-right:6px;">({{ claim.customer_rating }}/5)</span>
+        </p>
+        {% if claim.customer_feedback %}<p style="font-size:13px;color:#64748b;margin-top:6px;">{{ claim.customer_feedback }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h3>📜 تاریخچه درخواست</h3>
+        <ul class="tl-list">
+        {% for log in logs %}
+            <li class="tl-item">
+                <div class="tl-dot {{ log.action }}"></div>
+                <div>
+                    <div class="tl-action">{{ log.get_action_display }}</div>
+                    {% if log.note %}<div class="tl-note">{{ log.note }}</div>{% endif %}
+                    <div class="tl-meta">{{ log.created_at|date:"Y/m/d H:i" }}</div>
+                </div>
+            </li>
+        {% empty %}
+            <li style="font-size:13px;color:#94a3b8;">رویدادی ثبت نشده.</li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+<script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

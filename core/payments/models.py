@@ -551,6 +551,8 @@ class UserProfile(models.Model):
         ('sales_manager',     'مدیر فروش'),
         ('data_entry',        'تکمیل اطلاعات فیش'),
         ('staff',             'کارمند'),
+        ('warranty',          'کارشناس گارانتی'),
+        ('warranty_manager',  'مدیر گارانتی'),
         # گروه طرف حساب‌ها
         ('counterparty',      'طرف حساب'),
     )
@@ -1697,4 +1699,203 @@ class AgencyApplicationLog(models.Model):
     class Meta:
         verbose_name = 'لاگ درخواست نمایندگی'
         verbose_name_plural = 'لاگ‌های درخواست نمایندگی'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  گارانتی و خدمات پس از فروش
+# ─────────────────────────────────────────────────────────────────────────────
+
+def warranty_claim_file_upload_to(instance, filename):
+    return _unique_upload_path(instance, filename, 'warranty', 'warrantyclaimfile')
+
+
+class WarrantyClaim(models.Model):
+    STATUS_SUBMITTED   = 'submitted'
+    STATUS_REVIEWING   = 'reviewing'
+    STATUS_INFO_NEEDED = 'info_needed'
+    STATUS_APPROVED    = 'approved'
+    STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_RESOLVED    = 'resolved'
+    STATUS_REJECTED    = 'rejected'
+    STATUS_CLOSED      = 'closed'
+
+    STATUS_CHOICES = [
+        (STATUS_SUBMITTED,   'ثبت شده'),
+        (STATUS_REVIEWING,   'در حال بررسی'),
+        (STATUS_INFO_NEEDED, 'نیاز به اطلاعات تکمیلی'),
+        (STATUS_APPROVED,    'تأیید گارانتی'),
+        (STATUS_IN_PROGRESS, 'در حال پردازش'),
+        (STATUS_RESOLVED,    'رفع شد'),
+        (STATUS_REJECTED,    'رد شده'),
+        (STATUS_CLOSED,      'بسته شده'),
+    ]
+
+    STATUS_CLASS = {
+        STATUS_SUBMITTED:   'flag-gray',
+        STATUS_REVIEWING:   'flag-blue',
+        STATUS_INFO_NEEDED: 'flag-yellow',
+        STATUS_APPROVED:    'flag-green',
+        STATUS_IN_PROGRESS: 'flag-blue',
+        STATUS_RESOLVED:    'flag-green',
+        STATUS_REJECTED:    'flag-red',
+        STATUS_CLOSED:      'flag-gray',
+    }
+
+    PRIORITY_LOW    = 'low'
+    PRIORITY_NORMAL = 'normal'
+    PRIORITY_HIGH   = 'high'
+    PRIORITY_URGENT = 'urgent'
+
+    PRIORITY_CHOICES = [
+        (PRIORITY_LOW,    'کم'),
+        (PRIORITY_NORMAL, 'معمولی'),
+        (PRIORITY_HIGH,   'زیاد'),
+        (PRIORITY_URGENT, 'فوری'),
+    ]
+
+    RESOLUTION_REPAIR   = 'repair'
+    RESOLUTION_REPLACE  = 'replace'
+    RESOLUTION_REFUND   = 'refund'
+
+    RESOLUTION_CHOICES = [
+        (RESOLUTION_REPAIR,  'تعمیر'),
+        (RESOLUTION_REPLACE, 'تعویض'),
+        (RESOLUTION_REFUND,  'استرداد وجه'),
+    ]
+
+    # مشتری / متقاضی
+    user           = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='warranty_claims', verbose_name='کاربر (مشتری)')
+    submitted_by   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='submitted_warranty_claims', verbose_name='ثبت‌کننده')
+    claimant_name  = models.CharField('نام متقاضی', max_length=100)
+    claimant_phone = models.CharField('موبایل متقاضی', max_length=20)
+    claimant_email = models.EmailField('ایمیل', blank=True)
+
+    # قطعه / محصول
+    part_name      = models.CharField('نام قطعه / محصول', max_length=200)
+    part_model     = models.CharField('مدل / شناسه', max_length=200, blank=True)
+    serial_number  = models.CharField('شماره سریال', max_length=100, db_index=True)
+    purchase_date  = models.DateField('تاریخ خرید')
+    invoice_number = models.CharField('شماره فاکتور', max_length=100, blank=True)
+
+    # شرح خرابی
+    defect_description = models.TextField('شرح خرابی')
+    customer_reply     = models.TextField('توضیح تکمیلی مشتری', blank=True)
+
+    # ردیابی
+    tracking_code = models.CharField('کد پیگیری', max_length=12, unique=True, db_index=True)
+    status        = models.CharField('وضعیت', max_length=20, choices=STATUS_CHOICES,
+                                     default=STATUS_SUBMITTED, db_index=True)
+    priority      = models.CharField('اولویت', max_length=10, choices=PRIORITY_CHOICES,
+                                     default=PRIORITY_NORMAL, db_index=True)
+
+    # کارشناس گارانتی
+    assigned_to       = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                          related_name='assigned_warranty_claims', verbose_name='مسئول بررسی')
+    resolution_type   = models.CharField('نوع رفع مسئله', max_length=20, choices=RESOLUTION_CHOICES, blank=True)
+    resolution_note   = models.TextField('توضیح رفع مسئله', blank=True)
+    staff_note        = models.TextField('یادداشت داخلی', blank=True)
+    info_request_note = models.TextField('توضیح درخواست اطلاعات', blank=True)
+    rejection_reason  = models.TextField('دلیل رد', blank=True)
+
+    # زمان / SLA
+    created_at  = models.DateTimeField('تاریخ ثبت', auto_now_add=True)
+    updated_at  = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+    reviewed_at = models.DateTimeField('تاریخ شروع بررسی', null=True, blank=True)
+    resolved_at = models.DateTimeField('تاریخ رفع', null=True, blank=True)
+    due_date    = models.DateTimeField('موعد پاسخ SLA', null=True, blank=True)
+
+    # رضایت‌سنجی
+    customer_rating   = models.PositiveSmallIntegerField('امتیاز مشتری', null=True, blank=True)
+    customer_feedback = models.TextField('بازخورد مشتری', blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'درخواست گارانتی'
+        verbose_name_plural = 'درخواست‌های گارانتی'
+
+    def __str__(self):
+        return f'گارانتی #{self.id} — {self.part_name}'
+
+    @property
+    def status_class(self):
+        return self.STATUS_CLASS.get(self.status, 'flag-gray')
+
+    @property
+    def priority_class(self):
+        return {
+            self.PRIORITY_LOW:    'flag-gray',
+            self.PRIORITY_NORMAL: 'flag-blue',
+            self.PRIORITY_HIGH:   'flag-orange',
+            self.PRIORITY_URGENT: 'flag-red',
+        }.get(self.priority, 'flag-gray')
+
+    @property
+    def is_open(self):
+        return self.status not in {self.STATUS_RESOLVED, self.STATUS_REJECTED, self.STATUS_CLOSED}
+
+    @property
+    def is_overdue(self):
+        return bool(self.due_date and timezone.now() > self.due_date and self.is_open)
+
+
+class WarrantyClaimFile(models.Model):
+    claim       = models.ForeignKey(WarrantyClaim, on_delete=models.CASCADE, related_name='files')
+    file        = models.FileField('فایل', upload_to=warranty_claim_file_upload_to)
+    description = models.CharField('توضیح', max_length=200, blank=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='warranty_claim_files')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['uploaded_at']
+        verbose_name = 'فایل گارانتی'
+        verbose_name_plural = 'فایل‌های گارانتی'
+
+
+class WarrantyClaimLog(models.Model):
+    ACTION_SUBMITTED      = 'submitted'
+    ACTION_REVIEWING      = 'reviewing'
+    ACTION_INFO_NEEDED    = 'info_needed'
+    ACTION_CUSTOMER_REPLY = 'customer_reply'
+    ACTION_APPROVED       = 'approved'
+    ACTION_IN_PROGRESS    = 'in_progress'
+    ACTION_RESOLVED       = 'resolved'
+    ACTION_REJECTED       = 'rejected'
+    ACTION_CLOSED         = 'closed'
+    ACTION_NOTE           = 'note'
+    ACTION_ASSIGNED       = 'assigned'
+    ACTION_PRIORITY       = 'priority'
+    ACTION_FILE           = 'file'
+    ACTION_RATED          = 'rated'
+
+    ACTION_CHOICES = [
+        (ACTION_SUBMITTED,      'ثبت درخواست'),
+        (ACTION_REVIEWING,      'شروع بررسی'),
+        (ACTION_INFO_NEEDED,    'درخواست اطلاعات تکمیلی'),
+        (ACTION_CUSTOMER_REPLY, 'پاسخ مشتری'),
+        (ACTION_APPROVED,       'تأیید گارانتی'),
+        (ACTION_IN_PROGRESS,    'شروع پردازش'),
+        (ACTION_RESOLVED,       'رفع شد'),
+        (ACTION_REJECTED,       'رد گارانتی'),
+        (ACTION_CLOSED,         'بسته شدن'),
+        (ACTION_NOTE,           'یادداشت'),
+        (ACTION_ASSIGNED,       'تخصیص'),
+        (ACTION_PRIORITY,       'تغییر اولویت'),
+        (ACTION_FILE,           'بارگذاری فایل'),
+        (ACTION_RATED,          'ثبت امتیاز'),
+    ]
+
+    claim                  = models.ForeignKey(WarrantyClaim, on_delete=models.CASCADE, related_name='logs')
+    actor                  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action                 = models.CharField('اقدام', max_length=30, choices=ACTION_CHOICES)
+    note                   = models.TextField('یادداشت', blank=True)
+    is_visible_to_customer = models.BooleanField('قابل مشاهده توسط مشتری', default=True)
+    created_at             = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'لاگ گارانتی'
+        verbose_name_plural = 'لاگ‌های گارانتی'
         ordering = ['created_at']

@@ -1,0 +1,148 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ثبت درخواست گارانتی</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f7fb; }
+        .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+        .page-title { font-size: 20px; font-weight: 800; color: #172033; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .card { background: #fff; border-radius: 12px; padding: 22px 24px; margin-bottom: 18px; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
+        .card h3 { font-size: 14px; font-weight: 700; color: #1e3a5f; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+        .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .field-grid.full { grid-template-columns: 1fr; }
+        label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 5px; }
+        input, textarea, select { width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; transition: border .2s; box-sizing: border-box; }
+        input:focus, textarea:focus, select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+        .field-err input, .field-err textarea, .field-err select { border-color: #dc2626; }
+        .err-msg { font-size: 12px; color: #dc2626; margin-top: 4px; }
+        textarea { min-height: 90px; resize: vertical; }
+        .file-hint { font-size: 12px; color: #64748b; margin-top: 6px; }
+        .submit-btn { background: #2563eb; color: #fff; border: none; border-radius: 10px; padding: 13px 32px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 4px; }
+        .submit-btn:hover { background: #1d4ed8; }
+        .alert { border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; }
+        .alert-yellow { background: #fefce8; border: 1px solid #fde047; color: #713f12; }
+        .alert-blue { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+        .required { color: #dc2626; }
+        @media (max-width: 600px) { .field-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+{% include "payments/partials/app_navigation.html" %}
+<div class="wrap">
+    <div class="page-title">🛡️ {% if is_agent_submission %}ثبت درخواست گارانتی برای مشتری{% else %}ثبت درخواست گارانتی{% endif %}</div>
+
+    {% if is_agent_submission %}
+    <div class="alert alert-blue" style="margin-bottom:16px;">
+        📋 <strong>ثبت از طرف مشتری / خریدار:</strong> مشخصات و اطلاعات خریدار / مشتری نهایی را وارد کنید، نه مشخصات خودتان. کد پیگیری از طریق پیامک به شماره موبایل خریدار ارسال می‌شود.
+    </div>
+    {% endif %}
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'blue' }}">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+
+    {% if duplicate and show_force %}
+    <div class="alert alert-yellow">
+        ⚠️ یک درخواست گارانتی فعال با همین شماره سریال وجود دارد (کد پیگیری: <strong>{{ duplicate.tracking_code }}</strong>، وضعیت: {{ duplicate.get_status_display }}).
+        <br>در صورت تمایل می‌توانید همچنان درخواست جدید ثبت کنید.
+    </div>
+    {% elif duplicate %}
+    <div class="alert alert-yellow">
+        ⚠️ یک درخواست گارانتی فعال با همین شماره سریال موجود است ({{ duplicate.tracking_code }}).
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% if show_force %}
+        <input type="hidden" name="force_submit" value="1">
+        {% endif %}
+
+        <div class="card">
+            <h3>👤 {% if is_agent_submission %}مشخصات خریدار / مشتری نهایی{% else %}مشخصات متقاضی{% endif %}</h3>
+            <div class="field-grid">
+                <div class="{% if errors.claimant_name %}field-err{% endif %}">
+                    <label>نام و نام خانوادگی <span class="required">*</span></label>
+                    <input type="text" name="claimant_name" value="{{ form.claimant_name|default:'' }}">
+                    {% if errors.claimant_name %}<div class="err-msg">{{ errors.claimant_name }}</div>{% endif %}
+                </div>
+                <div class="{% if errors.claimant_phone %}field-err{% endif %}">
+                    <label>شماره موبایل <span class="required">*</span></label>
+                    <input type="tel" name="claimant_phone" value="{{ form.claimant_phone|default:'' }}" dir="ltr">
+                    {% if errors.claimant_phone %}<div class="err-msg">{{ errors.claimant_phone }}</div>{% endif %}
+                </div>
+                <div>
+                    <label>ایمیل (اختیاری)</label>
+                    <input type="email" name="claimant_email" value="{{ form.claimant_email|default:'' }}" dir="ltr">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🔧 مشخصات قطعه / محصول</h3>
+            <div class="field-grid">
+                <div class="{% if errors.part_name %}field-err{% endif %}">
+                    <label>نام قطعه / محصول <span class="required">*</span></label>
+                    <input type="text" name="part_name" value="{{ form.part_name|default:'' }}">
+                    {% if errors.part_name %}<div class="err-msg">{{ errors.part_name }}</div>{% endif %}
+                </div>
+                <div>
+                    <label>مدل / شناسه</label>
+                    <input type="text" name="part_model" value="{{ form.part_model|default:'' }}">
+                </div>
+                <div class="{% if errors.serial_number %}field-err{% endif %}">
+                    <label>شماره سریال <span class="required">*</span></label>
+                    <input type="text" name="serial_number" value="{{ form.serial_number|default:'' }}" dir="ltr">
+                    {% if errors.serial_number %}<div class="err-msg">{{ errors.serial_number }}</div>{% endif %}
+                </div>
+                <div class="{% if errors.purchase_date %}field-err{% endif %}">
+                    <label>تاریخ خرید <span class="required">*</span></label>
+                    <input type="date" name="purchase_date" value="{{ form.purchase_date|default:'' }}" dir="ltr">
+                    {% if errors.purchase_date %}<div class="err-msg">{{ errors.purchase_date }}</div>{% endif %}
+                </div>
+                <div>
+                    <label>شماره فاکتور (اختیاری)</label>
+                    <input type="text" name="invoice_number" value="{{ form.invoice_number|default:'' }}" dir="ltr">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📋 شرح مشکل و تصاویر</h3>
+            <div class="field-grid full">
+                <div class="{% if errors.defect_description %}field-err{% endif %}">
+                    <label>شرح کامل خرابی / مشکل <span class="required">*</span></label>
+                    <textarea name="defect_description" placeholder="مشکل را به تفصیل توضیح دهید: چه زمانی رخ داد، چه نشانه‌هایی دارد، چه اقدامی انجام دادید...">{{ form.defect_description|default:'' }}</textarea>
+                    {% if errors.defect_description %}<div class="err-msg">{{ errors.defect_description }}</div>{% endif %}
+                </div>
+                <div>
+                    <label>تصاویر قطعه معیوب (اختیاری، حداکثر ۱۰ فایل)</label>
+                    <input type="file" name="photos" multiple accept="image/*,.pdf,.mp4,.mov">
+                    <div class="file-hint">فرمت‌های مجاز: JPG، PNG، PDF، MP4 — حداکثر ۱۵ مگابایت هر فایل</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-blue" style="margin-bottom:16px;">
+            {% if is_agent_submission %}
+            📌 پس از ثبت، کد پیگیری از طریق پیامک به موبایل خریدار ارسال می‌شود. همچنین این درخواست در بخش «درخواست‌های من» شما قابل پیگیری است.
+            {% else %}
+            📌 پس از ثبت، کد پیگیری برای شما ارسال می‌شود. از طریق منوی «درخواست‌های من» می‌توانید وضعیت را پیگیری کنید.
+            {% endif %}
+        </div>
+
+        <button type="submit" class="submit-btn">
+            {% if show_force %}✅ ثبت با وجود درخواست مشابه{% else %}📤 ثبت درخواست گارانتی{% endif %}
+        </button>
+    </form>
+</div>
+<script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

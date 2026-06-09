@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile
+from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 
 
 def format_jalali_datetime(value):
@@ -636,3 +636,40 @@ class ReconciliationReadStateAdmin(admin.ModelAdmin):
     list_display = ('thread', 'user', 'last_read_at')
     list_filter = ('last_read_at',)
     search_fields = ('thread__title', 'user__username')
+
+
+class WarrantyClaimFileInline(admin.TabularInline):
+    model = WarrantyClaimFile
+    extra = 0
+    readonly_fields = ('uploaded_by', 'uploaded_at')
+
+
+class WarrantyClaimLogInline(admin.TabularInline):
+    model = WarrantyClaimLog
+    extra = 0
+    readonly_fields = ('actor', 'action', 'note', 'is_visible_to_customer', 'created_at')
+    can_delete = False
+
+
+@admin.register(WarrantyClaim)
+class WarrantyClaimAdmin(admin.ModelAdmin):
+    list_display = ('tracking_code', 'claimant_name', 'claimant_phone', 'part_name', 'serial_number', 'status', 'priority', 'assigned_to', 'created_at')
+    list_filter = ('status', 'priority', 'created_at')
+    search_fields = ('tracking_code', 'claimant_name', 'claimant_phone', 'serial_number', 'part_name')
+    readonly_fields = ('tracking_code', 'created_at', 'updated_at', 'reviewed_at', 'resolved_at')
+    inlines = [WarrantyClaimFileInline, WarrantyClaimLogInline]
+    date_hierarchy = 'created_at'
+
+
+@admin.register(WarrantyClaimFile)
+class WarrantyClaimFileAdmin(admin.ModelAdmin):
+    list_display = ('claim', 'description', 'uploaded_by', 'uploaded_at')
+    list_filter = ('uploaded_at',)
+    search_fields = ('claim__tracking_code', 'description')
+
+
+@admin.register(WarrantyClaimLog)
+class WarrantyClaimLogAdmin(admin.ModelAdmin):
+    list_display = ('claim', 'actor', 'action', 'is_visible_to_customer', 'created_at')
+    list_filter = ('action', 'is_visible_to_customer', 'created_at')
+    search_fields = ('claim__tracking_code', 'note', 'actor__username')

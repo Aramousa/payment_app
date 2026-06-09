@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile
+from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 import os
 
 
@@ -6474,4 +6474,492 @@ def agency_application_action(request, app_id):
         messages.error(request, 'عملیات نامعتبر است.')
 
     return redirect(reverse('agency_application_detail', args=[app_id]))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  گارانتی و خدمات پس از فروش
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_WARRANTY_STAFF_ROLES = {'warranty', 'warranty_manager'}
+_WARRANTY_ALPHABET    = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+import datetime as _dt
+import secrets as _secrets
+
+
+def _is_warranty_staff(user):
+    if user.is_superuser:
+        return True
+    return _user_role(user) in _WARRANTY_STAFF_ROLES
+
+
+def _warranty_tracking_code():
+    for _ in range(20):
+        code = 'WR' + ''.join(_secrets.choice(_WARRANTY_ALPHABET) for _ in range(8))
+        if not WarrantyClaim.objects.filter(tracking_code=code).exists():
+            return code
+    raise RuntimeError('warranty tracking code exhausted')
+
+
+def _warranty_log(claim, actor, action, note='', visible_to_customer=True):
+    WarrantyClaimLog.objects.create(
+        claim=claim, actor=actor, action=action,
+        note=note, is_visible_to_customer=visible_to_customer,
+    )
+
+
+def _warranty_sms(phone, text):
+    try:
+        from .sms_service import send_sms
+        send_sms(phone, text, purpose='warranty_notify')
+    except Exception:
+        pass
+
+
+def _warranty_due_date():
+    return timezone.now() + _dt.timedelta(days=3)
+
+
+def _warranty_notify_staff(claim, title, body):
+    staff = User.objects.filter(profile__role__in=['warranty', 'warranty_manager'], is_active=True)
+    if claim.assigned_to_id:
+        staff = staff | User.objects.filter(pk=claim.assigned_to_id)
+    _notify_users(
+        list(staff.distinct()),
+        title, body,
+        reverse('warranty_staff_detail', args=[claim.pk]),
+        category=UserNotification.CATEGORY_PAYMENT,
+    )
+
+
+def _save_warranty_files(request, claim, description='تصویر'):
+    saved = 0
+    for f in request.FILES.getlist('photos'):
+        if f.size > 15 * 1024 * 1024:
+            continue
+        ext = os.path.splitext(f.name)[1].lower()
+        if ext not in {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.mp4', '.mov'}:
+            continue
+        WarrantyClaimFile.objects.create(
+            claim=claim, file=f, description=description, uploaded_by=request.user,
+        )
+        saved += 1
+        if saved >= 10:
+            break
+    if saved:
+        _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_FILE,
+                      note=f'{saved} فایل بارگذاری شد.', visible_to_customer=True)
+    return saved
+
+
+@login_required
+def warranty_new(request):
+    profile = getattr(request.user, 'profile', None)
+    # Only 'customer' role users submit on their own behalf.
+    # sales reps, counterparty agents, and warranty staff submit on behalf of the end-buyer.
+    submitter_role = _user_role(request.user)
+    is_direct_customer = (not request.user.is_superuser and submitter_role == 'customer')
+    is_agent_submission = not is_direct_customer  # sales rep, counterparty, warranty staff, superuser
+
+    def _duplicate_check(sn):
+        return WarrantyClaim.objects.filter(
+            serial_number=sn,
+            status__in=[
+                WarrantyClaim.STATUS_SUBMITTED, WarrantyClaim.STATUS_REVIEWING,
+                WarrantyClaim.STATUS_INFO_NEEDED, WarrantyClaim.STATUS_APPROVED,
+                WarrantyClaim.STATUS_IN_PROGRESS,
+            ],
+        ).first()
+
+    if request.method == 'POST':
+        data = request.POST
+        errors = {}
+        part_name    = data.get('part_name', '').strip()
+        part_model   = data.get('part_model', '').strip()
+        serial       = data.get('serial_number', '').strip()
+        inv_no       = data.get('invoice_number', '').strip()
+        defect       = data.get('defect_description', '').strip()
+        c_name       = data.get('claimant_name', '').strip()
+        c_phone      = data.get('claimant_phone', '').strip()
+        c_email      = data.get('claimant_email', '').strip()
+        purchase_str = data.get('purchase_date', '').strip()
+        force_submit = data.get('force_submit') == '1'
+
+        if not part_name:   errors['part_name']            = 'نام قطعه الزامی است.'
+        if not serial:      errors['serial_number']        = 'شماره سریال الزامی است.'
+        if not defect:      errors['defect_description']   = 'شرح خرابی الزامی است.'
+        if not c_name:      errors['claimant_name']        = 'نام الزامی است.'
+        if not c_phone:     errors['claimant_phone']       = 'شماره موبایل الزامی است.'
+
+        purchase_date = None
+        if not purchase_str:
+            errors['purchase_date'] = 'تاریخ خرید الزامی است.'
+        else:
+            try:
+                purchase_date = _dt.date.fromisoformat(purchase_str)
+            except ValueError:
+                errors['purchase_date'] = 'فرمت تاریخ معتبر نیست (YYYY-MM-DD).'
+
+        duplicate_claim = _duplicate_check(serial) if serial else None
+
+        if errors:
+            return render(request, 'payments/warranty_new.html', {
+                'errors': errors, 'form': data,
+                'duplicate': duplicate_claim,
+                'is_agent_submission': is_agent_submission,
+            })
+
+        if duplicate_claim and not force_submit:
+            return render(request, 'payments/warranty_new.html', {
+                'errors': {}, 'form': data,
+                'duplicate': duplicate_claim, 'show_force': True,
+                'is_agent_submission': is_agent_submission,
+            })
+
+        # For direct customers: link claim to their account.
+        # For agents/staff: user=None (end-buyer may not have an account); track via submitted_by.
+        claim = WarrantyClaim.objects.create(
+            user=request.user if is_direct_customer else None,
+            submitted_by=request.user,
+            claimant_name=c_name, claimant_phone=c_phone, claimant_email=c_email,
+            part_name=part_name, part_model=part_model,
+            serial_number=serial, purchase_date=purchase_date, invoice_number=inv_no,
+            defect_description=defect,
+            tracking_code=_warranty_tracking_code(),
+            due_date=_warranty_due_date(),
+        )
+        _save_warranty_files(request, claim, description='تصویر اولیه')
+        _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_SUBMITTED, visible_to_customer=True)
+        _warranty_notify_staff(
+            claim, '🛡️ درخواست گارانتی جدید',
+            f'درخواست گارانتی جدید برای «{part_name}» (سریال: {serial}) ثبت شد.',
+        )
+        _warranty_sms(
+            c_phone,
+            f'درخواست گارانتی شما ثبت شد.\nکد پیگیری: {claim.tracking_code}\n'
+            'وضعیت را از طریق سامانه پیگیری کنید.',
+        )
+        messages.success(request, f'درخواست گارانتی با کد {claim.tracking_code} ثبت شد.')
+        return redirect('warranty_claim_detail', claim_id=claim.pk)
+
+    prefill = {}
+    # Only pre-fill claimant info for direct customers submitting for themselves.
+    if is_direct_customer and profile:
+        prefill['claimant_name']  = f"{profile.first_name} {profile.last_name}".strip()
+        prefill['claimant_phone'] = profile.mobile or profile.phone or ''
+    return render(request, 'payments/warranty_new.html', {
+        'form': prefill,
+        'errors': {},
+        'is_agent_submission': is_agent_submission,
+    })
+
+
+@login_required
+def warranty_my_claims(request):
+    # Show claims the user owns (direct customer) OR submitted on someone else's behalf (agent/staff).
+    from django.db.models import Q as _Q
+    claims = WarrantyClaim.objects.filter(
+        _Q(user=request.user) | _Q(submitted_by=request.user)
+    ).distinct().order_by('-created_at')
+    status_f = request.GET.get('status', '')
+    if status_f:
+        claims = claims.filter(status=status_f)
+    paginator = Paginator(claims, 20)
+    page = paginator.get_page(request.GET.get('page'))
+    return render(request, 'payments/warranty_my_claims.html', {
+        'page': page,
+        'status_choices': WarrantyClaim.STATUS_CHOICES,
+        'status_filter': status_f,
+    })
+
+
+@login_required
+def warranty_claim_detail(request, claim_id):
+    claim = get_object_or_404(WarrantyClaim, pk=claim_id)
+    # Allow access to: the customer who owns the claim, the person who submitted it, and warranty staff.
+    can_access = (
+        claim.user_id == request.user.id or
+        claim.submitted_by_id == request.user.id or
+        _is_warranty_staff(request.user)
+    )
+    if not can_access:
+        return HttpResponseForbidden('دسترسی ندارید.')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'reply' and claim.status == WarrantyClaim.STATUS_INFO_NEEDED:
+            reply = request.POST.get('reply', '').strip()
+            if not reply:
+                messages.error(request, 'متن پاسخ را وارد کنید.')
+            else:
+                claim.customer_reply = reply
+                claim.status = WarrantyClaim.STATUS_REVIEWING
+                claim.save(update_fields=['customer_reply', 'status', 'updated_at'])
+                _save_warranty_files(request, claim, description='فایل تکمیلی مشتری')
+                _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_CUSTOMER_REPLY, note=reply)
+                _warranty_notify_staff(
+                    claim, '💬 پاسخ مشتری',
+                    f'مشتری پاسخ اطلاعات تکمیلی برای گارانتی #{claim.id} را ارسال کرد.',
+                )
+                messages.success(request, 'پاسخ شما ثبت شد.')
+
+        elif action == 'rate' and claim.status in {
+            WarrantyClaim.STATUS_RESOLVED, WarrantyClaim.STATUS_CLOSED
+        }:
+            try:
+                rating = max(1, min(5, int(request.POST.get('rating', '0'))))
+            except ValueError:
+                rating = None
+            feedback = request.POST.get('feedback', '').strip()
+            if rating:
+                claim.customer_rating = rating
+                claim.customer_feedback = feedback
+                claim.save(update_fields=['customer_rating', 'customer_feedback', 'updated_at'])
+                _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_RATED,
+                              note=f'امتیاز: {rating}/5 — {feedback}')
+                messages.success(request, 'امتیاز شما ثبت شد.')
+
+        elif action == 'add_file':
+            saved = _save_warranty_files(request, claim, description='فایل تکمیلی')
+            if saved:
+                messages.success(request, f'{saved} فایل بارگذاری شد.')
+            else:
+                messages.error(request, 'فایلی بارگذاری نشد.')
+
+        return redirect('warranty_claim_detail', claim_id=claim.pk)
+
+    return render(request, 'payments/warranty_claim_detail.html', {
+        'claim': claim,
+        'logs': claim.logs.filter(is_visible_to_customer=True),
+        'files': claim.files.all(),
+    })
+
+
+def warranty_track(request):
+    result = None
+    error  = None
+    if request.method == 'POST':
+        query = request.POST.get('query', '').strip().upper()
+        if not query:
+            error = 'کد پیگیری را وارد کنید.'
+        else:
+            result = WarrantyClaim.objects.filter(tracking_code=query).first()
+            if not result:
+                error = f'درخواستی با کد «{query}» یافت نشد.'
+    return render(request, 'payments/warranty_track.html', {'result': result, 'error': error})
+
+
+@login_required
+def warranty_staff_list(request):
+    if not _is_warranty_staff(request.user):
+        return HttpResponseForbidden('دسترسی ندارید.')
+
+    qs = WarrantyClaim.objects.select_related('user', 'assigned_to').all()
+    status_f   = request.GET.get('status', '')
+    priority_f = request.GET.get('priority', '')
+    search     = request.GET.get('q', '').strip()
+    assigned_f = request.GET.get('assigned', '')
+    overdue_f  = request.GET.get('overdue', '')
+
+    if status_f:   qs = qs.filter(status=status_f)
+    if priority_f: qs = qs.filter(priority=priority_f)
+    if search:
+        qs = qs.filter(
+            Q(tracking_code__icontains=search) | Q(claimant_name__icontains=search) |
+            Q(claimant_phone__icontains=search) | Q(part_name__icontains=search) |
+            Q(serial_number__icontains=search)
+        )
+    if assigned_f == 'me':
+        qs = qs.filter(assigned_to=request.user)
+    elif assigned_f == 'unassigned':
+        qs = qs.filter(assigned_to__isnull=True)
+    if overdue_f == '1':
+        qs = qs.filter(due_date__lt=timezone.now(), status__in=[
+            WarrantyClaim.STATUS_SUBMITTED, WarrantyClaim.STATUS_REVIEWING,
+            WarrantyClaim.STATUS_INFO_NEEDED, WarrantyClaim.STATUS_APPROVED,
+            WarrantyClaim.STATUS_IN_PROGRESS,
+        ])
+
+    open_statuses = [
+        WarrantyClaim.STATUS_SUBMITTED, WarrantyClaim.STATUS_REVIEWING,
+        WarrantyClaim.STATUS_INFO_NEEDED, WarrantyClaim.STATUS_APPROVED,
+        WarrantyClaim.STATUS_IN_PROGRESS,
+    ]
+    status_counts = [
+        (val, label, WarrantyClaim.objects.filter(status=val).count())
+        for val, label in WarrantyClaim.STATUS_CHOICES
+    ]
+    open_count    = WarrantyClaim.objects.filter(status__in=open_statuses).count()
+    overdue_count = WarrantyClaim.objects.filter(
+        due_date__lt=timezone.now(), status__in=open_statuses).count()
+
+    paginator = Paginator(qs, 25)
+    page = paginator.get_page(request.GET.get('page'))
+    return render(request, 'payments/warranty_staff_list.html', {
+        'page': page,
+        'status_choices':   WarrantyClaim.STATUS_CHOICES,
+        'priority_choices': WarrantyClaim.PRIORITY_CHOICES,
+        'status_counts':    status_counts,
+        'open_count':       open_count,
+        'overdue_count':    overdue_count,
+        'status_filter':    status_f,
+        'priority_filter':  priority_f,
+        'search':           search,
+        'assigned_filter':  assigned_f,
+        'overdue_filter':   overdue_f,
+    })
+
+
+@login_required
+def warranty_staff_detail(request, claim_id):
+    if not _is_warranty_staff(request.user):
+        return HttpResponseForbidden('دسترسی ندارید.')
+    claim = get_object_or_404(WarrantyClaim, pk=claim_id)
+    warranty_staff_users = list(
+        User.objects.filter(profile__role__in=['warranty', 'warranty_manager'], is_active=True)
+        .select_related('profile')
+    )
+    return render(request, 'payments/warranty_staff_detail.html', {
+        'claim': claim,
+        'logs': claim.logs.all(),
+        'files': claim.files.all(),
+        'staff_users': warranty_staff_users,
+        'resolution_choices': WarrantyClaim.RESOLUTION_CHOICES,
+        'priority_choices':   WarrantyClaim.PRIORITY_CHOICES,
+    })
+
+
+@login_required
+@require_POST
+def warranty_staff_action(request, claim_id):
+    if not _is_warranty_staff(request.user):
+        return HttpResponseForbidden('دسترسی ندارید.')
+    claim  = get_object_or_404(WarrantyClaim, pk=claim_id)
+    action = request.POST.get('action', '').strip()
+    note   = request.POST.get('note', '').strip()
+    now    = timezone.now()
+
+    if action == 'start_review':
+        if claim.status == WarrantyClaim.STATUS_SUBMITTED:
+            claim.status = WarrantyClaim.STATUS_REVIEWING
+            claim.reviewed_at = now
+            claim.save(update_fields=['status', 'reviewed_at', 'updated_at'])
+            _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_REVIEWING)
+            _warranty_sms(claim.claimant_phone,
+                          f'درخواست گارانتی {claim.tracking_code} در دست بررسی قرار گرفت.')
+            messages.success(request, 'بررسی شروع شد.')
+
+    elif action == 'info_needed':
+        if not note:
+            messages.error(request, 'توضیح درخواست اطلاعات الزامی است.')
+        else:
+            claim.status = WarrantyClaim.STATUS_INFO_NEEDED
+            claim.info_request_note = note
+            claim.save(update_fields=['status', 'info_request_note', 'updated_at'])
+            _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_INFO_NEEDED, note=note)
+            _warranty_sms(claim.claimant_phone,
+                          f'گارانتی {claim.tracking_code}: اطلاعات تکمیلی لازم است.\n{note}')
+            messages.success(request, 'درخواست اطلاعات ارسال شد.')
+
+    elif action == 'approve':
+        claim.status = WarrantyClaim.STATUS_APPROVED
+        claim.save(update_fields=['status', 'updated_at'])
+        _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_APPROVED, note=note)
+        _warranty_sms(claim.claimant_phone,
+                      f'گارانتی {claim.tracking_code} تأیید شد. به زودی تماس خواهیم گرفت.')
+        messages.success(request, 'گارانتی تأیید شد.')
+
+    elif action == 'in_progress':
+        claim.status = WarrantyClaim.STATUS_IN_PROGRESS
+        claim.save(update_fields=['status', 'updated_at'])
+        _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_IN_PROGRESS, note=note)
+        _warranty_sms(claim.claimant_phone,
+                      f'گارانتی {claim.tracking_code} در حال پردازش / تعمیر است.')
+        messages.success(request, 'وضعیت «در حال پردازش» ثبت شد.')
+
+    elif action == 'resolve':
+        resolution_type = request.POST.get('resolution_type', '').strip()
+        resolution_note = request.POST.get('resolution_note', '').strip()
+        if not resolution_type:
+            messages.error(request, 'نوع رفع مسئله را انتخاب کنید.')
+        else:
+            claim.status          = WarrantyClaim.STATUS_RESOLVED
+            claim.resolution_type = resolution_type
+            claim.resolution_note = resolution_note or note
+            claim.resolved_at     = now
+            claim.save(update_fields=['status', 'resolution_type', 'resolution_note',
+                                      'resolved_at', 'updated_at'])
+            res_label = dict(WarrantyClaim.RESOLUTION_CHOICES).get(resolution_type, resolution_type)
+            _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_RESOLVED,
+                          note=f'{res_label}: {resolution_note}'.strip())
+            _warranty_sms(claim.claimant_phone,
+                          f'گارانتی {claim.tracking_code} رفع شد ({res_label}). '
+                          'لطفاً رضایت خود را در سامانه ثبت کنید.')
+            messages.success(request, 'درخواست رفع شد.')
+
+    elif action == 'reject':
+        if not note:
+            messages.error(request, 'دلیل رد الزامی است.')
+        else:
+            claim.status           = WarrantyClaim.STATUS_REJECTED
+            claim.rejection_reason = note
+            claim.save(update_fields=['status', 'rejection_reason', 'updated_at'])
+            _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_REJECTED, note=note)
+            _warranty_sms(claim.claimant_phone,
+                          f'گارانتی {claim.tracking_code} رد شد.\nدلیل: {note}')
+            messages.success(request, 'درخواست رد شد.')
+
+    elif action == 'close':
+        claim.status = WarrantyClaim.STATUS_CLOSED
+        claim.save(update_fields=['status', 'updated_at'])
+        _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_CLOSED,
+                      note=note, visible_to_customer=False)
+        messages.success(request, 'درخواست بسته شد.')
+
+    elif action == 'assign':
+        assign_to = request.POST.get('assign_to', '').strip()
+        if assign_to:
+            try:
+                staff_user = User.objects.get(
+                    pk=int(assign_to), profile__role__in=['warranty', 'warranty_manager'])
+                claim.assigned_to = staff_user
+                claim.save(update_fields=['assigned_to', 'updated_at'])
+                _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_ASSIGNED,
+                              note=f'تخصیص به {staff_user.get_full_name() or staff_user.username}',
+                              visible_to_customer=False)
+                messages.success(request, 'تخصیص انجام شد.')
+            except (User.DoesNotExist, ValueError):
+                messages.error(request, 'کارشناس معتبر نیست.')
+        else:
+            claim.assigned_to = None
+            claim.save(update_fields=['assigned_to', 'updated_at'])
+            messages.success(request, 'تخصیص برداشته شد.')
+
+    elif action == 'priority':
+        new_priority = request.POST.get('priority', '').strip()
+        if new_priority in {v for v, _ in WarrantyClaim.PRIORITY_CHOICES}:
+            old_label = claim.get_priority_display()
+            claim.priority = new_priority
+            claim.save(update_fields=['priority', 'updated_at'])
+            _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_PRIORITY,
+                          note=f'{old_label} → {claim.get_priority_display()}',
+                          visible_to_customer=False)
+            messages.success(request, 'اولویت تغییر کرد.')
+
+    elif action == 'note':
+        if note:
+            visible = request.POST.get('note_visible', '1') == '1'
+            _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_NOTE,
+                          note=note, visible_to_customer=visible)
+            messages.success(request, 'یادداشت ثبت شد.')
+
+    elif action == 'add_file':
+        saved = _save_warranty_files(request, claim, description=note or 'فایل کارشناس')
+        if saved:
+            messages.success(request, f'{saved} فایل بارگذاری شد.')
+        else:
+            messages.error(request, 'فایلی بارگذاری نشد.')
+
+    return redirect('warranty_staff_detail', claim_id=claim.pk)
 

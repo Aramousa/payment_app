@@ -1,0 +1,174 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت گارانتی</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f7fb; }
+        .wrap { max-width: 1300px; margin: 0 auto; padding: 20px 16px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+        .top-bar h2 { font-size: 20px; font-weight: 800; color: #172033; margin: 0; }
+        .btn { display: inline-block; background: #1e3a5f; color: #fff; border-radius: 7px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; }
+        .btn.alt { background: #6c757d; }
+        /* summary chips */
+        .summary-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .s-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; text-decoration: none; border: 2px solid transparent; }
+        .s-chip.open    { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+        .s-chip.overdue { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+        .s-chip.submitted   { background: #f8fafc; color: #64748b; border-color: #e2e8f0; }
+        .s-chip.reviewing   { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+        .s-chip.info_needed { background: #fefce8; color: #854d0e; border-color: #fde047; }
+        .s-chip.approved    { background: #f0fdf4; color: #15803d; border-color: #86efac; }
+        .s-chip.in_progress { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+        .s-chip.resolved    { background: #f0fdf4; color: #15803d; border-color: #86efac; }
+        .s-chip.rejected    { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+        .s-chip.closed      { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+        .s-chip.active-filter { font-weight: 800; border-width: 2px; }
+        /* filters */
+        .filter-panel { background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(15,23,42,.06); }
+        .filter-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+        .filter-grid label { font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 4px; }
+        .filter-grid input, .filter-grid select { width: 100%; padding: 8px 10px; border: 1.5px solid #d1d5db; border-radius: 7px; font-family: inherit; font-size: 13px; }
+        .filter-grid .filter-actions { display: flex; gap: 6px; }
+        .filter-grid button { background: #1e3a5f; color: #fff; border: none; border-radius: 7px; padding: 9px 16px; font-family: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+        /* table */
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(15,23,42,.06); font-size: 13px; }
+        thead tr { background: #1e3a5f; color: #fff; }
+        th { padding: 11px 12px; text-align: right; font-weight: 600; white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8faff; }
+        .flag-chip { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 11px; color: #fff; white-space: nowrap; }
+        .flag-gray   { background: #6b7280; }
+        .flag-blue   { background: #1e88e5; }
+        .flag-yellow { background: #f59e0b; color: #111; }
+        .flag-green  { background: #16a34a; }
+        .flag-red    { background: #dc2626; }
+        .flag-orange { background: #f97316; }
+        .priority-chip { display: inline-block; padding: 2px 7px; border-radius: 8px; font-size: 11px; font-weight: 600; }
+        .p-low    { background: #f1f5f9; color: #64748b; }
+        .p-normal { background: #eff6ff; color: #1d4ed8; }
+        .p-high   { background: #fff7ed; color: #c2410c; }
+        .p-urgent { background: #fef2f2; color: #dc2626; }
+        .action-link { display: inline-block; background: #1e3a5f; color: #fff; border-radius: 5px; padding: 4px 10px; text-decoration: none; font-size: 12px; }
+        .overdue-row td { background: #fff5f5 !important; }
+        .empty { text-align: center; color: #94a3b8; padding: 40px; }
+        .pager { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 14px; font-size: 13px; }
+        .pager a { background: #1e3a5f; color: #fff; border-radius: 5px; padding: 6px 14px; text-decoration: none; }
+        code { font-size: 11px; letter-spacing: 1px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+        @media (max-width: 900px) { .filter-grid { grid-template-columns: 1fr 1fr; } }
+    </style>
+</head>
+<body>
+{% include "payments/partials/app_navigation.html" %}
+<div class="wrap">
+    <div class="top-bar">
+        <h2>🛡️ مدیریت درخواست‌های گارانتی</h2>
+    </div>
+
+    <div class="summary-bar">
+        <a href="?" class="s-chip open">باز: {{ open_count }}</a>
+        {% if overdue_count %}<a href="?overdue=1" class="s-chip overdue {% if overdue_filter == '1' %}active-filter{% endif %}">تأخیر: {{ overdue_count }}</a>{% endif %}
+        {% for val, label, count in status_counts %}
+        <a href="?status={{ val }}" class="s-chip {{ val }} {% if status_filter == val %}active-filter{% endif %}">{{ label }}: {{ count }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="filter-panel">
+        <form method="get" class="filter-grid">
+            <div>
+                <label>جستجو</label>
+                <input type="text" name="q" value="{{ search }}" placeholder="نام، موبایل، کد پیگیری، سریال، قطعه">
+            </div>
+            <div>
+                <label>وضعیت</label>
+                <select name="status">
+                    <option value="">همه وضعیت‌ها</option>
+                    {% for val, label in status_choices %}
+                    <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>اولویت</label>
+                <select name="priority">
+                    <option value="">همه اولویت‌ها</option>
+                    {% for val, label in priority_choices %}
+                    <option value="{{ val }}" {% if priority_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>تخصیص</label>
+                <select name="assigned">
+                    <option value="">همه</option>
+                    <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>موارد من</option>
+                    <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>تخصیص‌نداده</option>
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit">اعمال</button>
+                <a href="{% url 'warranty_staff_list' %}" class="btn alt">پاک</a>
+            </div>
+        </form>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>کد پیگیری</th>
+                <th>متقاضی</th>
+                <th>قطعه / محصول</th>
+                <th>سریال</th>
+                <th>اولویت</th>
+                <th>وضعیت</th>
+                <th>مسئول</th>
+                <th>تاریخ ثبت</th>
+                <th>اقدام</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for claim in page %}
+            <tr {% if claim.is_overdue %}class="overdue-row"{% endif %}>
+                <td><code>{{ claim.tracking_code }}</code></td>
+                <td>
+                    <div style="font-weight:600;">{{ claim.claimant_name }}</div>
+                    <div style="font-size:11px;color:#64748b;" dir="ltr">{{ claim.claimant_phone }}</div>
+                    {% if claim.submitted_by and claim.submitted_by != claim.user %}
+                    <div style="font-size:10px;color:#c2410c;margin-top:2px;">از طرف: {{ claim.submitted_by.get_full_name|default:claim.submitted_by.username }}</div>
+                    {% endif %}
+                </td>
+                <td style="max-width:160px;">{{ claim.part_name }}</td>
+                <td dir="ltr" style="font-size:12px;">{{ claim.serial_number }}</td>
+                <td>
+                    <span class="priority-chip p-{{ claim.priority }}">{{ claim.get_priority_display }}</span>
+                </td>
+                <td>
+                    <span class="flag-chip {{ claim.status_class }}">{{ claim.get_status_display }}</span>
+                    {% if claim.is_overdue %}<br><span style="font-size:10px;color:#dc2626;">⏰ تأخیر</span>{% endif %}
+                </td>
+                <td style="font-size:12px;">{{ claim.assigned_to.get_full_name|default:claim.assigned_to.username|default:"—" }}</td>
+                <td style="white-space:nowrap;font-size:12px;">{{ claim.created_at|date:"y/m/d" }}</td>
+                <td><a href="{% url 'warranty_staff_detail' claim.id %}" class="action-link">بررسی</a></td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="9" class="empty">هیچ درخواستی یافت نشد.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if page.has_other_pages %}
+    <div class="pager">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&status={{ status_filter }}&priority={{ priority_filter }}&q={{ search }}&assigned={{ assigned_filter }}&overdue={{ overdue_filter }}">قبلی</a>{% endif %}
+        <span>صفحه {{ page.number }} از {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}&status={{ status_filter }}&priority={{ priority_filter }}&q={{ search }}&assigned={{ assigned_filter }}&overdue={{ overdue_filter }}">بعدی</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+<script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

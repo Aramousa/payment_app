@@ -1,5 +1,12 @@
 from django.urls import path
 from .views import (
+    warranty_new,
+    warranty_my_claims,
+    warranty_claim_detail,
+    warranty_track,
+    warranty_staff_list,
+    warranty_staff_detail,
+    warranty_staff_action,
     agency_application_action,
     agency_application_detail,
     agency_applications_list,
@@ -169,4 +176,13 @@ urlpatterns = [
     path('profile-change-requests/<int:request_id>/review/', profile_change_request_review, name='profile_change_request_review'),
     path('profile/password/', profile_password_change, name='profile_password_change'),
     path('profile/password/cancel/', profile_password_cancel, name='profile_password_cancel'),
+
+    # ─── گارانتی و خدمات پس از فروش ─────────────────────────────────────────────
+    path('warranty/',                          warranty_new,          name='warranty_new'),
+    path('warranty/my/',                       warranty_my_claims,    name='warranty_my_claims'),
+    path('warranty/track/',                    warranty_track,        name='warranty_track'),
+    path('warranty/<int:claim_id>/',           warranty_claim_detail, name='warranty_claim_detail'),
+    path('warranty/staff/',                    warranty_staff_list,   name='warranty_staff_list'),
+    path('warranty/staff/<int:claim_id>/',     warranty_staff_detail, name='warranty_staff_detail'),
+    path('warranty/staff/<int:claim_id>/action/', warranty_staff_action, name='warranty_staff_action'),
 ]

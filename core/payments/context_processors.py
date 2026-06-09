@@ -5,10 +5,10 @@ from django.conf import settings
 from django.db.models import Q
 from zoneinfo import ZoneInfo
 
-from .models import FinalApprovalDelegate, LoginAdvertisement, ReconciliationThread, SystemSettings, UserNotification, UserProfile
+from .models import FinalApprovalDelegate, LoginAdvertisement, ReconciliationThread, SystemSettings, UserNotification, UserProfile, WarrantyClaim
 
 
-STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
+STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry', 'warranty', 'warranty_manager'}
 DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
 
@@ -84,14 +84,15 @@ def _reconciliation_unread_count_nav(user):
 
 
 _GROUP_META = {
-    'main':      {'label': 'داشبورد',       'icon': '🏠', 'order': 0},
-    'documents': {'label': 'اسناد',         'icon': '📋', 'order': 1},
-    'customers': {'label': 'مشتریان',       'icon': '👥', 'order': 2},
-    'business':  {'label': 'بازرگانی',      'icon': '🏦', 'order': 3},
-    'sales':     {'label': 'فروش',          'icon': '📦', 'order': 4},
-    'finance':   {'label': 'مالی',          'icon': '💰', 'order': 5},
-    'system':    {'label': 'عملیات سیستمی', 'icon': '⚙️', 'order': 6},
-    'account':   {'label': 'حساب من',       'icon': '👤', 'order': 7},
+    'main':      {'label': 'داشبورد',                    'icon': '🏠',  'order': 0},
+    'documents': {'label': 'اسناد',                      'icon': '📋',  'order': 1},
+    'customers': {'label': 'مشتریان',                    'icon': '👥',  'order': 2},
+    'business':  {'label': 'بازرگانی',                   'icon': '🏦',  'order': 3},
+    'sales':     {'label': 'فروش',                       'icon': '📦',  'order': 4},
+    'warranty':  {'label': 'گارانتی و خدمات پس از فروش', 'icon': '🛡️', 'order': 5},
+    'finance':   {'label': 'مالی',                       'icon': '💰',  'order': 6},
+    'system':    {'label': 'عملیات سیستمی',               'icon': '⚙️', 'order': 7},
+    'account':   {'label': 'حساب من',                    'icon': '👤',  'order': 8},
 }
 
 
@@ -199,6 +200,9 @@ def app_navigation(request):
             _nav_item('فاکتور فروش',     'invoices_dashboard',     'invoices',                'main', '🧾'),
             _nav_item('برنامه واریز',    'customer_daily_payments','customer_daily_payments', 'main', '📅'),
             _nav_item('مغایرت‌گیری',      'reconciliation_center',  'reconciliation',          'main', '💬'),
+            _nav_item('درخواست گارانتی', 'warranty_new',           'warranty_new',            'warranty', '🛡️'),
+            _nav_item('درخواست‌های من',   'warranty_my_claims',     'warranty_my',             'warranty', '📋'),
+            _nav_item('پیگیری وضعیت',    'warranty_track',         'warranty_track',          'warranty', '🔍'),
         ])
     else:
         items.append(_nav_item('صف کاری اسناد', 'submit', 'payment_queue', 'documents', '📥'))
@@ -221,6 +225,24 @@ def app_navigation(request):
             items.append(_nav_item('داشبورد فروش', 'sales_expert_dashboard', 'sales_dashboard', 'sales', '📊'))
         if user.is_superuser or role in {'sales_manager', 'sales', 'commercial_manager'}:
             items.append(_nav_item('درخواست‌های نمایندگی', 'agency_applications', 'agency', 'sales', '🤝'))
+
+        # ── گارانتی ───────────────────────────────────────────────────────────
+        if user.is_superuser or role in {'warranty', 'warranty_manager'}:
+            open_count = WarrantyClaim.objects.filter(status__in=[
+                WarrantyClaim.STATUS_SUBMITTED, WarrantyClaim.STATUS_REVIEWING,
+                WarrantyClaim.STATUS_INFO_NEEDED, WarrantyClaim.STATUS_APPROVED,
+                WarrantyClaim.STATUS_IN_PROGRESS,
+            ]).count()
+            items.append(_nav_item(
+                f'مدیریت گارانتی' + (f' ({open_count})' if open_count else ''),
+                'warranty_staff_list', 'warranty_staff', 'warranty', '🛡️',
+            ))
+        # کارکنان دیگر هم می‌توانند درخواست ثبت کنند
+        if is_staff_user:
+            items.extend([
+                _nav_item('ثبت درخواست گارانتی', 'warranty_new',    'warranty_new_staff', 'warranty', '📝'),
+                _nav_item('درخواست‌های من',        'warranty_my_claims', 'warranty_my_staff', 'warranty', '📋'),
+            ])
 
         if user.is_superuser or role == 'finance_manager':
             items.append(_nav_item('تفویض تایید اسناد', 'final_approval_delegation', 'delegation', 'finance', '✍️'))
@@ -259,6 +281,8 @@ def app_navigation(request):
         'sales_manager':      'مدیر فروش',
         'data_entry':         'تکمیل اطلاعات',
         'staff':              'کارمند',
+        'warranty':           'کارشناس گارانتی',
+        'warranty_manager':   'مدیر گارانتی',
         'counterparty':       'طرف حساب',
     }.get(role, 'کاربر')
 
