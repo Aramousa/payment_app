@@ -692,8 +692,11 @@ def _active_payment_records_for_user(user):
     ready_q = _ready_for_final_q()
 
     if user.is_superuser:
-        # ادمین: همه به‌جز در‌انتظار‌تأیید‌نهایی (→ صف جداگانه) و تأیید‌نهایی‌شده (→ سوابق)
-        return records.filter(pending_final_approval=False).exclude(status=PaymentRecord.STATUS_FINAL_APPROVED)
+        # ادمین: همه به‌جز در‌انتظار‌تأیید‌نهایی (→ صف جداگانه)، تأیید‌نهایی‌شده و رد‌شده (→ سوابق)
+        return records.filter(pending_final_approval=False).exclude(status__in=[
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+        ])
 
     role = _department_role(_user_role(user))
     if role == 'commercial':
@@ -3576,6 +3579,12 @@ def staff_update_status(request, payment_id):
         payment.counterparty = selected_counterparty
 
     update_fields = ['status', 'last_staff_note', 'counterparty', 'is_locked']
+
+    # سند رد شده: pending_final_approval پاک می‌شود تا از صف تأیید خارج شود
+    if target_status == PaymentRecord.STATUS_REJECTED:
+        payment.pending_final_approval = False
+        payment.pending_final_approval_since = None
+        update_fields += ['pending_final_approval', 'pending_final_approval_since']
 
     # هر بار که سند از حالت ناقص خارج می‌شود، ثبت مالی قبلی ابطال می‌شود
     REACTIVATE_FROM_INCOMPLETE = {
