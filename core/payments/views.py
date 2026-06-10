@@ -3663,6 +3663,7 @@ def edit_payment(request, payment_id):
             payment.pending_final_approval = False
             payment.pending_final_approval_since = None
             payment.created_at = timezone.now()
+            payment.last_edited_at = timezone.now()
             payment.save()
             _save_receipts(payment, form)
             _log_activity(
@@ -4015,7 +4016,8 @@ def staff_edit_payment_details(request, payment_id):
             payment = form.save(commit=False)
             change_note = _payment_detail_changes_note(before, payment, form)
             if change_note:
-                payment.save(update_fields=list(form.fields.keys()))
+                payment.last_edited_at = timezone.now()
+                payment.save(update_fields=list(form.fields.keys()) + ['last_edited_at'])
                 _log_activity(
                     payment,
                     request.user,

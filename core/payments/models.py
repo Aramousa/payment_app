@@ -389,7 +389,8 @@ class PaymentRecord(models.Model):
     pending_final_approval_since = models.DateTimeField('زمان آماده‌شدن برای تأیید نهایی', null=True, blank=True)
     last_staff_note = models.TextField('آخرین توضیح کارشناس', blank=True)
     customer_notes = models.TextField('توضیحات مشتری', blank=True, help_text='توضیحات یا نکات مشتری در مورد این واریزی')
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    last_edited_at = models.DateTimeField('آخرین ویرایش', null=True, blank=True)
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
 
     # تصمیم طرف حساب روی فیش
