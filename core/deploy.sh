@@ -14,11 +14,9 @@ MANAGE="${APP_DIR}/manage.py"
 echo "=== deploy payment_app ==="
 echo "زمان: $(date '+%Y-%m-%d %H:%M:%S')"
 
-# ─── نصب پکیج‌های آفلاین (اگر تغییر کرده)
+# ─── نصب/به‌روزرسانی پکیج‌ها (از اینترنت)
 echo "▶ نصب/به‌روزرسانی پکیج‌ها..."
 "${PIP}" install \
-    --no-index \
-    --find-links="${APP_DIR}/offline_packages/" \
     -r "${APP_DIR}/requirements.txt" \
     --quiet
 

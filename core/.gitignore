@@ -23,9 +23,3 @@ media/*
 # OS files
 .DS_Store
 Thumbs.db
-
-# Oversized vendor wheels (exceed GitHub's 100MB file limit)
-# Transfer these to the server separately (e.g. via the deployment tarball/scp),
-# not through git.
-vendor/wheels-linux/torch-*.whl
-vendor/wheels-linux-py310-django52/torch-*.whl
