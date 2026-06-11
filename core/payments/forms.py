@@ -1762,6 +1762,7 @@ class ReconciliationThreadForm(forms.ModelForm):
         label='مشتری',
         queryset=User.objects.none(),
         required=False,
+        widget=forms.Select(attrs={'size': 6}),
     )
     staff_participants = forms.ModelMultipleChoiceField(
         label='کارشناسان گفتگو',
