@@ -42,10 +42,23 @@
 
         <form class="settings-form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
+            <input type="hidden" name="form_name" value="logo_settings">
             {{ form.as_p }}
             <div class="settings-actions">
                 <button type="submit">ذخیره لوگو</button>
                 <a href="{% url 'submit' %}">بازگشت</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="settings-panel" style="margin-top:18px;">
+        <h1 class="settings-title">تنظیمات منو</h1>
+        <form class="settings-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="form_name" value="menu_settings">
+            {{ menu_form.as_p }}
+            <div class="settings-actions">
+                <button type="submit">ذخیره تنظیمات منو</button>
             </div>
         </form>
     </section>

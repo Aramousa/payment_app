@@ -1903,3 +1903,12 @@ class SystemLogoSettingsForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class SystemMenuSettingsForm(forms.ModelForm):
+    class Meta:
+        model = SystemSettings
+        fields = ['customer_warranty_menu_enabled']
+        labels = {
+            'customer_warranty_menu_enabled': 'نمایش منوی «گارانتی و خدمات پس از فروش» برای مشتریان',
+        }

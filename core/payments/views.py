@@ -33,7 +33,7 @@ from django_ratelimit.decorators import ratelimit
 from axes.helpers import get_client_ip_address
 from zoneinfo import ZoneInfo
 
-from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, UserAccessManagementForm, UserAccountManagementForm
+from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
 from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 import os
@@ -3961,16 +3961,28 @@ def system_logo_settings(request):
         return HttpResponseForbidden('فقط مدیر سیستم امکان تغییر لوگوی سامانه را دارد.')
     settings_obj = SystemSettings.load()
     if request.method == 'POST':
-        form = SystemLogoSettingsForm(request.POST, request.FILES, instance=settings_obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'تنظیمات لوگوی سامانه ذخیره شد.')
-            return redirect('system_logo_settings')
-        messages.error(request, 'ذخیره لوگو انجام نشد. لطفا خطاها را بررسی کنید.')
+        if request.POST.get('form_name') == 'menu_settings':
+            menu_form = SystemMenuSettingsForm(request.POST, instance=settings_obj)
+            logo_form = SystemLogoSettingsForm(instance=settings_obj)
+            if menu_form.is_valid():
+                menu_form.save()
+                messages.success(request, 'تنظیمات منو ذخیره شد.')
+                return redirect('system_logo_settings')
+            messages.error(request, 'ذخیره تنظیمات منو انجام نشد. لطفا خطاها را بررسی کنید.')
+        else:
+            logo_form = SystemLogoSettingsForm(request.POST, request.FILES, instance=settings_obj)
+            menu_form = SystemMenuSettingsForm(instance=settings_obj)
+            if logo_form.is_valid():
+                logo_form.save()
+                messages.success(request, 'تنظیمات لوگوی سامانه ذخیره شد.')
+                return redirect('system_logo_settings')
+            messages.error(request, 'ذخیره لوگو انجام نشد. لطفا خطاها را بررسی کنید.')
     else:
-        form = SystemLogoSettingsForm(instance=settings_obj)
+        logo_form = SystemLogoSettingsForm(instance=settings_obj)
+        menu_form = SystemMenuSettingsForm(instance=settings_obj)
     return render(request, 'payments/system_logo_settings.html', {
-        'form': form,
+        'form': logo_form,
+        'menu_form': menu_form,
         'settings_obj': settings_obj,
     })
 

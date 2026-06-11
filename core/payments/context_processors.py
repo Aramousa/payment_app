@@ -218,6 +218,12 @@ def app_navigation(request):
             _nav_item('برنامه واریز',    'customer_daily_payments','customer_daily_payments', 'main', '📅'),
             _nav_item('مغایرت‌گیری',      'reconciliation_center',  'reconciliation',          'main', '💬'),
         ])
+        if SystemSettings.load().customer_warranty_menu_enabled:
+            items.extend([
+                _nav_item('درخواست گارانتی', 'warranty_new',           'warranty_new',            'warranty', '🛡️'),
+                _nav_item('درخواست‌های من',   'warranty_my_claims',     'warranty_my',             'warranty', '📋'),
+                _nav_item('پیگیری وضعیت',    'warranty_track',         'warranty_track',          'warranty', '🔍'),
+            ])
     else:
         items.append(_nav_item('صف کاری اسناد', 'submit', 'payment_queue', 'documents', '📥'))
         if _can_see_pending_final_nav(user, role):

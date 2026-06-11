@@ -1438,6 +1438,13 @@ class SystemSettings(models.Model):
         help_text='فرمت مجاز: PNG/JPG/WEBP، حداکثر 512KB، حداکثر 600×220 پیکسل.',
     )
 
+    # ─── تنظیمات منو ────────────────────────────────────────────────────────
+    customer_warranty_menu_enabled = models.BooleanField(
+        'نمایش منوی «گارانتی و خدمات پس از فروش» برای مشتریان',
+        default=False,
+        help_text='در صورت فعال بودن، گزینه‌های درخواست گارانتی، درخواست‌های من و پیگیری وضعیت در منوی مشتریان نمایش داده می‌شود.',
+    )
+
     # ─── تنظیمات پیامک ──────────────────────────────────────────────────────
     SMS_PROVIDER_KAVENEGAR = 'kavenegar'
     SMS_PROVIDER_GHASEDAK  = 'ghasedak'

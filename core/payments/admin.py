@@ -501,6 +501,9 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             'fields': ('session_inactivity_timeout',),
             'description': 'مقادیر زیر حداکثر ۶۰ ثانیه پس از ذخیره اعمال می‌شوند.',
         }),
+        ('تنظیمات منو', {
+            'fields': ('customer_warranty_menu_enabled',),
+        }),
         ('تنظیمات پیامک', {
             'fields': (
                 'sms_provider',
