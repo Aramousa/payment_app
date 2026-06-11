@@ -395,7 +395,7 @@ should_be_pending_final = (
 | رد سند | `commercial`, `commercial_manager`, `superuser` | هر وضعیتی |
 | ناقص کردن | `commercial`, `commercial_manager`, `finance`, `superuser` | هر وضعیتی |
 | ثبت مالی | `finance`, `finance_manager`, `superuser` | سند رد یا تأیید نهایی نشده باشد |
-| عودت به بازرگانی | `finance`, `finance_manager`, `superuser` | `status=approved` |
+| عودت به بازرگانی | `finance`, `finance_manager`, `superuser` | `status` در `[approved, incomplete, rejected]` (یعنی بازرگانی سند را ثبت/ناقص/رد کرده باشد) |
 | تأیید نهایی | `finance_manager`, تفویض‌شده فعال، `superuser` | `pending_final_approval=True` (هر سه شرط تکمیل) |
 | ویرایش سند (رفع نقص) | `customer` (مالک) | `status=incomplete` |
 

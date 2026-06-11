@@ -1052,7 +1052,7 @@
                                 </div>
                             </div>
 
-                            {% if not payment.can_commercial_act and not payment.can_finance_register and not is_pending_final_mode or not payment.can_commercial_act and not payment.can_finance_register and not payment.can_final_approve %}
+                            {% if not payment.can_commercial_act and not payment.can_finance_register and not payment.finance_choices and not is_pending_final_mode or not payment.can_commercial_act and not payment.can_finance_register and not payment.finance_choices and not payment.can_final_approve %}
                             <div class="tiny" style="color:#94a3b8;">🔒 در این مرحله امکان اقدام برای نقش شما وجود ندارد.</div>
 
                             {% else %}

@@ -1847,8 +1847,12 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         if is_finance_actor:
             if payment.can_finance_register:
                 finance_choices.append(('finance_register', 'ثبت مالی'))
-            # عودت فقط وقتی بازرگانی ثبت کرده (status=approved)
-            if payment.status == PaymentRecord.STATUS_APPROVED:
+            # عودت وقتی بازرگانی سند را به یکی از وضعیت‌های ثبت بازرگانی، ناقص یا رد تغییر داده باشد
+            if payment.status in {
+                PaymentRecord.STATUS_APPROVED,
+                PaymentRecord.STATUS_INCOMPLETE,
+                PaymentRecord.STATUS_REJECTED,
+            }:
                 finance_choices.append(('return_to_commercial', 'عودت به بازرگانی'))
         payment.finance_choices = finance_choices
         payment.is_finance_actor = is_finance_actor

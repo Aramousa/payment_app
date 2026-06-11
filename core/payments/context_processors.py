@@ -217,9 +217,6 @@ def app_navigation(request):
             _nav_item('فاکتور فروش',     'invoices_dashboard',     'invoices',                'main', '🧾'),
             _nav_item('برنامه واریز',    'customer_daily_payments','customer_daily_payments', 'main', '📅'),
             _nav_item('مغایرت‌گیری',      'reconciliation_center',  'reconciliation',          'main', '💬'),
-            _nav_item('درخواست گارانتی', 'warranty_new',           'warranty_new',            'warranty', '🛡️'),
-            _nav_item('درخواست‌های من',   'warranty_my_claims',     'warranty_my',             'warranty', '📋'),
-            _nav_item('پیگیری وضعیت',    'warranty_track',         'warranty_track',          'warranty', '🔍'),
         ])
     else:
         items.append(_nav_item('صف کاری اسناد', 'submit', 'payment_queue', 'documents', '📥'))
