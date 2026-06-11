@@ -1770,6 +1770,11 @@ class ReconciliationThreadForm(forms.ModelForm):
         widget=forms.SelectMultiple(attrs={'size': 6}),
     )
 
+    @staticmethod
+    def _label_from_instance(user):
+        profile = getattr(user, 'profile', None)
+        return profile.display_name if profile else user.username
+
     class Meta:
         model = ReconciliationThread
         fields = ['title', 'customer', 'staff_participants', 'document_type', 'document_id']
@@ -1787,7 +1792,9 @@ class ReconciliationThreadForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         is_customer = bool(user and _role_for_user(user) == 'customer')
         self.fields['staff_participants'].queryset = _reconciliation_staff_queryset(customer_visible_only=is_customer)
+        self.fields['staff_participants'].label_from_instance = self._label_from_instance
         self.fields['customer'].queryset = _reconciliation_customer_queryset()
+        self.fields['customer'].label_from_instance = self._label_from_instance
         if is_customer:
             self.fields.pop('customer', None)
 
