@@ -1312,7 +1312,7 @@ CustomerOrderItemFormSet = inlineformset_factory(
     CustomerOrder,
     CustomerOrderItem,
     form=CustomerOrderItemForm,
-    extra=1,
+    extra=0,
     min_num=1,
     validate_min=True,
     can_delete=True,

@@ -16,7 +16,7 @@
         .button-link.alt { background: #6c757d; }
         .form-grid, .filters, .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; }
         .items-grid { display: grid; gap: 10px; margin-top: 8px; }
-        .item-row { display: grid; grid-template-columns: 2fr 120px 130px 2fr; gap: 8px; align-items: start; background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
+        .item-row { display: grid; grid-template-columns: 2fr 120px 130px 2fr 46px; gap: 8px; align-items: start; background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 10px; }
         label { display: block; margin-bottom: 5px; font-size: 13px; color: #333; }
         input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 9px; font-family: inherit; }
 
@@ -69,26 +69,32 @@
             </div>
             <h4 style="margin-top:16px;">اقلام سفارش</h4>
             {{ item_formset.management_form }}
+            {# قالب خالی برای clone — همیشه مخفی #}
+            <div class="item-row" id="empty-form-template" style="display:none;" aria-hidden="true">
+                {% for field in item_formset.empty_form.visible_fields %}
+                    {% if field.name == 'DELETE' %}
+                        <div class="item-field-wrap" style="display:none;">{{ field }}</div>
+                    {% else %}
+                        <div class="item-field-wrap">
+                            <label>{{ field.label }}</label>
+                            {{ field }}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
             <div class="items-grid" id="items-container">
                 {% for form in item_formset %}
-                    {% if not form.instance.pk and forloop.last and forloop.first %}
-                    {# قالب خالی برای clone — همیشه مخفی #}
-                    <div class="item-row" id="empty-form-template" style="display:none;" aria-hidden="true">
-                        {% for field in form.visible_fields %}
-                            <div class="item-field-wrap">
-                                <label>{{ field.label }}</label>
-                                {{ field }}
-                            </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
                     <div class="item-row item-entry">
                         {% for field in form.visible_fields %}
-                            <div class="item-field-wrap" style="position:relative;">
-                                <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
-                                {{ field }}
-                                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-                            </div>
+                            {% if field.name == 'DELETE' %}
+                                <div class="item-field-wrap" style="display:none;">{{ field }}</div>
+                            {% else %}
+                                <div class="item-field-wrap" style="position:relative;">
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
+                                    {{ field }}
+                                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                                </div>
+                            {% endif %}
                         {% endfor %}
                         <div class="item-field-wrap" style="display:flex;align-items:flex-end;">
                             <button type="button" class="remove-row-btn" style="background:#dc3545;color:#fff;border:none;border-radius:6px;padding:9px 12px;cursor:pointer;font-size:13px;" title="حذف ردیف">✕</button>
