@@ -3174,7 +3174,7 @@ def _user_card_payload(user):
     if counterparty:
         role_label = f'طرف حساب: {counterparty.name}'
     return {
-        'display_name': user.get_full_name().strip() or user.username,
+        'display_name': profile.display_name if profile else (user.get_full_name().strip() or user.username),
         'username': user.username,
         'role_label': role_label,
         'organization': organization or '-',
