@@ -14,6 +14,10 @@ MANAGE="${APP_DIR}/manage.py"
 echo "=== deploy payment_app ==="
 echo "زمان: $(date '+%Y-%m-%d %H:%M:%S')"
 
+# ─── دریافت آخرین تغییرات از مخزن
+echo "▶ دریافت آخرین تغییرات از git..."
+git -C "${APP_DIR}" pull
+
 # ─── نصب/به‌روزرسانی پکیج‌ها (از اینترنت)
 echo "▶ نصب/به‌روزرسانی پکیج‌ها..."
 "${PIP}" install \
