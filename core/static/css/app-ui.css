@@ -262,6 +262,13 @@ h3 {
     width: 100% !important;
 }
 
+/* رفع باگ فایرفاکس: ترکیب table-layout:fixed + width:100% + float:left + direction:rtl
+   باعث می‌شود Gecko عرض جدول روزها را به یک مقدار غیرواقعی (میلیون‌ها پیکسل) محاسبه کند
+   و کل سلول‌های روز از صفحه خارج و نامرئی شوند. کروم با این ترکیب مشکلی ندارد. */
+.datepicker-plot-area .table-days {
+    table-layout: auto !important;
+}
+
 .datepicker-plot-area th,
 .datepicker-plot-area td {
     background: transparent !important;

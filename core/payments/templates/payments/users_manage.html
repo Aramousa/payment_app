@@ -347,6 +347,19 @@
 
     <script>
         $(document).ready(function () {
+            // برای مشتریان، دسترسی مشاهده فاکتور همیشه فعال است و نیازی به تنظیم جداگانه نیست.
+            const roleField = document.getElementById('id_role');
+            const viewInvoicesBox = document.getElementById('id_can_view_invoices');
+            const viewInvoicesField = viewInvoicesBox ? viewInvoicesBox.closest('.field-box') : null;
+            function toggleViewInvoicesField() {
+                if (!roleField || !viewInvoicesField) return;
+                viewInvoicesField.style.display = roleField.value === 'customer' ? 'none' : '';
+            }
+            if (roleField) {
+                roleField.addEventListener('change', toggleViewInvoicesField);
+                toggleViewInvoicesField();
+            }
+
             $('.jalali-date').persianDatepicker({
                 format: 'YYYY/MM/DD',
                 observer: true,

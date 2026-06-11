@@ -36,9 +36,26 @@ def _can_view_invoices_nav(user):
     if not user.is_authenticated:
         return False
     try:
+        # مشتریان همگی دسترسی یکسان به مشاهده فاکتورهای خودشان دارند.
+        if user.profile.role == 'customer':
+            return True
         if user.profile.role in {'sales', 'sales_manager', 'commercial_manager', 'finance_manager'}:
             return True
         return bool(user.profile.can_view_invoices or user.profile.can_upload_invoices)
+    except UserProfile.DoesNotExist:
+        return False
+
+
+ACCESS_DEPARTMENT_MANAGER_ROLES = {'commercial_manager', 'finance_manager', 'sales_manager', 'warranty_manager'}
+
+
+def _can_manage_access_nav(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        return user.profile.role in ACCESS_DEPARTMENT_MANAGER_ROLES
     except UserProfile.DoesNotExist:
         return False
 
@@ -253,6 +270,8 @@ def app_navigation(request):
 
         if user.is_superuser or role == 'sales_manager':
             items.append(_nav_item('تخصیص مشتریان فروش', 'sales_assignments', 'sales_assignments', 'system', '🔗'))
+        if _can_manage_access_nav(user):
+            items.append(_nav_item('مدیریت دسترسی‌ها', 'access_management', 'access_management', 'system', '🔐'))
         if user.is_superuser:
             items.extend([
                 _nav_item('مدیریت کاربران', 'users_manage', 'users', 'system', '👤'),

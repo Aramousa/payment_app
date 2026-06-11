@@ -329,6 +329,23 @@ class PaymentRecord(models.Model):
         STATUS_INCOMPLETE: 'ناقص',
     }
 
+    # ─── دلیل رد فیش/سند — برای دسته‌بندی و جستجوی فیش‌های رد شده ──────────
+    REJECTION_REASON_AMOUNT_MISMATCH = 'amount_mismatch'
+    REJECTION_REASON_INVALID_DOCUMENT = 'invalid_document'
+    REJECTION_REASON_WRONG_ACCOUNT = 'wrong_account'
+    REJECTION_REASON_DUPLICATE = 'duplicate'
+    REJECTION_REASON_DEFECTIVE_DOCUMENT = 'defective_document'
+    REJECTION_REASON_OTHER = 'other'
+
+    REJECTION_REASON_CHOICES = [
+        (REJECTION_REASON_AMOUNT_MISMATCH, 'مغایرت مبلغ'),
+        (REJECTION_REASON_INVALID_DOCUMENT, 'فیش/سند نامعتبر یا ناخوانا'),
+        (REJECTION_REASON_WRONG_ACCOUNT, 'واریز به حساب اشتباه'),
+        (REJECTION_REASON_DUPLICATE, 'تکراری بودن فیش'),
+        (REJECTION_REASON_DEFECTIVE_DOCUMENT, 'مخدوش بودن سند'),
+        (REJECTION_REASON_OTHER, 'سایر'),
+    ]
+
     # ─── فلگ مالی — مستقل از فلگ بازرگانی ──────────────────────────────────
     FINANCE_STATUS_PENDING  = None           # در انتظار ثبت مالی
     FINANCE_STATUS_APPROVED = 'finance_ok'   # ثبت مالی
@@ -388,6 +405,10 @@ class PaymentRecord(models.Model):
     pending_final_approval = models.BooleanField('در انتظار تأیید نهایی', default=False, db_index=True)
     pending_final_approval_since = models.DateTimeField('زمان آماده‌شدن برای تأیید نهایی', null=True, blank=True)
     last_staff_note = models.TextField('آخرین توضیح کارشناس', blank=True)
+    rejection_reason = models.CharField(
+        'دلیل رد', max_length=30,
+        choices=REJECTION_REASON_CHOICES, blank=True, db_index=True,
+    )
     customer_notes = models.TextField('توضیحات مشتری', blank=True, help_text='توضیحات یا نکات مشتری در مورد این واریزی')
     created_at    = models.DateTimeField(auto_now_add=True)
     last_edited_at = models.DateTimeField('آخرین ویرایش', null=True, blank=True)

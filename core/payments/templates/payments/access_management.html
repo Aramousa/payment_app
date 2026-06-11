@@ -1,0 +1,106 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>مدیریت دسترسی‌ها</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f6f7fb; padding: 20px; }
+        .section { max-width: 1180px; margin: 0 auto 18px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .button-link, .cancel-link { border: none; border-radius: 6px; padding: 8px 14px; text-decoration: none; color: #fff; display: inline-block; cursor: pointer; font-family: inherit; }
+        .button-link { background: #1e3a5f; }
+        .cancel-link { background: #6c757d; }
+        input, select { box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 8px 10px; margin: 0; font-family: inherit; font-size: 13px; }
+        .hint-box { background: #eef6ff; border: 1px solid #cfe2ff; color: #124b91; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+        .perm-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin: 1px; }
+        .perm-on { background: #e6f7ec; color: #198754; border: 1px solid #b6e3c6; }
+        .perm-off { background: #f4f5f7; color: #94a3b8; border: 1px solid #e2e8f0; }
+        .status-active { color: #198754; font-weight: 700; }
+        .status-suspended { color: #dc3545; font-weight: 700; }
+        .status-inactive { color: #94a3b8; font-weight: 700; }
+        .edit-link { background: #fd7e14; color: #fff; border-radius: 6px; padding: 6px 10px; text-decoration: none; font-size: 12px; }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+
+    <div class="section">
+        <h2 style="margin-top:0;">🔐 مدیریت دسترسی‌ها</h2>
+        <div class="hint-box">
+            در این صفحه فقط نقش و دسترسی‌های کارکنان (غیر از مشتریان) مدیریت می‌شود.
+            مشتریان همگی به‌صورت یکسان به امکانات پنل خودشان (از جمله مشاهده فاکتور) دسترسی دارند و نیازی به تنظیم جداگانه ندارند.
+            برای ایجاد کاربر جدید یا ویرایش مشخصات کامل، از صفحه «مدیریت کاربران» استفاده کنید.
+        </div>
+
+        <form method="get" class="app-filter-panel">
+            <div class="app-filter-grid">
+                <div>
+                    <label for="userSearch">جستجو</label>
+                    <input id="userSearch" type="search" name="q" value="{{ filters.q }}" placeholder="نام، نام کاربری، موبایل یا مجموعه">
+                </div>
+                <div>
+                    <label for="roleFilter">نقش</label>
+                    <select id="roleFilter" name="role">
+                        <option value="">همه نقش‌ها</option>
+                        {% for val, label in role_choices %}
+                            <option value="{{ val }}" {% if filters.role == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="app-filter-actions">
+                    <button type="submit" class="button-link">اعمال فیلتر</button>
+                    <a href="{% url 'access_management' %}" class="cancel-link">حذف فیلتر</a>
+                </div>
+            </div>
+        </form>
+
+        <table data-table-prefs="access-management-list">
+            <thead>
+                <tr>
+                    <th>ردیف</th>
+                    <th>نام و نام خانوادگی</th>
+                    <th>نام کاربری</th>
+                    <th>نقش</th>
+                    <th>دسترسی‌ها</th>
+                    <th>وضعیت</th>
+                    <th>اقدام</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in users %}
+                    <tr>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ item.id }}</span></td>
+                        <td><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' item.id %}">{{ item.first_name }} {{ item.last_name }}</button></td>
+                        <td dir="ltr">{{ item.username }}</td>
+                        <td>{{ item.profile.get_role_display }}</td>
+                        <td>
+                            <span class="perm-chip {% if item.profile.can_view_invoices %}perm-on{% else %}perm-off{% endif %}">مشاهده فاکتور</span>
+                            <span class="perm-chip {% if item.profile.can_upload_invoices %}perm-on{% else %}perm-off{% endif %}">بارگذاری فاکتور</span>
+                            <span class="perm-chip {% if item.profile.can_edit_payment_details %}perm-on{% else %}perm-off{% endif %}">تکمیل فیش</span>
+                            <span class="perm-chip {% if item.profile.can_access_reconciliation %}perm-on{% else %}perm-off{% endif %}">مغایرت‌گیری</span>
+                        </td>
+                        <td>
+                            {% if item.profile.suspended %}
+                                <span class="status-suspended">معلق</span>
+                            {% elif not item.is_active %}
+                                <span class="status-inactive">غیرفعال</span>
+                            {% else %}
+                                <span class="status-active">فعال</span>
+                            {% endif %}
+                        </td>
+                        <td><a href="{% url 'access_management_edit' item.id %}" class="edit-link">ویرایش دسترسی</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7">کاربری برای مدیریت یافت نشد.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
+    </div>
+
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

@@ -33,7 +33,7 @@ from django_ratelimit.decorators import ratelimit
 from axes.helpers import get_client_ip_address
 from zoneinfo import ZoneInfo
 
-from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, UserAccountManagementForm
+from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
 from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 import os
@@ -131,6 +131,9 @@ def _can_view_invoices(user):
         return True
     try:
         role = user.profile.role
+        # مشتریان همگی دسترسی یکسان به مشاهده فاکتورهای خودشان دارند.
+        if role == 'customer':
+            return True
         if role in {'sales', 'sales_manager', 'commercial_manager', 'finance_manager'}:
             return True
         return user.profile.can_view_invoices
@@ -355,6 +358,58 @@ def _can_staff_access_customer(user, customer_id):
 
 def _can_manage_users(user):
     return bool(user and user.is_authenticated and user.is_superuser)
+
+
+# نگاشت نقش مدیر هر بخش به نقش کارکنان همان بخش — برای «مدیریت دسترسی‌ها»
+ACCESS_DEPARTMENT_MANAGER_ROLES = {
+    'commercial_manager': 'commercial',
+    'finance_manager':    'finance',
+    'sales_manager':      'sales',
+    'warranty_manager':   'warranty',
+}
+
+
+def _can_manage_access(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) in ACCESS_DEPARTMENT_MANAGER_ROLES
+
+
+def _access_manageable_users(user, query='', role=''):
+    qs = (
+        User.objects.select_related('profile')
+        .filter(is_superuser=False)
+        .exclude(profile__role='customer')
+        .exclude(counterparty_account__isnull=False)
+        .order_by('profile__role', 'first_name', 'last_name', 'username')
+    )
+    if not user.is_superuser:
+        dept_role = ACCESS_DEPARTMENT_MANAGER_ROLES.get(_user_role(user))
+        if not dept_role:
+            return qs.none()
+        qs = qs.filter(profile__role=dept_role)
+    if query:
+        qs = qs.filter(
+            Q(username__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(profile__mobile__icontains=query) |
+            Q(profile__organization__icontains=query)
+        )
+    if role:
+        qs = qs.filter(profile__role=role)
+    return qs
+
+
+def _can_manage_access_for_target(user, target):
+    if not _can_manage_access(user):
+        return False
+    if user.is_superuser:
+        return not target.is_superuser and target.profile.role != 'customer' and not getattr(target, 'counterparty_account', None)
+    dept_role = ACCESS_DEPARTMENT_MANAGER_ROLES.get(_user_role(user))
+    return bool(dept_role) and target.profile.role == dept_role
 
 
 def _can_edit_payment_details(user):
@@ -1845,6 +1900,7 @@ def _apply_record_filters(records, request, is_staff_user):
         'cp_status':       (request.GET.get('cp_status') or '').strip(),
         'serial':          (request.GET.get('serial') or '').strip(),
         'accounting_code': (request.GET.get('accounting_code') or '').strip(),
+        'rejection_reason': (request.GET.get('rejection_reason') or '').strip(),
     }
 
     if is_staff_user:
@@ -1940,6 +1996,11 @@ def _apply_record_filters(records, request, is_staff_user):
         records = records.filter(counterparty_status=PaymentRecord.CP_STATUS_REJECTED)
     elif cp_f == 'has_cp':
         records = records.filter(counterparty__isnull=False)
+
+    # فیلتر دلیل رد فیش/سند
+    valid_rejection_reasons = {choice[0] for choice in PaymentRecord.REJECTION_REASON_CHOICES}
+    if filters['rejection_reason'] in valid_rejection_reasons:
+        records = records.filter(rejection_reason=filters['rejection_reason'])
 
     return records, filters
 
@@ -2906,6 +2967,7 @@ def create_payment(request):
         'cp_returned_count': PaymentRecord.objects.filter(
             counterparty_status=PaymentRecord.CP_STATUS_RETURNED
         ).count() if is_staff_user and _user_role(request.user) in {'commercial', 'commercial_manager'} else 0,
+        'rejection_reason_choices': PaymentRecord.REJECTION_REASON_CHOICES,
     })
 
 
@@ -2958,6 +3020,7 @@ def payment_history(request):
         'customer_debt': None,
         'active_daily_assignment': None,
         'expired_daily_assignment': None,
+        'rejection_reason_choices': PaymentRecord.REJECTION_REASON_CHOICES,
     })
 
 
@@ -3028,6 +3091,7 @@ def pending_final_approval_queue(request):
             _can_final_approve(staff_role, PaymentRecord(), is_system_admin, user=request.user)
         ),
         'cp_returned_count': 0,
+        'rejection_reason_choices': PaymentRecord.REJECTION_REASON_CHOICES,
     })
 
 
@@ -3545,7 +3609,9 @@ def staff_update_status(request, payment_id):
 
     form = StaffStatusUpdateForm(request.POST)
     if not form.is_valid():
-        messages.error(request, 'اطلاعات ارسالی معتبر نیست.')
+        for field_errors in form.errors.values():
+            for error in field_errors:
+                messages.error(request, error)
         return redirect(redirect_target)
 
     target_status = form.cleaned_data['status']
@@ -3555,13 +3621,14 @@ def staff_update_status(request, payment_id):
         return redirect(redirect_target)
 
     note = (form.cleaned_data['note'] or '').strip()
-    if target_status in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE} and not note:
-        messages.error(request, 'برای وضعیت «رد شده» یا «ناقص»، ثبت توضیح الزامی است.')
+    if target_status == PaymentRecord.STATUS_INCOMPLETE and not note:
+        messages.error(request, 'برای وضعیت «ناقص»، ثبت توضیح الزامی است.')
         return redirect(redirect_target)
 
     from_status = payment.status
     payment.status = target_status
     payment.last_staff_note = note
+    payment.rejection_reason = form.cleaned_data['rejection_reason'] if target_status == PaymentRecord.STATUS_REJECTED else ''
     department_role = _department_role(staff_role)
 
     # Finance can hard-lock records on terminal decisions.
@@ -3578,7 +3645,7 @@ def staff_update_status(request, payment_id):
     if selected_counterparty and department_role in {'commercial', 'staff'}:
         payment.counterparty = selected_counterparty
 
-    update_fields = ['status', 'last_staff_note', 'counterparty', 'is_locked']
+    update_fields = ['status', 'last_staff_note', 'rejection_reason', 'counterparty', 'is_locked']
 
     # سند رد شده: pending_final_approval پاک می‌شود تا از صف تأیید خارج شود
     if target_status == PaymentRecord.STATUS_REJECTED:
@@ -4176,6 +4243,64 @@ def user_edit(request, user_id):
         'can_manage_user_accounts': True,
         'can_review_profile_changes': _can_review_profile_change(request.user),
         'pending_profile_changes': [],
+    })
+
+
+@login_required
+def access_management(request):
+    if not _can_manage_access(request.user):
+        return HttpResponseForbidden('شما دسترسی مدیریت دسترسی‌ها را ندارید.')
+
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'role': (request.GET.get('role') or '').strip(),
+    }
+    users_source = _access_manageable_users(request.user, query=filters['q'], role=filters['role'])
+    users_page = _paginate_queryset(request, users_source, per_page=10, page_param='page')
+    page_base_query = _build_query_string(request, remove_keys=['page'])
+
+    if request.user.is_superuser:
+        role_choices = UserAccessManagementForm.ROLE_CHOICES
+    else:
+        dept_role = ACCESS_DEPARTMENT_MANAGER_ROLES.get(_user_role(request.user))
+        role_choices = [c for c in UserAccessManagementForm.ROLE_CHOICES if c[0] == dept_role]
+
+    return render(request, 'payments/access_management.html', {
+        'users': users_page,
+        'page_obj': users_page,
+        'page_base_query': page_base_query,
+        'filters': filters,
+        'role_choices': role_choices,
+        'allow_role_change': request.user.is_superuser,
+    })
+
+
+@login_required
+def access_management_edit(request, user_id):
+    target = get_object_or_404(User.objects.select_related('profile'), id=user_id)
+    if not _can_manage_access_for_target(request.user, target):
+        return HttpResponseForbidden('شما دسترسی مدیریت این کاربر را ندارید.')
+
+    allow_role_change = request.user.is_superuser
+
+    if request.method == 'POST':
+        form = UserAccessManagementForm(request.POST, target=target, allow_role_change=allow_role_change)
+        if form.is_valid():
+            form.save()
+            _log_system_activity(
+                request.user,
+                target,
+                SystemActivityLog.ACTION_USER_UPDATED,
+                'دسترسی‌های کاربر بروزرسانی شد.',
+            )
+            messages.success(request, 'دسترسی‌های کاربر با موفقیت بروزرسانی شد.')
+            return redirect('access_management')
+    else:
+        form = UserAccessManagementForm(target=target, allow_role_change=allow_role_change)
+
+    return render(request, 'payments/access_management_edit.html', {
+        'form': form,
+        'target': target,
     })
 
 

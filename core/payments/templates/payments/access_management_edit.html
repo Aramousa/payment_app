@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>ویرایش دسترسی کاربر</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f6f7fb; padding: 20px; }
+        .section { max-width: 640px; margin: 0 auto 18px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .button-link, .cancel-link, .submit-btn { border: none; border-radius: 6px; padding: 8px 14px; text-decoration: none; color: #fff; display: inline-block; cursor: pointer; font-family: inherit; }
+        .button-link, .cancel-link { background: #6c757d; }
+        .submit-btn { background: #198754; }
+        select { width: 100%; box-sizing: border-box; border: 1px solid #ccd3dd; border-radius: 6px; padding: 8px 10px; font-family: inherit; font-size: 13px; }
+        .field-box { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .field-box.checkbox-field {
+            align-items: center;
+            background: #fff8e6;
+            border: 1px solid #f2d58c;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            min-height: 42px;
+            padding: 9px 10px;
+        }
+        .field-box.checkbox-field label { color: #704b00; cursor: pointer; font-size: 13px; font-weight: 700; margin: 0; }
+        input[type="checkbox"] { width: 16px !important; height: 16px; margin: 0 !important; flex: 0 0 auto; cursor: pointer; }
+        label { font-size: 13px; color: #243447; font-weight: 600; }
+        .field-error { color: #c62828; font-size: 11px; }
+        .target-card { background: #eef2f8; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+
+    <div class="section">
+        <h2 style="margin-top:0;">🔐 ویرایش دسترسی کاربر</h2>
+        <div class="target-card">
+            <strong>{{ target.first_name }} {{ target.last_name }}</strong>
+            <span dir="ltr" style="color:#64748b;">({{ target.username }})</span> —
+            {{ target.profile.get_role_display }}
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+                {% if field.field.widget.input_type == 'checkbox' %}
+                    <div class="field-box checkbox-field">
+                        {{ field }}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                    </div>
+                {% else %}
+                    <div class="field-box">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:14px;">
+                <a href="{% url 'access_management' %}" class="cancel-link">انصراف</a>
+                <button type="submit" class="submit-btn">ذخیره دسترسی‌ها</button>
+            </div>
+            {% for error in form.non_field_errors %}<div class="field-error" style="margin-top:10px;">{{ error }}</div>{% endfor %}
+        </form>
+    </div>
+
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>

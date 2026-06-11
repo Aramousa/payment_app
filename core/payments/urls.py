@@ -88,6 +88,8 @@ from .views import (
     user_business_card,
     user_edit,
     users_manage,
+    access_management,
+    access_management_edit,
 )
 
 urlpatterns = [
@@ -160,6 +162,8 @@ urlpatterns = [
     path('users/', users_manage, name='users_manage'),
     path('users/<int:user_id>/card/', user_business_card, name='user_business_card'),
     path('users/<int:user_id>/edit/', user_edit, name='user_edit'),
+    path('access-management/', access_management, name='access_management'),
+    path('access-management/<int:user_id>/edit/', access_management_edit, name='access_management_edit'),
     path('counterparties/', counterparties_manage, name='counterparties_manage'),
     path('counterparties/manage/', counterparty_manage_list, name='counterparty_manage_list'),
     path('counterparties/manage/new/', counterparty_manage_edit, name='counterparty_manage_create'),

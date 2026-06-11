@@ -739,6 +739,11 @@ class StaffStatusUpdateForm(forms.Form):
         choices=PaymentRecord.STATUS_CHOICES,
         label='وضعیت جدید',
     )
+    rejection_reason = forms.ChoiceField(
+        choices=[('', '---------')] + list(PaymentRecord.REJECTION_REASON_CHOICES),
+        required=False,
+        label='دلیل رد',
+    )
     note = forms.CharField(
         required=False,
         label='توضیح',
@@ -750,6 +755,20 @@ class StaffStatusUpdateForm(forms.Form):
         label='طرف حساب',
         empty_label='بدون طرف حساب',
     )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get('status')
+        rejection_reason = cleaned_data.get('rejection_reason')
+        note = (cleaned_data.get('note') or '').strip()
+
+        if status == PaymentRecord.STATUS_REJECTED:
+            if not rejection_reason:
+                self.add_error('rejection_reason', 'انتخاب دلیل رد الزامی است.')
+            elif rejection_reason == PaymentRecord.REJECTION_REASON_OTHER and not note:
+                self.add_error('note', 'برای دلیل «سایر»، نوشتن توضیح الزامی است.')
+
+        return cleaned_data
 
 
 class DailyPaymentPlanForm(forms.ModelForm):
@@ -1654,6 +1673,66 @@ class UserAccountManagementForm(forms.Form):
             profile.avatar_image = self.cleaned_data['avatar_image']
         profile.save()
         return instance
+
+
+class UserAccessManagementForm(forms.Form):
+    """فرم سبک مخصوص «مدیریت دسترسی‌ها» — فقط نقش (در صورت اجازه) و فلگ‌های دسترسی/وضعیت."""
+
+    ROLE_CHOICES = (
+        ('commercial',        '🏬 واحد بازرگانی'),
+        ('commercial_manager','🏬 مدیر بازرگانی'),
+        ('finance',           '💰 واحد مالی'),
+        ('finance_manager',   '💰 مدیر مالی'),
+        ('sales',             '📊 فروش'),
+        ('sales_manager',     '📊 مدیر فروش'),
+        ('data_entry',        '✏️ تکمیل اطلاعات فیش'),
+        ('staff',             '🔧 کارمند'),
+        ('warranty',          '🛡️ کارشناس گارانتی'),
+        ('warranty_manager',  '🛡️ مدیر گارانتی'),
+    )
+
+    role = forms.ChoiceField(label='نقش', choices=ROLE_CHOICES, required=True)
+    can_view_invoices = forms.BooleanField(label='دسترسی مشاهده فاکتورها', required=False)
+    can_upload_invoices = forms.BooleanField(label='دسترسی بارگذاری فاکتورها', required=False)
+    can_edit_payment_details = forms.BooleanField(label='دسترسی تکمیل اطلاعات فیش‌ها', required=False)
+    can_access_reconciliation = forms.BooleanField(label='دسترسی مغایرت‌گیری', required=False)
+    is_active = forms.BooleanField(label='فعال', required=False)
+    suspended = forms.BooleanField(label='معلق', required=False)
+
+    def __init__(self, *args, **kwargs):
+        self.target = kwargs.pop('target')
+        self.allow_role_change = kwargs.pop('allow_role_change', False)
+        super().__init__(*args, **kwargs)
+
+        if not self.allow_role_change:
+            self.fields.pop('role')
+
+        if not self.is_bound:
+            profile = self.target.profile
+            self.initial.update({
+                'role': profile.role,
+                'can_view_invoices': profile.can_view_invoices,
+                'can_upload_invoices': profile.can_upload_invoices,
+                'can_edit_payment_details': profile.can_edit_payment_details,
+                'can_access_reconciliation': profile.can_access_reconciliation,
+                'is_active': self.target.is_active,
+                'suspended': profile.suspended,
+            })
+
+    def save(self):
+        profile = self.target.profile
+        if 'role' in self.cleaned_data:
+            profile.role = self.cleaned_data['role']
+            self.target.is_staff = self.target.is_superuser or profile.role in STAFF_ROLES or profile.role in {'warranty', 'warranty_manager'}
+        profile.can_view_invoices = self.cleaned_data.get('can_view_invoices', False)
+        profile.can_upload_invoices = self.cleaned_data.get('can_upload_invoices', False)
+        profile.can_edit_payment_details = self.cleaned_data.get('can_edit_payment_details', False)
+        profile.can_access_reconciliation = self.cleaned_data.get('can_access_reconciliation', False)
+        profile.suspended = self.cleaned_data.get('suspended', False)
+        self.target.is_active = self.cleaned_data.get('is_active', True)
+        self.target.save()
+        profile.save()
+        return self.target
 
 
 def _reconciliation_staff_queryset(customer_visible_only=False):
