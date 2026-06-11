@@ -96,8 +96,9 @@
                                 </div>
                             {% endif %}
                         {% endfor %}
-                        <div class="item-field-wrap" style="display:flex;align-items:flex-end;">
-                            <button type="button" class="remove-row-btn" style="background:#dc3545;color:#fff;border:none;border-radius:6px;padding:9px 12px;cursor:pointer;font-size:13px;" title="حذف ردیف">✕</button>
+                        <div class="item-field-wrap" style="display:flex;flex-direction:column;">
+                            <label style="visibility:hidden;">حذف</label>
+                            <button type="button" class="remove-row-btn" style="background:#dc3545;color:#fff;border:none;border-radius:6px;padding:9px 12px;cursor:pointer;font-size:13px;width:100%;" title="حذف ردیف">✕</button>
                         </div>
                     </div>
                 {% endfor %}
@@ -255,8 +256,8 @@
             // اضافه کردن دکمه حذف
             const delWrap = document.createElement('div');
             delWrap.className = 'item-field-wrap';
-            delWrap.style.cssText = 'display:flex;align-items:flex-end;';
-            delWrap.innerHTML = '<button type="button" class="remove-row-btn" style="background:#dc3545;color:#fff;border:none;border-radius:6px;padding:9px 12px;cursor:pointer;font-size:13px;" title="حذف ردیف">✕</button>';
+            delWrap.style.cssText = 'display:flex;flex-direction:column;';
+            delWrap.innerHTML = '<label style="visibility:hidden;">حذف</label><button type="button" class="remove-row-btn" style="background:#dc3545;color:#fff;border:none;border-radius:6px;padding:9px 12px;cursor:pointer;font-size:13px;width:100%;" title="حذف ردیف">✕</button>';
             newRow.appendChild(delWrap);
 
             updateIndices(newRow, idx);
