@@ -10,7 +10,7 @@ import json
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import DatabaseError, IntegrityError
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -733,7 +733,10 @@ def _can_delegate_final_approval(role, is_system_admin=False):
 
 
 def _records_for_user(user):
-    qs = PaymentRecord.objects.select_related('counterparty', 'user').prefetch_related('receipts', 'activity_logs')
+    qs = PaymentRecord.objects.select_related('counterparty', 'user', 'user__profile').prefetch_related(
+        'receipts',
+        Prefetch('activity_logs', queryset=PaymentActivityLog.objects.select_related('actor', 'actor__profile')),
+    )
     if _is_staff_user(user):
         return qs.order_by('-created_at', '-id')
     return qs.filter(user=user).order_by('-created_at', '-id')
@@ -1811,7 +1814,7 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
                     'text': _log_text(log),
                     'note': log.note,
                 }
-                for log in payment.activity_logs.all()[:5]
+                for log in list(payment.activity_logs.all())[:5]
             ]
         else:
             payment.timeline_lines = _customer_visible_logs(payment.activity_logs.all())[:5]
@@ -2925,14 +2928,14 @@ def create_payment(request):
     records = _active_payment_records_for_user(request.user)
     records, active_filters = _apply_record_filters(records, request, is_staff_user)
     records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
-    records = _enrich_records(
-        records,
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_obj.object_list = _enrich_records(
+        page_obj.object_list,
         staff_role=staff_role,
         is_system_admin=is_system_admin,
         can_edit_payment_details=_can_edit_payment_details(request.user),
         acting_user=request.user,
     )
-    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
@@ -2985,14 +2988,14 @@ def payment_history(request):
     records = _history_payment_records_for_user(request.user)
     records, active_filters = _apply_record_filters(records, request, True)
     records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
-    records = _enrich_records(
-        records,
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_obj.object_list = _enrich_records(
+        page_obj.object_list,
         staff_role=staff_role,
         is_system_admin=is_system_admin,
         can_edit_payment_details=_can_edit_payment_details(request.user),
         acting_user=request.user,
     )
-    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
@@ -3040,20 +3043,23 @@ def pending_final_approval_queue(request):
     records = (
         PaymentRecord.objects
         .filter(pending_final_approval=True)
-        .select_related('counterparty', 'user')
-        .prefetch_related('receipts', 'activity_logs')
+        .select_related('counterparty', 'user', 'user__profile')
+        .prefetch_related(
+            'receipts',
+            Prefetch('activity_logs', queryset=PaymentActivityLog.objects.select_related('actor', 'actor__profile')),
+        )
         .order_by('pending_final_approval_since', 'id')
     )
     records, active_filters = _apply_record_filters(records, request, True)
     records, current_sort, current_sort_dir, sort_base_query = _apply_record_sort(records, request)
-    records = _enrich_records(
-        records,
+    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
+    page_obj.object_list = _enrich_records(
+        page_obj.object_list,
         staff_role=staff_role,
         is_system_admin=is_system_admin,
         can_edit_payment_details=_can_edit_payment_details(request.user),
         acting_user=request.user,
     )
-    page_obj = _paginate_queryset(request, records, per_page=10, page_param='page')
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 

@@ -619,6 +619,13 @@ class UserProfile(models.Model):
         return self.user.username
 
     @property
+    def display_name(self):
+        full_name = f"{self.user.first_name} {self.user.last_name}".strip()
+        if not full_name:
+            full_name = f"{self.first_name} {self.last_name}".strip()
+        return full_name or self.user.username
+
+    @property
     def sms_number(self):
         """شماره برای ارسال پیامک — موبایل اول، در غیر این‌صورت شماره تلفن."""
         if self.delegate_sms_to_representative and self.representative_mobile:

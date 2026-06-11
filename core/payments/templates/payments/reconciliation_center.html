@@ -119,7 +119,7 @@
                             <span class="thread-title">{{ thread.title }}</span>
                             {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
                         </span>
-                        <span class="thread-meta">{{ thread.customer.get_full_name|default:thread.customer.username }}</span>
+                        <span class="thread-meta">{{ thread.customer.profile.display_name }}</span>
                         {% if thread.document_label %}
                             <span class="thread-doc">{{ thread.document_label }}</span>
                         {% endif %}
@@ -143,7 +143,7 @@
                     <div class="chat-title">
                         <strong>{{ active_thread.title }}</strong>
                         <span class="chat-subtitle">
-                            مشتری: {{ active_thread.customer.get_full_name|default:active_thread.customer.username }}
+                            مشتری: {{ active_thread.customer.profile.display_name }}
                             {% if active_thread.document_label %} | مرجع: {{ active_thread.document_label }}{% endif %}
                         </span>
                     </div>
@@ -165,7 +165,7 @@
                             {% if message.sender %}
                                 <span class="msg-avatar app-user-avatar {{ message.sender.profile.avatar_class }}">
                                     {% if message.sender.profile.avatar_url %}
-                                        <img src="{{ message.sender.profile.avatar_url }}" alt="{{ message.sender.get_full_name|default:message.sender.username }}">
+                                        <img src="{{ message.sender.profile.avatar_url }}" alt="{{ message.sender.profile.display_name }}">
                                     {% else %}
                                         {{ message.sender.profile.avatar_icon }}
                                     {% endif %}
@@ -174,7 +174,7 @@
                             <div class="msg-bubble">
                                 {% if message.sender %}
                                     <button class="msg-author" type="button" data-user-card-url="{% url 'user_business_card' message.sender.id %}">
-                                        {{ message.sender.get_full_name|default:message.sender.username }}
+                                        {{ message.sender.profile.display_name }}
                                     </button>
                                 {% else %}
                                     <div class="msg-author">کاربر حذف‌شده</div>
