@@ -1826,14 +1826,17 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             if code in reached
         ]
         if staff_role:
-            payment.timeline_lines = [
+            raw_lines = [
                 {
                     'time': _format_jalali_datetime(log.created_at),
                     'text': _log_text(log),
                     'note': log.note,
+                    'action': log.action,
+                    'actor_id': log.actor_id,
                 }
-                for log in list(payment.activity_logs.all())[:5]
+                for log in list(payment.activity_logs.all()[:20])
             ]
+            payment.timeline_lines = _group_consecutive_views(raw_lines)[:5]
         else:
             payment.timeline_lines = _customer_visible_logs(payment.activity_logs.all())[:5]
         payment.staff_can_act = _can_staff_act_on_payment(
