@@ -134,30 +134,8 @@
                     {% endif %}
                 </div>
             </form>
-            <div class="thread-list">
-                {% for thread in threads %}
-                    <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}{% if thread.status == 'closed' %} closed{% endif %}" href="{% querystring thread=thread.id %}">
-                        <span class="thread-title-row">
-                            <span class="thread-title">{{ thread.title }}</span>
-                            {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
-                        </span>
-                        <span class="thread-meta">{{ thread.customer.profile.display_name }}</span>
-                        {% if thread.document_label %}
-                            <span class="thread-doc">{{ thread.document_label }}</span>
-                        {% endif %}
-                        {% if thread.last_message %}
-                            <span class="thread-meta">{{ thread.last_message.body|truncatechars:58 }}</span>
-                        {% endif %}
-                    </a>
-                {% empty %}
-                    {% if thread_tab == 'by_customer' and not selected_customer_id %}
-                        <div class="empty-chat">برای نمایش گفتگوها، یک مشتری را از بالا انتخاب کنید.</div>
-                    {% elif thread_filters.q or thread_filters.status or thread_filters.document_type %}
-                        <div class="empty-chat">نتیجه‌ای مطابق با جستجوی شما یافت نشد.</div>
-                    {% else %}
-                        <div class="empty-chat">هنوز گفتگویی ثبت نشده است.</div>
-                    {% endif %}
-                {% endfor %}
+            <div class="thread-list" data-thread-list>
+                {% include 'payments/partials/_reconciliation_thread_list.html' %}
             </div>
         </aside>
 
@@ -182,48 +160,19 @@
                 {% endif %}
             </div>
 
-            <div class="chat-feed">
+            {% with last_message=active_messages|last %}
+            <div class="chat-feed" {% if active_thread %}data-thread-id="{{ active_thread.id }}" data-last-message-id="{{ last_message.id|default:0 }}"{% endif %}>
                 {% if active_thread %}
                     {% for message in active_messages %}
-                        <article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}">
-                            {% if message.sender %}
-                                <span class="msg-avatar app-user-avatar {{ message.sender.profile.avatar_class }}">
-                                    {% if message.sender.profile.avatar_url %}
-                                        <img src="{{ message.sender.profile.avatar_url }}" alt="{{ message.sender.profile.display_name }}">
-                                    {% else %}
-                                        {{ message.sender.profile.avatar_icon }}
-                                    {% endif %}
-                                </span>
-                            {% endif %}
-                            <div class="msg-bubble">
-                                {% if message.sender %}
-                                    <button class="msg-author" type="button" data-user-card-url="{% url 'user_business_card' message.sender.id %}">
-                                        {{ message.sender.profile.display_name }}
-                                    </button>
-                                {% else %}
-                                    <div class="msg-author">کاربر حذف‌شده</div>
-                                {% endif %}
-                                {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
-                                {% if message.attachment %}
-                                    <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">📎 {{ message.attachment_display_name|truncatechars:42 }}</a>
-                                {% endif %}
-                                {% if message.document_label %}
-                                    {% if message.document_url %}
-                                        <a class="doc-link" href="{{ message.document_url }}">{{ message.document_label }}</a>
-                                    {% else %}
-                                        <span class="doc-link">{{ message.document_label }}</span>
-                                    {% endif %}
-                                {% endif %}
-                                <div class="msg-time">{{ message.created_at|date:"Y/m/d H:i" }}</div>
-                            </div>
-                        </article>
+                        {% include 'payments/partials/_reconciliation_message.html' %}
                     {% empty %}
-                        <div class="empty-chat">اولین پیام این گفتگو را ارسال کنید.</div>
+                        <div class="empty-chat" data-empty-chat>اولین پیام این گفتگو را ارسال کنید.</div>
                     {% endfor %}
                 {% else %}
                     <div class="empty-chat">یک گفتگو را انتخاب کنید یا پرونده جدید بسازید.</div>
                 {% endif %}
             </div>
+            {% endwith %}
 
             {% if active_thread %}
                 {% if active_thread.status == 'closed' %}
@@ -333,6 +282,35 @@
                 }
             });
         }
+
+        // به‌روزرسانی خودکار: پیام‌های جدید گفتگو و فهرست گفتگوها بدون نیاز به رفرش
+        var threadListEl = document.querySelector('[data-thread-list]');
+        var pollParams = new URLSearchParams(window.location.search);
+        function pollReconciliation() {
+            var params = new URLSearchParams(pollParams);
+            if (feed && feed.dataset.threadId) {
+                params.set('thread', feed.dataset.threadId);
+                params.set('after', feed.dataset.lastMessageId || '0');
+            }
+            fetch('{% url "reconciliation_poll" %}?' + params.toString(), { credentials: 'same-origin' })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (data) {
+                    if (!data) return;
+                    if (feed && data.messages_html) {
+                        var emptyEl = feed.querySelector('[data-empty-chat]');
+                        if (emptyEl) emptyEl.remove();
+                        var nearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 80;
+                        feed.insertAdjacentHTML('beforeend', data.messages_html);
+                        feed.dataset.lastMessageId = data.last_message_id;
+                        if (nearBottom) feed.scrollTop = feed.scrollHeight;
+                    }
+                    if (threadListEl && typeof data.threads_html === 'string') {
+                        threadListEl.innerHTML = data.threads_html;
+                    }
+                })
+                .catch(function () { /* silent */ });
+        }
+        setInterval(pollReconciliation, 8000);
     })();
 </script>
 </body>

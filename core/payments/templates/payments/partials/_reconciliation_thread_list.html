@@ -1,0 +1,23 @@
+{% for thread in threads %}
+    <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}{% if thread.status == 'closed' %} closed{% endif %}" href="{% querystring thread=thread.id %}">
+        <span class="thread-title-row">
+            <span class="thread-title">{{ thread.title }}</span>
+            {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
+        </span>
+        <span class="thread-meta">{{ thread.customer.profile.display_name }}</span>
+        {% if thread.document_label %}
+            <span class="thread-doc">{{ thread.document_label }}</span>
+        {% endif %}
+        {% if thread.last_message %}
+            <span class="thread-meta">{{ thread.last_message.body|truncatechars:58 }}</span>
+        {% endif %}
+    </a>
+{% empty %}
+    {% if thread_tab == 'by_customer' and not selected_customer_id %}
+        <div class="empty-chat">برای نمایش گفتگوها، یک مشتری را از بالا انتخاب کنید.</div>
+    {% elif thread_filters.q or thread_filters.status or thread_filters.document_type %}
+        <div class="empty-chat">نتیجه‌ای مطابق با جستجوی شما یافت نشد.</div>
+    {% else %}
+        <div class="empty-chat">هنوز گفتگویی ثبت نشده است.</div>
+    {% endif %}
+{% endfor %}

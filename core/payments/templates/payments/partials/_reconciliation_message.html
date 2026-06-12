@@ -1,0 +1,32 @@
+<article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}" data-message-id="{{ message.id }}">
+    {% if message.sender %}
+        <span class="msg-avatar app-user-avatar {{ message.sender.profile.avatar_class }}">
+            {% if message.sender.profile.avatar_url %}
+                <img src="{{ message.sender.profile.avatar_url }}" alt="{{ message.sender.profile.display_name }}">
+            {% else %}
+                {{ message.sender.profile.avatar_icon }}
+            {% endif %}
+        </span>
+    {% endif %}
+    <div class="msg-bubble">
+        {% if message.sender %}
+            <button class="msg-author" type="button" data-user-card-url="{% url 'user_business_card' message.sender.id %}">
+                {{ message.sender.profile.display_name }}
+            </button>
+        {% else %}
+            <div class="msg-author">کاربر حذف‌شده</div>
+        {% endif %}
+        {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
+        {% if message.attachment %}
+            <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">📎 {{ message.attachment_display_name|truncatechars:42 }}</a>
+        {% endif %}
+        {% if message.document_label %}
+            {% if message.document_url %}
+                <a class="doc-link" href="{{ message.document_url }}">{{ message.document_label }}</a>
+            {% else %}
+                <span class="doc-link">{{ message.document_label }}</span>
+            {% endif %}
+        {% endif %}
+        <div class="msg-time">{{ message.created_at|date:"Y/m/d H:i" }}</div>
+    </div>
+</article>

@@ -13,6 +13,7 @@ from django.db import DatabaseError, IntegrityError
 from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -4119,6 +4120,73 @@ def reconciliation_center(request):
         'thread_tab': thread_tab,
         'customer_options': customer_options,
         'selected_customer_id': selected_customer_id,
+    })
+
+
+@login_required
+def reconciliation_poll(request):
+    """به‌روزرسانی لحظه‌ای: پیام‌های جدید گفتگوی فعال + فهرست گفتگوها بدون نیاز به رفرش صفحه."""
+    if not _can_access_reconciliation(request.user):
+        return HttpResponseForbidden('شما دسترسی مغایرت‌گیری ندارید.')
+
+    threads_qs = _reconciliation_threads_for_user(request.user)
+    is_customer_user = _user_role(request.user) == 'customer'
+
+    thread_tab = request.GET.get('tab') if request.GET.get('tab') in {'all', 'by_customer'} else 'all'
+    selected_customer_id = request.GET.get('customer', '').strip()
+    if thread_tab == 'by_customer' and not is_customer_user:
+        if selected_customer_id:
+            threads_qs = threads_qs.filter(customer_id=selected_customer_id)
+        else:
+            threads_qs = threads_qs.none()
+    else:
+        thread_tab = 'all'
+        selected_customer_id = ''
+
+    active_thread = None
+    selected_id = request.GET.get('thread')
+    if selected_id:
+        active_thread = threads_qs.filter(id=selected_id).first()
+
+    filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
+    thread_rows = list(filtered_threads_qs[:80])
+    for thread in thread_rows:
+        thread.document_url = _reconciliation_document_url(thread.document_type, thread.document_id, thread.id)
+        thread.last_message = thread.messages.last()
+
+    messages_html = ''
+    last_message_id = 0
+    if active_thread:
+        after_id = int(request.GET.get('after') or 0)
+        _mark_reconciliation_thread_read(active_thread, request.user)
+        new_messages = list(
+            active_thread.messages
+            .select_related('sender', 'sender__profile')
+            .filter(id__gt=after_id)
+        )
+        for message in new_messages:
+            message.document_url = _reconciliation_document_url(message.document_type, message.document_id, active_thread.id)
+        if new_messages:
+            last_message_id = new_messages[-1].id
+            messages_html = ''.join(
+                render_to_string('payments/partials/_reconciliation_message.html', {'message': message}, request=request)
+                for message in new_messages
+            )
+        else:
+            last_message_id = after_id
+
+    threads_html = render_to_string('payments/partials/_reconciliation_thread_list.html', {
+        'threads': thread_rows,
+        'active_thread': active_thread,
+        'thread_tab': thread_tab,
+        'selected_customer_id': selected_customer_id,
+        'thread_filters': thread_filters,
+    }, request=request)
+
+    return JsonResponse({
+        'messages_html': messages_html,
+        'last_message_id': last_message_id,
+        'threads_html': threads_html,
     })
 
 
