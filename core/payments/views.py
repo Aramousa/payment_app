@@ -3999,6 +3999,27 @@ def reconciliation_center(request):
         return HttpResponseForbidden('شما دسترسی مغایرت‌گیری ندارید.')
 
     threads_qs = _reconciliation_threads_for_user(request.user)
+    is_customer_user = _user_role(request.user) == 'customer'
+
+    customer_options = []
+    if not is_customer_user:
+        customer_ids = threads_qs.order_by().values_list('customer_id', flat=True).distinct()
+        customer_options = [
+            (customer.id, customer.profile.display_name)
+            for customer in User.objects.filter(id__in=customer_ids).select_related('profile').order_by('first_name', 'last_name', 'username')
+        ]
+
+    thread_tab = request.GET.get('tab') if request.GET.get('tab') in {'all', 'by_customer'} else 'all'
+    selected_customer_id = request.GET.get('customer', '').strip()
+    if thread_tab == 'by_customer' and not is_customer_user:
+        if selected_customer_id:
+            threads_qs = threads_qs.filter(customer_id=selected_customer_id)
+        else:
+            threads_qs = threads_qs.none()
+    else:
+        thread_tab = 'all'
+        selected_customer_id = ''
+
     active_thread = None
     selected_id = request.GET.get('thread')
     if selected_id:
@@ -4073,8 +4094,11 @@ def reconciliation_center(request):
         'active_messages': active_messages,
         'thread_form': thread_form,
         'message_form': message_form,
-        'is_customer_user': _user_role(request.user) == 'customer',
+        'is_customer_user': is_customer_user,
         'can_manage_thread_state': request.user.is_superuser or (_user_role(request.user) != 'customer' and _can_access_reconciliation(request.user)),
+        'thread_tab': thread_tab,
+        'customer_options': customer_options,
+        'selected_customer_id': selected_customer_id,
     })
 
 

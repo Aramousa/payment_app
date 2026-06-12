@@ -23,6 +23,11 @@
         .thread-filter-actions .clear-btn { align-items: center; background: #6c757d; border-radius: 8px; color: #fff; display: inline-flex; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 800; justify-content: center; min-height: 36px; padding: 6px 14px; text-decoration: none; white-space: nowrap; }
         .thread-filter-actions .clear-btn:hover { background: #5a6268; color: #fff; }
         .recon-threads-aside { display: flex; flex-direction: column; }
+        .thread-tabs { display: flex; border-bottom: 1px solid #edf1f6; }
+        .thread-tab { flex: 1; text-align: center; padding: 10px 8px; font-size: 13px; font-weight: 800; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; }
+        .thread-tab.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
+        .thread-tab:hover { background: #f8fafc; }
+        .customer-select-row select { background: #f8fafc; border: 1px solid #d7e2ee; border-radius: 7px; font-family: Vazir, sans-serif; min-height: 36px; padding: 6px 8px; width: 100%; }
         .thread-list { display: grid; align-content: start; flex: 1; min-height: 0; overflow-y: auto; }
         .thread-item { border-bottom: 1px solid #edf1f6; color: inherit; display: grid; gap: 5px; padding: 12px 14px; text-decoration: none; }
         .thread-item:hover, .thread-item.active { background: #eef5ff; }
@@ -88,8 +93,25 @@
     <div class="recon-shell">
         <aside class="recon-panel recon-threads-aside">
             <div class="recon-head"><h3>گفتگوها</h3></div>
+            {% if not is_customer_user %}
+            <div class="thread-tabs">
+                <a class="thread-tab{% if thread_tab == 'all' %} active{% endif %}" href="{% querystring tab='all' %}">همه گفتگوها</a>
+                <a class="thread-tab{% if thread_tab == 'by_customer' %} active{% endif %}" href="{% querystring tab='by_customer' %}">بر اساس مشتری</a>
+            </div>
+            {% endif %}
             <form class="thread-filter-form" method="get">
                 {% if active_thread %}<input type="hidden" name="thread" value="{{ active_thread.id }}">{% endif %}
+                <input type="hidden" name="tab" value="{{ thread_tab }}">
+                {% if thread_tab == 'by_customer' %}
+                <div class="customer-select-row">
+                    <select name="customer" onchange="this.form.submit()">
+                        <option value="">یک مشتری را انتخاب کنید...</option>
+                        {% for customer_id, customer_name in customer_options %}
+                            <option value="{{ customer_id }}"{% if selected_customer_id == customer_id|stringformat:'s' %} selected{% endif %}>{{ customer_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
                 <input type="search" name="q" value="{{ thread_filters.q }}" placeholder="جستجو بر اساس نام مشتری، عنوان، شماره سند یا متن پیام">
                 <div class="thread-filter-row">
                     <select name="status">
@@ -128,7 +150,9 @@
                         {% endif %}
                     </a>
                 {% empty %}
-                    {% if thread_filters.q or thread_filters.status or thread_filters.document_type %}
+                    {% if thread_tab == 'by_customer' and not selected_customer_id %}
+                        <div class="empty-chat">برای نمایش گفتگوها، یک مشتری را از بالا انتخاب کنید.</div>
+                    {% elif thread_filters.q or thread_filters.status or thread_filters.document_type %}
                         <div class="empty-chat">نتیجه‌ای مطابق با جستجوی شما یافت نشد.</div>
                     {% else %}
                         <div class="empty-chat">هنوز گفتگویی ثبت نشده است.</div>
