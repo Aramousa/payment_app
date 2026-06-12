@@ -1654,6 +1654,24 @@ def _display_name(user):
     return full_name or user.username
 
 
+def _group_consecutive_views(logs):
+    """مشاهده‌های پیاپی یک کاربر را زیر یک رویداد جمع می‌کند تا تاریخچه شلوغ نشود."""
+    grouped = []
+    for log in logs:
+        log['children'] = []
+        previous = grouped[-1] if grouped else None
+        if (
+            previous
+            and log['action'] == PaymentActivityLog.ACTION_VIEWED
+            and previous['action'] == PaymentActivityLog.ACTION_VIEWED
+            and previous['actor_id'] == log['actor_id']
+        ):
+            previous['children'].append(log)
+        else:
+            grouped.append(log)
+    return grouped
+
+
 def _log_text(log):
     """متن کامل رویداد برای کارکنان — با نام، نقش و جزئیات."""
     actor = _display_name(log.actor)
@@ -3786,8 +3804,6 @@ def payment_timeline(request, payment_id):
         # کارکنان: جزئیات کامل
         logs = []
         for log in raw_logs:
-            if log.action == PaymentActivityLog.ACTION_VIEWED:
-                continue  # مشاهده را در تاریخچه کارکنان نشان نمی‌دهیم (حجم بالا)
             logs.append({
                 'text':        _log_text(log),
                 'note':        log.note,
@@ -3800,6 +3816,7 @@ def payment_timeline(request, payment_id):
                 'to_status':   dict(PaymentRecord.STATUS_CHOICES).get(log.to_status, log.to_status or ''),
                 'is_customer_note': log.action == PaymentActivityLog.ACTION_CUSTOMER_NOTE,
             })
+        logs = _group_consecutive_views(logs)
     else:
         # مشتری: وضعیت‌های کلیدی بدون جزئیات کارکنان
         logs = [

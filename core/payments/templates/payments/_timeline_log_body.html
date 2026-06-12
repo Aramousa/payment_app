@@ -1,0 +1,25 @@
+<div class="tl-text">{{ log.text }}</div>
+
+<div class="tl-actors">
+    {% if log.actor_name and log.actor_name != 'سیستم' %}
+    <span class="tl-actor-badge">👤 {% if log.actor_id %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' log.actor_id %}">{{ log.actor_name }}</button>{% else %}{{ log.actor_name }}{% endif %}</span>
+    {% if log.actor_role %}<span class="tl-actor-badge">{{ log.actor_role }}</span>{% endif %}
+    {% endif %}
+    {% if log.from_status and log.to_status %}
+    <span>{{ log.from_status }} ← {{ log.to_status }}</span>
+    {% elif log.to_status %}
+    <span>→ {{ log.to_status }}</span>
+    {% endif %}
+</div>
+
+{% if log.note %}
+<div class="tl-note
+    {% if log.action == 'customer_note' %}note-teal
+    {% elif log.action == 'finance_reg' %}note-purple
+    {% elif log.to_status == 'rejected' or log.action == 'cp_rejected' %}note-red
+    {% endif %}">
+    {{ log.note|linebreaksbr }}
+</div>
+{% endif %}
+
+<div class="tl-time">{{ log.jalali_time }}</div>

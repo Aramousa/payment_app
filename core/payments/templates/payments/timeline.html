@@ -39,6 +39,7 @@
         .staff-tl-dot.incomplete{ background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
         .staff-tl-dot.customer  { background: #1e3a5f; box-shadow: 0 0 0 2px #1e3a5f; }
         .staff-tl-dot.cp        { background: #0369a1; box-shadow: 0 0 0 2px #0369a1; }
+        .staff-tl-dot.viewed    { background: #94a3b8; box-shadow: 0 0 0 2px #94a3b8; }
 
         .staff-tl-body { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; }
         .staff-tl-body.is-note  { background: #eef2f8; border-color: #c7d2e8; }
@@ -46,6 +47,17 @@
         .staff-tl-body.is-reject{ background: #fff5f5; border-color: #fca5a5; }
         .staff-tl-body.is-incomplete { background: #fffbeb; border-color: #fde68a; }
         .staff-tl-body.is-finance { background: #f5f3ff; border-color: #ddd6fe; }
+
+        .tl-group-toggle { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px;
+                            font-size: 12px; color: #475569; cursor: pointer; user-select: none; }
+        .tl-group-toggle:hover { color: #1e3a5f; }
+        .tl-group-toggle .tl-toggle-icon { display: inline-flex; align-items: center; justify-content: center;
+                            width: 18px; height: 18px; border-radius: 4px; background: #e2e8f0; font-weight: bold; }
+        .tl-group-children { display: none; margin-top: 10px; padding-right: 16px; border-right: 2px dashed #cbd5e1; }
+        .tl-group-children.open { display: block; }
+        .tl-child-item { position: relative; margin-bottom: 8px; padding: 8px 12px; background: #f1f5f9;
+                            border: 1px solid #e2e8f0; border-radius: 6px; }
+        .tl-child-item:last-child { margin-bottom: 0; }
 
         .tl-text  { font-size: 13px; font-weight: 600; color: #1e293b; }
         .tl-actors { font-size: 11px; color: #64748b; margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
@@ -235,6 +247,8 @@
                         <div class="staff-tl-dot customer">💬</div>
                     {% elif log.action in 'cp_approved,cp_returned,cp_rejected' %}
                         <div class="staff-tl-dot cp">🏢</div>
+                    {% elif log.action == 'viewed' %}
+                        <div class="staff-tl-dot viewed">👁</div>
                     {% else %}
                         <div class="staff-tl-dot">•</div>
                     {% endif %}
@@ -248,32 +262,21 @@
                         {% elif log.action == 'finance_reg' %}is-finance
                         {% endif %}">
 
-                        <div class="tl-text">{{ log.text }}</div>
+                        {% include 'payments/_timeline_log_body.html' %}
 
-                        {# جزئیات کامل برای کارکنان #}
-                        <div class="tl-actors">
-                            {% if log.actor_name and log.actor_name != 'سیستم' %}
-                            <span class="tl-actor-badge">👤 {% if log.actor_id %}<button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' log.actor_id %}">{{ log.actor_name }}</button>{% else %}{{ log.actor_name }}{% endif %}</span>
-                            {% if log.actor_role %}<span class="tl-actor-badge">{{ log.actor_role }}</span>{% endif %}
-                            {% endif %}
-                            {% if log.from_status and log.to_status %}
-                            <span>{{ log.from_status }} ← {{ log.to_status }}</span>
-                            {% elif log.to_status %}
-                            <span>→ {{ log.to_status }}</span>
-                            {% endif %}
+                        {% if log.children %}
+                        <div class="tl-group-toggle" onclick="toggleTlGroup(this)">
+                            <span class="tl-toggle-icon">+</span>
+                            <span>{{ log.children|length }} مشاهده دیگر توسط {{ log.actor_name }}</span>
                         </div>
-
-                        {% if log.note %}
-                        <div class="tl-note
-                            {% if log.action == 'customer_note' %}note-teal
-                            {% elif log.action == 'finance_reg' %}note-purple
-                            {% elif log.to_status == 'rejected' or log.action == 'cp_rejected' %}note-red
-                            {% endif %}">
-                            {{ log.note|linebreaksbr }}
+                        <div class="tl-group-children">
+                            {% for child in log.children %}
+                            <div class="tl-child-item">
+                                {% include 'payments/_timeline_log_body.html' with log=child %}
+                            </div>
+                            {% endfor %}
                         </div>
                         {% endif %}
-
-                        <div class="tl-time">{{ log.jalali_time }}</div>
                     </div>
                 </div>
                 {% empty %}
@@ -647,6 +650,13 @@
             }
         });
     })();
+
+    function toggleTlGroup(el) {
+        var children = el.nextElementSibling;
+        var icon = el.querySelector('.tl-toggle-icon');
+        var open = children.classList.toggle('open');
+        icon.textContent = open ? '−' : '+';
+    }
     </script>
     <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
