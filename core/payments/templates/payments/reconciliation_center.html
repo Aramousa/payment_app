@@ -104,7 +104,7 @@
                 <input type="hidden" name="tab" value="{{ thread_tab }}">
                 {% if thread_tab == 'by_customer' %}
                 <div class="customer-select-row">
-                    <select name="customer" onchange="this.form.submit()">
+                    <select name="customer" size="6" onchange="this.form.submit()">
                         <option value="">یک مشتری را انتخاب کنید...</option>
                         {% for customer_id, customer_name in customer_options %}
                             <option value="{{ customer_id }}"{% if selected_customer_id == customer_id|stringformat:'s' %} selected{% endif %}>{{ customer_name }}</option>
