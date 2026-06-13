@@ -681,9 +681,9 @@
 
     <div class="filter-box">
         <form method="get" class="filter-grid">
-            <div><label for="serial_filter">سریال سند</label><input id="serial_filter" type="number" name="serial" value="{{ filters.serial }}" placeholder="#" dir="ltr" style="font-family:monospace;font-weight:700;"></div>
+            <div><label for="serial_filter">سریال سند</label><input id="serial_filter" type="number" name="serial" value="{{ filters.serial }}" placeholder="#" dir="ltr" style="font-family:Vazir,sans-serif;font-weight:700;"></div>
             {% if is_staff_user %}
-                <div><label for="accounting_code_filter">کد تفضیلی</label><input id="accounting_code_filter" type="text" name="accounting_code" value="{{ filters.accounting_code }}" placeholder="کد تفضیلی مشتری" dir="ltr" style="font-family:monospace;"></div>
+                <div><label for="accounting_code_filter">کد تفضیلی</label><input id="accounting_code_filter" type="text" name="accounting_code" value="{{ filters.accounting_code }}" placeholder="کد تفضیلی مشتری" dir="ltr" style="font-family:Vazir,sans-serif;"></div>
                 <div><label for="first_name">نام</label><input id="first_name" type="text" name="first_name" value="{{ filters.first_name }}"></div>
                 <div><label for="last_name">نام خانوادگی</label><input id="last_name" type="text" name="last_name" value="{{ filters.last_name }}"></div>
                 <div><label for="phone">شماره تلفن</label><input id="phone" type="text" name="phone" value="{{ filters.phone }}"></div>
@@ -848,7 +848,7 @@
                 </td>
                 <td style="white-space:normal;line-height:1.6;">
                     <div>{{ payment.pay_date|jalali_date }}</div>
-                    <div style="display:inline-block;margin-top:2px;padding:1px 6px;font-size:12px;font-family:monospace;color:#1e3a5f;background:#eef2f8;border:1px solid #c7d2e8;border-radius:4px;letter-spacing:.3px;">{{ payment.tracking_code|default:'-' }}</div>
+                    <div style="display:inline-block;margin-top:2px;padding:1px 6px;font-size:12px;font-family:Vazir,sans-serif;color:#1e3a5f;background:#eef2f8;border:1px solid #c7d2e8;border-radius:4px;letter-spacing:.3px;">{{ payment.tracking_code|default:'-' }}</div>
                     <div style="color:#64748b;font-size:11px;margin-top:3px;">{% if payment.last_edited_at %}ویرایش: {{ payment.last_edited_at|jalali_datetime }}{% else %}ثبت: {{ payment.created_at|jalali_datetime }}{% endif %}</div>
                 </td>
                 <td>{{ payment.amount|thousand_sep }}</td>

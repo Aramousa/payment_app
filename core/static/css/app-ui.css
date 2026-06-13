@@ -30,6 +30,19 @@
     box-sizing: border-box;
 }
 
+html,
+body,
+body *,
+body *::before,
+body *::after,
+button,
+input,
+select,
+textarea,
+summary {
+    font-family: Vazir, sans-serif !important;
+}
+
 html {
     background: var(--app-bg);
     color-scheme: light;
@@ -3061,7 +3074,7 @@ tbody tr:hover:not(.detail-row) {
     padding: 1px 7px;
     font-size: 11px;
     font-weight: 800;
-    font-family: monospace;
+    font-family: Vazir, sans-serif;
     letter-spacing: .4px;
 }
 
@@ -3073,7 +3086,7 @@ tbody tr:hover:not(.detail-row) {
 .tbl-cell-stack .main  { font-size: 12px; color: var(--app-text); }
 .tbl-cell-stack .sub   { font-size: 11px; color: #64748b; }
 .tbl-cell-stack .sub2  { font-size: 11px; color: #94a3b8; }
-.tbl-cell-stack .mono  { font-family: monospace; direction: ltr; }
+.tbl-cell-stack .mono  { font-family: Vazir, sans-serif; direction: ltr; }
 
 /* badge وضعیت */
 .tbl-badge {
@@ -3583,6 +3596,132 @@ body:has(.app-shell-nav) {
         padding: 3px 0 0 !important;
         position: static !important;
         transform: none !important;
+    }
+}
+
+
+/* ─── UX polish: RTL readability, focus, and touch ergonomics ─── */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+    outline: 3px solid rgba(30, 58, 95, .28) !important;
+    outline-offset: 2px !important;
+}
+
+table th,
+table td {
+    line-height: 1.65 !important;
+    text-align: right !important;
+}
+
+table th:first-child,
+table td:first-child,
+table th:last-child,
+table td:last-child {
+    text-align: center !important;
+}
+
+.money-cell,
+.mono,
+[dir="ltr"] {
+    direction: ltr;
+    unicode-bidi: plaintext;
+}
+
+.top-bar h2,
+.section-title,
+.app-filter-panel label,
+.invoice-filter-grid label,
+.field-box label {
+    text-align: right !important;
+}
+
+.empty-message,
+.notification-empty {
+    line-height: 1.9 !important;
+}
+
+.summary-row,
+.dashboard-row,
+.customer-row {
+    cursor: pointer;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #8796a8;
+    opacity: 1;
+}
+
+.customers-table-wrap {
+    margin: 0 auto;
+    max-width: 1200px;
+    overflow-x: auto;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+}
+
+.customers-table-wrap table {
+    margin-top: 0;
+}
+
+[data-table-prefs="customers-list"] .customers-action-col {
+    background: #fff !important;
+    box-shadow: -8px 0 14px rgba(15, 23, 42, .08);
+    min-width: 132px;
+    position: sticky;
+    right: 0;
+    text-align: center !important;
+    z-index: 3;
+}
+
+[data-table-prefs="customers-list"] thead .customers-action-col {
+    background: var(--app-primary) !important;
+    color: #fff !important;
+    z-index: 4;
+}
+
+@media (max-width: 760px) {
+    table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table th,
+    table td {
+        min-width: 108px;
+    }
+
+    .button-link,
+    .back-link,
+    .clear-btn,
+    .logout-btn,
+    .edit-link,
+    .cancel-link,
+    .customer-link,
+    .detail-link,
+    .track-link,
+    .expand-btn,
+    .apply-btn,
+    .submit-btn,
+    button[type="submit"] {
+        min-height: 42px;
+    }
+
+    [data-table-prefs="customers-list"] th:nth-child(10),
+    [data-table-prefs="customers-list"] td:nth-child(10),
+    [data-table-prefs="customers-list"] th:nth-child(11),
+    [data-table-prefs="customers-list"] td:nth-child(11),
+    [data-table-prefs="customers-list"] th:nth-child(12),
+    [data-table-prefs="customers-list"] td:nth-child(12),
+    [data-table-prefs="customers-list"] th:nth-child(13),
+    [data-table-prefs="customers-list"] td:nth-child(13) {
+        display: none;
     }
 }
 
