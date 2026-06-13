@@ -206,6 +206,7 @@
             <thead>
                 <tr>
                     <th>ردیف</th>
+                    <th>شماره سند</th>
                     <th>مبلغ (ریال)</th>
                     <th>تاریخ واریز</th>
                     <th>کد پیگیری</th>
@@ -220,6 +221,7 @@
                 {% for payment in payments %}
                     <tr class="summary-row" onclick="toggleDetail('payment-{{ payment.id }}')">
                         <td>{{ payments_page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td>{{ payment.id }}</td>
                         <td>{{ payment.amount|thousand_sep }}</td>
                         <td>{{ payment.pay_date|jalali_date }}</td>
                         <td>{{ payment.tracking_code|default:'-' }}</td>
@@ -232,7 +234,7 @@
                         </td>
                     </tr>
                     <tr class="detail-row" id="payment-{{ payment.id }}">
-                        <td colspan="9">
+                        <td colspan="10">
                             <div class="detail-grid">
                                 <div class="detail-card">
                                     <strong>نام و نام خانوادگی واریز کننده:</strong><br>

@@ -604,6 +604,36 @@ class InvoiceFlowTests(TestCase):
         response = self.client.get(reverse('payment_history'))
         self.assertContains(response, 'WF-APPROVE')
 
+    def test_ready_for_final_approval_document_is_visible_in_history_for_all_staff(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='WF-PENDING-FINAL',
+            status=PaymentRecord.STATUS_APPROVED,
+            finance_status=PaymentRecord.FINANCE_STATUS_APPROVED,
+            pending_final_approval=True,
+        )
+
+        for username in ['commercial1', 'finance1', 'sales1']:
+            with self.subTest(username=username):
+                self.client.logout()
+                self.client.login(username=username, password='pass1234')
+
+                response = self.client.get(reverse('submit'))
+                self.assertNotContains(response, payment.tracking_code)
+
+                response = self.client.get(reverse('payment_history'))
+                self.assertContains(response, payment.tracking_code)
+                self.assertNotContains(response, reverse('staff_update_status', args=[payment.id]))
+                self.assertNotContains(response, reverse('finance_unified_action', args=[payment.id]))
+                self.assertNotContains(response, reverse('finance_final_approve', args=[payment.id]))
+
     def test_staff_status_choices_for_generic_staff_role_are_not_empty(self):
         choices = _staff_status_choices_for_role('staff')
         self.assertTrue(len(choices) > 0)

@@ -791,32 +791,9 @@ def _history_payment_records_for_user(user):
         return PaymentRecord.objects.none()
 
     records = _records_for_user(user)
-    if user.is_superuser:
-        return records.filter(status__in=[
-            PaymentRecord.STATUS_APPROVED,
-            PaymentRecord.STATUS_FINAL_APPROVED,
-            PaymentRecord.STATUS_REJECTED,
-        ])
-
     role = _department_role(_user_role(user))
-    if role == 'commercial':
-        # سوابق بازرگانی: ثبت شده، تأیید نهایی، رد شده، ناقص
-        return records.filter(status__in=[
-            PaymentRecord.STATUS_APPROVED,
-            PaymentRecord.STATUS_FINAL_APPROVED,
-            PaymentRecord.STATUS_REJECTED,
-            PaymentRecord.STATUS_INCOMPLETE,
-        ])
-    if role == 'finance':
-        return records.filter(status__in=[
-            PaymentRecord.STATUS_FINAL_APPROVED,
-            PaymentRecord.STATUS_REJECTED,
-        ])
-    if role in {'data_entry', 'sales'}:
-        return records.filter(status__in=[
-            PaymentRecord.STATUS_FINAL_APPROVED,
-            PaymentRecord.STATUS_REJECTED,
-        ])
+    if user.is_superuser or role in {'commercial', 'finance', 'data_entry', 'sales'}:
+        return records
     return records.none()
 
 
