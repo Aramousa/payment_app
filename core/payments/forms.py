@@ -1916,7 +1916,8 @@ class SystemLogoSettingsForm(forms.ModelForm):
 class SystemMenuSettingsForm(forms.ModelForm):
     class Meta:
         model = SystemSettings
-        fields = ['customer_warranty_menu_enabled']
+        fields = ['customer_warranty_menu_enabled', 'accounting_code_import_enabled']
         labels = {
             'customer_warranty_menu_enabled': 'نمایش منوی «گارانتی و خدمات پس از فروش» برای مشتریان',
+            'accounting_code_import_enabled': 'فعال بودن دکمه «ورود کد تفضیلی از اکسل» در صفحه مشتریان',
         }

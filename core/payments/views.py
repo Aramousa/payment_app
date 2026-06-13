@@ -365,6 +365,8 @@ def _can_manage_users(user):
 def _can_import_customer_accounting_codes(user):
     if not user or not user.is_authenticated:
         return False
+    if not SystemSettings.load().accounting_code_import_enabled:
+        return False
     if user.is_superuser:
         return True
     return _user_role(user) in {'finance_manager', 'commercial_manager'}
