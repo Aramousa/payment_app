@@ -3369,7 +3369,7 @@ body:has(.app-shell-nav) {
     justify-content: flex-start !important;
     min-height: var(--app-menu-height) !important;
     overflow: visible !important;
-    text-align: center !important;
+    text-align: right !important;
     width: 100% !important;
 }
 
@@ -3401,8 +3401,8 @@ body:has(.app-shell-nav) {
     gap: 7px !important;
     min-height: 36px !important;
     padding: 7px 11px !important;
-    justify-content: center !important;
-    text-align: center !important;
+    justify-content: flex-start !important;
+    text-align: right !important;
     white-space: nowrap !important;
 }
 
@@ -3430,8 +3430,8 @@ body:has(.app-shell-nav) {
     grid-template-columns: none !important;
     min-height: 36px !important;
     padding: 7px 10px !important;
-    justify-content: center !important;
-    text-align: center !important;
+    justify-content: flex-start !important;
+    text-align: right !important;
     white-space: nowrap !important;
 }
 
@@ -3486,8 +3486,8 @@ body:has(.app-shell-nav) {
     min-height: 34px !important;
     padding: 7px 9px !important;
     align-items: center !important;
-    justify-content: center !important;
-    text-align: center !important;
+    justify-content: flex-start !important;
+    text-align: right !important;
     white-space: nowrap !important;
 }
 
@@ -3541,7 +3541,7 @@ body:has(.app-shell-nav) {
         flex-wrap: nowrap !important;
         gap: 8px !important;
         min-height: 0 !important;
-        text-align: center !important;
+        text-align: right !important;
     }
 
     .app-shell-nav .app-nav-section {
@@ -3557,9 +3557,9 @@ body:has(.app-shell-nav) {
     }
 
     .app-shell-nav .sb-group-header {
-        justify-content: center !important;
+        justify-content: flex-start !important;
         padding: 8px 16px 4px !important;
-        text-align: center !important;
+        text-align: right !important;
     }
 
     .app-shell-nav .app-nav-direct,
@@ -3568,10 +3568,10 @@ body:has(.app-shell-nav) {
         border-radius: 0 !important;
         display: flex !important;
         gap: 7px !important;
-        justify-content: center !important;
+        justify-content: flex-start !important;
         min-height: 38px !important;
         padding: 7px 14px 7px 10px !important;
-        text-align: center !important;
+        text-align: right !important;
     }
 
     .app-shell-nav .app-nav-group-panel {
