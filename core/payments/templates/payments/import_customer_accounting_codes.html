@@ -1,0 +1,138 @@
+{% load static %}
+{% load payment_dates %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>ورود کد تفضیلی مشتریان</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f6f7fb; padding: 20px; }
+        .page-wrap { max-width: 1240px; margin: 0 auto; }
+        .section { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
+        .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .section-head h2 { margin: 0; border: 0; padding: 0; text-align: right; }
+        .upload-row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+        .upload-row .field { flex: 1 1 320px; }
+        .upload-row input[type=file] { width: 100%; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; }
+        .stat strong { display: block; font-size: 20px; color: #172033; }
+        .stat span { color: #64748b; font-size: 12px; }
+        .status-chip { display: inline-block; border-radius: 6px; font-size: 11px; font-weight: 800; padding: 3px 8px; white-space: nowrap; }
+        .status-matched { background: #dcfce7; color: #15803d; }
+        .status-review { background: #fef9c3; color: #854d0e; }
+        .status-ambiguous { background: #ffedd5; color: #c2410c; }
+        .status-unmatched { background: #fee2e2; color: #b91c1c; }
+        .preview-table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th, td { border-bottom: 1px solid #eef2f7; padding: 9px 10px; vertical-align: top; font-size: 12px; }
+        th { background: #1e3a5f; color: #fff; white-space: nowrap; }
+        .muted { color: #64748b; font-size: 12px; }
+        .ltr { direction: ltr; unicode-bidi: plaintext; }
+        .actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
+        .help-list { margin: 8px 0 0; color: #475569; font-size: 13px; line-height: 1.9; }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+    <div class="page-wrap">
+        <div class="section">
+            <div class="section-head">
+                <h2>ورود کد تفضیلی مشتریان از اکسل</h2>
+                <a href="{% url 'customers_list' %}" class="back-link">بازگشت به لیست مشتریان</a>
+            </div>
+            {% if messages %}
+            <div style="display:grid;gap:8px;margin-bottom:12px;">
+                {% for message in messages %}
+                <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <form method="post" enctype="multipart/form-data" class="upload-row">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="preview">
+                <div class="field">
+                    <label for="tafzil-file">فایل اکسل حسابداری</label>
+                    <input id="tafzil-file" type="file" name="file" accept=".xlsx,.xlsm" required>
+                </div>
+                <button type="submit" class="submit-btn">خواندن و پیش‌نمایش</button>
+            </form>
+            <ul class="help-list">
+                <li>ستون‌های قابل تشخیص: «کد» برای شماره تفضیلی و «عنوان» برای نام مشتری.</li>
+                <li>اگر عنوان شامل شهر داخل پرانتز باشد، مثل «علی محمدخانی (تهران)»، شهر هم در امتیاز تطبیق لحاظ می‌شود.</li>
+                <li>ثبت نهایی فقط برای ردیف‌های انتخاب‌شده انجام می‌شود؛ موارد مشکوک را قبل از ثبت بررسی کنید.</li>
+            </ul>
+        </div>
+
+        {% if preview %}
+        <div class="section">
+            <div class="stats">
+                <div class="stat"><strong>{{ summary.total|thousand_sep }}</strong><span>ردیف خوانده‌شده</span></div>
+                <div class="stat"><strong>{{ summary.matched|thousand_sep }}</strong><span>تطبیق مطمئن</span></div>
+                <div class="stat"><strong>{{ summary.review|thousand_sep }}</strong><span>نیازمند بررسی</span></div>
+                <div class="stat"><strong>{{ summary.ambiguous|thousand_sep }}</strong><span>چند تطبیق نزدیک</span></div>
+                <div class="stat"><strong>{{ summary.unmatched|thousand_sep }}</strong><span>بدون تطبیق</span></div>
+            </div>
+        </div>
+
+        <form method="post" class="section">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="apply">
+            <div class="preview-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ثبت</th>
+                            <th>ردیف اکسل</th>
+                            <th>کد تفضیلی</th>
+                            <th>عنوان اکسل</th>
+                            <th>مشتری پیشنهادی سیستم</th>
+                            <th>کد فعلی</th>
+                            <th>امتیاز</th>
+                            <th>وضعیت</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview %}
+                        <tr>
+                            <td>
+                                {% if row.profile_id and row.code %}
+                                <input type="checkbox" name="apply_rows" value="{{ forloop.counter0 }}" {% if row.is_safe %}checked{% endif %}>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>{{ row.row_number }}</td>
+                            <td class="ltr">{{ row.code|default:'-' }}</td>
+                            <td>
+                                {{ row.title_raw|default:'-' }}
+                                {% if row.city %}<div class="muted">شهر استخراج‌شده: {{ row.city }}</div>{% endif %}
+                            </td>
+                            <td>
+                                {% if row.profile_id %}
+                                    <strong>{{ row.customer_name }}</strong>
+                                    <div class="muted">{{ row.customer_org|default:'-' }}{% if row.customer_city %} - {{ row.customer_city }}{% endif %}</div>
+                                    <div class="muted">تطبیق با: {{ row.matched_field }}</div>
+                                {% else %}
+                                    <span class="muted">موردی پیدا نشد</span>
+                                {% endif %}
+                            </td>
+                            <td class="ltr">{{ row.old_code|default:'-' }}</td>
+                            <td>{{ row.score }}</td>
+                            <td><span class="status-chip status-{{ row.status }}">{{ row.status_label }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="actions">
+                <span class="muted">موارد تیک‌خورده در پایگاه داده ثبت می‌شوند.</span>
+                <button type="submit" class="submit-btn">ثبت کدهای انتخاب‌شده</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</body>
+</html>

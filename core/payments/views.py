@@ -4,12 +4,13 @@ import mimetypes
 import random
 import re
 import uuid
+from difflib import SequenceMatcher
 from openpyxl import Workbook
 from urllib.parse import urlencode
 import json
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -359,6 +360,14 @@ def _can_staff_access_customer(user, customer_id):
 
 def _can_manage_users(user):
     return bool(user and user.is_authenticated and user.is_superuser)
+
+
+def _can_import_customer_accounting_codes(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) in {'finance_manager', 'commercial_manager'}
 
 
 # نگاشت نقش مدیر هر بخش به نقش کارکنان همان بخش — برای «مدیریت دسترسی‌ها»
@@ -6061,6 +6070,287 @@ def customers_list(request):
         'filters': filters,
         'export_dataset': 'customers',
         'export_fields': CUSTOMER_EXPORT_FIELDS,
+        'can_import_accounting_codes': _can_import_customer_accounting_codes(request.user),
+    })
+
+
+_CUSTOMER_ACCOUNTING_IMPORT_SESSION_KEY = 'customer_accounting_code_import_preview'
+
+
+def _normalize_customer_match_text(value):
+    text = str(value or '').strip()
+    text = text.translate(str.maketrans({
+        'ي': 'ی',
+        'ك': 'ک',
+        'ۀ': 'ه',
+        'ة': 'ه',
+        'ؤ': 'و',
+        'إ': 'ا',
+        'أ': 'ا',
+        'آ': 'ا',
+    }))
+    text = re.sub(r'[\u064b-\u065f\u0670]', '', text)
+    text = re.sub(r'[^\w\s\u0600-\u06ff]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip().lower()
+    return text
+
+
+def _split_accounting_title(title):
+    raw = str(title or '').strip()
+    city = ''
+    match = re.search(r'\(([^()]+)\)\s*$', raw)
+    if match:
+        city = match.group(1).strip()
+        raw = raw[:match.start()].strip()
+    return raw, city
+
+
+def _customer_match_candidates(profile):
+    user = profile.user
+    values = [
+        f'{profile.first_name} {profile.last_name}',
+        f'{user.first_name} {user.last_name}',
+        profile.display_name,
+        profile.organization,
+        profile.representative_name,
+        user.username,
+        profile.phone,
+        profile.mobile,
+    ]
+    return [v.strip() for v in values if str(v or '').strip()]
+
+
+def _customer_match_index(profile):
+    return {
+        'profile': profile,
+        'city_norm': _normalize_customer_match_text(profile.city),
+        'candidates': [
+            (candidate, _normalize_customer_match_text(candidate))
+            for candidate in _customer_match_candidates(profile)
+        ],
+    }
+
+
+def _score_accounting_customer_match(title_norm, city_norm, customer_index):
+    profile_city_norm = customer_index['city_norm']
+    best_score = 0
+    best_field = ''
+    for candidate, candidate_norm in customer_index['candidates']:
+        if not candidate_norm or not title_norm:
+            continue
+        if title_norm == candidate_norm:
+            score = 100
+        elif title_norm in candidate_norm or candidate_norm in title_norm:
+            score = 88
+        else:
+            title_tokens = set(title_norm.split())
+            candidate_tokens = set(candidate_norm.split())
+            overlap = len(title_tokens & candidate_tokens) / max(len(title_tokens | candidate_tokens), 1)
+            ratio = SequenceMatcher(None, title_norm, candidate_norm).ratio()
+            score = int(max(overlap * 100, ratio * 92))
+        if city_norm and profile_city_norm and city_norm == profile_city_norm:
+            score = min(100, score + 5)
+        if score > best_score:
+            best_score = score
+            best_field = candidate
+    return best_score, best_field
+
+
+def _build_accounting_code_import_preview(file_obj):
+    import openpyxl
+
+    wb = openpyxl.load_workbook(file_obj, read_only=True, data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        raise ValueError('فایل خالی است.')
+
+    headers = [str(c or '').strip() for c in rows[0]]
+
+    def col(candidates, fallback):
+        normalized_headers = [_normalize_customer_match_text(h) for h in headers]
+        for name in candidates:
+            needle = _normalize_customer_match_text(name)
+            for idx, header in enumerate(normalized_headers):
+                if header == needle:
+                    return idx
+        return fallback if fallback < len(headers) else None
+
+    code_col = col(['کد', 'کد تفضیلی', 'accounting_code', 'code'], 1)
+    title_col = col(['عنوان', 'نام', 'نام مشتری', 'customer', 'name', 'title'], 2)
+    id_col = col(['ID', 'شناسه'], 0)
+    if code_col is None or title_col is None:
+        raise ValueError('ستون‌های «کد» و «عنوان» در فایل یافت نشد.')
+
+    customers = [
+        _customer_match_index(profile)
+        for profile in (
+            UserProfile.objects
+            .filter(role='customer')
+            .exclude(user__counterparty_account__isnull=False)
+            .select_related('user')
+        )
+    ]
+    exact_lookup = {}
+    token_lookup = {}
+    for idx, customer_index in enumerate(customers):
+        for _, candidate_norm in customer_index['candidates']:
+            if not candidate_norm:
+                continue
+            exact_lookup.setdefault(candidate_norm, set()).add(idx)
+            for token in candidate_norm.split():
+                token_lookup.setdefault(token, set()).add(idx)
+
+    preview = []
+    summary = {'total': 0, 'matched': 0, 'review': 0, 'unmatched': 0, 'ambiguous': 0}
+
+    for row_number, row in enumerate(rows[1:], start=2):
+        def cell(idx):
+            if idx is None or idx >= len(row) or row[idx] is None:
+                return ''
+            value = row[idx]
+            if isinstance(value, float) and value.is_integer():
+                return str(int(value))
+            return str(value).strip()
+
+        code = cell(code_col)
+        title_raw = cell(title_col)
+        external_id = cell(id_col)
+        if not code and not title_raw:
+            continue
+        title, city = _split_accounting_title(title_raw)
+        title_norm = _normalize_customer_match_text(title)
+        city_norm = _normalize_customer_match_text(city)
+        scored = []
+        candidate_indexes = set(exact_lookup.get(title_norm, set()))
+        if not candidate_indexes:
+            for token in title_norm.split():
+                candidate_indexes.update(token_lookup.get(token, set()))
+        for idx in candidate_indexes:
+            customer_index = customers[idx]
+            score, field = _score_accounting_customer_match(title_norm, city_norm, customer_index)
+            if score:
+                scored.append((score, field, customer_index['profile']))
+        scored.sort(key=lambda item: item[0], reverse=True)
+
+        best = scored[0] if scored else None
+        second = scored[1] if len(scored) > 1 else None
+        status = 'unmatched'
+        status_label = 'بدون تطبیق'
+        is_safe = False
+        ambiguous = False
+        profile = None
+        matched_field = ''
+        score = 0
+
+        if best:
+            score, matched_field, profile = best
+            ambiguous = bool(second and second[0] >= score - 3)
+            if score < 75:
+                status = 'unmatched'
+                status_label = 'بدون تطبیق'
+                profile = None
+                matched_field = ''
+            elif ambiguous:
+                status = 'ambiguous'
+                status_label = 'چند تطبیق نزدیک'
+            elif score >= 92:
+                status = 'matched'
+                status_label = 'تطبیق مطمئن'
+                is_safe = True
+            elif score >= 75:
+                status = 'review'
+                status_label = 'نیازمند بررسی'
+            else:
+                status = 'unmatched'
+                status_label = 'بدون تطبیق'
+
+        summary['total'] += 1
+        summary[status] += 1
+        preview.append({
+            'row_number': row_number,
+            'external_id': external_id,
+            'code': code,
+            'title_raw': title_raw,
+            'title': title,
+            'city': city,
+            'status': status,
+            'status_label': status_label,
+            'is_safe': is_safe,
+            'score': score,
+            'matched_field': matched_field,
+            'profile_id': profile.id if profile else None,
+            'user_id': profile.user_id if profile else None,
+            'customer_name': profile.display_name if profile else '',
+            'customer_org': profile.organization if profile else '',
+            'customer_city': profile.city if profile else '',
+            'old_code': profile.accounting_code if profile else '',
+        })
+
+    return preview, summary
+
+
+@login_required
+def import_customer_accounting_codes(request):
+    if not _can_import_customer_accounting_codes(request.user):
+        return HttpResponseForbidden('شما دسترسی ورود کد تفضیلی مشتریان را ندارید.')
+
+    preview = request.session.get(_CUSTOMER_ACCOUNTING_IMPORT_SESSION_KEY, [])
+    summary = {
+        'total': len(preview),
+        'matched': sum(1 for row in preview if row.get('status') == 'matched'),
+        'review': sum(1 for row in preview if row.get('status') == 'review'),
+        'unmatched': sum(1 for row in preview if row.get('status') == 'unmatched'),
+        'ambiguous': sum(1 for row in preview if row.get('status') == 'ambiguous'),
+    }
+
+    if request.method == 'POST' and request.POST.get('action') == 'preview':
+        file = request.FILES.get('file')
+        if not file:
+            messages.error(request, 'فایل اکسل را انتخاب کنید.')
+            return redirect('import_customer_accounting_codes')
+        try:
+            preview, summary = _build_accounting_code_import_preview(file)
+            request.session[_CUSTOMER_ACCOUNTING_IMPORT_SESSION_KEY] = preview
+            request.session.modified = True
+            messages.success(request, f'{summary["total"]} ردیف خوانده شد؛ {summary["matched"]} مورد تطبیق مطمئن دارد.')
+        except Exception as exc:
+            logger.exception('Customer accounting code import preview failed')
+            messages.error(request, f'خطا در خواندن فایل: {exc}')
+            return redirect('import_customer_accounting_codes')
+
+    elif request.method == 'POST' and request.POST.get('action') == 'apply':
+        selected = {int(idx) for idx in request.POST.getlist('apply_rows') if str(idx).isdigit()}
+        if not preview:
+            messages.error(request, 'ابتدا فایل را بارگذاری و پیش‌نمایش را بررسی کنید.')
+            return redirect('import_customer_accounting_codes')
+        updated = 0
+        skipped = 0
+        with transaction.atomic():
+            for idx, row in enumerate(preview):
+                if idx not in selected:
+                    skipped += 1
+                    continue
+                profile_id = row.get('profile_id')
+                code = (row.get('code') or '').strip()
+                if not profile_id or not code:
+                    skipped += 1
+                    continue
+                profile = UserProfile.objects.select_for_update().get(id=profile_id, role='customer')
+                if profile.accounting_code != code:
+                    profile.accounting_code = code
+                    profile.save(update_fields=['accounting_code'])
+                    updated += 1
+                else:
+                    skipped += 1
+        request.session.pop(_CUSTOMER_ACCOUNTING_IMPORT_SESSION_KEY, None)
+        messages.success(request, f'{updated} کد تفضیلی ثبت/به‌روزرسانی شد. {skipped} ردیف بدون تغییر ماند.')
+        return redirect('customers_list')
+
+    return render(request, 'payments/import_customer_accounting_codes.html', {
+        'preview': preview,
+        'summary': summary,
+        'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
     })
 
 
