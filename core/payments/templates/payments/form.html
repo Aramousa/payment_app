@@ -1137,7 +1137,7 @@
                                 <form class="staff-action" method="post" action="{% url 'finance_unified_action' payment.id %}">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <select name="finance_action" required style="margin-bottom:6px;">
+                                    <select name="finance_action" required style="margin-bottom:6px;" onchange="this.closest('form').querySelector('textarea[name=note]').required = (this.value === 'return_to_commercial');">
                                         {% for val, lbl in payment.finance_choices %}
                                         <option value="{{ val }}">{{ lbl }}</option>
                                         {% endfor %}
@@ -1145,6 +1145,16 @@
                                     <textarea name="note" placeholder="توضیح (برای عودت به بازرگانی الزامی)" style="min-height:56px;margin-bottom:6px;"></textarea>
                                     <button type="submit" style="background:#6d28d9;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:Vazir,sans-serif;font-weight:700;font-size:13px;cursor:pointer;width:100%;">ثبت وضعیت مالی</button>
                                 </form>
+                                <script>
+                                (function() {
+                                    var form = document.currentScript.previousElementSibling;
+                                    var actionSelect = form.querySelector('select[name="finance_action"]');
+                                    var noteField = form.querySelector('textarea[name="note"]');
+                                    if (actionSelect && noteField && actionSelect.value === 'return_to_commercial') {
+                                        noteField.required = true;
+                                    }
+                                })();
+                                </script>
                             </div>
                             {% endif %}
 

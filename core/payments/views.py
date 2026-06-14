@@ -3511,6 +3511,9 @@ def finance_unified_action(request, payment_id):
         if dept != 'finance' and not request.user.is_superuser:
             messages.error(request, 'فقط واحد مالی می‌تواند سند را عودت دهد.')
             return redirect(redirect_target)
+        if not note:
+            messages.error(request, 'برای عودت به بازرگانی، ثبت توضیح الزامی است.')
+            return redirect(redirect_target)
         old_status = payment.status
         payment.status = PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL
         payment.finance_status = None
@@ -3524,7 +3527,7 @@ def finance_unified_action(request, payment_id):
         ])
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
                       from_status=old_status, to_status=payment.status,
-                      note=note or 'عودت به بازرگانی توسط مالی')
+                      note=note)
         messages.warning(request, f'سند #{payment_id} به بازرگانی عودت داده شد.')
 
     else:
