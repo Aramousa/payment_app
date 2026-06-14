@@ -312,10 +312,12 @@ class PaymentRecord(models.Model):
     ]
 
     STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING = 'commercial_approved_finance_pending'
+    STAFF_FILTER_FINANCE_PENDING = 'finance_pending'
 
     # گزینه‌های فیلتر اضافی برای پنل کارکنان (شامل فلگ مستقل مالی)
     STAFF_FILTER_CHOICES = STATUS_CHOICES + [
         ('finance_ok', 'ثبت مالی'),
+        (STAFF_FILTER_FINANCE_PENDING, 'در انتظار ثبت مالی'),
         (STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING, 'ثبت بازرگانی / در بررسی مالی'),
     ]
 

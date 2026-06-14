@@ -1973,6 +1973,13 @@ def _apply_record_filters(records, request, is_staff_user):
         if filters['status'] == 'finance_ok':
             # فیلتر ثبت مالی — فلگ مستقل مالی
             records = records.filter(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
+        elif filters['status'] == PaymentRecord.STAFF_FILTER_FINANCE_PENDING:
+            # کلیه اسنادی که فلگ مستقل مالی آن‌ها «در انتظار ثبت مالی» است
+            records = records.exclude(status__in=[
+                PaymentRecord.STATUS_FINAL_APPROVED,
+                PaymentRecord.STATUS_REJECTED,
+                PaymentRecord.STATUS_INCOMPLETE,
+            ]).exclude(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
         elif filters['status'] == PaymentRecord.STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING:
             records = records.filter(
                 status=PaymentRecord.STATUS_APPROVED,
