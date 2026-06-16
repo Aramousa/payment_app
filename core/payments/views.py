@@ -4275,10 +4275,11 @@ def reconciliation_poll(request):
 
 
 _THREAD_PREDEFINED_TITLES = {
-    'status_change':    'درخواست تغییر وضعیت',
-    'payment_review':   'بررسی فیش واریزی',
-    'discrepancy':      'مغایرت واریز',
-    'final_approval':   'درخواست تأیید نهایی',
+    'status_change':      'درخواست تغییر وضعیت',
+    'payment_review':     'بررسی فیش واریزی',
+    'discrepancy':        'مغایرت واریز',
+    'final_approval':     'درخواست تأیید نهایی',
+    'return_commercial':  'درخواست عودت به بازرگانی',
 }
 
 

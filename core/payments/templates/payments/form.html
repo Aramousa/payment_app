@@ -342,12 +342,22 @@
             box-shadow: 0 8px 32px rgba(0,0,0,.18);
         }
         #threadPopupBox h4 { margin: 0 0 16px; font-size: 15px; color: #1e3a5f; }
-        #threadPopupBox label { display: block; font-size: 13px; margin-bottom: 5px; color: #374151; }
-        #threadPopupBox select, #threadPopupBox input[type=text] {
+        #threadPopupBox label { display: block; font-size: 13px; margin-bottom: 5px; color: #374151; font-family: Vazir, sans-serif; }
+        #threadPopupBox input[type=text] {
             width: 100%; box-sizing: border-box; border: 1px solid #d1d5db;
             border-radius: 7px; padding: 8px 10px; font-family: Vazir, sans-serif;
             font-size: 13px; color: #111; background: #f9fafb;
         }
+        .thread-title-options { border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; margin-bottom: 2px; }
+        .thread-title-options label {
+            display: flex; align-items: center; gap: 9px; padding: 9px 12px;
+            cursor: pointer; font-family: Vazir, sans-serif; font-size: 13px;
+            color: #1e293b; border-bottom: 1px solid #e5e7eb; margin: 0;
+            transition: background .12s;
+        }
+        .thread-title-options label:last-child { border-bottom: 0; }
+        .thread-title-options label:hover { background: #f0f4f8; }
+        .thread-title-options input[type="radio"] { accent-color: #1e3a5f; flex-shrink: 0; }
         #threadCustomTitleWrap { margin-top: 10px; display: none; }
         #threadPopupActions { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end; }
 
@@ -1974,14 +1984,15 @@
                 {% csrf_token %}
                 <input type="hidden" name="payment_id" id="threadPaymentId">
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <label for="threadTitleChoice">موضوع گفتگو</label>
-                <select id="threadTitleChoice" name="title_choice">
-                    <option value="status_change">درخواست تغییر وضعیت</option>
-                    <option value="payment_review">بررسی فیش واریزی</option>
-                    <option value="discrepancy">مغایرت واریز</option>
-                    <option value="final_approval">درخواست تأیید نهایی</option>
-                    <option value="custom">عنوان دلخواه...</option>
-                </select>
+                <label style="margin-bottom:8px;">موضوع گفتگو</label>
+                <div class="thread-title-options">
+                    <label><input type="radio" name="title_choice" value="status_change" checked> درخواست تغییر وضعیت</label>
+                    <label><input type="radio" name="title_choice" value="payment_review"> بررسی فیش واریزی</label>
+                    <label><input type="radio" name="title_choice" value="discrepancy"> مغایرت واریز</label>
+                    <label><input type="radio" name="title_choice" value="final_approval"> درخواست تأیید نهایی</label>
+                    <label><input type="radio" name="title_choice" value="return_commercial"> درخواست عودت به بازرگانی</label>
+                    <label><input type="radio" name="title_choice" value="custom"> عنوان دلخواه...</label>
+                </div>
                 <div id="threadCustomTitleWrap">
                     <label for="threadCustomTitle" style="margin-top:0;">عنوان دلخواه</label>
                     <input type="text" id="threadCustomTitle" name="title_custom" placeholder="عنوان گفتگو را وارد کنید" maxlength="100">
@@ -1998,26 +2009,29 @@
         var overlay = document.getElementById('threadPopupOverlay');
         var paymentIdInput = document.getElementById('threadPaymentId');
         var labelEl = document.getElementById('threadPopupPaymentLabel');
-        var titleChoiceEl = document.getElementById('threadTitleChoice');
         var customWrap = document.getElementById('threadCustomTitleWrap');
         var customInput = document.getElementById('threadCustomTitle');
+        var popupForm = document.getElementById('threadPopupForm');
 
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('.btn-start-thread');
             if (!btn) return;
             paymentIdInput.value = btn.dataset.paymentId;
             labelEl.textContent = btn.dataset.paymentLabel || '';
-            titleChoiceEl.value = 'status_change';
+            // reset to first radio
+            var first = popupForm.querySelector('input[type="radio"]');
+            if (first) first.checked = true;
             customWrap.style.display = 'none';
             customInput.value = '';
             overlay.classList.add('open');
-            overlay.focus && overlay.focus();
         });
 
-        titleChoiceEl.addEventListener('change', function () {
-            var show = this.value === 'custom';
-            customWrap.style.display = show ? 'block' : 'none';
-            if (show) customInput.focus();
+        popupForm.addEventListener('change', function (e) {
+            if (e.target.name === 'title_choice') {
+                var show = e.target.value === 'custom';
+                customWrap.style.display = show ? 'block' : 'none';
+                if (show) customInput.focus();
+            }
         });
 
         overlay.addEventListener('click', function (e) {
