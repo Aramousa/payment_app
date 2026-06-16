@@ -908,7 +908,7 @@
                         {% endif %}
                         <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
                         {% if payment.user %}
-                        <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو">🚀</button>
+                        <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
                         {% endif %}
                     {% else %}
                         {# ─── ستون اقدام — فقط نشانگر وضعیت + دکمه جزئیات ─── #}
@@ -922,7 +922,7 @@
                             <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل</a>
                             {% endif %}
                             {% if payment.user %}
-                            <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو">🚀</button>
+                            <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
                             {% endif %}
                             <button type="button" class="expand-btn" data-row="{{ payment.id }}">{% if is_history_mode and not payment.can_commercial_act and not payment.can_finance_register and not payment.finance_choices %}جزئیات{% else %}جزئیات و اقدام{% endif %}</button>
                         </div>
@@ -1964,7 +1964,7 @@
     <!-- ─── Popup ارسال به گفتگو ─── -->
     <div id="threadPopupOverlay">
         <div id="threadPopupBox">
-            <h4>🚀 ارسال سند به گفتگو</h4>
+            <h4>ارسال سند به گفتگو</h4>
             <p id="threadPopupPaymentLabel" style="font-size:12px;color:#6b7280;margin:0 0 14px;"></p>
             <form id="threadPopupForm" method="post" action="{% url 'payment_start_thread' %}">
                 {% csrf_token %}
