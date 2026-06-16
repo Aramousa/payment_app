@@ -320,6 +320,35 @@
         .dashboard-empty { color: #667085; font-size: 13px; background: #f8fafc; border-radius: 7px; padding: 10px; }
         @media (max-width: 900px) { .customer-dashboard { grid-template-columns: 1fr; } }
 
+        /* دکمه ارسال به گفتگو */
+        .btn-start-thread {
+            background: none; border: 1.5px solid #1e3a5f; border-radius: 6px;
+            color: #1e3a5f; font-size: 14px; line-height: 1; padding: 3px 6px;
+            cursor: pointer; font-family: inherit; transition: background .15s, color .15s;
+        }
+        .btn-start-thread:hover { background: #1e3a5f; color: #fff; }
+
+        /* Popup گفتگوی جدید */
+        #threadPopupOverlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9800;
+            display: none; align-items: center; justify-content: center;
+        }
+        #threadPopupOverlay.open { display: flex; }
+        #threadPopupBox {
+            background: #fff; border-radius: 12px; padding: 24px 28px; width: 380px;
+            max-width: 96vw; direction: rtl; font-family: Vazir, sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,.18);
+        }
+        #threadPopupBox h4 { margin: 0 0 16px; font-size: 15px; color: #1e3a5f; }
+        #threadPopupBox label { display: block; font-size: 13px; margin-bottom: 5px; color: #374151; }
+        #threadPopupBox select, #threadPopupBox input[type=text] {
+            width: 100%; box-sizing: border-box; border: 1px solid #d1d5db;
+            border-radius: 7px; padding: 8px 10px; font-family: Vazir, sans-serif;
+            font-size: 13px; color: #111; background: #f9fafb;
+        }
+        #threadCustomTitleWrap { margin-top: 10px; display: none; }
+        #threadPopupActions { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end; }
+
     </style>
 </head>
 <body>
@@ -878,6 +907,9 @@
                             <a class="edit-link" href="{% url 'edit_payment' payment.id %}?next={{ request.get_full_path|urlencode }}">ویرایش</a>
                         {% endif %}
                         <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
+                        {% if payment.user %}
+                        <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو">🚀</button>
+                        {% endif %}
                     {% else %}
                         {# ─── ستون اقدام — فقط نشانگر وضعیت + دکمه جزئیات ─── #}
                         <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
@@ -888,6 +920,9 @@
                             {% endif %}
                             {% if payment.can_edit_details %}
                             <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل</a>
+                            {% endif %}
+                            {% if payment.user %}
+                            <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو">🚀</button>
                             {% endif %}
                             <button type="button" class="expand-btn" data-row="{{ payment.id }}">{% if is_history_mode and not payment.can_commercial_act and not payment.can_finance_register and not payment.finance_choices %}جزئیات{% else %}جزئیات و اقدام{% endif %}</button>
                         </div>
@@ -1925,5 +1960,74 @@
     }
     </script>
     <script src="{% static 'js/app-ui.js' %}"></script>
+
+    <!-- ─── Popup ارسال به گفتگو ─── -->
+    <div id="threadPopupOverlay">
+        <div id="threadPopupBox">
+            <h4>🚀 ارسال سند به گفتگو</h4>
+            <p id="threadPopupPaymentLabel" style="font-size:12px;color:#6b7280;margin:0 0 14px;"></p>
+            <form id="threadPopupForm" method="post" action="{% url 'payment_start_thread' %}">
+                {% csrf_token %}
+                <input type="hidden" name="payment_id" id="threadPaymentId">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <label for="threadTitleChoice">موضوع گفتگو</label>
+                <select id="threadTitleChoice" name="title_choice">
+                    <option value="status_change">درخواست تغییر وضعیت</option>
+                    <option value="payment_review">بررسی فیش واریزی</option>
+                    <option value="discrepancy">مغایرت واریز</option>
+                    <option value="final_approval">درخواست تأیید نهایی</option>
+                    <option value="custom">عنوان دلخواه...</option>
+                </select>
+                <div id="threadCustomTitleWrap">
+                    <label for="threadCustomTitle" style="margin-top:0;">عنوان دلخواه</label>
+                    <input type="text" id="threadCustomTitle" name="title_custom" placeholder="عنوان گفتگو را وارد کنید" maxlength="100">
+                </div>
+                <div id="threadPopupActions">
+                    <button type="button" class="button-link outline sm" onclick="closeThreadPopup()">انصراف</button>
+                    <button type="submit" class="button-link sm">ارسال به گفتگو</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var overlay = document.getElementById('threadPopupOverlay');
+        var paymentIdInput = document.getElementById('threadPaymentId');
+        var labelEl = document.getElementById('threadPopupPaymentLabel');
+        var titleChoiceEl = document.getElementById('threadTitleChoice');
+        var customWrap = document.getElementById('threadCustomTitleWrap');
+        var customInput = document.getElementById('threadCustomTitle');
+
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.btn-start-thread');
+            if (!btn) return;
+            paymentIdInput.value = btn.dataset.paymentId;
+            labelEl.textContent = btn.dataset.paymentLabel || '';
+            titleChoiceEl.value = 'status_change';
+            customWrap.style.display = 'none';
+            customInput.value = '';
+            overlay.classList.add('open');
+            overlay.focus && overlay.focus();
+        });
+
+        titleChoiceEl.addEventListener('change', function () {
+            var show = this.value === 'custom';
+            customWrap.style.display = show ? 'block' : 'none';
+            if (show) customInput.focus();
+        });
+
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) closeThreadPopup();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeThreadPopup();
+        });
+    })();
+
+    function closeThreadPopup() {
+        document.getElementById('threadPopupOverlay').classList.remove('open');
+    }
+    </script>
 </body>
 </html>

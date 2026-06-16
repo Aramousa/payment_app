@@ -4274,6 +4274,118 @@ def reconciliation_poll(request):
     })
 
 
+_THREAD_PREDEFINED_TITLES = {
+    'status_change':    'درخواست تغییر وضعیت',
+    'payment_review':   'بررسی فیش واریزی',
+    'discrepancy':      'مغایرت واریز',
+    'final_approval':   'درخواست تأیید نهایی',
+}
+
+
+@login_required
+def payment_start_thread(request):
+    """ایجاد یا بازیابی گفتگوی مغایرت‌گیری برای یک سند پرداخت."""
+    if request.method != 'POST':
+        return HttpResponseForbidden()
+
+    if not _can_access_reconciliation(request.user):
+        messages.error(request, 'دسترسی به مغایرت‌گیری ندارید.')
+        return redirect(request.POST.get('next') or reverse('submit'))
+
+    payment_id = request.POST.get('payment_id', '').strip()
+    payment = get_object_or_404(
+        PaymentRecord.objects.select_related('user', 'user__profile'),
+        id=payment_id,
+    )
+
+    is_staff = _is_staff_user(request.user)
+    is_owner = payment.user_id and payment.user_id == request.user.id
+    if not is_staff and not is_owner:
+        messages.error(request, 'دسترسی ندارید.')
+        return redirect(request.POST.get('next') or reverse('submit'))
+
+    if not payment.user:
+        messages.error(request, 'این سند فاقد حساب کاربری مشتری است.')
+        return redirect(request.POST.get('next') or reverse('submit'))
+
+    title_choice = request.POST.get('title_choice', 'status_change')
+    title_custom = request.POST.get('title_custom', '').strip()
+    if title_choice == 'custom':
+        base_title = title_custom or 'درخواست تغییر وضعیت'
+    else:
+        base_title = _THREAD_PREDEFINED_TITLES.get(title_choice, 'درخواست تغییر وضعیت')
+
+    from .templatetags.payment_dates import thousand_sep as _tsep, jalali_date as _jdate
+    amount_str = _tsep(payment.amount) if payment.amount else '—'
+    pay_date_str = _jdate(payment.pay_date) if payment.pay_date else '—'
+    auto_body = (
+        f"لطفا وضعیت سند را تغییر دهید.\n\n"
+        f"جزئیات سند:\n"
+        f"• شماره سند: #{payment.id}\n"
+        f"• مبلغ: {amount_str} ریال\n"
+        f"• تاریخ واریز: {pay_date_str}\n"
+        f"• کد پیگیری: {payment.tracking_code or '—'}\n"
+        f"• وضعیت فعلی: {payment.get_status_display()}"
+    )
+
+    from django.core.cache import cache as _cache
+    from .context_processors import recon_unread_cache_key
+
+    def _invalidate_thread_caches(thread_obj):
+        for _p in thread_obj.staff_participants.exclude(id=request.user.id):
+            _cache.delete(recon_unread_cache_key(_p.id))
+        if thread_obj.customer_id and thread_obj.customer_id != request.user.id:
+            _cache.delete(recon_unread_cache_key(thread_obj.customer_id))
+
+    existing = ReconciliationThread.objects.filter(
+        document_type=ReconciliationThread.DOC_PAYMENT,
+        document_id=payment.id,
+    ).order_by('-updated_at').first()
+
+    if existing:
+        if existing.status == ReconciliationThread.STATUS_CLOSED:
+            existing.status = ReconciliationThread.STATUS_OPEN
+            existing.save(update_fields=['status', 'updated_at'])
+        ReconciliationMessage.objects.create(
+            thread=existing,
+            sender=request.user,
+            body=auto_body,
+        )
+        existing.updated_at = timezone.now()
+        existing.save(update_fields=['updated_at'])
+        _invalidate_thread_caches(existing)
+        messages.success(request, 'گفتگوی موجود بروزرسانی و پیام ارسال شد.')
+        return redirect(f"{reverse('reconciliation_center')}?thread={existing.id}")
+
+    thread_title = f"{base_title} — سند #{payment.id}"
+    staff_qs = list(User.objects.filter(
+        is_active=True,
+        profile__role__in=['finance', 'commercial', 'sales'],
+    ).select_related('profile'))
+
+    thread = ReconciliationThread(
+        title=thread_title,
+        customer=payment.user,
+        created_by=request.user,
+        document_type=ReconciliationThread.DOC_PAYMENT,
+        document_id=payment.id,
+        status=ReconciliationThread.STATUS_OPEN,
+    )
+    thread.save()
+    thread.staff_participants.set(staff_qs)
+    if is_staff and not thread.staff_participants.filter(id=request.user.id).exists():
+        thread.staff_participants.add(request.user)
+
+    ReconciliationMessage.objects.create(
+        thread=thread,
+        sender=request.user,
+        body=auto_body,
+    )
+    _invalidate_thread_caches(thread)
+    messages.success(request, 'گفتگوی جدید ایجاد شد.')
+    return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
+
+
 @login_required
 def staff_edit_payment_details(request, payment_id):
     if not _can_edit_payment_details(request.user):
