@@ -664,6 +664,56 @@ def _can_staff_act_on_payment(role, payment, is_system_admin=False):
     return False
 
 
+def _commercial_can_revise(payment, logs=None):
+    """
+    بازرگانی/فروش می‌تواند وضعیت رد/ناقص/ثبت‌بازرگانی را تجدیدنظر کند اگر:
+    - جدیدترین اقدام واقعی روی سند از همین بخش باشد
+    - هیچ بخش دیگری پس از آن آخرین اقدام بازرگانی تغییری نداده باشد
+
+    لاگ‌ها به ترتیب جدیدترین-اول هستند (ordering = ['-created_at', '-id']).
+    اقدامات نادیده‌گرفته‌شده: VIEWED، CUSTOMER_NOTE، مدیر سیستم.
+    """
+    REVISABLE = {
+        PaymentRecord.STATUS_APPROVED,
+        PaymentRecord.STATUS_REJECTED,
+        PaymentRecord.STATUS_INCOMPLETE,
+    }
+    if payment.status not in REVISABLE:
+        return False
+
+    if logs is None:
+        logs = list(payment.activity_logs.all())
+
+    IGNORABLE = {PaymentActivityLog.ACTION_VIEWED, PaymentActivityLog.ACTION_CUSTOMER_NOTE}
+
+    # پیدا کردن جدیدترین (اولین در لیست) اقدام واقعی بازرگانی/فروش
+    most_recent_commercial_idx = None
+    for i, log in enumerate(logs):
+        if log.action in IGNORABLE:
+            continue
+        if log.actor and log.actor.is_superuser:
+            continue
+        dept = _department_role(_user_role(log.actor)) if log.actor else ''
+        if dept in {'commercial', 'sales'}:
+            most_recent_commercial_idx = i
+            break  # جدیدترین یافت شد
+
+    if most_recent_commercial_idx is None:
+        return False
+
+    # آیا اقدام واقعی سایر بخش‌ها جدیدتر از آن هست؟ (ایندکس کوچک‌تر = جدیدتر)
+    for log in logs[:most_recent_commercial_idx]:
+        if log.action in IGNORABLE:
+            continue
+        if log.actor and log.actor.is_superuser:
+            continue
+        dept = _department_role(_user_role(log.actor)) if log.actor else ''
+        if dept not in {'commercial', 'sales'}:
+            return False
+
+    return True
+
+
 def _can_finance_register(role, payment, is_system_admin=False):
     """آیا مالی می‌تواند ثبت مالی انجام دهد؟ — فلگ مستقل."""
     if is_system_admin:
@@ -1858,6 +1908,11 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
 
         # اقدام بازرگانی — فقط بازرگانی/فروش/ادمین (نه مالی)
         _dept = _department_role(staff_role) if staff_role else ''
+
+        # تجدیدنظر بازرگانی: اگر آخرین اقدام واقعی از بازرگانی بوده، امکان اصلاح وجود دارد
+        if not payment.staff_can_act and _dept in {'commercial', 'sales'}:
+            payment.staff_can_act = _commercial_can_revise(payment)
+
         payment.can_commercial_act = (
             _dept in {'commercial', 'sales'} and payment.staff_can_act
         ) or (
@@ -3649,7 +3704,13 @@ def staff_update_status(request, payment_id):
 
     payment = get_object_or_404(PaymentRecord, id=payment_id)
     staff_role = _user_role(request.user)
-    if not _can_staff_act_on_payment(staff_role, payment, is_system_admin=request.user.is_superuser):
+    can_act = _can_staff_act_on_payment(staff_role, payment, is_system_admin=request.user.is_superuser)
+    if not can_act:
+        dept = _department_role(staff_role)
+        if dept in {'commercial', 'sales'}:
+            fresh_logs = list(payment.activity_logs.select_related('actor', 'actor__profile').all())
+            can_act = _commercial_can_revise(payment, logs=fresh_logs)
+    if not can_act:
         messages.error(request, 'در وضعیت فعلی، امکان تغییر این سند برای شما وجود ندارد.')
         return redirect(redirect_target)
 
