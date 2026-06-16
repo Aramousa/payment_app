@@ -1138,6 +1138,11 @@ tr.detail-row {
     color: #fff !important;
 }
 
+.flag-teal {
+    background: #00b4a6 !important;
+    color: #fff !important;
+}
+
 .flag-orange {
     background: #f08c00 !important;
     color: #2b1700 !important;

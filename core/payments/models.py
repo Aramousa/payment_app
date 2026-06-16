@@ -295,6 +295,7 @@ class UploadSettings(models.Model):
 class PaymentRecord(models.Model):
     STATUS_PENDING = 'pending'
     STATUS_COMMERCIAL_REVIEW = 'commercial_review'
+    STATUS_TEMP_COMMERCIAL = 'temp_commercial'
     STATUS_APPROVED = 'approved'
     STATUS_FINAL_APPROVED = 'final_approved'
     STATUS_REJECTED = 'rejected'
@@ -304,6 +305,7 @@ class PaymentRecord(models.Model):
     STATUS_CHOICES = [
         (STATUS_PENDING, 'در حال بررسی'),
         (STATUS_COMMERCIAL_REVIEW, 'بررسی بازرگانی'),
+        (STATUS_TEMP_COMMERCIAL, 'ثبت موقت بازرگانی'),
         (STATUS_APPROVED, 'ثبت بازرگانی'),
         (STATUS_FINAL_APPROVED, 'تایید نهایی'),
         (STATUS_REJECTED, 'رد شده'),
@@ -324,6 +326,7 @@ class PaymentRecord(models.Model):
     CUSTOMER_VISIBLE_LABELS = {
         STATUS_PENDING: 'در حال بررسی',
         STATUS_COMMERCIAL_REVIEW: 'در حال بررسی',
+        STATUS_TEMP_COMMERCIAL: 'در حال بررسی',
         STATUS_RETURNED_TO_COMMERCIAL: 'در حال بررسی',
         STATUS_APPROVED: 'ثبت بازرگانی',
         STATUS_FINAL_APPROVED: 'تایید نهایی',
@@ -492,6 +495,8 @@ class PaymentRecord(models.Model):
             return 'flag-gray'      # خاکستری — بررسی اولیه
         if self.status == self.STATUS_COMMERCIAL_REVIEW:
             return 'flag-blue'      # آبی — در حال بررسی
+        if self.status == self.STATUS_TEMP_COMMERCIAL:
+            return 'flag-teal'      # فیروزه‌ای — ثبت موقت بازرگانی
         if self.status == self.STATUS_APPROVED:
             return 'flag-orange'    # نارنجی — ثبت بازرگانی
         if self.status == self.STATUS_FINAL_APPROVED:

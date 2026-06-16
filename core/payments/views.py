@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 STATUS_FLAG_META = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: ('بررسی بازرگانی', 'flag-blue'),
+    PaymentRecord.STATUS_TEMP_COMMERCIAL: ('ثبت موقت بازرگانی', 'flag-teal'),
     PaymentRecord.STATUS_APPROVED: ('ثبت بازرگانی', 'flag-orange'),
     PaymentRecord.STATUS_FINAL_APPROVED: ('تایید نهایی', 'flag-green'),
     PaymentRecord.STATUS_REJECTED: ('رد شده', 'flag-red'),
@@ -55,6 +56,7 @@ STATUS_FLAG_META = {
 }
 STATUS_PROGRESS_FLOWS = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW],
+    PaymentRecord.STATUS_TEMP_COMMERCIAL: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_TEMP_COMMERCIAL],
     PaymentRecord.STATUS_APPROVED: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_APPROVED],
     PaymentRecord.STATUS_FINAL_APPROVED: [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
@@ -599,6 +601,7 @@ def _staff_status_choices_for_role(role):
     # وضعیت‌های مجاز بازرگانی — مستقل از نقش مالی
     COMMERCIAL_CHOICES = [
         (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'در حال بررسی بازرگانی'),
+        (PaymentRecord.STATUS_TEMP_COMMERCIAL,   'ثبت موقت بازرگانی'),
         (PaymentRecord.STATUS_APPROVED,           'ثبت بازرگانی'),
         (PaymentRecord.STATUS_INCOMPLETE,         'ناقص'),
         (PaymentRecord.STATUS_REJECTED,           'رد شده'),
@@ -641,6 +644,7 @@ def _can_staff_act_on_payment(role, payment, is_system_admin=False):
     COMMERCIAL_ACTIVE_STATUSES = {
         PaymentRecord.STATUS_PENDING,
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        PaymentRecord.STATUS_TEMP_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
     }
 
@@ -773,12 +777,14 @@ def _active_payment_records_for_user(user):
         return records.filter(status__in=[
             PaymentRecord.STATUS_PENDING,
             PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+            PaymentRecord.STATUS_TEMP_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
         ])
     if role == 'finance':
         return records.filter(status__in=[
             PaymentRecord.STATUS_PENDING,
             PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+            PaymentRecord.STATUS_TEMP_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
             PaymentRecord.STATUS_APPROVED,
             PaymentRecord.STATUS_INCOMPLETE,
@@ -1539,6 +1545,8 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
 
     if to_status == PaymentRecord.STATUS_APPROVED:
         recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
+    elif to_status == PaymentRecord.STATUS_TEMP_COMMERCIAL:
+        recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL:
         recipients.extend(_staff_notification_users(roles={'commercial'}, exclude_user=actor))
     elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED, PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
@@ -1679,6 +1687,7 @@ def _log_text(log):
         to_text   = status_labels.get(log.to_status,   log.to_status or '')
         icon = {
             PaymentRecord.STATUS_APPROVED:   '🏬',
+            PaymentRecord.STATUS_TEMP_COMMERCIAL: '📋',
             PaymentRecord.STATUS_REJECTED:   '🚫',
             PaymentRecord.STATUS_INCOMPLETE: '⚠',
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: '↩',
@@ -1789,6 +1798,7 @@ def _customer_visible_logs(logs):
 def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_payment_details=False, acting_user=None):
     status_order = [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        PaymentRecord.STATUS_TEMP_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
         PaymentRecord.STATUS_APPROVED,
         PaymentRecord.STATUS_FINAL_APPROVED,
