@@ -663,17 +663,23 @@ def _can_staff_act_on_payment(role, payment, is_system_admin=False):
 
 def _commercial_can_revise(payment, logs=None):
     """
-    بازرگانی/فروش می‌تواند وضعیت رد/ناقص/ثبت‌بازرگانی را تجدیدنظر کند اگر:
-    - جدیدترین اقدام واقعی روی سند از همین بخش باشد
-    - هیچ بخش دیگری پس از آن آخرین اقدام بازرگانی تغییری نداده باشد
+    بازرگانی/فروش می‌تواند وضعیت سند را تجدیدنظر کند اگر آخرین اقدام
+    معنادار (غیر از مشاهده و یادداشت مشتری) از طرف خود بازرگانی/فروش
+    یا مدیر سیستم بوده باشد.
+
+    قوانین:
+    - آخرین اقدام از بازرگانی/فروش → می‌تواند تجدیدنظر کند
+    - آخرین اقدام از مدیر سیستم → می‌تواند تجدیدنظر کند (مدیر قفل را باز کرده)
+    - آخرین اقدام از مالی یا مشتری → قفل است تا مدیر/مالی وضعیت را دوباره تغییر دهند
 
     لاگ‌ها به ترتیب جدیدترین-اول هستند (ordering = ['-created_at', '-id']).
-    اقدامات نادیده‌گرفته‌شده: VIEWED، CUSTOMER_NOTE، مدیر سیستم.
+    اقدامات نادیده‌گرفته‌شده: VIEWED، CUSTOMER_NOTE.
     """
     REVISABLE = {
         PaymentRecord.STATUS_APPROVED,
         PaymentRecord.STATUS_REJECTED,
         PaymentRecord.STATUS_INCOMPLETE,
+        PaymentRecord.STATUS_TEMP_COMMERCIAL,
     }
     if payment.status not in REVISABLE:
         return False
@@ -683,32 +689,23 @@ def _commercial_can_revise(payment, logs=None):
 
     IGNORABLE = {PaymentActivityLog.ACTION_VIEWED, PaymentActivityLog.ACTION_CUSTOMER_NOTE}
 
-    # پیدا کردن جدیدترین (اولین در لیست) اقدام واقعی بازرگانی/فروش
-    most_recent_commercial_idx = None
-    for i, log in enumerate(logs):
+    # اولین اقدام معنادار در لیست = جدیدترین اقدام
+    for log in logs:
         if log.action in IGNORABLE:
             continue
-        if log.actor and log.actor.is_superuser:
+        actor = log.actor
+        if not actor:
             continue
-        dept = _department_role(_user_role(log.actor)) if log.actor else ''
+        # مدیر سیستم: قفل را باز می‌کند
+        if actor.is_superuser:
+            return True
+        dept = _department_role(_user_role(actor))
         if dept in {'commercial', 'sales'}:
-            most_recent_commercial_idx = i
-            break  # جدیدترین یافت شد
-
-    if most_recent_commercial_idx is None:
+            return True   # بازرگانی آخرین بار اقدام کرده
+        # مالی یا مشتری آخرین بار اقدام کرده → قفل
         return False
 
-    # آیا اقدام واقعی سایر بخش‌ها جدیدتر از آن هست؟ (ایندکس کوچک‌تر = جدیدتر)
-    for log in logs[:most_recent_commercial_idx]:
-        if log.action in IGNORABLE:
-            continue
-        if log.actor and log.actor.is_superuser:
-            continue
-        dept = _department_role(_user_role(log.actor)) if log.actor else ''
-        if dept not in {'commercial', 'sales'}:
-            return False
-
-    return True
+    return False  # هیچ اقدام معناداری یافت نشد
 
 
 def _can_finance_register(role, payment, is_system_admin=False):
@@ -1876,6 +1873,11 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             for code in status_order
             if code in reached
         ]
+        # لاگ‌ها را یک‌بار واکشی می‌کنیم و در چند جا استفاده می‌کنیم
+        _fetched_logs = list(
+            payment.activity_logs.select_related('actor', 'actor__profile').all()
+        )
+
         if staff_role:
             raw_lines = [
                 {
@@ -1885,12 +1887,12 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
                     'action': log.action,
                     'actor_id': log.actor_id,
                 }
-                for log in list(payment.activity_logs.all()[:20])
+                for log in _fetched_logs[:20]
                 if not _is_superuser_actor(log)
             ]
             payment.timeline_lines = _group_consecutive_views(raw_lines)[:5]
         else:
-            payment.timeline_lines = _customer_visible_logs(payment.activity_logs.all())[:5]
+            payment.timeline_lines = _customer_visible_logs(_fetched_logs)[:5]
         payment.staff_can_act = _can_staff_act_on_payment(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
@@ -1906,9 +1908,9 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         # اقدام بازرگانی — فقط بازرگانی/فروش/ادمین (نه مالی)
         _dept = _department_role(staff_role) if staff_role else ''
 
-        # تجدیدنظر بازرگانی: اگر آخرین اقدام واقعی از بازرگانی بوده، امکان اصلاح وجود دارد
+        # تجدیدنظر بازرگانی: اگر آخرین اقدام واقعی از بازرگانی یا مدیر بوده، امکان اصلاح وجود دارد
         if not payment.staff_can_act and _dept in {'commercial', 'sales'}:
-            payment.staff_can_act = _commercial_can_revise(payment)
+            payment.staff_can_act = _commercial_can_revise(payment, logs=_fetched_logs)
 
         payment.can_commercial_act = (
             _dept in {'commercial', 'sales'} and payment.staff_can_act
