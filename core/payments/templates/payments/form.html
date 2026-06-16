@@ -1039,7 +1039,8 @@
                             <a href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">نمایش کامل تاریخچه</a>
                         </div>
 
-                        {% if is_staff_user and staff_user_role != 'data_entry' and (not is_history_mode or payment.can_commercial_act or payment.can_finance_register or payment.finance_choices) %}
+                        {% if is_staff_user and staff_user_role != 'data_entry' %}
+                        {% if not is_history_mode or payment.can_commercial_act or payment.can_finance_register or payment.finance_choices %}
                         <div class="detail-card" style="{% if payment.staff_can_act or payment.can_finance_register or is_pending_final_mode and payment.can_final_approve %}border:2px solid #fde68a;background:#fffef0;{% endif %}">
                             <strong style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
                                 ⚙ اقدام روی سند
@@ -1221,6 +1222,7 @@
                             </div>
                             {% endif %}
                         </div>
+                        {% endif %}
                         {% endif %}
                     </div>
                 </td>
