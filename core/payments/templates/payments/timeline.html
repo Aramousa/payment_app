@@ -144,6 +144,10 @@
     {% include "payments/partials/system_messages_popup.html" %}
 
     <div class="wrap">
+        <div style="margin-bottom:14px;">
+            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}" class="back-link">← {{ return_label|default:'بازگشت' }}</a>
+        </div>
+
         <!-- اطلاعات فیش -->
         <div class="card">
             <div class="card-header">
@@ -333,9 +337,6 @@
         </div>
         {% endif %}
 
-        <div style="margin-top:12px;">
-            <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}" class="back-link">← {{ return_label|default:'بازگشت' }}</a>
-        </div>
     </div>
 
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
