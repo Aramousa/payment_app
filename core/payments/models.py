@@ -1441,7 +1441,7 @@ class LoginRecord(models.Model):
 class SystemSettings(models.Model):
     session_inactivity_timeout = models.PositiveIntegerField(
         'مدت بی‌فعالیت (دقیقه)',
-        default=30,
+        default=15,
         help_text='پس از این مدت بی‌فعالیت، کاربر به‌صورت خودکار خارج می‌شود.',
     )
     system_logo = models.ImageField(

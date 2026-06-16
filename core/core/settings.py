@@ -105,8 +105,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# مدت بی‌فعالیت مجاز قبل از خروج خودکار (ثانیه). پیش‌فرض ۳۰ دقیقه.
-SESSION_INACTIVITY_TIMEOUT = int(os.getenv('SESSION_INACTIVITY_TIMEOUT', str(30 * 60)))
+# مدت بی‌فعالیت مجاز قبل از خروج خودکار (ثانیه). پیش‌فرض ۱۵ دقیقه.
+SESSION_INACTIVITY_TIMEOUT = int(os.getenv('SESSION_INACTIVITY_TIMEOUT', str(15 * 60)))
 
 ROOT_URLCONF = 'core.urls'
 
