@@ -1627,6 +1627,11 @@ def _notify_invoice_customer_note(invoice, actor):
     )
 
 
+def _is_superuser_actor(log):
+    """True اگر log توسط مدیر سیستم ثبت شده باشد — برای حذف از نمایش تاریخچه."""
+    return bool(log.actor_id and log.actor and log.actor.is_superuser)
+
+
 def _role_title(user):
     if not user:
         return 'کاربر'
@@ -1834,6 +1839,7 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
                     'actor_id': log.actor_id,
                 }
                 for log in list(payment.activity_logs.all()[:20])
+                if not _is_superuser_actor(log)
             ]
             payment.timeline_lines = _group_consecutive_views(raw_lines)[:5]
         else:
@@ -3813,9 +3819,11 @@ def payment_timeline(request, payment_id):
     raw_logs = payment.activity_logs.select_related('actor', 'actor__profile').all()
 
     if is_staff_user:
-        # کارکنان: جزئیات کامل
+        # کارکنان: جزئیات کامل — مدیر سیستم از نمایش حذف می‌شود
         logs = []
         for log in raw_logs:
+            if _is_superuser_actor(log):
+                continue
             logs.append({
                 'text':        _log_text(log),
                 'note':        log.note,
