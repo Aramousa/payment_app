@@ -881,15 +881,15 @@
                     {% else %}
                         {# ─── ستون اقدام — فقط نشانگر وضعیت + دکمه جزئیات ─── #}
                         <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
-                            {% if not is_history_mode and payment.can_commercial_act or not is_history_mode and payment.can_finance_register or is_pending_final_mode and payment.can_final_approve %}
+                            {% if payment.can_commercial_act or payment.can_finance_register or is_pending_final_mode and payment.can_final_approve %}
                             <span class="tbl-badge tbl-badge-yellow">نیاز به اقدام</span>
                             {% elif staff_user_role != 'data_entry' %}
                             <span style="color:#94a3b8;font-size:12px;" title="قفل">🔒</span>
                             {% endif %}
-                            {% if not is_history_mode and payment.can_edit_details %}
+                            {% if payment.can_edit_details %}
                             <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل</a>
                             {% endif %}
-                            <button type="button" class="expand-btn" data-row="{{ payment.id }}">{% if is_history_mode %}جزئیات{% else %}جزئیات و اقدام{% endif %}</button>
+                            <button type="button" class="expand-btn" data-row="{{ payment.id }}">{% if is_history_mode and not payment.can_commercial_act and not payment.can_finance_register and not payment.finance_choices %}جزئیات{% else %}جزئیات و اقدام{% endif %}</button>
                         </div>
                     {% endif %}
                 </td>
@@ -1039,7 +1039,7 @@
                             <a href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">نمایش کامل تاریخچه</a>
                         </div>
 
-                        {% if is_staff_user and staff_user_role != 'data_entry' and not is_history_mode %}
+                        {% if is_staff_user and staff_user_role != 'data_entry' and (not is_history_mode or payment.can_commercial_act or payment.can_finance_register or payment.finance_choices) %}
                         <div class="detail-card" style="{% if payment.staff_can_act or payment.can_finance_register or is_pending_final_mode and payment.can_final_approve %}border:2px solid #fde68a;background:#fffef0;{% endif %}">
                             <strong style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
                                 ⚙ اقدام روی سند
