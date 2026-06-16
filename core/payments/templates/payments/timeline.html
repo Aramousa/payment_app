@@ -178,7 +178,7 @@
             {% endif %}
 
             <div style="font-size:13px;color:#475569;line-height:2;">
-                <strong>مبلغ:</strong> {{ payment.amount|floatformat:0 }} ریال
+                <strong>مبلغ:</strong> {{ payment.amount|thousand_sep }} ریال
                 {% if payment.pay_date %} &nbsp;|&nbsp; <strong>تاریخ:</strong> {{ payment.pay_date|jalali_date }}{% endif %}
                 {% if payment.tracking_code %} &nbsp;|&nbsp; <strong>کد پیگیری:</strong> {{ payment.tracking_code }}{% endif %}
             </div>

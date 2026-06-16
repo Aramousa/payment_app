@@ -208,8 +208,8 @@
                             <div style="font-size:11px;color:#64748b;">{{ payment.organization }}</div>
                             {% endif %}
                         </td>
-                        <td style="font-weight:700;direction:ltr;text-align:right;">
-                            {{ payment.amount|default:0|intcomma }}
+                        <td style="font-weight:700;text-align:right;">
+                            {{ payment.amount|default:0|thousand_sep }}
                         </td>
                         <td>{{ payment.pay_date|jalali_date|default:'-' }}</td>
                         <td>{{ payment.tracking_code|default:'-' }}</td>

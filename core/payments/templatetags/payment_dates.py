@@ -12,13 +12,20 @@ register = template.Library()
 DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
 
+_FA_DIGITS = str.maketrans('0123456789', '۰۱۲۳۴۵۶۷۸۹')
+
+
+def _to_persian_num(text):
+    return str(text).translate(_FA_DIGITS)
+
+
 @register.filter
 def thousand_sep(value):
     try:
-        amount = int(str(value).replace(',', '').strip())
+        amount = int(str(value).replace(',', '').replace('،', '').strip())
     except (ValueError, TypeError):
         return value
-    return '{:,}'.format(amount)
+    return _to_persian_num('{:,}'.format(amount))
 
 
 def _to_jalali(value):
