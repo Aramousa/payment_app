@@ -188,15 +188,8 @@ def _can_access_reconciliation(user):
         return False
     if user.is_superuser:
         return True
-    role = _user_role(user)
-    if role == 'customer':
-        return True
-    try:
-        if user.profile.can_access_reconciliation:
-            return True
-    except UserProfile.DoesNotExist:
-        pass
-    return ReconciliationThread.objects.filter(staff_participants=user).exists()
+    # کلیه کارکنان و مشتریان به بخش مغایرت‌گیری دسترسی دارند
+    return _is_staff_user(user) or _user_role(user) == 'customer'
 
 
 def _reconciliation_threads_for_user(user):
@@ -4139,6 +4132,9 @@ def reconciliation_center(request):
                 thread.created_by = request.user
                 thread.save()
                 thread_form.save_m2m()
+                # سازنده کارشناس را خودکار به گفتگو اضافه می‌کند تا دسترسی داشته باشد
+                if _is_staff_user(request.user) and not thread.staff_participants.filter(id=request.user.id).exists():
+                    thread.staff_participants.add(request.user)
                 messages.success(request, 'گفتگوی مغایرت‌گیری ایجاد شد.')
                 return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
         elif action == 'send_message':

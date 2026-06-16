@@ -72,11 +72,13 @@ def _can_access_reconciliation_nav(user):
     if user.is_superuser:
         return True
     try:
-        if user.profile.role == 'customer' or bool(user.profile.can_access_reconciliation):
-            return True
+        role = user.profile.role
     except UserProfile.DoesNotExist:
-        pass
-    return ReconciliationThread.objects.filter(staff_participants=user).exists()
+        role = ''
+    # کلیه کارکنان و مشتریان لینک مغایرت‌گیری را می‌بینند
+    if role == 'customer':
+        return True
+    return role in STAFF_ROLES
 
 
 def _reconciliation_unread_count_nav(user):
