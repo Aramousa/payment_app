@@ -1,5 +1,5 @@
 from django.utils import timezone
-
+from django.core.cache import cache
 from django.urls import reverse
 from django.conf import settings
 from django.db.models import Q
@@ -81,9 +81,20 @@ def _can_access_reconciliation_nav(user):
     return role in STAFF_ROLES
 
 
+_RECON_UNREAD_TTL = 30  # seconds
+
+
+def recon_unread_cache_key(user_id):
+    return f'recon_unread_{user_id}'
+
+
 def _reconciliation_unread_count_nav(user):
     if not _can_access_reconciliation_nav(user):
         return 0
+    cache_key = recon_unread_cache_key(user.id)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     count = 0
     threads = (
         ReconciliationThread.objects
@@ -99,6 +110,7 @@ def _reconciliation_unread_count_nav(user):
         if state:
             messages = messages.filter(created_at__gt=state.last_read_at)
         count += messages.count()
+    cache.set(cache_key, count, _RECON_UNREAD_TTL)
     return count
 
 

@@ -260,6 +260,10 @@ def _mark_reconciliation_thread_read(thread, user):
         user=user,
         defaults={'last_read_at': timezone.now()},
     )
+    # خواندن thread → شمارش پیام‌های نخوانده این کاربر کاهش می‌یابد
+    from django.core.cache import cache
+    from .context_processors import recon_unread_cache_key
+    cache.delete(recon_unread_cache_key(user.id))
 
 
 def _apply_reconciliation_filters(threads, request):
@@ -4155,6 +4159,13 @@ def reconciliation_center(request):
                 message.save()
                 thread.updated_at = timezone.now()
                 thread.save(update_fields=['updated_at'])
+                # باطل کردن cache شمارش پیام‌های نخوانده برای سایر اعضای thread
+                from django.core.cache import cache as _cache
+                from .context_processors import recon_unread_cache_key
+                for _p in thread.staff_participants.exclude(id=request.user.id):
+                    _cache.delete(recon_unread_cache_key(_p.id))
+                if thread.customer_id and thread.customer_id != request.user.id:
+                    _cache.delete(recon_unread_cache_key(thread.customer_id))
                 return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
             active_thread = thread
         elif action in {'close_thread', 'open_thread'}:
