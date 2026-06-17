@@ -196,7 +196,10 @@ def _reconciliation_threads_for_user(user):
     qs = (
         ReconciliationThread.objects
         .select_related('customer', 'customer__profile', 'created_by')
-        .prefetch_related('staff_participants', 'messages')
+        .prefetch_related(
+            Prefetch('staff_participants', queryset=User.objects.select_related('profile')),
+            'messages',
+        )
         .order_by('-updated_at', '-id')
     )
     if user.is_superuser:
