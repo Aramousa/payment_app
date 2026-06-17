@@ -2,6 +2,7 @@
     <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}{% if thread.status == 'closed' %} closed{% endif %}" href="{% querystring thread=thread.id %}">
         <span class="thread-title-row">
             <span class="thread-title">{{ thread.title }}</span>
+            {% if thread.is_internal %}<span class="thread-internal-chip">🔒 داخلی</span>{% endif %}
             {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
         </span>
         <span class="thread-meta">{{ thread.customer.profile.display_name }}</span>

@@ -1,4 +1,4 @@
-<article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}" data-message-id="{{ message.id }}">
+<article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}{% if message.is_internal %} msg-internal{% endif %}" data-message-id="{{ message.id }}">
     {% if message.sender %}
         <span class="msg-avatar app-user-avatar {{ message.sender.profile.avatar_class }}">
             {% if message.sender.profile.avatar_url %}
@@ -16,6 +16,7 @@
         {% else %}
             <div class="msg-author">کاربر حذف‌شده</div>
         {% endif %}
+        {% if message.is_internal %}<div class="msg-internal-badge">🔒 فقط کارکنان</div>{% endif %}
         {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
         {% if message.attachment %}
             <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">📎 {{ message.attachment_display_name|truncatechars:42 }}</a>

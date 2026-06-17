@@ -58,6 +58,12 @@
         .msg-author:hover { color: #0f766e; text-decoration: underline; }
         .msg-body { font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
         .msg-time { color: #64748b; font-size: 11px; margin-top: 6px; text-align: left; }
+        .msg-internal { opacity: .88; }
+        .msg-internal .msg-bubble { background: #fef9ec; border: 1.5px dashed #f59e0b; }
+        .msg-internal-badge { font-size: 11px; font-weight: 800; color: #b45309; margin-bottom: 4px; }
+        .internal-msg-toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #374151; cursor: pointer; padding: 4px 0; }
+        .internal-msg-toggle input { cursor: pointer; accent-color: #1e3a5f; }
+        .thread-internal-chip { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 999px; color: #92400e; font-size: 10px; font-weight: 800; padding: 1px 8px; white-space: nowrap; }
         .doc-link { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; margin-top: 8px; padding: 5px 8px; text-decoration: none; }
         .msg-attachment { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; gap: 5px; margin-top: 8px; padding: 5px 9px; text-decoration: none; }
         .msg-attachment:hover { background: #dbeafe; }
@@ -153,6 +159,7 @@
                         {% if active_thread.document_url %}
                             <a class="secondary-btn" href="{{ active_thread.document_url }}">مشاهده سند</a>
                         {% endif %}
+                        {% if active_thread.is_internal %}<span class="thread-internal-chip">🔒 گفتگوی داخلی</span>{% endif %}
                         <span class="status-chip{% if active_thread.status == 'closed' %} closed{% endif %}">{{ active_thread.get_status_display }}</span>
                     </div>
                 {% else %}
@@ -197,6 +204,11 @@
                             <p>{{ message_form.document_type.label_tag }} {{ message_form.document_type }}</p>
                             <p>{{ message_form.document_id.label_tag }} {{ message_form.document_id }}</p>
                         </div>
+                        {% if not is_customer_user %}
+                        <label class="internal-msg-toggle" title="این پیام فقط برای کارکنان نمایش داده می‌شود و مشتری آن را نمی‌بیند">
+                            <input type="checkbox" name="is_internal" value="1"> 🔒 فقط کارکنان (داخلی)
+                        </label>
+                        {% endif %}
                         {% if message_form.errors %}<div class="form-errors">{{ message_form.errors }}</div>{% endif %}
                     </form>
                 {% endif %}
@@ -209,6 +221,11 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="create_thread">
                 {{ thread_form.as_p }}
+                {% if not is_customer_user %}
+                <label class="internal-msg-toggle" title="این گفتگو برای مشتری نمایش داده نمی‌شود">
+                    <input type="checkbox" name="thread_is_internal" value="1"> 🔒 گفتگوی داخلی (فقط کارکنان)
+                </label>
+                {% endif %}
                 {% if thread_form.errors %}<div class="form-errors">{{ thread_form.errors }}</div>{% endif %}
                 <button class="primary-btn" type="submit">ایجاد گفتگو</button>
             </form>

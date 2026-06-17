@@ -202,7 +202,7 @@ def _reconciliation_threads_for_user(user):
     if user.is_superuser:
         return qs
     if _user_role(user) == 'customer':
-        return qs.filter(customer=user)
+        return qs.filter(customer=user, is_internal=False)
     return qs.filter(staff_participants=user).distinct()
 
 
@@ -210,7 +210,7 @@ def _can_access_reconciliation_thread(user, thread):
     if user.is_superuser:
         return True
     if _user_role(user) == 'customer':
-        return thread.customer_id == user.id
+        return thread.customer_id == user.id and not thread.is_internal
     return thread.staff_participants.filter(id=user.id).exists()
 
 
@@ -4136,6 +4136,9 @@ def reconciliation_center(request):
                 if _user_role(request.user) == 'customer':
                     thread.customer = request.user
                 thread.created_by = request.user
+                # فقط کارکنان می‌توانند thread داخلی ایجاد کنند
+                if _is_staff_user(request.user) and request.POST.get('thread_is_internal') == '1':
+                    thread.is_internal = True
                 thread.save()
                 thread_form.save_m2m()
                 # سازنده کارشناس را خودکار به گفتگو اضافه می‌کند تا دسترسی داشته باشد
@@ -4155,6 +4158,9 @@ def reconciliation_center(request):
                 message = message_form.save(commit=False)
                 message.thread = thread
                 message.sender = request.user
+                # فقط کارکنان می‌توانند پیام داخلی ارسال کنند
+                if _is_staff_user(request.user) and request.POST.get('is_internal') == '1':
+                    message.is_internal = True
                 uploaded = message_form.cleaned_data.get('attachment')
                 if uploaded:
                     message.attachment_name = uploaded.name
@@ -4188,7 +4194,10 @@ def reconciliation_center(request):
     if active_thread:
         _mark_reconciliation_thread_read(active_thread, request.user)
         active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id, active_thread.id)
-        active_messages = list(active_thread.messages.select_related('sender', 'sender__profile'))
+        _msg_qs = active_thread.messages.select_related('sender', 'sender__profile')
+        if is_customer_user:
+            _msg_qs = _msg_qs.filter(is_internal=False)
+        active_messages = list(_msg_qs)
         for message in active_messages:
             message.document_url = _reconciliation_document_url(message.document_type, message.document_id, active_thread.id)
 
@@ -4245,11 +4254,10 @@ def reconciliation_poll(request):
     if active_thread:
         after_id = int(request.GET.get('after') or 0)
         _mark_reconciliation_thread_read(active_thread, request.user)
-        new_messages = list(
-            active_thread.messages
-            .select_related('sender', 'sender__profile')
-            .filter(id__gt=after_id)
-        )
+        _poll_qs = active_thread.messages.select_related('sender', 'sender__profile').filter(id__gt=after_id)
+        if _user_role(request.user) == 'customer':
+            _poll_qs = _poll_qs.filter(is_internal=False)
+        new_messages = list(_poll_qs)
         for message in new_messages:
             message.document_url = _reconciliation_document_url(message.document_type, message.document_id, active_thread.id)
         if new_messages:
