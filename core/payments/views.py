@@ -4329,8 +4329,21 @@ def payment_start_thread(request):
     from .templatetags.payment_dates import thousand_sep as _tsep, jalali_date as _jdate
     amount_str = _tsep(payment.amount) if payment.amount else '—'
     pay_date_str = _jdate(payment.pay_date) if payment.pay_date else '—'
+
+    _THREAD_AUTO_INTROS = {
+        'status_change':     'لطفاً وضعیت این سند را بررسی و تغییر دهید.',
+        'payment_review':    'لطفاً فیش واریزی این سند را بررسی کنید.',
+        'discrepancy':       'در مبلغ یا اطلاعات این سند مغایرت وجود دارد. خواهشمند است رسیدگی شود.',
+        'final_approval':    'این سند آماده تأیید نهایی است. لطفاً بررسی و تأیید فرمایید.',
+        'return_commercial': 'لطفاً این سند به واحد بازرگانی عودت داده شود.',
+    }
+    if title_choice == 'custom':
+        intro = f'موضوع: {base_title}' if base_title else 'لطفاً این سند را بررسی کنید.'
+    else:
+        intro = _THREAD_AUTO_INTROS.get(title_choice, 'لطفاً این سند را بررسی کنید.')
+
     auto_body = (
-        f"لطفا وضعیت سند را تغییر دهید.\n\n"
+        f"{intro}\n\n"
         f"جزئیات سند:\n"
         f"• شماره سند: #{payment.id}\n"
         f"• مبلغ: {amount_str} ریال\n"
