@@ -71,20 +71,10 @@
         .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #1e3a5f; color: #fff; cursor: pointer; margin-top: 4px; font-family: Vazir, sans-serif; font-size: 12px; }
         .track-link { display: inline-block; border-radius: 5px; padding: 5px 10px; background: #e0f2fe; color: #0369a1; text-decoration: none; font-size: 12px; font-weight: 700; }
         .track-link:hover { background: #0369a1; color: #fff; }
-        .edit-link { display: inline-block; background: #fd7e14; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; }
-        .edit-link.sm { padding: 4px 9px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-height: 30px; box-sizing: border-box; }
         .tbl-id-badge { display: inline-block; background: #e0e7ef; color: #1e3a5f; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 700; margin-top: 2px; }
         .tbl-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700; }
         .tbl-badge-yellow { background: #fef9c3; color: #854d0e; }
         .tbl-badge-green  { background: #dcfce7; color: #15803d; }
-
-        /* ─── Paper plane button ─── */
-        .btn-start-thread {
-            background: #e0f2fe; color: #0369a1; border: none; border-radius: 5px;
-            padding: 4px 7px; cursor: pointer; display: inline-flex; align-items: center;
-            justify-content: center; min-height: 30px; box-sizing: border-box;
-        }
-        .btn-start-thread:hover { background: #1e3a5f; color: #fff; }
 
         /* ─── Detail grid ─── */
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; padding: 14px; }
@@ -113,33 +103,11 @@
         .receipt-thumb-caption { font-size: 11px; color: #64748b; }
         .receipt-thumb-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
 
-        /* ─── Staff action forms ─── */
-        .staff-action select, .staff-action textarea { width: 100%; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px; font-family: Vazir, sans-serif; font-size: 13px; margin-bottom: 6px; }
-        .staff-action textarea { min-height: 56px; resize: vertical; }
-        .staff-action select:focus, .staff-action textarea:focus { border-color: #1e3a5f; outline: none; box-shadow: 0 0 0 3px rgba(30,58,95,.12); }
-
         /* ─── Button links ─── */
         .button-link { display: inline-block; border-radius: 6px; padding: 8px 14px; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; border: none; background: #1e3a5f; color: #fff; }
         .button-link.sm { padding: 5px 10px; font-size: 12px; }
         .button-link.outline { background: transparent; border: 1.5px solid #94a3b8; color: #475569; }
         .button-link.outline:hover { border-color: #1e3a5f; color: #1e3a5f; }
-
-        /* ─── Paper plane popup ─── */
-        #threadPopupOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; align-items: center; justify-content: center; }
-        #threadPopupOverlay.open { display: flex; }
-        #threadPopupBox { background: #fff; border-radius: 14px; padding: 28px 24px; width: min(440px, 92vw); box-shadow: 0 8px 32px rgba(0,0,0,.22); font-family: Vazir, sans-serif; direction: rtl; }
-        #threadPopupBox h4 { margin: 0 0 8px; font-size: 17px; color: #1e3a5f; }
-        #threadPopupBox label { display: block; margin: 12px 0 5px; font-size: 13px; font-weight: 700; }
-        #threadPopupBox input[type=text] { width: 100%; box-sizing: border-box; border: 1.5px solid #c7d2e8; border-radius: 8px; padding: 9px 12px; font-family: Vazir, sans-serif; font-size: 14px; }
-        #threadCustomTitleWrap { display: none; }
-        #threadPopupActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
-        .cdd-wrap { position: relative; }
-        .cdd-trigger { width: 100%; text-align: right; border: 1.5px solid #c7d2e8; border-radius: 8px; padding: 9px 12px; background: #fff; font-family: Vazir, sans-serif; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .cdd-trigger::after { content: '▾'; color: #94a3b8; }
-        .cdd-list { display: none; position: absolute; top: 100%; right: 0; left: 0; background: #fff; border: 1.5px solid #c7d2e8; border-radius: 8px; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,.12); overflow: hidden; }
-        .cdd-wrap.open .cdd-list { display: block; }
-        .cdd-option { padding: 10px 14px; cursor: pointer; font-size: 14px; font-family: Vazir, sans-serif; }
-        .cdd-option:hover, .cdd-option.selected { background: #eef2ff; color: #1e3a5f; font-weight: 700; }
 
         /* ─── Invoice filter ─── */
         .invoice-filter-box { max-width: 1200px; margin: 0 auto 20px auto; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
@@ -276,7 +244,7 @@
                     <th>تاریخ / کد پیگیری</th>
                     <th style="width:120px;">مبلغ (ریال)</th>
                     <th style="width:160px;">وضعیت</th>
-                    <th style="width:140px;">اقدام</th>
+                    <th style="width:120px;">عملیات</th>
                 </tr>
             </thead>
             <tbody>
@@ -317,17 +285,8 @@
                     </td>
                     <td>
                         <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
-                            {% if payment.can_commercial_act or payment.can_finance_register %}
-                            <span class="tbl-badge tbl-badge-yellow">نیاز به اقدام</span>
-                            {% endif %}
                             <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
-                            <div style="display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center;">
-                                {% if payment.can_edit_details %}
-                                <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل</a>
-                                {% endif %}
-                                <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-                            </div>
-                            <button type="button" class="expand-btn" data-row="{{ payment.id }}">جزئیات و اقدام</button>
+                            <button type="button" class="expand-btn" data-row="{{ payment.id }}">جزئیات</button>
                         </div>
                     </td>
                 </tr>
@@ -443,107 +402,6 @@
                                 <a class="track-link" style="margin-top:8px;" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">نمایش کامل تاریخچه</a>
                             </div>
 
-                            <!-- ── پنل اقدام کارشناس ── -->
-                            {% if staff_user_role != 'data_entry' %}
-                            {% if payment.can_commercial_act or payment.can_finance_register or payment.finance_choices %}
-                            <div class="detail-card" style="{% if payment.staff_can_act or payment.can_finance_register %}border:2px solid #fde68a;background:#fffef0;{% endif %}">
-                                <strong style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
-                                    ⚙ اقدام روی سند
-                                    {% if payment.can_commercial_act or payment.can_finance_register %}
-                                    <span style="background:#fef9c3;color:#854d0e;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;">نیاز به اقدام</span>
-                                    {% endif %}
-                                </strong>
-
-                                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;">
-                                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                                        <div><span style="color:#64748b;">🏬 بازرگانی:</span> <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:11px;">{{ payment.commercial_status_label }}</span></div>
-                                        <div><span style="color:#64748b;">💰 مالی:</span> <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:11px;">{{ payment.finance_status_label }}</span></div>
-                                    </div>
-                                    <div style="margin-top:6px;color:#94a3b8;font-size:11px;">
-                                        {% if payment.status == 'approved' and not payment.is_finance_registered %}⚡ ثبت بازرگانی — در انتظار ثبت مالی
-                                        {% elif payment.status == 'final_approved' %}🔒 سند تأیید نهایی شده — قفل
-                                        {% elif payment.status == 'rejected' %}🚫 سند رد شده — قفل
-                                        {% elif payment.status == 'incomplete' %}⚠ ناقص — در انتظار اصلاح مشتری
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                {# بخش بازرگانی #}
-                                {% if payment.can_commercial_act %}
-                                <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
-                                    <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:6px;">🏬 فلگ بازرگانی / فروش</div>
-                                    <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                        <select name="status" required onchange="this.closest('form').querySelector('.rejection-reason-box').style.display = (this.value === 'rejected') ? 'block' : 'none';">
-                                            {% for value, label in payment.staff_allowed_choices %}
-                                                <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        {% if staff_user_role == 'commercial' or staff_user_role == 'staff' %}
-                                        <select name="counterparty">
-                                            <option value="">بدون طرف حساب</option>
-                                            {% for cp in counterparties %}
-                                                <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        {% endif %}
-                                        <div class="rejection-reason-box" style="display:none;">
-                                            <select name="rejection_reason" style="width:100%;margin-bottom:6px;">
-                                                <option value="">دلیل رد را انتخاب کنید...</option>
-                                                {% for value, label in rejection_reason_choices %}
-                                                    <option value="{{ value }}" {% if payment.rejection_reason == value %}selected{% endif %}>{{ label }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <textarea name="note" placeholder="توضیح (برای رد/ناقص اجباری)"></textarea>
-                                        <button type="submit" style="background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:Vazir,sans-serif;font-weight:700;font-size:13px;cursor:pointer;width:100%;">ثبت وضعیت بازرگانی</button>
-                                    </form>
-                                    <script>
-                                    (function(){var f=document.currentScript.previousElementSibling;var s=f.querySelector('select[name="status"]');var b=f.querySelector('.rejection-reason-box');if(s&&b&&s.value==='rejected')b.style.display='block';})();
-                                    </script>
-                                </div>
-                                {% endif %}
-
-                                {# بخش مالی #}
-                                {% if payment.finance_choices %}
-                                <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
-                                    <div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px;">💰 فلگ مالی</div>
-                                    <form class="staff-action" method="post" action="{% url 'finance_unified_action' payment.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                        <select name="finance_action" required>
-                                            {% for val, lbl in payment.finance_choices %}
-                                            <option value="{{ val }}">{{ lbl }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        <textarea name="note" placeholder="توضیح (برای عودت به بازرگانی الزامی)"></textarea>
-                                        <button type="submit" style="background:#6d28d9;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:Vazir,sans-serif;font-weight:700;font-size:13px;cursor:pointer;width:100%;">ثبت وضعیت مالی</button>
-                                    </form>
-                                </div>
-                                {% endif %}
-
-                                {# ویرایش جزئیات #}
-                                {% if payment.can_edit_details %}
-                                <a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">✏ تکمیل یا اصلاح اطلاعات فیش</a>
-                                {% endif %}
-                            </div>
-                            {% else %}
-                            <div class="detail-card">
-                                <strong>⚙ اقدام روی سند</strong>
-                                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;">
-                                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                                        <div><span style="color:#64748b;">🏬 بازرگانی:</span> <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:11px;">{{ payment.commercial_status_label }}</span></div>
-                                        <div><span style="color:#64748b;">💰 مالی:</span> <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:11px;">{{ payment.finance_status_label }}</span></div>
-                                    </div>
-                                </div>
-                                <div class="tiny" style="color:#94a3b8;">🔒 در این مرحله امکان اقدام برای نقش شما وجود ندارد.</div>
-                                {% if payment.can_edit_details %}
-                                <div style="margin-top:10px;"><a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">✏ تکمیل یا اصلاح اطلاعات فیش</a></div>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -666,40 +524,6 @@
     });
     </script>
 
-    <!-- ═══════════════════════ Paper plane popup ═══════════════════════ -->
-    <div id="threadPopupOverlay">
-        <div id="threadPopupBox">
-            <h4>ارسال سند به گفتگو</h4>
-            <p id="threadPopupPaymentLabel" style="font-size:12px;color:#6b7280;margin:0 0 14px;"></p>
-            <form id="threadPopupForm" method="post" action="{% url 'payment_start_thread' %}">
-                {% csrf_token %}
-                <input type="hidden" name="payment_id" id="threadPaymentId">
-                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <label>موضوع گفتگو</label>
-                <input type="hidden" name="title_choice" id="threadTitleValue" value="status_change">
-                <div class="cdd-wrap" id="threadTitleDrop">
-                    <button type="button" class="cdd-trigger" id="threadTitleTrigger"><span id="threadTitleLabel">درخواست تغییر وضعیت</span></button>
-                    <div class="cdd-list">
-                        <div class="cdd-option selected" data-value="status_change">درخواست تغییر وضعیت</div>
-                        <div class="cdd-option" data-value="payment_review">بررسی فیش واریزی</div>
-                        <div class="cdd-option" data-value="discrepancy">مغایرت واریز</div>
-                        <div class="cdd-option" data-value="final_approval">درخواست تأیید نهایی</div>
-                        <div class="cdd-option" data-value="return_commercial">درخواست عودت به بازرگانی</div>
-                        <div class="cdd-option" data-value="custom">عنوان دلخواه...</div>
-                    </div>
-                </div>
-                <div id="threadCustomTitleWrap">
-                    <label for="threadCustomTitle" style="margin-top:0;">عنوان دلخواه</label>
-                    <input type="text" id="threadCustomTitle" name="title_custom" placeholder="عنوان گفتگو را وارد کنید" maxlength="100">
-                </div>
-                <div id="threadPopupActions">
-                    <button type="button" class="button-link outline sm" onclick="closeThreadPopup()">انصراف</button>
-                    <button type="submit" class="button-link sm">ارسال به گفتگو</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script src="{% static 'js/app-ui.js' %}"></script>
     <script>
     // ─── Row expand / collapse ───
@@ -796,50 +620,6 @@
         var open = list.classList.toggle('open');
         if (icon) icon.textContent = open ? '−' : '+';
     }
-
-    // ─── Paper plane popup ───
-    (function () {
-        var overlay = document.getElementById('threadPopupOverlay');
-        var pidInput = document.getElementById('threadPaymentId');
-        var labelEl = document.getElementById('threadPopupPaymentLabel');
-        var customWrap = document.getElementById('threadCustomTitleWrap');
-        var customInput = document.getElementById('threadCustomTitle');
-        var titleValue = document.getElementById('threadTitleValue');
-        var drop = document.getElementById('threadTitleDrop');
-        var trigger = document.getElementById('threadTitleTrigger');
-        var triggerLabel = document.getElementById('threadTitleLabel');
-
-        trigger.addEventListener('click', function (e) { e.stopPropagation(); drop.classList.toggle('open'); });
-        drop.addEventListener('click', function (e) {
-            var opt = e.target.closest('.cdd-option');
-            if (!opt) return;
-            drop.querySelectorAll('.cdd-option').forEach(function (o) { o.classList.remove('selected'); });
-            opt.classList.add('selected');
-            titleValue.value = opt.dataset.value;
-            triggerLabel.textContent = opt.textContent;
-            drop.classList.remove('open');
-            var show = opt.dataset.value === 'custom';
-            customWrap.style.display = show ? 'block' : 'none';
-            if (show) customInput.focus();
-        });
-        document.addEventListener('click', function (e) { if (!drop.contains(e.target)) drop.classList.remove('open'); });
-
-        document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.btn-start-thread');
-            if (!btn) return;
-            pidInput.value = btn.dataset.paymentId;
-            if (labelEl) labelEl.textContent = btn.dataset.paymentLabel || '';
-            var first = drop.querySelector('.cdd-option');
-            drop.querySelectorAll('.cdd-option').forEach(function (o) { o.classList.remove('selected'); });
-            if (first) { first.classList.add('selected'); titleValue.value = first.dataset.value; triggerLabel.textContent = first.textContent; }
-            customWrap.style.display = 'none'; customInput.value = '';
-            overlay.classList.add('open');
-        });
-        overlay.addEventListener('click', function (e) { if (e.target === overlay) closeThreadPopup(); });
-        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { drop.classList.remove('open'); closeThreadPopup(); } });
-    })();
-
-    function closeThreadPopup() { document.getElementById('threadPopupOverlay').classList.remove('open'); }
     </script>
 </body>
 </html>
