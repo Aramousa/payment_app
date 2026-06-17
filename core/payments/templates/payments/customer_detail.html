@@ -14,51 +14,143 @@
         h2 { text-align: center; margin-bottom: 20px; }
         .top-bar { max-width: 1200px; margin: 0 auto 16px auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
         .back-link { background: #6c757d; color: #fff; border-radius: 5px; padding: 8px 14px; text-decoration: none; }
-        
+
         .customer-header { max-width: 1200px; margin: 0 auto 20px auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
         .customer-header-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
         .customer-header-item { font-size: 14px; }
         .customer-header-item strong { color: #0d6efd; display: block; margin-bottom: 4px; }
-        
+
         .summary-cards { max-width: 1200px; margin: 0 auto 20px auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
         .summary-card { background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); text-align: center; }
         .summary-card h3 { margin: 0 0 8px 0; font-size: 14px; color: #666; }
         .summary-card .value { font-size: 24px; font-weight: bold; color: #0d6efd; }
-        
-        .section-title { max-width: 1200px; margin: 30px auto 16px auto; font-size: 18px; color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 8px; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; vertical-align: top; }
-        th { background-color: #007bff; color: white; }
-        
-        .status-pill { display: inline-block; padding: 4px 10px; border-radius: 16px; color: #fff; font-size: 12px; }
-        .flag-blue { background: #1e88e5; }
-        .flag-purple { background: #7b1fa2; }
-        .flag-green { background: #2e7d32; }
-        .flag-red { background: #c62828; }
-        .flag-yellow { background: #f9a825; color: #111; }
-        .flag-gray { background: #546e7a; }
-        
-        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; text-align: right; }
-        .detail-card { background: #fafafa; border: 1px solid #e6e6e6; border-radius: 8px; padding: 10px; font-size: 13px; }
 
+        .section-title { max-width: 1200px; margin: 30px auto 16px auto; font-size: 18px; color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 8px; }
+
+        /* ─── Filter bar ─── */
+        .filter-bar { max-width: 1200px; margin: 0 auto 14px auto; background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+        .filter-bar form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+        .filter-bar label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+        .filter-bar select, .filter-bar input[type=text], .filter-bar input[type=number] {
+            border: 1.5px solid #c7d2e8; border-radius: 7px; padding: 7px 10px;
+            font-family: Vazir, sans-serif; font-size: 13px; background: #f7fffe;
+            min-width: 120px;
+        }
+        .filter-bar .f-btn { border: none; border-radius: 7px; padding: 8px 14px; cursor: pointer;
+            font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700; }
+        .f-apply { background: #1e3a5f; color: #fff; }
+        .f-clear  { background: #64748b; color: #fff; text-decoration: none; display: inline-block; }
+
+        /* ─── Per-page ─── */
+        .per-page-control { max-width: 1200px; margin: 0 auto 8px auto; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .per-page-select { border: 1.5px solid #c7d2e8; border-radius: 6px; padding: 4px 8px; font-family: Vazir, sans-serif; }
+
+        /* ─── Table ─── */
+        .table-wrap { max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #1e3a5f; color: #fff; padding: 10px 12px; font-size: 13px; text-align: center; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eef0f5; font-size: 13px; color: #374151; vertical-align: middle; text-align: center; }
+        tr:last-child td { border-bottom: 0; }
+        tr.summary-row { cursor: pointer; }
+        tr.summary-row:hover td { background: #f5f9ff; }
+        tr.detail-row { display: none; background: #fafafa; }
+        tr.detail-row.open { display: table-row; }
+        tr.detail-row td { white-space: normal !important; overflow: visible !important; }
+
+        /* ─── Status pills ─── */
+        .status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .flag-blue   { background: #dbeafe; color: #1e40af; }
+        .flag-purple { background: #ede9fe; color: #5b21b6; }
+        .flag-green  { background: #dcfce7; color: #15803d; }
+        .flag-red    { background: #fee2e2; color: #dc2626; }
+        .flag-yellow { background: #fef9c3; color: #854d0e; }
+        .flag-gray   { background: #f1f5f9; color: #475569; }
+        .flag-teal   { background: #ccfbf1; color: #065f46; }
+
+        /* ─── Action buttons ─── */
+        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #1e3a5f; color: #fff; cursor: pointer; margin-top: 4px; font-family: Vazir, sans-serif; font-size: 12px; }
+        .track-link { display: inline-block; border-radius: 5px; padding: 5px 10px; background: #e0f2fe; color: #0369a1; text-decoration: none; font-size: 12px; font-weight: 700; }
+        .track-link:hover { background: #0369a1; color: #fff; }
+        .edit-link { display: inline-block; background: #fd7e14; color: #fff; border-radius: 5px; padding: 6px 10px; text-decoration: none; }
+        .edit-link.sm { padding: 4px 9px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-height: 30px; box-sizing: border-box; }
+        .tbl-id-badge { display: inline-block; background: #e0e7ef; color: #1e3a5f; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 700; margin-top: 2px; }
+        .tbl-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700; }
+        .tbl-badge-yellow { background: #fef9c3; color: #854d0e; }
+        .tbl-badge-green  { background: #dcfce7; color: #15803d; }
+
+        /* ─── Paper plane button ─── */
+        .btn-start-thread {
+            background: #e0f2fe; color: #0369a1; border: none; border-radius: 5px;
+            padding: 4px 7px; cursor: pointer; display: inline-flex; align-items: center;
+            justify-content: center; min-height: 30px; box-sizing: border-box;
+        }
+        .btn-start-thread:hover { background: #1e3a5f; color: #fff; }
+
+        /* ─── Detail grid ─── */
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; padding: 14px; }
+        .detail-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 13px; }
+        .detail-card strong { display: block; color: #1e3a5f; margin-bottom: 8px; font-size: 13px; }
+        .detail-card div { margin-bottom: 4px; color: #374151; }
+
+        /* ─── Timeline ─── */
+        .timeline-list { margin: 6px 0; padding-right: 18px; }
+        .timeline-list li { margin-bottom: 6px; font-size: 12px; color: #374151; }
+        .tiny { font-size: 11px; color: #94a3b8; }
+        .timeline-group-toggle { margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: #64748b; background: none; border: none; font-family: Vazir, sans-serif; padding: 0; }
+        .timeline-group-toggle:hover { color: #1e3a5f; }
+        .tl-toggle-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; background: #e0e7ef; border-radius: 3px; font-size: 12px; font-weight: 700; }
+        .timeline-group-children { display: none; margin: 6px 0 0; padding-right: 16px; }
+        .timeline-group-children.open { display: block; }
+        .timeline-group-children li { margin-bottom: 6px; }
+
+        /* ─── Receipt thumbnails ─── */
+        .receipt-thumb-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+        .receipt-thumb-card { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .receipt-thumb-link { text-decoration: none; color: inherit; }
+        .receipt-thumb-media { display: block; width: 80px; height: 80px; border: 2px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #f8fafc; display: flex; align-items: center; justify-content: center; }
+        .receipt-thumb-media img { width: 100%; height: 100%; object-fit: cover; }
+        .receipt-thumb-pdf { font-size: 18px; font-weight: 800; color: #dc2626; }
+        .receipt-thumb-caption { font-size: 11px; color: #64748b; }
+        .receipt-thumb-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+
+        /* ─── Staff action forms ─── */
+        .staff-action select, .staff-action textarea { width: 100%; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px; font-family: Vazir, sans-serif; font-size: 13px; margin-bottom: 6px; }
+        .staff-action textarea { min-height: 56px; resize: vertical; }
+        .staff-action select:focus, .staff-action textarea:focus { border-color: #1e3a5f; outline: none; box-shadow: 0 0 0 3px rgba(30,58,95,.12); }
+
+        /* ─── Button links ─── */
+        .button-link { display: inline-block; border-radius: 6px; padding: 8px 14px; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; border: none; background: #1e3a5f; color: #fff; }
+        .button-link.sm { padding: 5px 10px; font-size: 12px; }
+        .button-link.outline { background: transparent; border: 1.5px solid #94a3b8; color: #475569; }
+        .button-link.outline:hover { border-color: #1e3a5f; color: #1e3a5f; }
+
+        /* ─── Paper plane popup ─── */
+        #threadPopupOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; align-items: center; justify-content: center; }
+        #threadPopupOverlay.open { display: flex; }
+        #threadPopupBox { background: #fff; border-radius: 14px; padding: 28px 24px; width: min(440px, 92vw); box-shadow: 0 8px 32px rgba(0,0,0,.22); font-family: Vazir, sans-serif; direction: rtl; }
+        #threadPopupBox h4 { margin: 0 0 8px; font-size: 17px; color: #1e3a5f; }
+        #threadPopupBox label { display: block; margin: 12px 0 5px; font-size: 13px; font-weight: 700; }
+        #threadPopupBox input[type=text] { width: 100%; box-sizing: border-box; border: 1.5px solid #c7d2e8; border-radius: 8px; padding: 9px 12px; font-family: Vazir, sans-serif; font-size: 14px; }
+        #threadCustomTitleWrap { display: none; }
+        #threadPopupActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+        .cdd-wrap { position: relative; }
+        .cdd-trigger { width: 100%; text-align: right; border: 1.5px solid #c7d2e8; border-radius: 8px; padding: 9px 12px; background: #fff; font-family: Vazir, sans-serif; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .cdd-trigger::after { content: '▾'; color: #94a3b8; }
+        .cdd-list { display: none; position: absolute; top: 100%; right: 0; left: 0; background: #fff; border: 1.5px solid #c7d2e8; border-radius: 8px; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,.12); overflow: hidden; }
+        .cdd-wrap.open .cdd-list { display: block; }
+        .cdd-option { padding: 10px 14px; cursor: pointer; font-size: 14px; font-family: Vazir, sans-serif; }
+        .cdd-option:hover, .cdd-option.selected { background: #eef2ff; color: #1e3a5f; font-weight: 700; }
+
+        /* ─── Invoice filter ─── */
         .invoice-filter-box { max-width: 1200px; margin: 0 auto 20px auto; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
         .invoice-filter-grid { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 10px; align-items: end; }
         .invoice-filter-grid label { display: block; margin-bottom: 6px; font-size: 13px; color: #333; }
         .invoice-filter-grid input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; }
         .invoice-filter-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
-        .invoice-filter-actions button,
-        .invoice-filter-actions a { border: none; border-radius: 6px; padding: 10px 14px; text-decoration: none; cursor: pointer; }
+        .invoice-filter-actions button, .invoice-filter-actions a { border: none; border-radius: 6px; padding: 10px 14px; text-decoration: none; cursor: pointer; }
         .invoice-filter-actions button { background: #007bff; color: white; }
         .invoice-filter-actions a { background: #f1f1f1; color: #333; }
-        
-        .timeline-list { margin: 0; padding-right: 18px; }
-        .timeline-list li { margin-bottom: 6px; font-size: 12px; color: #666; }
-        
-        .expand-btn { border: none; border-radius: 5px; padding: 6px 10px; background: #1e3a5f; color: #fff; cursor: pointer; margin-top: 6px; }
-        tr.detail-row { display: none; background: #fafafa; }
-        tr.detail-row.open { display: table-row; }
-        
+
         .empty-message { max-width: 1200px; margin: 20px auto; background: #fff; padding: 40px; border-radius: 10px; text-align: center; color: #666; }
     </style>
 </head>
@@ -70,121 +162,93 @@
             <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'customers_list' %}{% endif %}" class="back-link">← بازگشت به لیست مشتریان</a>
         </div>
     </div>
-    
+
     <!-- Customer Info Header -->
     <div class="customer-header">
         <div class="customer-header-grid">
-            <div class="customer-header-item">
-                <strong>نام کاربری:</strong>
-                <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' customer_user.id %}">{{ customer_user.username }}</button>
-            </div>
-            <div class="customer-header-item">
-                <strong>نام:</strong>
-                {{ customer_profile.first_name|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>نام خانوادگی:</strong>
-                {{ customer_profile.last_name|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>نام مجموعه:</strong>
-                {{ customer_profile.organization|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>شماره تماس:</strong>
-                {{ customer_profile.phone|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>شماره همراه:</strong>
-                {{ customer_profile.mobile|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>شماره همراه دوم:</strong>
-                {{ customer_profile.second_mobile|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>ایمیل:</strong>
-                {{ customer_user.email|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>نماینده:</strong>
-                {{ customer_profile.representative_name|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>موبایل نماینده:</strong>
-                {{ customer_profile.representative_mobile|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>تفویض SMS:</strong>
-                {% if customer_profile.delegate_sms_to_representative %}فعال{% else %}غیرفعال{% endif %}
-            </div>
-            <div class="customer-header-item">
-                <strong>استان:</strong>
-                {{ customer_profile.province|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>شهر:</strong>
-                {{ customer_profile.city|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>آدرس:</strong>
-                {{ customer_profile.address|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>آدرس دوم:</strong>
-                {{ customer_profile.second_address|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>تاریخ آغاز فعالیت:</strong>
-                {{ customer_profile.active_from|jalali_date|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>تاریخ اعتبار:</strong>
-                {{ customer_profile.valid_until|jalali_date|default:'-' }}
-            </div>
-            <div class="customer-header-item">
-                <strong>وضعیت:</strong>
-                {% if customer_profile.suspended %}
-                    <span style="color: #c62828;">معلق</span>
-                {% else %}
-                    <span style="color: #2e7d32;">فعال</span>
-                {% endif %}
-            </div>
+            <div class="customer-header-item"><strong>نام کاربری:</strong><button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' customer_user.id %}">{{ customer_user.username }}</button></div>
+            <div class="customer-header-item"><strong>نام:</strong>{{ customer_profile.first_name|default:'-' }}</div>
+            <div class="customer-header-item"><strong>نام خانوادگی:</strong>{{ customer_profile.last_name|default:'-' }}</div>
+            <div class="customer-header-item"><strong>نام مجموعه:</strong>{{ customer_profile.organization|default:'-' }}</div>
+            <div class="customer-header-item"><strong>شماره تماس:</strong>{{ customer_profile.phone|default:'-' }}</div>
+            <div class="customer-header-item"><strong>شماره همراه:</strong>{{ customer_profile.mobile|default:'-' }}</div>
+            <div class="customer-header-item"><strong>شماره همراه دوم:</strong>{{ customer_profile.second_mobile|default:'-' }}</div>
+            <div class="customer-header-item"><strong>ایمیل:</strong>{{ customer_user.email|default:'-' }}</div>
+            <div class="customer-header-item"><strong>نماینده:</strong>{{ customer_profile.representative_name|default:'-' }}</div>
+            <div class="customer-header-item"><strong>موبایل نماینده:</strong>{{ customer_profile.representative_mobile|default:'-' }}</div>
+            <div class="customer-header-item"><strong>تفویض SMS:</strong>{% if customer_profile.delegate_sms_to_representative %}فعال{% else %}غیرفعال{% endif %}</div>
+            <div class="customer-header-item"><strong>استان:</strong>{{ customer_profile.province|default:'-' }}</div>
+            <div class="customer-header-item"><strong>شهر:</strong>{{ customer_profile.city|default:'-' }}</div>
+            <div class="customer-header-item"><strong>آدرس:</strong>{{ customer_profile.address|default:'-' }}</div>
+            <div class="customer-header-item"><strong>آدرس دوم:</strong>{{ customer_profile.second_address|default:'-' }}</div>
+            <div class="customer-header-item"><strong>تاریخ آغاز فعالیت:</strong>{{ customer_profile.active_from|jalali_date|default:'-' }}</div>
+            <div class="customer-header-item"><strong>تاریخ اعتبار:</strong>{{ customer_profile.valid_until|jalali_date|default:'-' }}</div>
+            <div class="customer-header-item"><strong>وضعیت:</strong>{% if customer_profile.suspended %}<span style="color:#c62828;">معلق</span>{% else %}<span style="color:#2e7d32;">فعال</span>{% endif %}</div>
         </div>
     </div>
-    
+
     <!-- Summary Cards -->
     <div class="summary-cards">
-        <div class="summary-card">
-            <h3>تعداد فیش‌های پرداخت</h3>
-            <div class="value">{{ total_payments }}</div>
-        </div>
-        <div class="summary-card">
-            <h3>تعداد فاکتورها</h3>
-            <div class="value">{{ total_invoices }}</div>
-        </div>
-        <div class="summary-card">
-            <h3>جمع مبالغ فاکتورها (ریال)</h3>
-            <div class="value">{{ invoice_total_amount|thousand_sep }}</div>
-        </div>
-        <div class="summary-card">
-            <h3>جمع مبالغ واریزی (ریال)</h3>
-            <div class="value">{{ total_amount|thousand_sep }}</div>
-        </div>
-        <div class="summary-card">
-            <h3>بدهی فعلی ممیزی نشده (ریال)</h3>
-            <div class="value">{{ customer_debt.review_debt|thousand_sep }}</div>
-        </div>
-        <div class="summary-card">
-            <h3>بدهی تایید شده (ریال)</h3>
-            <div class="value">{{ customer_debt.confirmed_debt|thousand_sep }}</div>
-        </div>
+        <div class="summary-card"><h3>تعداد فیش‌های پرداخت</h3><div class="value">{{ total_payments }}</div></div>
+        <div class="summary-card"><h3>تعداد فاکتورها</h3><div class="value">{{ total_invoices }}</div></div>
+        <div class="summary-card"><h3>جمع مبالغ فاکتورها (ریال)</h3><div class="value">{{ invoice_total_amount|thousand_sep }}</div></div>
+        <div class="summary-card"><h3>جمع مبالغ واریزی (ریال)</h3><div class="value">{{ total_amount|thousand_sep }}</div></div>
+        <div class="summary-card"><h3>بدهی فعلی ممیزی نشده (ریال)</h3><div class="value">{{ customer_debt.review_debt|thousand_sep }}</div></div>
+        <div class="summary-card"><h3>بدهی تایید شده (ریال)</h3><div class="value">{{ customer_debt.confirmed_debt|thousand_sep }}</div></div>
     </div>
-    
-    <!-- Payments Section -->
+
+    <!-- ═══════════════════════ Payments Section ═══════════════════════ -->
     <h3 class="section-title">فیش‌های پرداخت</h3>
     {% include "payments/partials/export_panel.html" with export_dataset="customer_payments" export_fields=payment_export_fields export_extra_params=customer_export_params %}
-    <div class="per-page-control">
+
+    <!-- Payment Filter Bar -->
+    <div class="filter-bar">
+        <form method="get">
+            {% for key, value in request.GET.items %}
+                {% if key != 'payments_page' and key != 'status' and key != 'pay_date_from' and key != 'pay_date_to' and key != 'tracking_code' and key != 'amount' and key != 'payer_full_name' %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+            <div>
+                <label for="pf-status">وضعیت</label>
+                <select id="pf-status" name="status">
+                    <option value="">همه</option>
+                    {% for val, lbl in payment_status_choices %}
+                        <option value="{{ val }}" {% if filters.status == val %}selected{% endif %}>{{ lbl }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="pf-date-from">از تاریخ</label>
+                <input id="pf-date-from" type="text" name="pay_date_from" value="{{ filters.pay_date_from }}" placeholder="۱۴۰۳/۰۱/۰۱" style="width:110px;">
+            </div>
+            <div>
+                <label for="pf-date-to">تا تاریخ</label>
+                <input id="pf-date-to" type="text" name="pay_date_to" value="{{ filters.pay_date_to }}" placeholder="۱۴۰۳/۱۲/۲۹" style="width:110px;">
+            </div>
+            <div>
+                <label for="pf-tracking">کد پیگیری</label>
+                <input id="pf-tracking" type="text" name="tracking_code" value="{{ filters.tracking_code }}" placeholder="کد پیگیری" style="width:130px;">
+            </div>
+            <div>
+                <label for="pf-payer">نام واریزکننده</label>
+                <input id="pf-payer" type="text" name="payer_full_name" value="{{ filters.payer_full_name }}" placeholder="نام واریزکننده" style="width:130px;">
+            </div>
+            <div>
+                <label for="pf-amount">مبلغ (ریال)</label>
+                <input id="pf-amount" type="text" name="amount" value="{{ filters.amount }}" placeholder="مبلغ" style="width:110px;">
+            </div>
+            <div style="display:flex;gap:6px;align-items:flex-end;">
+                <button type="submit" class="f-btn f-apply">جستجو</button>
+                {% if filters.status or filters.pay_date_from or filters.pay_date_to or filters.tracking_code or filters.amount or filters.payer_full_name %}
+                    <a href="{% url 'customer_detail' customer_user.id %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}" class="f-btn f-clear">حذف فیلتر</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Per-page selector -->
+    <div class="per-page-control" style="max-width:1200px;margin:0 auto 8px auto;">
         <form method="get">
             {% for key, value in request.GET.items %}
                 {% if key != 'payments_page' and key != 'payments_per_page' %}
@@ -197,123 +261,303 @@
                 <option value="20" {% if request.GET.payments_per_page == '20' %}selected{% endif %}>20</option>
                 <option value="50" {% if request.GET.payments_per_page == '50' %}selected{% endif %}>50</option>
                 <option value="100" {% if request.GET.payments_per_page == '100' %}selected{% endif %}>100</option>
-                <option value="all" {% if request.GET.payments_per_page == 'all' %}selected{% endif %}>همه</option>
             </select>
         </form>
     </div>
+
     {% if payments %}
-        <table data-table-prefs="customer-payments">
+    <div class="table-wrap">
+        <table>
             <thead>
                 <tr>
-                    <th>ردیف</th>
-                    <th>شماره سند</th>
-                    <th>مبلغ (ریال)</th>
-                    <th>تاریخ واریز</th>
-                    <th>کد پیگیری</th>
-                    <th>بانک مقصد</th>
-                    <th>شماره حساب مقصد</th>
-                    <th>وضعیت بازرگانی</th>
-                    <th>وضعیت مالی</th>
-                    <th>عملیات</th>
+                    <th style="width:70px;">ردیف</th>
+                    <th>بانک مقصد / حساب</th>
+                    <th>واریزکننده</th>
+                    <th>تاریخ / کد پیگیری</th>
+                    <th style="width:120px;">مبلغ (ریال)</th>
+                    <th style="width:160px;">وضعیت</th>
+                    <th style="width:140px;">اقدام</th>
                 </tr>
             </thead>
             <tbody>
-                {% for payment in payments %}
-                    <tr class="summary-row" onclick="toggleDetail('payment-{{ payment.id }}')">
-                        <td>{{ payments_page_obj.start_index|add:forloop.counter0 }}</td>
-                        <td>{{ payment.id }}</td>
-                        <td>{{ payment.amount|thousand_sep }}</td>
-                        <td>{{ payment.pay_date|jalali_date }}</td>
-                        <td>{{ payment.tracking_code|default:'-' }}</td>
-                        <td>{{ payment.beneficiary_bank_name|default:'-' }}</td>
-                        <td>{{ payment.beneficiary_account_number|default:'-' }}</td>
-                        <td><span class="status-pill {{ payment.commercial_flag_class }}">{{ payment.commercial_status_label }}</span></td>
-                        <td><span class="status-pill {{ payment.finance_flag_class }}">{{ payment.finance_status_label }}</span></td>
-                        <td>
-                            <button class="expand-btn" type="button">مشاهده جزئیات</button>
-                        </td>
-                    </tr>
-                    <tr class="detail-row" id="payment-{{ payment.id }}">
-                        <td colspan="10">
-                            <div class="detail-grid">
-                                <div class="detail-card">
-                                    <strong>نام و نام خانوادگی واریز کننده:</strong><br>
-                                    {{ payment.payer_full_name|default:'-' }}
+            {% for payment in payments %}
+                <tr class="summary-row" data-row="{{ payment.id }}">
+                    <td>{{ payments_page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ payment.id }}</span></td>
+                    <td style="white-space:normal;line-height:1.6;text-align:right;">
+                        {% if payment.beneficiary_bank_name and payment.beneficiary_bank_name != 'Z' %}
+                            <div>{{ payment.beneficiary_bank_name }}</div>
+                        {% endif %}
+                        {% if payment.beneficiary_account_number and payment.beneficiary_account_number != 'Z' %}
+                            <div style="color:#64748b;font-size:11px;direction:ltr;">{{ payment.beneficiary_account_number }}</div>
+                        {% endif %}
+                        {% if payment.beneficiary_account_owner and payment.beneficiary_account_owner != 'Z' %}
+                            <div style="color:#94a3b8;font-size:11px;">{{ payment.beneficiary_account_owner }}</div>
+                        {% endif %}
+                        {% if not payment.beneficiary_bank_name or payment.beneficiary_bank_name == 'Z' %}-{% endif %}
+                    </td>
+                    <td style="white-space:normal;line-height:1.6;text-align:right;">
+                        <div>{% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</div>
+                        {% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}<div style="color:#64748b;font-size:11px;">{{ payment.payer_bank_name }}</div>{% endif %}
+                    </td>
+                    <td style="white-space:normal;line-height:1.6;">
+                        <div>{{ payment.pay_date|jalali_date }}</div>
+                        <div style="display:inline-block;margin-top:2px;padding:1px 6px;font-size:12px;color:#1e3a5f;background:#eef2f8;border:1px solid #c7d2e8;border-radius:4px;">{{ payment.tracking_code|default:'-' }}</div>
+                        <div style="color:#64748b;font-size:11px;margin-top:3px;">ثبت: {{ payment.created_at|jalali_datetime }}</div>
+                    </td>
+                    <td>{{ payment.amount|thousand_sep }}</td>
+                    <td style="white-space:normal;line-height:1.8;">
+                        <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
+                            <span style="font-size:10px;color:#64748b;min-width:42px;flex-shrink:0;">بازرگانی:</span>
+                            <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:10px;">&#9873; {{ payment.commercial_status_label }}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:5px;">
+                            <span style="font-size:10px;color:#64748b;min-width:42px;flex-shrink:0;">مالی:</span>
+                            <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:10px;">&#9873; {{ payment.finance_status_label }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+                            {% if payment.can_commercial_act or payment.can_finance_register %}
+                            <span class="tbl-badge tbl-badge-yellow">نیاز به اقدام</span>
+                            {% endif %}
+                            <a class="track-link" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">پیگیری وضعیت</a>
+                            <div style="display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center;">
+                                {% if payment.can_edit_details %}
+                                <a class="edit-link sm" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">تکمیل</a>
+                                {% endif %}
+                                <button type="button" class="btn-start-thread" data-payment-id="{{ payment.id }}" data-payment-label="سند #{{ payment.id }}" title="ارسال به گفتگو"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                            </div>
+                            <button type="button" class="expand-btn" data-row="{{ payment.id }}">جزئیات و اقدام</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="detail-row" id="detail-{{ payment.id }}">
+                    <td colspan="7">
+                        <div class="detail-grid">
+                            <!-- ── اطلاعات پایه ── -->
+                            <div class="detail-card">
+                                <strong>اطلاعات سند</strong>
+                                {% with ac=customer_user.profile.accounting_code %}
+                                {% if ac %}<div>کد تفضیلی: <span class="tbl-badge tbl-badge-green">{{ ac }}</span></div>{% endif %}
+                                {% endwith %}
+                                <div>مجموعه: {{ payment.organization|default:'-' }}</div>
+                                <div>شهر: {{ payment.city|default:'-' }}</div>
+                                <div>شماره تلفن: {{ payment.phone|default:'-' }}</div>
+                                <div>نام و نام‌خانوادگی واریزکننده: {% if payment.payer_full_name and payment.payer_full_name != 'Z' %}{{ payment.payer_full_name }}{% else %}-{% endif %}</div>
+                                <div>شماره حساب واریزکننده: {% if payment.payer_account_number and payment.payer_account_number != 'Z' %}{{ payment.payer_account_number }}{% else %}-{% endif %}</div>
+                                <div>بانک مبدا: {% if payment.payer_bank_name and payment.payer_bank_name != 'Z' %}{{ payment.payer_bank_name }}{% else %}-{% endif %}</div>
+                                <div>بانک مقصد: {% if payment.beneficiary_bank_name and payment.beneficiary_bank_name != 'Z' %}{{ payment.beneficiary_bank_name }}{% else %}-{% endif %}</div>
+                                <div>شماره حساب مقصد: {% if payment.beneficiary_account_number and payment.beneficiary_account_number != 'Z' %}{{ payment.beneficiary_account_number }}{% else %}-{% endif %}</div>
+                                <div>نام صاحب حساب مقصد: {% if payment.beneficiary_account_owner and payment.beneficiary_account_owner != 'Z' %}{{ payment.beneficiary_account_owner }}{% else %}-{% endif %}</div>
+                                <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
+                                <div>توضیح مشتری: {{ payment.customer_notes|default:'-' }}</div>
+                                <div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>
+                                <div>آخرین توضیح کارشناس: {{ payment.last_staff_note|default:'-' }}</div>
+                            </div>
+
+                            <!-- ── اسناد / فیش ── -->
+                            <div class="detail-card">
+                                <strong>اسناد</strong>
+                                <div class="receipt-thumb-grid">
+                                    {% with receipts=payment.receipts.all %}
+                                        {% if receipts %}
+                                            {% for receipt in receipts %}
+                                                {% with file_name=receipt.image.name|lower %}
+                                                <div class="receipt-thumb-card">
+                                                    <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
+                                                        <span class="receipt-thumb-media">
+                                                            {% if '.pdf' in file_name %}
+                                                                <span class="receipt-thumb-pdf">PDF</span>
+                                                            {% else %}
+                                                                <img src="{% url 'receipt_file' receipt.id %}" alt="سند {{ forloop.counter }}" loading="lazy">
+                                                            {% endif %}
+                                                        </span>
+                                                        <span class="receipt-thumb-caption">سند {{ forloop.counter }}</span>
+                                                    </a>
+                                                    {% if '.pdf' not in file_name %}
+                                                    <div class="receipt-thumb-actions">
+                                                        <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود">⬇</button>
+                                                        <button type="button" class="button-link outline sm receipt-thumb-print" data-image-url="{% url 'receipt_file' receipt.id %}" title="چاپ">🖨</button>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                                {% endwith %}
+                                            {% endfor %}
+                                        {% elif payment.receipt_image %}
+                                            {% with file_name=payment.receipt_image.name|lower %}
+                                            <div class="receipt-thumb-card">
+                                                <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
+                                                    <span class="receipt-thumb-media">
+                                                        {% if '.pdf' in file_name %}
+                                                            <span class="receipt-thumb-pdf">PDF</span>
+                                                        {% else %}
+                                                            <img src="{% url 'legacy_payment_receipt_file' payment.id %}" alt="سند" loading="lazy">
+                                                        {% endif %}
+                                                    </span>
+                                                    <span class="receipt-thumb-caption">سند</span>
+                                                </a>
+                                                {% if '.pdf' not in file_name %}
+                                                <div class="receipt-thumb-actions">
+                                                    <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود">⬇</button>
+                                                    <button type="button" class="button-link outline sm receipt-thumb-print" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" title="چاپ">🖨</button>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            {% endwith %}
+                                        {% else %}
+                                            <span style="color:#94a3b8;font-size:12px;">سندی بارگذاری نشده.</span>
+                                        {% endif %}
+                                    {% endwith %}
                                 </div>
-                                <div class="detail-card">
-                                    <strong>شماره حساب واریز کننده:</strong><br>
-                                    {{ payment.payer_account_number|default:'-' }}
+                            </div>
+
+                            <!-- ── تاریخچه ── -->
+                            <div class="detail-card">
+                                <strong>روند تغییرات</strong>
+                                <ul class="timeline-list">
+                                    {% for row in payment.timeline_lines %}
+                                        <li>
+                                            {{ row.text }}
+                                            <div class="tiny">{{ row.time }}</div>
+                                            {% if row.note %}<div class="tiny">توضیح: {{ row.note }}</div>{% endif %}
+                                            {% if row.children %}
+                                            <div class="timeline-group-toggle" onclick="toggleTimelineGroup(this)">
+                                                <span class="tl-toggle-icon">+</span>
+                                                <span>{{ row.children|length }} مورد مشابه دیگر</span>
+                                            </div>
+                                            <ul class="timeline-group-children">
+                                                {% for child in row.children %}
+                                                <li>
+                                                    {{ child.text }}
+                                                    <div class="tiny">{{ child.time }}</div>
+                                                    {% if child.note %}<div class="tiny">توضیح: {{ child.note }}</div>{% endif %}
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                            {% endif %}
+                                        </li>
+                                    {% empty %}
+                                        <li style="color:#94a3b8;">تاریخچه‌ای ثبت نشده است.</li>
+                                    {% endfor %}
+                                </ul>
+                                <a class="track-link" style="margin-top:8px;" href="{% url 'payment_timeline' payment.id %}?next={{ request.get_full_path|urlencode }}">نمایش کامل تاریخچه</a>
+                            </div>
+
+                            <!-- ── پنل اقدام کارشناس ── -->
+                            {% if staff_user_role != 'data_entry' %}
+                            {% if payment.can_commercial_act or payment.can_finance_register or payment.finance_choices %}
+                            <div class="detail-card" style="{% if payment.staff_can_act or payment.can_finance_register %}border:2px solid #fde68a;background:#fffef0;{% endif %}">
+                                <strong style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+                                    ⚙ اقدام روی سند
+                                    {% if payment.can_commercial_act or payment.can_finance_register %}
+                                    <span style="background:#fef9c3;color:#854d0e;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;">نیاز به اقدام</span>
+                                    {% endif %}
+                                </strong>
+
+                                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;">
+                                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                                        <div><span style="color:#64748b;">🏬 بازرگانی:</span> <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:11px;">{{ payment.commercial_status_label }}</span></div>
+                                        <div><span style="color:#64748b;">💰 مالی:</span> <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:11px;">{{ payment.finance_status_label }}</span></div>
+                                    </div>
+                                    <div style="margin-top:6px;color:#94a3b8;font-size:11px;">
+                                        {% if payment.status == 'approved' and not payment.is_finance_registered %}⚡ ثبت بازرگانی — در انتظار ثبت مالی
+                                        {% elif payment.status == 'final_approved' %}🔒 سند تأیید نهایی شده — قفل
+                                        {% elif payment.status == 'rejected' %}🚫 سند رد شده — قفل
+                                        {% elif payment.status == 'incomplete' %}⚠ ناقص — در انتظار اصلاح مشتری
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                <div class="detail-card">
-                                    <strong>بانک مبدا:</strong><br>
-                                    {{ payment.payer_bank_name|default:'-' }}
-                                </div>
-                                <div class="detail-card">
-                                    <strong>نام صاحب حساب مقصد:</strong><br>
-                                    {{ payment.beneficiary_account_owner|default:'-' }}
-                                </div>
-                                <div class="detail-card">
-                                    <strong>تاریخ ثبت:</strong><br>
-                                    {{ payment.created_at|jalali_datetime }}
-                                </div>
-                                <div class="detail-card">
-                                    <strong>توضیح مشتری:</strong><br>
-                                    {{ payment.customer_notes|default:'-' }}
-                                </div>
-                                {% if payment.last_staff_note %}
-                                <div class="detail-card">
-                                    <strong>آخرین توضیح کارشناس:</strong><br>
-                                    {{ payment.last_staff_note }}
+
+                                {# بخش بازرگانی #}
+                                {% if payment.can_commercial_act %}
+                                <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
+                                    <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:6px;">🏬 فلگ بازرگانی / فروش</div>
+                                    <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <select name="status" required onchange="this.closest('form').querySelector('.rejection-reason-box').style.display = (this.value === 'rejected') ? 'block' : 'none';">
+                                            {% for value, label in payment.staff_allowed_choices %}
+                                                <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if staff_user_role == 'commercial' or staff_user_role == 'staff' %}
+                                        <select name="counterparty">
+                                            <option value="">بدون طرف حساب</option>
+                                            {% for cp in counterparties %}
+                                                <option value="{{ cp.id }}" {% if payment.counterparty_id == cp.id %}selected{% endif %}>{{ cp.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% endif %}
+                                        <div class="rejection-reason-box" style="display:none;">
+                                            <select name="rejection_reason" style="width:100%;margin-bottom:6px;">
+                                                <option value="">دلیل رد را انتخاب کنید...</option>
+                                                {% for value, label in rejection_reason_choices %}
+                                                    <option value="{{ value }}" {% if payment.rejection_reason == value %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <textarea name="note" placeholder="توضیح (برای رد/ناقص اجباری)"></textarea>
+                                        <button type="submit" style="background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:Vazir,sans-serif;font-weight:700;font-size:13px;cursor:pointer;width:100%;">ثبت وضعیت بازرگانی</button>
+                                    </form>
+                                    <script>
+                                    (function(){var f=document.currentScript.previousElementSibling;var s=f.querySelector('select[name="status"]');var b=f.querySelector('.rejection-reason-box');if(s&&b&&s.value==='rejected')b.style.display='block';})();
+                                    </script>
                                 </div>
                                 {% endif %}
+
+                                {# بخش مالی #}
+                                {% if payment.finance_choices %}
+                                <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
+                                    <div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px;">💰 فلگ مالی</div>
+                                    <form class="staff-action" method="post" action="{% url 'finance_unified_action' payment.id %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <select name="finance_action" required>
+                                            {% for val, lbl in payment.finance_choices %}
+                                            <option value="{{ val }}">{{ lbl }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <textarea name="note" placeholder="توضیح (برای عودت به بازرگانی الزامی)"></textarea>
+                                        <button type="submit" style="background:#6d28d9;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:Vazir,sans-serif;font-weight:700;font-size:13px;cursor:pointer;width:100%;">ثبت وضعیت مالی</button>
+                                    </form>
+                                </div>
+                                {% endif %}
+
+                                {# ویرایش جزئیات #}
+                                {% if payment.can_edit_details %}
+                                <a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">✏ تکمیل یا اصلاح اطلاعات فیش</a>
+                                {% endif %}
                             </div>
-                            {% if payment.row_flags %}
-                            <div style="margin-top: 10px;">
-                                <strong>تاریخچه وضعیت:</strong>
-                                {% for flag in payment.row_flags %}
-                                    <span class="status-pill {{ flag.css }}" style="margin: 2px;">{{ flag.label }}</span>
-                                {% endfor %}
+                            {% else %}
+                            <div class="detail-card">
+                                <strong>⚙ اقدام روی سند</strong>
+                                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;">
+                                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                                        <div><span style="color:#64748b;">🏬 بازرگانی:</span> <span class="status-pill {{ payment.commercial_flag_class }}" style="font-size:11px;">{{ payment.commercial_status_label }}</span></div>
+                                        <div><span style="color:#64748b;">💰 مالی:</span> <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:11px;">{{ payment.finance_status_label }}</span></div>
+                                    </div>
+                                </div>
+                                <div class="tiny" style="color:#94a3b8;">🔒 در این مرحله امکان اقدام برای نقش شما وجود ندارد.</div>
+                                {% if payment.can_edit_details %}
+                                <div style="margin-top:10px;"><a class="edit-link" href="{% url 'staff_edit_payment_details' payment.id %}?next={{ request.get_full_path|urlencode }}">✏ تکمیل یا اصلاح اطلاعات فیش</a></div>
+                                {% endif %}
                             </div>
                             {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
             </tbody>
         </table>
+    </div>
 
-        {% include "payments/partials/pagination.html" with page_obj=payments_page_obj page_param="payments_page" page_base_query=payments_page_base_query link_class="customer-link" %}
-        {% if legacy_pagination_enabled and payments_page_obj.has_other_pages %}
-            <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
-                {% if payments_page_obj.number > 1 %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page=1" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
-                {% endif %}
-                {% if payments_page_obj.has_previous %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.previous_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
-                {% endif %}
-
-                <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
-                    {% for key, value in request.GET.items %}
-                        {% if key != 'payments_page' and key != 'payments_per_page' %}
-                            <input type="hidden" name="{{ key }}" value="{{ value }}">
-                        {% endif %}
-                    {% endfor %}
-                    <input type="number" name="payments_page" min="1" max="{{ payments_page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
-                    <button type="submit" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
-                </form>
-
-                {% if payments_page_obj.has_next %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.next_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
-                {% endif %}
-                {% if payments_page_obj.number < payments_page_obj.paginator.num_pages %}
-                    <a href="?{% if payments_page_base_query %}{{ payments_page_base_query }}&{% endif %}payments_page={{ payments_page_obj.paginator.num_pages }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
-                {% endif %}
-            </div>
-        {% endif %}
+    {% include "payments/partials/pagination.html" with page_obj=payments_page_obj page_param="payments_page" page_base_query=payments_page_base_query link_class="customer-link" %}
     {% else %}
-        <div class="empty-message">هیچ فیش پرداختی برای این مشتری ثبت نشده است.</div>
+        <div class="empty-message">{% if filters.status or filters.pay_date_from or filters.pay_date_to or filters.tracking_code or filters.amount or filters.payer_full_name %}نتیجه‌ای مطابق با فیلتر یافت نشد.{% else %}هیچ فیش پرداختی برای این مشتری ثبت نشده است.{% endif %}</div>
     {% endif %}
-    
-    <!-- Invoices Section -->
+
+    <!-- ═══════════════════════ Invoices Section ═══════════════════════ -->
     <h3 class="section-title">فاکتورها</h3>
     {% if can_view_invoices %}
         {% include "payments/partials/export_panel.html" with export_dataset="customer_invoices" export_fields=invoice_export_fields export_extra_params=customer_export_params %}
@@ -331,7 +575,6 @@
                 </div>
             </form>
         </div>
-
         <div class="per-page-control">
             <form method="get">
                 {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
@@ -346,16 +589,16 @@
                     <option value="20" {% if request.GET.invoice_per_page == '20' %}selected{% endif %}>20</option>
                     <option value="50" {% if request.GET.invoice_per_page == '50' %}selected{% endif %}>50</option>
                     <option value="100" {% if request.GET.invoice_per_page == '100' %}selected{% endif %}>100</option>
-                    <option value="all" {% if request.GET.invoice_per_page == 'all' %}selected{% endif %}>همه</option>
                 </select>
             </form>
         </div>
     {% endif %}
     {% if not can_view_invoices %}
-        <div class="empty-message" style="background: #fff8e1; border: 1px solid #f0d58a; color: #7a5600; padding: 12px; border-radius: 8px;">
-            شما دسترسی مشاهده فاکتورها را ندارید. برای مشاهده جزئیات فاکتورها باید دسترسی مربوطه در حساب کاربری شما فعال شود.
+        <div class="empty-message" style="background:#fff8e1;border:1px solid #f0d58a;color:#7a5600;padding:12px;border-radius:8px;">
+            شما دسترسی مشاهده فاکتورها را ندارید.
         </div>
     {% elif invoices %}
+        <div class="table-wrap" style="margin-top:8px;">
         <table data-table-prefs="customer-invoices">
             <thead>
                 <tr>
@@ -379,58 +622,224 @@
                         <td>{{ invoice.invoice_date|jalali_date }}</td>
                         <td>{{ invoice.uploaded_by|default:'-' }}</td>
                         <td>{{ invoice.created_at|jalali_datetime }}</td>
-                        <td>
-                            {% if invoice.customer_seen_at %}
-                                <span style="color: #2e7d32;">✓ بله</span>
-                            {% else %}
-                                <span style="color: #c62828;">✗ خیر</span>
-                            {% endif %}
-                        </td>
+                        <td>{% if invoice.customer_seen_at %}<span style="color:#2e7d32;">✓ بله</span>{% else %}<span style="color:#c62828;">✗ خیر</span>{% endif %}</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-
+        </div>
         {% include "payments/partials/pagination.html" with page_obj=invoices_page_obj page_param="invoice_page" page_base_query=invoices_page_base_query link_class="customer-link" %}
-        {% if legacy_pagination_enabled and invoices_page_obj.has_other_pages %}
-            <div style="margin:18px 0; display:flex; gap:10px; justify-content:center; align-items:center;">
-                {% if invoices_page_obj.number > 1 %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page=1" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">اول</a>
-                {% endif %}
-                {% if invoices_page_obj.has_previous %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.previous_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">قبلی</a>
-                {% endif %}
-
-                <form method="get" style="display:inline-flex; gap:8px; align-items:center;">
-                    {% for key, value in request.GET.items %}
-                        {% if key != 'invoice_page' and key != 'invoice_per_page' %}
-                            <input type="hidden" name="{{ key }}" value="{{ value }}">
-                        {% endif %}
-                    {% endfor %}
-                    <input type="number" name="invoice_page" min="1" max="{{ invoices_page_obj.paginator.num_pages }}" placeholder="صفحه" style="width:80px; padding:6px;">
-                    <button type="submit" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">برو</button>
-                </form>
-
-                {% if invoices_page_obj.has_next %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.next_page_number }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">بعدی</a>
-                {% endif %}
-                {% if invoices_page_obj.number < invoices_page_obj.paginator.num_pages %}
-                    <a href="?{% if invoices_page_base_query %}{{ invoices_page_base_query }}&{% endif %}invoice_page={{ invoices_page_obj.paginator.num_pages }}" style="display:inline-block; background:#1e3a5f; color:#fff; border-radius:6px; padding:8px 12px; text-decoration:none;">آخر</a>
-                {% endif %}
-            </div>
-        {% endif %}
     {% else %}
         <div class="empty-message">هیچ فاکتوری برای این مشتری ثبت نشده است.</div>
     {% endif %}
 
+    <!-- ═══════════════════════ Preview overlay (receipt) ═══════════════════════ -->
+    <style>
+        .preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 9990; padding: 20px; }
+        .preview-overlay.open { display: flex; }
+        .preview-box { background: #fff; border-radius: 10px; max-width: 92vw; max-height: 92vh; width: 980px; padding: 10px; position: relative; }
+        .preview-frame { width: 100%; height: 78vh; border: 0; }
+        .preview-image { max-width: 100%; max-height: 78vh; display: block; margin: 0 auto; }
+        .preview-hint { font-size: 12px; color: #666; text-align: center; margin-top: 8px; }
+    </style>
+    <div id="previewOverlay" class="preview-overlay">
+        <div class="preview-box" id="previewBox">
+            <img id="previewImage" class="preview-image" alt="پیش‌نمایش سند" style="display:none;">
+            <iframe id="previewFrame" class="preview-frame" style="display:none;"></iframe>
+            <div class="preview-hint">برای بستن روی پس‌زمینه کلیک کنید.</div>
+        </div>
+    </div>
     <script>
-        function toggleDetail(id) {
-            var row = document.getElementById(id);
-            if (row) {
-                row.classList.toggle('open');
-            }
+    document.addEventListener('DOMContentLoaded', function () {
+        var povl = document.getElementById('previewOverlay');
+        if (povl) {
+            povl.addEventListener('click', function (e) {
+                if (e.target === povl) {
+                    povl.classList.remove('open');
+                    var img = document.getElementById('previewImage');
+                    var frm = document.getElementById('previewFrame');
+                    if (img) { img.style.display='none'; img.src=''; }
+                    if (frm) { frm.style.display='none'; frm.src=''; }
+                }
+            });
         }
+    });
     </script>
+
+    <!-- ═══════════════════════ Paper plane popup ═══════════════════════ -->
+    <div id="threadPopupOverlay">
+        <div id="threadPopupBox">
+            <h4>ارسال سند به گفتگو</h4>
+            <p id="threadPopupPaymentLabel" style="font-size:12px;color:#6b7280;margin:0 0 14px;"></p>
+            <form id="threadPopupForm" method="post" action="{% url 'payment_start_thread' %}">
+                {% csrf_token %}
+                <input type="hidden" name="payment_id" id="threadPaymentId">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <label>موضوع گفتگو</label>
+                <input type="hidden" name="title_choice" id="threadTitleValue" value="status_change">
+                <div class="cdd-wrap" id="threadTitleDrop">
+                    <button type="button" class="cdd-trigger" id="threadTitleTrigger"><span id="threadTitleLabel">درخواست تغییر وضعیت</span></button>
+                    <div class="cdd-list">
+                        <div class="cdd-option selected" data-value="status_change">درخواست تغییر وضعیت</div>
+                        <div class="cdd-option" data-value="payment_review">بررسی فیش واریزی</div>
+                        <div class="cdd-option" data-value="discrepancy">مغایرت واریز</div>
+                        <div class="cdd-option" data-value="final_approval">درخواست تأیید نهایی</div>
+                        <div class="cdd-option" data-value="return_commercial">درخواست عودت به بازرگانی</div>
+                        <div class="cdd-option" data-value="custom">عنوان دلخواه...</div>
+                    </div>
+                </div>
+                <div id="threadCustomTitleWrap">
+                    <label for="threadCustomTitle" style="margin-top:0;">عنوان دلخواه</label>
+                    <input type="text" id="threadCustomTitle" name="title_custom" placeholder="عنوان گفتگو را وارد کنید" maxlength="100">
+                </div>
+                <div id="threadPopupActions">
+                    <button type="button" class="button-link outline sm" onclick="closeThreadPopup()">انصراف</button>
+                    <button type="submit" class="button-link sm">ارسال به گفتگو</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="{% static 'js/app-ui.js' %}"></script>
+    <script>
+    // ─── Row expand / collapse ───
+    document.addEventListener('DOMContentLoaded', function () {
+        function toggleRow(rowId, exclusive) {
+            var det = document.getElementById('detail-' + rowId);
+            if (!det) return;
+            var open = det.classList.contains('open');
+            if (exclusive) {
+                document.querySelectorAll('tr.detail-row.open').forEach(function (r) { r.classList.remove('open'); });
+            }
+            if (!open) det.classList.add('open');
+            else if (!exclusive) det.classList.remove('open');
+        }
+
+        document.querySelectorAll('tr.summary-row').forEach(function (row) {
+            row.addEventListener('click', function (e) {
+                if (e.target.closest('a, button, input, select, textarea, form')) return;
+                toggleRow(row.getAttribute('data-row'), true);
+            });
+        });
+        document.querySelectorAll('.expand-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                toggleRow(btn.getAttribute('data-row'), true);
+            });
+        });
+
+        // ─── Receipt preview ───
+        document.querySelectorAll('.receipt-preview-link').forEach(function (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                var url = link.getAttribute('href');
+                var name = link.getAttribute('data-file-name') || '';
+                var overlay = document.getElementById('previewOverlay');
+                var img = document.getElementById('previewImage');
+                var frame = document.getElementById('previewFrame');
+                if (!overlay || !img || !frame) { window.open(url, '_blank', 'noopener'); return; }
+                if (name.toLowerCase().endsWith('.pdf')) {
+                    img.style.display = 'none'; frame.style.display = 'block'; frame.src = url;
+                } else {
+                    frame.style.display = 'none'; img.style.display = 'block'; img.src = url;
+                }
+                overlay.classList.add('open');
+            });
+        });
+
+        function sanitize(t) { return (t||'').replace(/[\\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim(); }
+        function ext(n) { var m=/\.([a-zA-Z0-9]{1,8})(?:[?#]|$)/.exec((n||'').split('/').pop()||''); return m?m[1].toLowerCase():'jpg'; }
+
+        async function dlImg(url, fname, dlName, btn) {
+            if (btn) btn.disabled = true;
+            try {
+                var r = await fetch(url, {credentials:'same-origin'});
+                if (!r.ok) throw new Error();
+                var blob = await r.blob();
+                var burl = URL.createObjectURL(blob);
+                var a = document.createElement('a'); a.href = burl;
+                a.download = (dlName||'سند') + '.' + ext(fname);
+                document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(burl);
+            } catch(e) { window.open(url,'_blank','noopener'); }
+            finally { if (btn) btn.disabled = false; }
+        }
+
+        function printImg(url) {
+            var f = document.createElement('iframe');
+            f.style.cssText = 'position:fixed;right:-10000px;bottom:0;width:0;height:0;border:0;';
+            document.body.appendChild(f);
+            var d = f.contentWindow.document;
+            d.open(); d.write('<!DOCTYPE html><html><head><style>html,body{margin:0;height:100%;}body{display:flex;align-items:center;justify-content:center;}img{max-width:100%;max-height:100vh;}</style></head><body><img id="pi" src="'+url+'"></body></html>'); d.close();
+            var img = d.getElementById('pi');
+            function go() { try { f.contentWindow.focus(); f.contentWindow.print(); } finally { setTimeout(function(){if(f.parentNode)f.parentNode.removeChild(f);},1000); } }
+            if (img.complete) go(); else { img.addEventListener('load',go); img.addEventListener('error',function(){if(f.parentNode)f.parentNode.removeChild(f);}); }
+        }
+
+        document.querySelectorAll('.receipt-thumb-download').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                var cn = sanitize(btn.getAttribute('data-customer-name'));
+                var dn = sanitize(btn.getAttribute('data-doc-number'));
+                dlImg(btn.getAttribute('data-image-url'), btn.getAttribute('data-file-name'), [cn,dn].filter(Boolean).join(' ') || 'سند', btn);
+            });
+        });
+        document.querySelectorAll('.receipt-thumb-print').forEach(function (btn) {
+            btn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); printImg(btn.getAttribute('data-image-url')); });
+        });
+    });
+
+    // ─── Timeline group toggle ───
+    function toggleTimelineGroup(btn) {
+        var icon = btn.querySelector('.tl-toggle-icon');
+        var list = btn.nextElementSibling;
+        if (!list) return;
+        var open = list.classList.toggle('open');
+        if (icon) icon.textContent = open ? '−' : '+';
+    }
+
+    // ─── Paper plane popup ───
+    (function () {
+        var overlay = document.getElementById('threadPopupOverlay');
+        var pidInput = document.getElementById('threadPaymentId');
+        var labelEl = document.getElementById('threadPopupPaymentLabel');
+        var customWrap = document.getElementById('threadCustomTitleWrap');
+        var customInput = document.getElementById('threadCustomTitle');
+        var titleValue = document.getElementById('threadTitleValue');
+        var drop = document.getElementById('threadTitleDrop');
+        var trigger = document.getElementById('threadTitleTrigger');
+        var triggerLabel = document.getElementById('threadTitleLabel');
+
+        trigger.addEventListener('click', function (e) { e.stopPropagation(); drop.classList.toggle('open'); });
+        drop.addEventListener('click', function (e) {
+            var opt = e.target.closest('.cdd-option');
+            if (!opt) return;
+            drop.querySelectorAll('.cdd-option').forEach(function (o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+            titleValue.value = opt.dataset.value;
+            triggerLabel.textContent = opt.textContent;
+            drop.classList.remove('open');
+            var show = opt.dataset.value === 'custom';
+            customWrap.style.display = show ? 'block' : 'none';
+            if (show) customInput.focus();
+        });
+        document.addEventListener('click', function (e) { if (!drop.contains(e.target)) drop.classList.remove('open'); });
+
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.btn-start-thread');
+            if (!btn) return;
+            pidInput.value = btn.dataset.paymentId;
+            if (labelEl) labelEl.textContent = btn.dataset.paymentLabel || '';
+            var first = drop.querySelector('.cdd-option');
+            drop.querySelectorAll('.cdd-option').forEach(function (o) { o.classList.remove('selected'); });
+            if (first) { first.classList.add('selected'); titleValue.value = first.dataset.value; triggerLabel.textContent = first.textContent; }
+            customWrap.style.display = 'none'; customInput.value = '';
+            overlay.classList.add('open');
+        });
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) closeThreadPopup(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { drop.classList.remove('open'); closeThreadPopup(); } });
+    })();
+
+    function closeThreadPopup() { document.getElementById('threadPopupOverlay').classList.remove('open'); }
+    </script>
 </body>
 </html>

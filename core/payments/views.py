@@ -6068,27 +6068,44 @@ def customer_detail(request, user_id):
     if not is_staff_user:
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدها قابل دسترسی است.')
     return_url = _safe_next_url(request)
+    staff_role = _user_role(request.user)
+    is_system_admin = request.user.is_superuser
 
-    # Get the customer user
     customer_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
     customer_profile = getattr(customer_user, 'profile', None)
 
-    # Get all payments for this customer
-    payments = (
+    # Base payment queryset — apply same filters as the main payment list
+    payments_qs = (
         PaymentRecord.objects
         .filter(user=customer_user)
-        .select_related('counterparty', 'user')
-        .prefetch_related('receipts', 'activity_logs', 'activity_logs__actor')
+        .select_related('counterparty', 'user', 'user__profile')
+        .prefetch_related(
+            'receipts',
+            'activity_logs',
+            Prefetch('activity_logs__actor', queryset=User.objects.select_related('profile')),
+        )
         .order_by('-created_at')
     )
-    payments = _enrich_records(
-        payments,
-        staff_role=_user_role(request.user),
-        is_system_admin=request.user.is_superuser,
+    payments_qs, active_payment_filters = _apply_record_filters(payments_qs, request, is_staff_user=True)
+
+    # Summary stats from filtered queryset (before pagination — no enrichment needed)
+    total_payments = payments_qs.count()
+    total_amount = payments_qs.aggregate(total=Sum('amount'))['total'] or 0
+    status_counts = {
+        s['status']: s['cnt']
+        for s in payments_qs.values('status').annotate(cnt=Count('id'))
+    }
+
+    # Paginate then enrich only current page
+    payments_page_obj = _paginate_queryset(request, payments_qs, per_page=10, page_param='payments_page')
+    payments_page_obj.object_list = _enrich_records(
+        list(payments_page_obj.object_list),
+        staff_role=staff_role,
+        is_system_admin=is_system_admin,
         can_edit_payment_details=_can_edit_payment_details(request.user),
     )
 
-    # Get all invoices for this customer
+    # Invoices
     invoices = (
         InvoiceRecord.objects
         .filter(customer=customer_user)
@@ -6103,22 +6120,11 @@ def customer_detail(request, user_id):
     if invoice_number_filter and can_view_invoices:
         invoices = invoices.filter(invoice_number__icontains=invoice_number_filter)
 
-    # Calculate summary
-    total_payments = len(payments)
     total_invoices = invoices.count()
-    total_amount = sum(p.amount for p in payments)
     invoice_total_amount = invoices.aggregate(total=Sum('amount'))['total'] or 0
-
-    payments_page_obj = _paginate_queryset(request, payments, per_page=10, page_param='payments_page')
     invoices_page_obj = _paginate_queryset(request, invoices, per_page=10, page_param='invoice_page')
     payments_page_base_query = _build_query_string(request, remove_keys=['payments_page'])
     invoices_page_base_query = _build_query_string(request, remove_keys=['invoice_page'])
-
-    # Status breakdown for payments
-    status_counts = {}
-    for payment in payments:
-        status = payment.get_status_display()
-        status_counts[status] = status_counts.get(status, 0) + 1
 
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
 
@@ -6138,16 +6144,26 @@ def customer_detail(request, user_id):
         'customer_debt': _customer_debt_summary(customer_user),
         'status_counts': status_counts,
         'is_staff_user': is_staff_user,
-        'staff_user_role': _user_role(request.user),
+        'staff_user_role': staff_role,
+        'is_system_admin': is_system_admin,
         'can_view_invoices': can_view_invoices,
         'filters': {
+            **active_payment_filters,
             'invoice_number': invoice_number_filter,
         },
+        'payment_status_choices': PaymentRecord.STAFF_FILTER_CHOICES,
         'user_display_name': user_display_name,
         'return_url': return_url,
         'payment_export_fields': PAYMENT_EXPORT_FIELDS,
         'invoice_export_fields': INVOICE_EXPORT_FIELDS,
         'customer_export_params': {'customer_id': customer_user.id},
+        'is_history_mode': True,
+        'is_pending_final_mode': False,
+        'counterparties': Counterparty.objects.all(),
+        'finance_users': list(User.objects.filter(
+            profile__role__in=['finance', 'finance_manager'], is_active=True
+        ).select_related('profile')),
+        'rejection_reason_choices': PaymentRecord.REJECTION_REASON_CHOICES,
     })
 
 
