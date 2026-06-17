@@ -63,3 +63,9 @@
   font-weight: 900;
   font-display:swap;
 }
+
+/* Apply Vazir to every element — including form controls that browsers don't inherit into */
+*, *::before, *::after,
+button, input, select, textarea, summary {
+  font-family: Vazir, sans-serif !important;
+}
