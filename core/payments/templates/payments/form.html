@@ -124,6 +124,7 @@
         .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
         .filter-grid label { display: block; margin-bottom: 4px; font-size: 13px; }
         .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .date-blocked { opacity: 0.38; pointer-events: none; }
         .filter-actions button, .filter-actions a { border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; text-decoration: none; text-align: center; }
         .apply-btn { background: #1e3a5f; color: #fff; }
         .clear-btn { background: #6c757d; color: #fff; }
@@ -1378,6 +1379,54 @@
             autoClose: true,
             initialValue: false
         });
+
+        // ─── Mutual exclusion: exact date vs date range ───
+        (function () {
+            var exactEl  = document.getElementById('pay_date_filter');
+            var fromEl   = document.getElementById('pay_date_from_filter');
+            var toEl     = document.getElementById('pay_date_to_filter');
+            if (!exactEl || !fromEl || !toEl) return;
+            var exactWrap = exactEl.parentElement;
+            var fromWrap  = fromEl.parentElement;
+            var toWrap    = toEl.parentElement;
+
+            function onExact() {
+                if (exactEl.value.trim()) {
+                    fromEl.value = ''; toEl.value = '';
+                    fromWrap.classList.add('date-blocked');
+                    toWrap.classList.add('date-blocked');
+                    exactWrap.classList.remove('date-blocked');
+                } else {
+                    fromWrap.classList.remove('date-blocked');
+                    toWrap.classList.remove('date-blocked');
+                }
+            }
+            function onRange() {
+                if (fromEl.value.trim() || toEl.value.trim()) {
+                    exactEl.value = '';
+                    exactWrap.classList.add('date-blocked');
+                    fromWrap.classList.remove('date-blocked');
+                    toWrap.classList.remove('date-blocked');
+                } else {
+                    exactWrap.classList.remove('date-blocked');
+                }
+            }
+
+            exactEl.addEventListener('input', onExact);
+            exactEl.addEventListener('change', onExact);
+            fromEl.addEventListener('input', onRange);
+            fromEl.addEventListener('change', onRange);
+            toEl.addEventListener('input', onRange);
+            toEl.addEventListener('change', onRange);
+
+            if (exactEl.value.trim()) {
+                fromWrap.classList.add('date-blocked');
+                toWrap.classList.add('date-blocked');
+            } else if (fromEl.value.trim() || toEl.value.trim()) {
+                exactWrap.classList.add('date-blocked');
+            }
+        })();
+
         const amountEls = document.querySelectorAll('.amount-input');
         amountEls.forEach(function (amountEl) {
             new Cleave(amountEl, {
