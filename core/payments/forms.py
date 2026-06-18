@@ -4,8 +4,11 @@ import os
 import random
 import re
 import time as _time
+from zoneinfo import ZoneInfo
 
+import jdatetime
 from django import forms
+from django.conf import settings
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -16,6 +19,8 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django_jalali.forms import jDateField, jDateInput
 from PIL import Image, ImageOps
+
+DISPLAY_TZ = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
 from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, SystemSettings, UploadSettings, UserProfile
 
@@ -622,8 +627,14 @@ class PaymentRecordForm(forms.ModelForm):
 
     def clean_pay_date(self):
         pay_date = self.cleaned_data.get('pay_date')
+        today = jdatetime.date.fromgregorian(date=timezone.localdate(timezone=DISPLAY_TZ))
         if pay_date is None:
-            return timezone.localdate()
+            return today
+        if pay_date > today:
+            raise ValidationError(
+                f'تاریخ واریز ({pay_date.strftime("%Y/%m/%d")}) در آینده است. '
+                'تاریخ روی فیش را دوباره بررسی و وارد کنید.'
+            )
         return pay_date
 
     def clean_receipt_images(self):
