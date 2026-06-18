@@ -141,8 +141,9 @@
         .recon-form p { margin: 0; }
         .recon-form label, .chat-form label { color: #334155; display: block; font-size: 12px; font-weight: 900; margin-bottom: 4px; }
         .recon-form input, .recon-form select, .chat-form input, .chat-form select, .chat-form textarea { font-family: Vazir, sans-serif; width: 100%; }
-        .recon-form p:has(.internal-checkbox) { display: flex; align-items: center; gap: 8px; background: #fef9ec; border: 1px solid #f59e0b; border-radius: 7px; padding: 8px 10px; }
-        .recon-form p:has(.internal-checkbox) label { color: #92400e; font-size: 12px; font-weight: 900; margin: 0; cursor: pointer; }
+        .recon-form p:has(.internal-checkbox) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; background: #fef9ec; border: 1px solid #f59e0b; border-radius: 7px; padding: 8px 10px; }
+        .recon-form p:has(.internal-checkbox) label { color: #92400e; display: inline; font-size: 12px; font-weight: 900; margin: 0; cursor: pointer; }
+        .recon-form p:has(.internal-checkbox) .helptext { flex-basis: 100%; color: #92400e; font-size: 10px; margin-top: 1px; }
         .recon-form .internal-checkbox { width: auto; cursor: pointer; accent-color: #b45309; flex-shrink: 0; }
         .select-search { background: #f8fafc; border: 1px solid #d7e2ee; border-radius: 7px; font-family: Vazir, sans-serif; margin-bottom: 6px; min-height: 34px; padding: 7px 9px; width: 100%; }
         .primary-btn, .secondary-btn { border: 0; border-radius: 8px; cursor: pointer; font-family: Vazir, sans-serif; font-weight: 900; min-height: 38px; padding: 8px 14px; }
