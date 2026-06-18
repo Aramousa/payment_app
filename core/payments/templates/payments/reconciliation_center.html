@@ -68,7 +68,8 @@
         .msg-menu-btn { align-items: center; background: rgba(255,255,255,.85); border: none; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.15); color: #64748b; cursor: pointer; display: flex; font-size: 18px; font-weight: 900; height: 26px; justify-content: center; line-height: 1; opacity: 0; padding: 0; transition: opacity .15s; width: 26px; }
         .msg-bubble:hover .msg-menu-btn { opacity: 1; }
         .msg-menu-btn:focus { opacity: 1; outline: none; }
-        .msg-menu-dropdown { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.14); min-width: 130px; position: absolute; top: 30px; left: 0; z-index: 200; }
+        .msg-menu-dropdown { display: none; }
+        .msg-menu-floater { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.14); min-width: 160px; position: fixed; z-index: 9999; }
         .msg-menu-item { background: none; border: none; cursor: pointer; display: block; font-family: Vazir, sans-serif; font-size: 13px; padding: 9px 16px; text-align: right; width: 100%; }
         .msg-menu-item:first-child { border-radius: 8px 8px 0 0; }
         .msg-menu-item:last-child { border-radius: 0 0 8px 8px; }
@@ -513,21 +514,41 @@
             .catch(function () { onError('خطای ارتباطی. دوباره تلاش کنید.'); });
         }
 
+        var _activeFloater = null;
+
+        function closeMsgMenus() {
+            if (_activeFloater) { _activeFloater.remove(); _activeFloater = null; }
+        }
+
+        function openMsgMenu(btn) {
+            closeMsgMenus();
+            var template = btn.nextElementSibling; // .msg-menu-dropdown (hidden data source)
+            var floater = document.createElement('div');
+            floater.className = 'msg-menu-floater';
+            floater.innerHTML = template.innerHTML;
+            var rect = btn.getBoundingClientRect();
+            floater.style.top = (rect.bottom + 4) + 'px';
+            floater.style.left = rect.left + 'px';
+            document.body.appendChild(floater);
+            _activeFloater = floater;
+            // Adjust if floater would overflow viewport edges
+            var fr = floater.getBoundingClientRect();
+            if (fr.bottom > window.innerHeight - 8) { floater.style.top = (rect.top - fr.height - 4) + 'px'; }
+            if (fr.right > window.innerWidth - 8) { floater.style.left = (rect.right - fr.width) + 'px'; }
+        }
+
         document.addEventListener('click', function (e) {
             // Three-dot menu toggle
             var menuBtn = e.target.closest('.msg-menu-btn');
             if (menuBtn) {
-                var dropdown = menuBtn.nextElementSibling;
-                var isOpen = !dropdown.hidden;
-                document.querySelectorAll('.msg-menu-dropdown').forEach(function (d) { d.hidden = true; });
-                if (!isOpen) { dropdown.hidden = false; }
+                var alreadyOpen = !!_activeFloater;
+                closeMsgMenus();
+                if (!alreadyOpen) { openMsgMenu(menuBtn); }
                 return;
             }
 
-            // Close all open menus when clicking outside
-            if (!e.target.closest('.msg-menu-wrap')) {
-                document.querySelectorAll('.msg-menu-dropdown').forEach(function (d) { d.hidden = true; });
-            }
+            // Close floater on any click outside (including menu item clicks — actions run after)
+            closeMsgMenus();
 
             // Reply
             var replyBtn = e.target.closest('[data-reply-msg]');
