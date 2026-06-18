@@ -4174,6 +4174,12 @@ def reconciliation_center(request):
                 # فقط کارکنان می‌توانند پیام داخلی ارسال کنند
                 if _is_staff_user(request.user) and request.POST.get('is_internal') == '1':
                     message.is_internal = True
+                reply_to_id = request.POST.get('reply_to_id') or None
+                if reply_to_id:
+                    try:
+                        message.reply_to = ReconciliationMessage.objects.get(pk=reply_to_id, thread=thread)
+                    except ReconciliationMessage.DoesNotExist:
+                        pass
                 uploaded = message_form.cleaned_data.get('attachment')
                 if uploaded:
                     message.attachment_name = uploaded.name
@@ -4266,7 +4272,7 @@ def reconciliation_center(request):
         _mark_reconciliation_thread_read(active_thread, request.user)
         active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id, active_thread.id)
         can_see_receipts = request.user.is_superuser or request.user.id == active_thread.created_by_id
-        _msg_qs = active_thread.messages.select_related('sender', 'sender__profile', 'deleted_by')
+        _msg_qs = active_thread.messages.select_related('sender', 'sender__profile', 'deleted_by', 'reply_to', 'reply_to__sender', 'reply_to__sender__profile')
         if can_see_receipts:
             _msg_qs = _msg_qs.prefetch_related(
                 Prefetch('read_receipts', queryset=ReconciliationMessageReadReceipt.objects.select_related('user__profile'))
@@ -4333,7 +4339,7 @@ def reconciliation_poll(request):
         after_id = int(request.GET.get('after') or 0)
         _mark_reconciliation_thread_read(active_thread, request.user)
         can_see_receipts = request.user.is_superuser or request.user.id == active_thread.created_by_id
-        _poll_qs = active_thread.messages.select_related('sender', 'sender__profile', 'deleted_by').filter(id__gt=after_id)
+        _poll_qs = active_thread.messages.select_related('sender', 'sender__profile', 'deleted_by', 'reply_to', 'reply_to__sender', 'reply_to__sender__profile').filter(id__gt=after_id)
         if can_see_receipts:
             _poll_qs = _poll_qs.prefetch_related(
                 Prefetch('read_receipts', queryset=ReconciliationMessageReadReceipt.objects.select_related('user__profile'))

@@ -723,6 +723,7 @@ class ReconciliationMessage(models.Model):
     document_type = models.CharField('نوع سند ارجاع‌شده', max_length=24, choices=ReconciliationThread.DOCUMENT_CHOICES, default='', blank=True)
     document_id = models.PositiveIntegerField('شناسه سند ارجاع‌شده', null=True, blank=True)
     created_at = models.DateTimeField('زمان ارسال', auto_now_add=True)
+    reply_to = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='replies', verbose_name='در پاسخ به')
     is_edited = models.BooleanField('ویرایش شده', default=False)
     edited_at = models.DateTimeField('زمان ویرایش', null=True, blank=True)
     is_deleted = models.BooleanField('حذف شده', default=False)

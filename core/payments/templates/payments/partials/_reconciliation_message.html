@@ -20,6 +20,12 @@
                 <div class="msg-author">کاربر حذف‌شده</div>
             {% endif %}
             {% if message.is_internal %}<div class="msg-internal-badge">🔒 فقط کارکنان</div>{% endif %}
+            {% if message.reply_to %}
+            <div class="msg-reply-quote" data-scroll-to="{{ message.reply_to_id }}">
+                <div class="msg-reply-quote-author">{% if message.reply_to.sender %}{{ message.reply_to.sender.profile.display_name }}{% else %}کاربر حذف‌شده{% endif %}</div>
+                <div class="msg-reply-quote-body">{% if message.reply_to.is_deleted %}🚫 پیام حذف شده{% else %}{{ message.reply_to.body|truncatechars:80 }}{% endif %}</div>
+            </div>
+            {% endif %}
             <div class="msg-body-wrap">
                 {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
             </div>
@@ -47,17 +53,20 @@
                 {% endif %}
                 {% endwith %}
             {% endif %}
-            {% if message.sender_id == request.user.id or request.user.is_superuser %}
             <div class="msg-menu-wrap">
                 <button class="msg-menu-btn" type="button" title="گزینه‌ها">⋮</button>
                 <div class="msg-menu-dropdown" hidden>
+                    <button class="msg-menu-item" type="button" data-reply-msg="{{ message.id }}" data-reply-author="{% if message.sender %}{{ message.sender.profile.display_name|escapejs }}{% else %}کاربر حذف‌شده{% endif %}" data-reply-body="{{ message.body|truncatechars:100|escapejs }}">↩ ریپلای</button>
+                    <button class="msg-menu-item" type="button" data-copy-msg="{{ message.id }}">📋 کپی متن</button>
+                    {% if message.sender_id == request.user.id or request.user.is_superuser %}
+                    <hr class="msg-menu-sep">
                     {% if message.sender_id == request.user.id %}
                         <button class="msg-menu-item" type="button" data-edit-msg="{{ message.id }}">✏️ ویرایش</button>
                     {% endif %}
                     <button class="msg-menu-item msg-menu-item--danger" type="button" data-delete-msg="{{ message.id }}">🗑 حذف</button>
+                    {% endif %}
                 </div>
             </div>
-            {% endif %}
         {% endif %}
     </div>
 </article>
