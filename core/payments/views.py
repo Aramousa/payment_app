@@ -4121,6 +4121,9 @@ def reconciliation_center(request):
             for customer in User.objects.filter(id__in=customer_ids).select_related('profile').order_by('first_name', 'last_name', 'username')
         ]
 
+    # queryset بدون فیلتر مشتری — برای جستجوی active thread استفاده می‌شود
+    accessible_threads_qs = threads_qs
+
     thread_tab = request.GET.get('tab') if request.GET.get('tab') in {'all', 'by_customer'} else 'all'
     selected_customer_id = request.GET.get('customer', '').strip()
     if thread_tab == 'by_customer' and not is_customer_user:
@@ -4135,7 +4138,7 @@ def reconciliation_center(request):
     active_thread = None
     selected_id = request.GET.get('thread')
     if selected_id:
-        active_thread = get_object_or_404(threads_qs, id=selected_id)
+        active_thread = get_object_or_404(accessible_threads_qs, id=selected_id)
     else:
         active_thread = threads_qs.first()
 
@@ -4394,6 +4397,8 @@ def reconciliation_poll(request):
     threads_qs = _reconciliation_threads_for_user(request.user)
     is_customer_user = _user_role(request.user) == 'customer'
 
+    accessible_threads_qs = threads_qs
+
     thread_tab = request.GET.get('tab') if request.GET.get('tab') in {'all', 'by_customer'} else 'all'
     selected_customer_id = request.GET.get('customer', '').strip()
     if thread_tab == 'by_customer' and not is_customer_user:
@@ -4408,7 +4413,7 @@ def reconciliation_poll(request):
     active_thread = None
     selected_id = request.GET.get('thread')
     if selected_id:
-        active_thread = threads_qs.filter(id=selected_id).first()
+        active_thread = accessible_threads_qs.filter(id=selected_id).first()
 
     filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
     _pin_subq = ReconciliationThreadPin.objects.filter(user=request.user, thread=OuterRef('pk'))
