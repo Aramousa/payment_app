@@ -87,6 +87,18 @@
         .reply-preview-close { background: none; border: none; color: #64748b; cursor: pointer; font-size: 16px; flex-shrink: 0; line-height: 1; padding: 0 2px; }
         @keyframes msgHighlight { 0%,100% { box-shadow: none; } 30% { box-shadow: 0 0 0 4px #fbbf24; } }
         .msg-highlight .msg-bubble { animation: msgHighlight .8s ease; }
+        .msg-info-overlay { align-items: center; background: rgba(0,0,0,.45); display: flex; inset: 0; justify-content: center; position: fixed; z-index: 600; }
+        .msg-info-panel { background: #fff; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.22); max-height: 80vh; max-width: 420px; min-width: 280px; overflow-y: auto; padding: 24px 20px 20px; width: 92%; }
+        .msg-info-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .msg-info-title { font-size: 15px; font-weight: 800; }
+        .msg-info-close-btn { background: none; border: none; color: #64748b; cursor: pointer; font-size: 20px; line-height: 1; padding: 0; }
+        .msg-info-section { margin-bottom: 16px; }
+        .msg-info-section-label { align-items: center; color: #64748b; display: flex; font-size: 11px; font-weight: 800; gap: 5px; letter-spacing: .04em; margin-bottom: 8px; }
+        .msg-info-row { align-items: center; display: flex; gap: 8px; padding: 5px 0; }
+        .msg-info-row + .msg-info-row { border-top: 1px solid #f1f5f9; }
+        .msg-info-name { font-size: 13px; }
+        .msg-info-time { color: #94a3b8; font-size: 11px; margin-right: auto; }
+        .msg-info-empty { color: #94a3b8; font-size: 12px; padding: 4px 0; }
         .msg-edit-form { margin-top: 4px; }
         .msg-edit-textarea { border: 1px solid #cbd5e1; border-radius: 6px; font-family: Vazir, sans-serif; font-size: 14px; line-height: 1.9; padding: 6px 8px; resize: vertical; width: 100%; }
         .msg-edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
@@ -456,6 +468,31 @@
             });
         }
 
+        function showMsgInfoModal(data) {
+            var existing = document.getElementById('msgInfoOverlay');
+            if (existing) existing.remove();
+            function rows(list, withTime) {
+                if (!list.length) return '<div class="msg-info-empty">—</div>';
+                return list.map(function (r) {
+                    return '<div class="msg-info-row"><span class="msg-info-name">' + r.name + '</span>' +
+                        (withTime ? '<span class="msg-info-time">' + r.read_at + '</span>' : '') + '</div>';
+                }).join('');
+            }
+            var overlay = document.createElement('div');
+            overlay.className = 'msg-info-overlay';
+            overlay.id = 'msgInfoOverlay';
+            overlay.innerHTML =
+                '<div class="msg-info-panel">' +
+                '<div class="msg-info-header"><span class="msg-info-title">اطلاعات پیام</span>' +
+                '<button class="msg-info-close-btn" type="button">✕</button></div>' +
+                '<div class="msg-info-section"><div class="msg-info-section-label">✅ دیده شده (' + data.read.length + ')</div>' + rows(data.read, true) + '</div>' +
+                '<div class="msg-info-section"><div class="msg-info-section-label">📬 دریافت شده، مشاهده نشده (' + data.unread.length + ')</div>' + rows(data.unread, false) + '</div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            overlay.querySelector('.msg-info-close-btn').addEventListener('click', function () { overlay.remove(); });
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        }
+
         function replaceMsgHtml(msgId, html) {
             var el = document.querySelector('[data-message-id="' + msgId + '"]');
             if (el) { el.outerHTML = html; setupEditTimers(); }
@@ -529,6 +566,16 @@
                 if (navigator.clipboard && text) {
                     navigator.clipboard.writeText(text);
                 }
+                return;
+            }
+
+            // Message info (admin / creator only)
+            var infoBtn = e.target.closest('[data-info-msg]');
+            if (infoBtn) {
+                postMsgAction({ action: 'message_info', message_id: infoBtn.dataset.infoMsg },
+                    function (d) { showMsgInfoModal(d); },
+                    function (err) { alert(err); }
+                );
                 return;
             }
 

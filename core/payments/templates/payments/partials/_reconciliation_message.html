@@ -58,6 +58,9 @@
                 <div class="msg-menu-dropdown" hidden>
                     <button class="msg-menu-item" type="button" data-reply-msg="{{ message.id }}" data-reply-author="{% if message.sender %}{{ message.sender.profile.display_name|escapejs }}{% else %}کاربر حذف‌شده{% endif %}" data-reply-body="{{ message.body|truncatechars:100|escapejs }}">↩ ریپلای</button>
                     <button class="msg-menu-item" type="button" data-copy-msg="{{ message.id }}">📋 کپی متن</button>
+                    {% if can_see_receipts %}
+                    <button class="msg-menu-item" type="button" data-info-msg="{{ message.id }}">ℹ️ اطلاعات پیام</button>
+                    {% endif %}
                     {% if message.sender_id == request.user.id or request.user.is_superuser %}
                     <hr class="msg-menu-sep">
                     {% if message.sender_id == request.user.id %}

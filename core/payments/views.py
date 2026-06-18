@@ -4259,6 +4259,34 @@ def reconciliation_center(request):
                 'thread_created_by_id': _thr.created_by_id,
             }, request=request)
             return JsonResponse({'html': html, 'message_id': msg_obj.id})
+        elif action == 'message_info':
+            msg_id = request.POST.get('message_id')
+            msg_obj = get_object_or_404(ReconciliationMessage.objects.select_related('thread'), id=msg_id)
+            thr = msg_obj.thread
+            if not (request.user.is_superuser or request.user.id == thr.created_by_id):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            if not _can_access_reconciliation_thread(request.user, thr):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            participant_ids = set()
+            for _s in thr.staff_participants.all():
+                if _s.id != msg_obj.sender_id:
+                    participant_ids.add(_s.id)
+            if thr.customer_id and thr.customer_id != msg_obj.sender_id:
+                participant_ids.add(thr.customer_id)
+            receipts = ReconciliationMessageReadReceipt.objects.filter(
+                message=msg_obj, user_id__in=participant_ids
+            ).select_related('user__profile').order_by('read_at')
+            read_ids = set()
+            read_list = []
+            for _r in receipts:
+                read_ids.add(_r.user_id)
+                read_list.append({'name': _r.user.profile.display_name, 'read_at': _r.read_at.strftime('%Y/%m/%d %H:%M')})
+            unread_list = []
+            unread_ids = participant_ids - read_ids
+            if unread_ids:
+                for _u in User.objects.filter(id__in=unread_ids).select_related('profile'):
+                    unread_list.append({'name': _u.profile.display_name})
+            return JsonResponse({'read': read_list, 'unread': unread_list})
 
     filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
     thread_rows = list(filtered_threads_qs[:80])
