@@ -437,6 +437,15 @@
 
                 fromEl.addEventListener('input', syncTo);
                 fromEl.addEventListener('change', syncTo);
+
+                // Intercept programmatic value changes from persianDatepicker
+                var proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+                Object.defineProperty(fromEl, 'value', {
+                    get: function () { return proto.get.call(this); },
+                    set: function (v) { proto.set.call(this, v); setTimeout(syncTo, 0); },
+                    configurable: true
+                });
+
                 syncTo();
             })();
 
