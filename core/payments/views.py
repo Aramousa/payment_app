@@ -11,7 +11,7 @@ import json
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Count, Exists, Max, OuterRef, Prefetch, Q, Sum
+from django.db.models import Count, Exists, Max, OuterRef, Prefetch, Q, Sum, prefetch_related_objects
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -4228,7 +4228,7 @@ def reconciliation_center(request):
             _thr = msg_obj.thread
             _can_see = request.user.is_superuser or request.user.id == _thr.created_by_id
             if _can_see:
-                msg_obj.prefetch_related_objects(['read_receipts__user__profile'])
+                prefetch_related_objects([msg_obj], 'read_receipts__user__profile')
             html = render_to_string('payments/partials/_reconciliation_message.html', {
                 'message': msg_obj, 'can_see_receipts': _can_see,
                 'thread_created_by_id': _thr.created_by_id,
@@ -4309,7 +4309,7 @@ def reconciliation_center(request):
             _thr = msg_obj.thread
             _can_see = request.user.is_superuser or request.user.id == _thr.created_by_id
             if _can_see:
-                msg_obj.prefetch_related_objects(['read_receipts__user__profile'])
+                prefetch_related_objects([msg_obj], 'read_receipts__user__profile')
             html = render_to_string('payments/partials/_reconciliation_message.html', {
                 'message': msg_obj, 'can_see_receipts': _can_see,
                 'thread_created_by_id': _thr.created_by_id,
