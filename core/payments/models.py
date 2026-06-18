@@ -723,6 +723,11 @@ class ReconciliationMessage(models.Model):
     document_type = models.CharField('نوع سند ارجاع‌شده', max_length=24, choices=ReconciliationThread.DOCUMENT_CHOICES, default='', blank=True)
     document_id = models.PositiveIntegerField('شناسه سند ارجاع‌شده', null=True, blank=True)
     created_at = models.DateTimeField('زمان ارسال', auto_now_add=True)
+    is_edited = models.BooleanField('ویرایش شده', default=False)
+    edited_at = models.DateTimeField('زمان ویرایش', null=True, blank=True)
+    is_deleted = models.BooleanField('حذف شده', default=False)
+    deleted_at = models.DateTimeField('زمان حذف', null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='deleted_reconciliation_messages', verbose_name='حذف‌کننده')
 
     class Meta:
         ordering = ['created_at', 'id']
@@ -743,6 +748,41 @@ class ReconciliationMessage(models.Model):
         if not self.attachment:
             return ''
         return self.attachment_name or self.attachment.name.rsplit('/', 1)[-1]
+
+
+class ReconciliationMessageLog(models.Model):
+    ACTION_EDIT = 'edit'
+    ACTION_DELETE = 'delete'
+    ACTION_CHOICES = [(ACTION_EDIT, 'ویرایش'), (ACTION_DELETE, 'حذف')]
+
+    message = models.ForeignKey(ReconciliationMessage, on_delete=models.CASCADE, related_name='logs', verbose_name='پیام')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reconciliation_message_logs', verbose_name='کاربر')
+    action = models.CharField('عملیات', max_length=16, choices=ACTION_CHOICES)
+    old_body = models.TextField('متن قبلی', blank=True)
+    timestamp = models.DateTimeField('زمان', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'لاگ پیام گفتگو'
+        verbose_name_plural = 'لاگ‌های پیام گفتگو'
+
+    def __str__(self):
+        return f'{self.get_action_display()} — {self.actor} — {self.timestamp:%Y-%m-%d %H:%M}'
+
+
+class ReconciliationMessageReadReceipt(models.Model):
+    message = models.ForeignKey(ReconciliationMessage, on_delete=models.CASCADE, related_name='read_receipts', verbose_name='پیام')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reconciliation_read_receipts', verbose_name='کاربر')
+    read_at = models.DateTimeField('زمان مشاهده', auto_now_add=True)
+
+    class Meta:
+        unique_together = [('message', 'user')]
+        ordering = ['read_at']
+        verbose_name = 'رسید خواندن پیام'
+        verbose_name_plural = 'رسیدهای خواندن پیام'
+
+    def __str__(self):
+        return f'msg#{self.message_id} — {self.user}'
 
 
 class ReconciliationReadState(models.Model):

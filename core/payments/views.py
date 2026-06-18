@@ -37,7 +37,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 import os
 
 
@@ -267,6 +267,24 @@ def _mark_reconciliation_thread_read(thread, user):
     from django.core.cache import cache
     from .context_processors import recon_unread_cache_key
     cache.delete(recon_unread_cache_key(user.id))
+
+
+def _create_read_receipts(messages, user):
+    """ثبت رسید خواندن پیام‌ها برای کاربر (به جز پیام‌های خود کاربر)."""
+    if not messages or not user or not user.is_authenticated:
+        return
+    candidate_ids = [m.id for m in messages if m.sender_id != user.id and not getattr(m, 'is_deleted', False)]
+    if not candidate_ids:
+        return
+    existing = set(ReconciliationMessageReadReceipt.objects.filter(
+        message_id__in=candidate_ids, user=user,
+    ).values_list('message_id', flat=True))
+    new_receipts = [
+        ReconciliationMessageReadReceipt(message_id=mid, user=user)
+        for mid in candidate_ids if mid not in existing
+    ]
+    if new_receipts:
+        ReconciliationMessageReadReceipt.objects.bulk_create(new_receipts, ignore_conflicts=True)
 
 
 def _apply_reconciliation_filters(threads, request):
@@ -4178,6 +4196,63 @@ def reconciliation_center(request):
             thread.status = ReconciliationThread.STATUS_CLOSED if action == 'close_thread' else ReconciliationThread.STATUS_OPEN
             thread.save(update_fields=['status', 'updated_at'])
             return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
+        elif action == 'edit_message':
+            msg_id = request.POST.get('message_id')
+            new_body = (request.POST.get('body') or '').strip()
+            msg_obj = get_object_or_404(ReconciliationMessage.objects.select_related('thread'), id=msg_id)
+            if not _can_access_reconciliation_thread(request.user, msg_obj.thread):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            if msg_obj.sender_id != request.user.id:
+                return JsonResponse({'error': 'فقط فرستنده می‌تواند پیام را ویرایش کند'}, status=403)
+            if msg_obj.is_deleted:
+                return JsonResponse({'error': 'پیام حذف شده است'}, status=400)
+            if (timezone.now() - msg_obj.created_at).total_seconds() > 300:
+                return JsonResponse({'error': 'مهلت ۵ دقیقه‌ای ویرایش پیام به پایان رسیده است'}, status=400)
+            if not new_body:
+                return JsonResponse({'error': 'متن پیام نمی‌تواند خالی باشد'}, status=400)
+            ReconciliationMessageLog.objects.create(
+                message=msg_obj, actor=request.user,
+                action=ReconciliationMessageLog.ACTION_EDIT, old_body=msg_obj.body,
+            )
+            msg_obj.body = new_body
+            msg_obj.is_edited = True
+            msg_obj.edited_at = timezone.now()
+            msg_obj.save(update_fields=['body', 'is_edited', 'edited_at'])
+            msg_obj.document_url = _reconciliation_document_url(msg_obj.document_type, msg_obj.document_id, msg_obj.thread_id)
+            _thr = msg_obj.thread
+            _can_see = request.user.is_superuser or request.user.id == _thr.created_by_id
+            if _can_see:
+                msg_obj.prefetch_related_objects(['read_receipts__user__profile'])
+            html = render_to_string('payments/partials/_reconciliation_message.html', {
+                'message': msg_obj, 'can_see_receipts': _can_see,
+                'thread_created_by_id': _thr.created_by_id,
+            }, request=request)
+            return JsonResponse({'html': html, 'message_id': msg_obj.id})
+        elif action == 'delete_message':
+            msg_id = request.POST.get('message_id')
+            msg_obj = get_object_or_404(ReconciliationMessage.objects.select_related('thread'), id=msg_id)
+            if not _can_access_reconciliation_thread(request.user, msg_obj.thread):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            if not (request.user.is_superuser or msg_obj.sender_id == request.user.id):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            if msg_obj.is_deleted:
+                return JsonResponse({'error': 'پیام قبلاً حذف شده است'}, status=400)
+            ReconciliationMessageLog.objects.create(
+                message=msg_obj, actor=request.user,
+                action=ReconciliationMessageLog.ACTION_DELETE, old_body=msg_obj.body,
+            )
+            msg_obj.is_deleted = True
+            msg_obj.deleted_at = timezone.now()
+            msg_obj.deleted_by = request.user
+            msg_obj.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+            msg_obj.document_url = ''
+            _thr = msg_obj.thread
+            _can_see = request.user.is_superuser or request.user.id == _thr.created_by_id
+            html = render_to_string('payments/partials/_reconciliation_message.html', {
+                'message': msg_obj, 'can_see_receipts': _can_see,
+                'thread_created_by_id': _thr.created_by_id,
+            }, request=request)
+            return JsonResponse({'html': html, 'message_id': msg_obj.id})
 
     filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
     thread_rows = list(filtered_threads_qs[:80])
@@ -4186,15 +4261,22 @@ def reconciliation_center(request):
         thread.last_message = thread.messages.last()
 
     active_messages = []
+    can_see_receipts = False
     if active_thread:
         _mark_reconciliation_thread_read(active_thread, request.user)
         active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id, active_thread.id)
-        _msg_qs = active_thread.messages.select_related('sender', 'sender__profile')
+        can_see_receipts = request.user.is_superuser or request.user.id == active_thread.created_by_id
+        _msg_qs = active_thread.messages.select_related('sender', 'sender__profile', 'deleted_by')
+        if can_see_receipts:
+            _msg_qs = _msg_qs.prefetch_related(
+                Prefetch('read_receipts', queryset=ReconciliationMessageReadReceipt.objects.select_related('user__profile'))
+            )
         if is_customer_user:
             _msg_qs = _msg_qs.filter(is_internal=False)
         active_messages = list(_msg_qs)
         for message in active_messages:
             message.document_url = _reconciliation_document_url(message.document_type, message.document_id, active_thread.id)
+        _create_read_receipts(active_messages, request.user)
 
     return render(request, 'payments/reconciliation_center.html', {
         'threads': thread_rows,
@@ -4210,6 +4292,7 @@ def reconciliation_center(request):
         'thread_tab': thread_tab,
         'customer_options': customer_options,
         'selected_customer_id': selected_customer_id,
+        'can_see_receipts': can_see_receipts,
     })
 
 
@@ -4249,16 +4332,26 @@ def reconciliation_poll(request):
     if active_thread:
         after_id = int(request.GET.get('after') or 0)
         _mark_reconciliation_thread_read(active_thread, request.user)
-        _poll_qs = active_thread.messages.select_related('sender', 'sender__profile').filter(id__gt=after_id)
+        can_see_receipts = request.user.is_superuser or request.user.id == active_thread.created_by_id
+        _poll_qs = active_thread.messages.select_related('sender', 'sender__profile', 'deleted_by').filter(id__gt=after_id)
+        if can_see_receipts:
+            _poll_qs = _poll_qs.prefetch_related(
+                Prefetch('read_receipts', queryset=ReconciliationMessageReadReceipt.objects.select_related('user__profile'))
+            )
         if _user_role(request.user) == 'customer':
             _poll_qs = _poll_qs.filter(is_internal=False)
         new_messages = list(_poll_qs)
         for message in new_messages:
             message.document_url = _reconciliation_document_url(message.document_type, message.document_id, active_thread.id)
+        _create_read_receipts(new_messages, request.user)
         if new_messages:
             last_message_id = new_messages[-1].id
             messages_html = ''.join(
-                render_to_string('payments/partials/_reconciliation_message.html', {'message': message}, request=request)
+                render_to_string('payments/partials/_reconciliation_message.html', {
+                    'message': message,
+                    'can_see_receipts': can_see_receipts,
+                    'thread_created_by_id': active_thread.created_by_id,
+                }, request=request)
                 for message in new_messages
             )
         else:

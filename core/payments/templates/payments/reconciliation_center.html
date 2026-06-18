@@ -58,6 +58,20 @@
         .msg-author:hover { color: #0f766e; text-decoration: underline; }
         .msg-body { font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
         .msg-time { color: #64748b; font-size: 11px; margin-top: 6px; text-align: left; }
+        .msg-edited-badge { background: #f1f5f9; border-radius: 4px; color: #94a3b8; font-size: 10px; margin-right: 5px; padding: 1px 5px; }
+        .msg-deleted .msg-bubble { background: #f8fafc; border-color: #e2e8f0; opacity: .75; }
+        .msg-deleted-body { color: #94a3b8; font-size: 13px; font-style: italic; }
+        .msg-read-receipts { color: #94a3b8; font-size: 10px; margin-top: 4px; text-align: left; }
+        .msg-read-icon { margin-left: 2px; }
+        .msg-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 4px; opacity: 0; transition: opacity .15s; }
+        .msg-bubble:hover .msg-actions { opacity: 1; }
+        .msg-action-btn { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+        .msg-action-btn:hover { background: #e2e8f0; }
+        .msg-edit-form { margin-top: 4px; }
+        .msg-edit-textarea { border: 1px solid #cbd5e1; border-radius: 6px; font-family: Vazir, sans-serif; font-size: 14px; line-height: 1.9; padding: 6px 8px; resize: vertical; width: 100%; }
+        .msg-edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+        .msg-edit-save { background: #22c55e; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-family: Vazir, sans-serif; font-size: 12px; font-weight: 700; padding: 4px 12px; }
+        .msg-edit-cancel { background: #e2e8f0; border: none; border-radius: 6px; color: #374151; cursor: pointer; font-family: Vazir, sans-serif; font-size: 12px; padding: 4px 12px; }
         .msg-internal { opacity: .88; }
         .msg-internal .msg-bubble { background: #fef9ec; border: 1.5px dashed #f59e0b; }
         .msg-internal-badge { font-size: 11px; font-weight: 800; color: #b45309; margin-bottom: 4px; }
@@ -390,6 +404,98 @@
                 .catch(function () { /* silent */ });
         }
         setInterval(pollReconciliation, 8000);
+
+        // ─── Edit / Delete messages ───────────────────────────────────────
+        var CSRF = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+        var EDIT_WINDOW_MS = 5 * 60 * 1000;
+
+        function setupEditTimers() {
+            document.querySelectorAll('[data-edit-msg]').forEach(function (btn) {
+                var sentUnix = parseInt(btn.closest('[data-sent-unix]').dataset.sentUnix || '0') * 1000;
+                var remaining = EDIT_WINDOW_MS - (Date.now() - sentUnix);
+                if (remaining <= 0) { btn.style.display = 'none'; return; }
+                setTimeout(function () { btn.style.display = 'none'; }, remaining);
+            });
+        }
+        setupEditTimers();
+
+        function replaceMsgHtml(msgId, html) {
+            var el = document.querySelector('[data-message-id="' + msgId + '"]');
+            if (el) { el.outerHTML = html; setupEditTimers(); }
+        }
+
+        function postMsgAction(data, onSuccess, onError) {
+            var body = Object.keys(data).map(function (k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]);
+            }).join('&');
+            fetch(window.location.pathname + window.location.search, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': CSRF },
+                body: body,
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { d.error ? onError(d.error) : onSuccess(d); })
+            .catch(function () { onError('خطای ارتباطی. دوباره تلاش کنید.'); });
+        }
+
+        document.addEventListener('click', function (e) {
+            // Delete
+            var delBtn = e.target.closest('[data-delete-msg]');
+            if (delBtn) {
+                if (!confirm('آیا مطمئن هستید که می‌خواهید این پیام را حذف کنید؟')) return;
+                postMsgAction({ action: 'delete_message', message_id: delBtn.dataset.deleteMsg },
+                    function (d) { replaceMsgHtml(d.message_id, d.html); },
+                    function (err) { alert(err); }
+                );
+                return;
+            }
+
+            // Edit — open inline editor
+            var editBtn = e.target.closest('[data-edit-msg]');
+            if (editBtn) {
+                var msgId = editBtn.dataset.editMsg;
+                var article = document.querySelector('[data-message-id="' + msgId + '"]');
+                if (!article) return;
+                var sentUnix = parseInt(article.dataset.sentUnix || '0') * 1000;
+                if (Date.now() - sentUnix > EDIT_WINDOW_MS) {
+                    alert('مهلت ۵ دقیقه‌ای ویرایش پیام به پایان رسیده است.'); return;
+                }
+                var bodyWrap = article.querySelector('.msg-body-wrap');
+                if (!bodyWrap || bodyWrap.querySelector('.msg-edit-form')) return;
+                var original = article.dataset.msgBody || '';
+                var form = document.createElement('div');
+                form.className = 'msg-edit-form';
+                form.innerHTML =
+                    '<textarea class="msg-edit-textarea" rows="3">' + original.replace(/</g,'&lt;') + '</textarea>' +
+                    '<div class="msg-edit-actions">' +
+                    '<button class="msg-edit-save" data-edit-save="' + msgId + '">ذخیره</button>' +
+                    '<button class="msg-edit-cancel">انصراف</button></div>';
+                bodyWrap.appendChild(form);
+                form.querySelector('textarea').focus();
+                return;
+            }
+
+            // Edit — cancel
+            if (e.target.closest('.msg-edit-cancel')) {
+                var form = e.target.closest('.msg-edit-form');
+                if (form) form.remove();
+                return;
+            }
+
+            // Edit — save
+            var saveBtn = e.target.closest('[data-edit-save]');
+            if (saveBtn) {
+                var msgId = saveBtn.dataset.editSave;
+                var textarea = saveBtn.closest('.msg-edit-form').querySelector('textarea');
+                var newBody = textarea.value.trim();
+                if (!newBody) { alert('متن پیام نمی‌تواند خالی باشد.'); return; }
+                postMsgAction({ action: 'edit_message', message_id: msgId, body: newBody },
+                    function (d) { replaceMsgHtml(d.message_id, d.html); },
+                    function (err) { alert(err); }
+                );
+            }
+        });
     })();
 </script>
 </body>

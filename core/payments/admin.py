@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 
 
 def format_jalali_datetime(value):
@@ -614,14 +614,14 @@ class ProductCatalogAdmin(admin.ModelAdmin):
 class ReconciliationMessageInline(admin.TabularInline):
     model = ReconciliationMessage
     extra = 0
-    readonly_fields = ('sender', 'body', 'document_type', 'document_id', 'created_at')
+    readonly_fields = ('sender', 'body', 'is_edited', 'is_deleted', 'deleted_by', 'document_type', 'document_id', 'created_at')
     can_delete = False
 
 
 @admin.register(ReconciliationThread)
 class ReconciliationThreadAdmin(admin.ModelAdmin):
-    list_display = ('title', 'customer', 'status', 'document_type', 'document_id', 'updated_at')
-    list_filter = ('status', 'document_type', 'created_at', 'updated_at')
+    list_display = ('title', 'customer', 'status', 'is_internal', 'document_type', 'document_id', 'created_by', 'updated_at')
+    list_filter = ('status', 'is_internal', 'document_type', 'created_at', 'updated_at')
     search_fields = ('title', 'customer__username', 'customer__first_name', 'customer__last_name')
     filter_horizontal = ('staff_participants',)
     inlines = [ReconciliationMessageInline]
@@ -629,9 +629,26 @@ class ReconciliationThreadAdmin(admin.ModelAdmin):
 
 @admin.register(ReconciliationMessage)
 class ReconciliationMessageAdmin(admin.ModelAdmin):
-    list_display = ('thread', 'sender', 'created_at')
-    list_filter = ('created_at', 'document_type')
+    list_display = ('thread', 'sender', 'is_edited', 'is_deleted', 'deleted_by', 'created_at')
+    list_filter = ('is_deleted', 'is_edited', 'is_internal', 'created_at', 'document_type')
     search_fields = ('body', 'thread__title', 'sender__username')
+    readonly_fields = ('created_at', 'edited_at', 'deleted_at', 'deleted_by', 'is_edited', 'is_deleted')
+
+
+@admin.register(ReconciliationMessageLog)
+class ReconciliationMessageLogAdmin(admin.ModelAdmin):
+    list_display = ('message', 'action', 'actor', 'timestamp')
+    list_filter = ('action', 'timestamp')
+    search_fields = ('message__thread__title', 'actor__username')
+    readonly_fields = ('message', 'actor', 'action', 'old_body', 'timestamp')
+
+
+@admin.register(ReconciliationMessageReadReceipt)
+class ReconciliationMessageReadReceiptAdmin(admin.ModelAdmin):
+    list_display = ('message', 'user', 'read_at')
+    list_filter = ('read_at',)
+    search_fields = ('message__thread__title', 'user__username')
+    readonly_fields = ('message', 'user', 'read_at')
 
 
 @admin.register(ReconciliationReadState)

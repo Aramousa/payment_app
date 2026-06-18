@@ -1,5 +1,6 @@
-<article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}{% if message.is_internal %} msg-internal{% endif %}" data-message-id="{{ message.id }}">
-    {% if message.sender %}
+{% load payment_dates %}
+<article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}{% if message.is_internal %} msg-internal{% endif %}{% if message.is_deleted %} msg-deleted{% endif %}" data-message-id="{{ message.id }}" data-sent-unix="{{ message.created_at|date:'U' }}" data-msg-body="{{ message.body|escapejs }}">
+    {% if not message.is_deleted and message.sender %}
         <span class="msg-avatar app-user-avatar {{ message.sender.profile.avatar_class }}">
             {% if message.sender.profile.avatar_url %}
                 <img src="{{ message.sender.profile.avatar_url }}" alt="{{ message.sender.profile.display_name }}">
@@ -9,25 +10,51 @@
         </span>
     {% endif %}
     <div class="msg-bubble">
-        {% if message.sender %}
-            <button class="msg-author" type="button" data-user-card-url="{% url 'user_business_card' message.sender.id %}">
-                {{ message.sender.profile.display_name }}
-            </button>
+        {% if message.is_deleted %}
+            <div class="msg-deleted-body">🚫 این پیام حذف شده است</div>
+            <div class="msg-time">{{ message.created_at|date:"Y/m/d H:i" }}</div>
         {% else %}
-            <div class="msg-author">کاربر حذف‌شده</div>
-        {% endif %}
-        {% if message.is_internal %}<div class="msg-internal-badge">🔒 فقط کارکنان</div>{% endif %}
-        {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
-        {% if message.attachment %}
-            <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">📎 {{ message.attachment_display_name|truncatechars:42 }}</a>
-        {% endif %}
-        {% if message.document_label %}
-            {% if message.document_url %}
-                <a class="doc-link" href="{{ message.document_url }}">{{ message.document_label }}</a>
+            {% if message.sender %}
+                <button class="msg-author" type="button" data-user-card-url="{% url 'user_business_card' message.sender.id %}">{{ message.sender.profile.display_name }}</button>
             {% else %}
-                <span class="doc-link">{{ message.document_label }}</span>
+                <div class="msg-author">کاربر حذف‌شده</div>
             {% endif %}
+            {% if message.is_internal %}<div class="msg-internal-badge">🔒 فقط کارکنان</div>{% endif %}
+            <div class="msg-body-wrap">
+                {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
+            </div>
+            {% if message.attachment %}
+                <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">📎 {{ message.attachment_display_name|truncatechars:42 }}</a>
+            {% endif %}
+            {% if message.document_label %}
+                {% if message.document_url %}
+                    <a class="doc-link" href="{{ message.document_url }}">{{ message.document_label }}</a>
+                {% else %}
+                    <span class="doc-link">{{ message.document_label }}</span>
+                {% endif %}
+            {% endif %}
+            <div class="msg-time">
+                {{ message.created_at|date:"Y/m/d H:i" }}
+                {% if message.is_edited %}<span class="msg-edited-badge">ویرایش شده</span>{% endif %}
+            </div>
+            {% if can_see_receipts %}
+                {% with receipts=message.read_receipts.all %}
+                {% if receipts %}
+                <div class="msg-read-receipts">
+                    <span class="msg-read-icon">👁</span>
+                    {% for r in receipts %}{{ r.user.profile.display_name }}{% if not forloop.last %}، {% endif %}{% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
+            {% endif %}
+            <div class="msg-actions">
+                {% if message.sender_id == request.user.id %}
+                    <button class="msg-action-btn msg-edit-btn" data-edit-msg="{{ message.id }}" title="ویرایش (تا ۵ دقیقه)">✏️</button>
+                {% endif %}
+                {% if message.sender_id == request.user.id or request.user.is_superuser %}
+                    <button class="msg-action-btn msg-delete-btn" data-delete-msg="{{ message.id }}" title="حذف پیام">🗑</button>
+                {% endif %}
+            </div>
         {% endif %}
-        <div class="msg-time">{{ message.created_at|date:"Y/m/d H:i" }}</div>
     </div>
 </article>
