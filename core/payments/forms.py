@@ -1821,7 +1821,8 @@ class ReconciliationThreadForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        if self.user and _role_for_user(self.user) != 'customer' and not cleaned_data.get('customer'):
+        is_internal = cleaned_data.get('is_internal')
+        if self.user and _role_for_user(self.user) != 'customer' and not is_internal and not cleaned_data.get('customer'):
             self.add_error('customer', 'انتخاب مشتری الزامی است.')
         document_type = cleaned_data.get('document_type')
         document_id = cleaned_data.get('document_id')

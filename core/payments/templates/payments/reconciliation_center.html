@@ -164,7 +164,7 @@
                     <div class="chat-title">
                         <strong>{{ active_thread.title }}</strong>
                         <span class="chat-subtitle">
-                            مشتری: {{ active_thread.customer.profile.display_name }}
+                            {% if active_thread.customer %}مشتری: {{ active_thread.customer.profile.display_name }}{% else %}گفتگوی داخلی{% endif %}
                             {% if active_thread.document_label %} | مرجع: {{ active_thread.document_label }}{% endif %}
                         </span>
                     </div>
@@ -238,6 +238,7 @@
             {% if active_thread %}
             <div class="recon-head"><h3>اعضای گفتگو</h3></div>
             <div class="participants-list">
+                {% if active_thread.customer %}
                 <div class="participant-row">
                     <span class="msg-avatar app-user-avatar {{ active_thread.customer.profile.avatar_class }}">
                         {% if active_thread.customer.profile.avatar_url %}
@@ -249,6 +250,7 @@
                     <span class="participant-name">{{ active_thread.customer.profile.display_name }}</span>
                     <span class="participant-role customer">مشتری</span>
                 </div>
+                {% endif %}
                 {% for staff in active_thread.staff_participants.all %}
                 <div class="participant-row">
                     <span class="msg-avatar app-user-avatar {{ staff.profile.avatar_class }}">

@@ -5,7 +5,7 @@
             {% if thread.is_internal %}<span class="thread-internal-chip">🔒 داخلی</span>{% endif %}
             {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
         </span>
-        <span class="thread-meta">{{ thread.customer.profile.display_name }}</span>
+        {% if thread.customer %}<span class="thread-meta">{{ thread.customer.profile.display_name }}</span>{% endif %}
         {% if thread.document_label %}
             <span class="thread-doc">{{ thread.document_label }}</span>
         {% endif %}

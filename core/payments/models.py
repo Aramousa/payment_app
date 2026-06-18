@@ -688,7 +688,7 @@ class ReconciliationThread(models.Model):
     )
 
     title = models.CharField('عنوان گفتگو', max_length=160)
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reconciliation_threads', verbose_name='مشتری')
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='reconciliation_threads', verbose_name='مشتری')
     staff_participants = models.ManyToManyField(User, related_name='assigned_reconciliation_threads', verbose_name='کارشناسان منتخب')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_reconciliation_threads', verbose_name='ایجادکننده')
     status = models.CharField('وضعیت', max_length=12, choices=STATUS_CHOICES, default=STATUS_OPEN)
