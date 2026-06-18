@@ -1842,8 +1842,19 @@ class ReconciliationThreadForm(forms.ModelForm):
                 model_cls, owner_field = _doc_map[document_type]
                 try:
                     doc = model_cls.objects.only(owner_field).get(pk=document_id)
-                    if getattr(doc, owner_field) != customer.id:
-                        self.add_error(None, f'سند شماره {document_id} به مشتری انتخاب‌شده تعلق ندارد. مشتری را بررسی کنید.')
+                    actual_owner_id = getattr(doc, owner_field)
+                    if actual_owner_id != customer.id:
+                        try:
+                            actual_owner = User.objects.select_related('profile').get(pk=actual_owner_id)
+                            owner_name = actual_owner.profile.display_name
+                        except User.DoesNotExist:
+                            owner_name = f'#{actual_owner_id}'
+                        customer_name = customer.profile.display_name
+                        self.add_error(None, (
+                            f'سند شماره {document_id} به مشتری {owner_name} تعلق دارد، '
+                            f'اما شما قصد انتصاب آن به مشتری {customer_name} را دارید. '
+                            f'لطفا بررسی نمایید.'
+                        ))
                 except model_cls.DoesNotExist:
                     self.add_error('document_id', f'سند با شناسه {document_id} یافت نشد.')
         return cleaned_data
