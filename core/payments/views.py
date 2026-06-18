@@ -4282,9 +4282,12 @@ def reconciliation_center(request):
             ).select_related('user__profile').order_by('read_at')
             read_ids = set()
             read_list = []
+            _tehran = ZoneInfo('Asia/Tehran')
             for _r in receipts:
                 read_ids.add(_r.user_id)
-                read_list.append({'name': _r.user.profile.display_name, 'read_at': _r.read_at.strftime('%Y/%m/%d %H:%M')})
+                _local = timezone.localtime(_r.read_at, _tehran)
+                _jdt = jdatetime.datetime.fromgregorian(datetime=_local)
+                read_list.append({'name': _r.user.profile.display_name, 'read_at': _jdt.strftime('%Y/%m/%d %H:%M')})
             unread_list = []
             unread_ids = participant_ids - read_ids
             if unread_ids:

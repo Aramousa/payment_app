@@ -43,16 +43,6 @@
                 {{ message.created_at|date:"Y/m/d H:i" }}
                 {% if message.is_edited %}<span class="msg-edited-badge">ویرایش شده</span>{% endif %}
             </div>
-            {% if can_see_receipts %}
-                {% with receipts=message.read_receipts.all %}
-                {% if receipts %}
-                <div class="msg-read-receipts">
-                    <span class="msg-read-icon">👁</span>
-                    {% for r in receipts %}{{ r.user.profile.display_name }}{% if not forloop.last %}، {% endif %}{% endfor %}
-                </div>
-                {% endif %}
-                {% endwith %}
-            {% endif %}
             <div class="msg-menu-wrap">
                 <button class="msg-menu-btn" type="button" title="گزینه‌ها">⋮</button>
                 <div class="msg-menu-dropdown" hidden>
