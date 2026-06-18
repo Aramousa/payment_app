@@ -1822,12 +1822,30 @@ class ReconciliationThreadForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         is_internal = cleaned_data.get('is_internal')
-        if self.user and _role_for_user(self.user) != 'customer' and not is_internal and not cleaned_data.get('customer'):
+        customer = cleaned_data.get('customer')
+        if self.user and _role_for_user(self.user) != 'customer' and not is_internal and not customer:
             self.add_error('customer', 'انتخاب مشتری الزامی است.')
         document_type = cleaned_data.get('document_type')
         document_id = cleaned_data.get('document_id')
         if document_type and document_type != ReconciliationThread.DOC_OTHER and not document_id:
             self.add_error('document_id', 'برای لینک کردن سند، شناسه سند را وارد کنید.')
+        # Validate document belongs to the selected customer
+        if document_type and document_type != ReconciliationThread.DOC_OTHER and document_id and customer:
+            _doc_map = {
+                ReconciliationThread.DOC_PAYMENT:       (PaymentRecord,          'user_id'),
+                ReconciliationThread.DOC_INVOICE:       (InvoiceRecord,          'customer_id'),
+                ReconciliationThread.DOC_PROFORMA:      (ProformaInvoice,        'customer_id'),
+                ReconciliationThread.DOC_ORDER:         (CustomerOrder,          'customer_id'),
+                ReconciliationThread.DOC_DAILY_PAYMENT: (DailyPaymentAssignment, 'customer_id'),
+            }
+            if document_type in _doc_map:
+                model_cls, owner_field = _doc_map[document_type]
+                try:
+                    doc = model_cls.objects.only(owner_field).get(pk=document_id)
+                    if getattr(doc, owner_field) != customer.id:
+                        self.add_error(None, f'سند شماره {document_id} به مشتری انتخاب‌شده تعلق ندارد. مشتری را بررسی کنید.')
+                except model_cls.DoesNotExist:
+                    self.add_error('document_id', f'سند با شناسه {document_id} یافت نشد.')
         return cleaned_data
 
 
