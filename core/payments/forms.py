@@ -1778,14 +1778,16 @@ class ReconciliationThreadForm(forms.ModelForm):
 
     class Meta:
         model = ReconciliationThread
-        fields = ['title', 'customer', 'staff_participants', 'document_type', 'document_id']
+        fields = ['title', 'customer', 'staff_participants', 'is_internal', 'document_type', 'document_id']
         labels = {
             'title': 'عنوان مغایرت',
             'document_type': 'نوع سند مرجع',
             'document_id': 'شناسه سند',
+            'is_internal': '🔒 گفتگوی داخلی (فقط کارکنان)',
         }
         widgets = {
             'document_id': forms.NumberInput(attrs={'min': 1, 'placeholder': 'مثلا 125'}),
+            'is_internal': forms.CheckboxInput(attrs={'class': 'internal-checkbox'}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -1798,6 +1800,7 @@ class ReconciliationThreadForm(forms.ModelForm):
         self.fields['customer'].label_from_instance = self._label_from_instance
         if is_customer:
             self.fields.pop('customer', None)
+            self.fields.pop('is_internal', None)
 
     def clean_staff_participants(self):
         staff = self.cleaned_data.get('staff_participants')

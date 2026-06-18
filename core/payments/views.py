@@ -4138,10 +4138,8 @@ def reconciliation_center(request):
                 thread = thread_form.save(commit=False)
                 if _user_role(request.user) == 'customer':
                     thread.customer = request.user
+                    thread.is_internal = False
                 thread.created_by = request.user
-                # فقط کارکنان می‌توانند thread داخلی ایجاد کنند
-                if _is_staff_user(request.user) and request.POST.get('thread_is_internal') == '1':
-                    thread.is_internal = True
                 thread.save()
                 thread_form.save_m2m()
                 # سازنده کارشناس را خودکار به گفتگو اضافه می‌کند تا دسترسی داشته باشد
