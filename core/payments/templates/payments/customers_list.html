@@ -123,7 +123,7 @@
                 {% for customer in customer_data %}
                     <tr class="customer-row" data-search="{{ customer.user.username }} {{ customer.profile.first_name|default:'' }} {{ customer.profile.last_name|default:'' }} {{ customer.profile.organization|default:'' }} {{ customer.profile.city|default:'' }} {{ customer.profile.phone|default:'' }} {{ customer.profile.mobile|default:'' }} {{ customer.profile.representative_name|default:'' }} {{ customer.profile.representative_mobile|default:'' }} {{ customer.profile.accounting_code|default:'' }}">
                         <td class="customers-action-col">
-                            <a href="{% url 'customer_detail' customer.user.id %}?next={{ request.get_full_path|urlencode }}" class="customer-link">مشاهده جزئیات</a>
+                            <a href="{% url 'customer_detail' customer.user.id %}?next={{ request.get_full_path|urlencode }}" class="customer-link">جزئیات</a>
                         </td>
                         <td>{{ page_obj.start_index|add:forloop.counter0 }}<br><span class="tbl-id-badge">#{{ customer.user.id }}</span></td>
                         <td>
