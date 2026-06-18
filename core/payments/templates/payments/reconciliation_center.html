@@ -700,12 +700,14 @@
                 var form = document.createElement('div');
                 form.className = 'msg-edit-form';
                 form.innerHTML =
-                    '<textarea class="msg-edit-textarea" rows="3">' + original.replace(/</g,'&lt;') + '</textarea>' +
+                    '<textarea class="msg-edit-textarea" rows="3"></textarea>' +
                     '<div class="msg-edit-actions">' +
                     '<button class="msg-edit-save" data-edit-save="' + msgId + '">ذخیره</button>' +
                     '<button class="msg-edit-cancel">انصراف</button></div>';
+                var ta = form.querySelector('textarea');
+                ta.value = original;
                 bodyWrap.appendChild(form);
-                form.querySelector('textarea').focus();
+                ta.focus();
                 return;
             }
 

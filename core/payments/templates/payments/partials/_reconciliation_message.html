@@ -1,5 +1,5 @@
 {% load payment_dates %}
-<article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}{% if message.is_internal %} msg-internal{% endif %}{% if message.is_deleted %} msg-deleted{% endif %}" data-message-id="{{ message.id }}" data-sent-unix="{{ message.created_at|date:'U' }}" data-msg-body="{{ message.body|escapejs }}">
+<article class="msg{% if message.sender_id == request.user.id %} mine{% else %} other{% endif %}{% if message.is_internal %} msg-internal{% endif %}{% if message.is_deleted %} msg-deleted{% endif %}" data-message-id="{{ message.id }}" data-sent-unix="{{ message.created_at|date:'U' }}" data-msg-body="{{ message.body }}">
     {% if not message.is_deleted and message.sender %}
         <span class="msg-avatar app-user-avatar {{ message.sender.profile.avatar_class }}">
             {% if message.sender.profile.avatar_url %}
@@ -56,7 +56,7 @@
             <div class="msg-menu-wrap">
                 <button class="msg-menu-btn" type="button" title="گزینه‌ها">⋮</button>
                 <div class="msg-menu-dropdown" hidden>
-                    <button class="msg-menu-item" type="button" data-reply-msg="{{ message.id }}" data-reply-author="{% if message.sender %}{{ message.sender.profile.display_name|escapejs }}{% else %}کاربر حذف‌شده{% endif %}" data-reply-body="{{ message.body|truncatechars:100|escapejs }}">↩ ریپلای</button>
+                    <button class="msg-menu-item" type="button" data-reply-msg="{{ message.id }}" data-reply-author="{% if message.sender %}{{ message.sender.profile.display_name }}{% else %}کاربر حذف‌شده{% endif %}" data-reply-body="{{ message.body|truncatechars:100 }}">↩ ریپلای</button>
                     <button class="msg-menu-item" type="button" data-copy-msg="{{ message.id }}">📋 کپی متن</button>
                     {% if can_see_receipts %}
                     <button class="msg-menu-item" type="button" data-info-msg="{{ message.id }}">ℹ️ اطلاعات پیام</button>
