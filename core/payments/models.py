@@ -755,7 +755,8 @@ class ReconciliationMessageLog(models.Model):
     ACTION_EDIT = 'edit'
     ACTION_DELETE = 'delete'
     ACTION_VISIBILITY = 'visibility'
-    ACTION_CHOICES = [(ACTION_EDIT, 'ویرایش'), (ACTION_DELETE, 'حذف'), (ACTION_VISIBILITY, 'تغییر دیدپذیری')]
+    ACTION_INFO = 'info'
+    ACTION_CHOICES = [(ACTION_EDIT, 'ویرایش'), (ACTION_DELETE, 'حذف'), (ACTION_VISIBILITY, 'تغییر دیدپذیری'), (ACTION_INFO, 'مشاهده اطلاعات')]
 
     message = models.ForeignKey(ReconciliationMessage, on_delete=models.CASCADE, related_name='logs', verbose_name='پیام')
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reconciliation_message_logs', verbose_name='کاربر')

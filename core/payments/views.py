@@ -4267,6 +4267,10 @@ def reconciliation_center(request):
                 return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
             if not _can_access_reconciliation_thread(request.user, thr):
                 return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            ReconciliationMessageLog.objects.create(
+                message=msg_obj, actor=request.user,
+                action=ReconciliationMessageLog.ACTION_INFO, old_body='',
+            )
             participant_ids = set()
             for _s in thr.staff_participants.all():
                 if _s.id != msg_obj.sender_id:
