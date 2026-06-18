@@ -787,6 +787,21 @@ class ReconciliationMessageReadReceipt(models.Model):
         return f'msg#{self.message_id} — {self.user}'
 
 
+class ReconciliationThreadPin(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pinned_recon_threads', verbose_name='کاربر')
+    thread = models.ForeignKey(ReconciliationThread, on_delete=models.CASCADE, related_name='pins', verbose_name='گفتگو')
+    pinned_at = models.DateTimeField('زمان پین', auto_now_add=True)
+
+    class Meta:
+        unique_together = [('user', 'thread')]
+        ordering = ['-pinned_at']
+        verbose_name = 'گفتگوی پین‌شده'
+        verbose_name_plural = 'گفتگوهای پین‌شده'
+
+    def __str__(self):
+        return f'{self.user} ← {self.thread}'
+
+
 class ReconciliationReadState(models.Model):
     thread = models.ForeignKey(ReconciliationThread, on_delete=models.CASCADE, related_name='read_states', verbose_name='گفتگو')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reconciliation_read_states', verbose_name='کاربر')

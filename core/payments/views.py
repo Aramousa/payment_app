@@ -11,7 +11,7 @@ import json
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Count, Max, Prefetch, Q, Sum
+from django.db.models import Count, Exists, Max, OuterRef, Prefetch, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -37,7 +37,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 import os
 
 
@@ -4315,8 +4315,28 @@ def reconciliation_center(request):
                 'thread_created_by_id': _thr.created_by_id,
             }, request=request)
             return JsonResponse({'html': html, 'message_id': msg_obj.id})
+        elif action == 'pin_thread':
+            thr = get_object_or_404(threads_qs, id=request.POST.get('thread_id'))
+            pin_qs = ReconciliationThreadPin.objects.filter(user=request.user)
+            existing = pin_qs.filter(thread=thr).first()
+            if existing:
+                existing.delete()
+                return JsonResponse({'pinned': False})
+            if pin_qs.count() >= 10:
+                return JsonResponse({'error': 'حداکثر ۱۰ گفتگو می‌توانید پین کنید'}, status=400)
+            ReconciliationThreadPin.objects.create(user=request.user, thread=thr)
+            return JsonResponse({'pinned': True})
+        elif action == 'delete_thread':
+            if not request.user.is_superuser:
+                return JsonResponse({'error': 'فقط ادمین می‌تواند گفتگو را حذف کند'}, status=403)
+            thr = get_object_or_404(ReconciliationThread, id=request.POST.get('thread_id'))
+            thread_id = thr.id
+            thr.delete()
+            return JsonResponse({'deleted': True, 'thread_id': thread_id})
 
     filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
+    _pin_subq = ReconciliationThreadPin.objects.filter(user=request.user, thread=OuterRef('pk'))
+    filtered_threads_qs = filtered_threads_qs.annotate(is_pinned=Exists(_pin_subq)).order_by('-is_pinned', '-updated_at', '-id')
     thread_rows = list(filtered_threads_qs[:80])
     for thread in thread_rows:
         thread.document_url = _reconciliation_document_url(thread.document_type, thread.document_id, thread.id)
@@ -4384,6 +4404,8 @@ def reconciliation_poll(request):
         active_thread = threads_qs.filter(id=selected_id).first()
 
     filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
+    _pin_subq = ReconciliationThreadPin.objects.filter(user=request.user, thread=OuterRef('pk'))
+    filtered_threads_qs = filtered_threads_qs.annotate(is_pinned=Exists(_pin_subq)).order_by('-is_pinned', '-updated_at', '-id')
     thread_rows = list(filtered_threads_qs[:80])
     for thread in thread_rows:
         thread.document_url = _reconciliation_document_url(thread.document_type, thread.document_id, thread.id)

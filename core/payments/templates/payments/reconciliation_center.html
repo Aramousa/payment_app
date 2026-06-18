@@ -29,10 +29,18 @@
         .thread-tab:hover { background: #f8fafc; }
         .customer-select-row select { background: #f8fafc; border: 1px solid #d7e2ee; border-radius: 7px; font-family: Vazir, sans-serif; min-height: 36px; padding: 6px 8px; width: 100%; }
         .thread-list { display: grid; align-content: start; flex: 1; min-height: 0; overflow-y: auto; }
-        .thread-item { border-bottom: 1px solid #edf1f6; color: inherit; display: grid; gap: 5px; padding: 12px 14px; text-decoration: none; }
+        .thread-item-wrap { position: relative; }
+        .thread-item { border-bottom: 1px solid #edf1f6; color: inherit; display: grid; gap: 5px; padding: 12px 38px 12px 14px; text-decoration: none; }
         .thread-item:hover, .thread-item.active { background: #eef5ff; }
         .thread-item.closed { background: #f8fafc; }
         .thread-item.closed:hover, .thread-item.closed.active { background: #eef5ff; }
+        .thread-pinned .thread-item { background: #fffbeb; border-right: 3px solid #f59e0b; }
+        .thread-pinned .thread-item:hover, .thread-pinned .thread-item.active { background: #fef3c7; }
+        .pin-badge { flex-shrink: 0; font-size: 11px; }
+        .thread-menu-btn { align-items: center; background: none; border: none; border-radius: 50%; color: #94a3b8; cursor: pointer; display: flex; font-size: 18px; font-weight: 900; height: 28px; justify-content: center; opacity: 0; padding: 0; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); transition: opacity .15s; width: 28px; }
+        .thread-item-wrap:hover .thread-menu-btn { opacity: 1; }
+        .thread-menu-btn:focus { opacity: 1; outline: none; }
+        .thread-menu-template { display: none; }
         .thread-title-row { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
         .thread-title { font-weight: 900; }
         .thread-item.closed .thread-title { color: #6b7280; }
@@ -520,25 +528,36 @@
             if (_activeFloater) { _activeFloater.remove(); _activeFloater = null; }
         }
 
-        function openMsgMenu(btn) {
+        function openFloater(templateEl, anchorBtn) {
             closeMsgMenus();
-            var template = btn.nextElementSibling; // .msg-menu-dropdown (hidden data source)
             var floater = document.createElement('div');
             floater.className = 'msg-menu-floater';
-            floater.innerHTML = template.innerHTML;
-            var rect = btn.getBoundingClientRect();
+            floater.innerHTML = templateEl.innerHTML;
+            var rect = anchorBtn.getBoundingClientRect();
             floater.style.top = (rect.bottom + 4) + 'px';
             floater.style.left = rect.left + 'px';
             document.body.appendChild(floater);
             _activeFloater = floater;
-            // Adjust if floater would overflow viewport edges
             var fr = floater.getBoundingClientRect();
             if (fr.bottom > window.innerHeight - 8) { floater.style.top = (rect.top - fr.height - 4) + 'px'; }
             if (fr.right > window.innerWidth - 8) { floater.style.left = (rect.right - fr.width) + 'px'; }
         }
 
+        function openMsgMenu(btn) {
+            openFloater(btn.nextElementSibling, btn);
+        }
+
         document.addEventListener('click', function (e) {
-            // Three-dot menu toggle
+            // Thread three-dot menu
+            var threadMenuBtn = e.target.closest('.thread-menu-btn');
+            if (threadMenuBtn) {
+                var alreadyOpen = !!_activeFloater;
+                closeMsgMenus();
+                if (!alreadyOpen) { openFloater(threadMenuBtn.nextElementSibling, threadMenuBtn); }
+                return;
+            }
+
+            // Three-dot menu toggle (message)
             var menuBtn = e.target.closest('.msg-menu-btn');
             if (menuBtn) {
                 var alreadyOpen = !!_activeFloater;
@@ -549,6 +568,42 @@
 
             // Close floater on any click outside (including menu item clicks — actions run after)
             closeMsgMenus();
+
+            // Pin / unpin thread
+            var pinBtn = e.target.closest('[data-pin-thread]');
+            if (pinBtn) {
+                var fd = new FormData();
+                fd.append('action', 'pin_thread');
+                fd.append('thread_id', pinBtn.dataset.pinThread);
+                fd.append('csrfmiddlewaretoken', CSRF);
+                fetch(window.location.pathname + window.location.search, { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) { if (d.error) { alert(d.error); } else { window.location.reload(); } })
+                    .catch(function () { alert('خطای ارتباطی'); });
+                return;
+            }
+
+            // Delete thread (superuser only)
+            var delThreadBtn = e.target.closest('[data-delete-thread]');
+            if (delThreadBtn) {
+                if (!confirm('آیا مطمئن هستید؟ تمام پیام‌های این گفتگو حذف خواهند شد.')) return;
+                var fd = new FormData();
+                fd.append('action', 'delete_thread');
+                fd.append('thread_id', delThreadBtn.dataset.deleteThread);
+                fd.append('csrfmiddlewaretoken', CSRF);
+                fetch(window.location.pathname + window.location.search, { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.error) { alert(d.error); return; }
+                        var params = new URLSearchParams(window.location.search);
+                        if (params.get('thread') == d.thread_id) {
+                            params.delete('thread');
+                        }
+                        window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+                    })
+                    .catch(function () { alert('خطای ارتباطی'); });
+                return;
+            }
 
             // Reply
             var replyBtn = e.target.closest('[data-reply-msg]');

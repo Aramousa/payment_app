@@ -1,18 +1,28 @@
 {% for thread in threads %}
-    <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}{% if thread.status == 'closed' %} closed{% endif %}" href="{% querystring thread=thread.id %}">
-        <span class="thread-title-row">
-            <span class="thread-title">{{ thread.title }}</span>
-            {% if thread.is_internal %}<span class="thread-internal-chip">🔒 داخلی</span>{% endif %}
-            {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
-        </span>
-        {% if thread.customer %}<span class="thread-meta">{{ thread.customer.profile.display_name }}</span>{% endif %}
-        {% if thread.document_label %}
-            <span class="thread-doc">{{ thread.document_label }}</span>
-        {% endif %}
-        {% if thread.last_message %}
-            <span class="thread-meta">{{ thread.last_message.body|truncatechars:58 }}</span>
-        {% endif %}
-    </a>
+    <div class="thread-item-wrap{% if thread.is_pinned %} thread-pinned{% endif %}">
+        <a class="thread-item{% if active_thread and active_thread.id == thread.id %} active{% endif %}{% if thread.status == 'closed' %} closed{% endif %}" href="{% querystring thread=thread.id %}">
+            <span class="thread-title-row">
+                {% if thread.is_pinned %}<span class="pin-badge">📌</span>{% endif %}
+                <span class="thread-title">{{ thread.title }}</span>
+                {% if thread.is_internal %}<span class="thread-internal-chip">🔒 داخلی</span>{% endif %}
+                {% if thread.status == 'closed' %}<span class="thread-status-chip">{{ thread.get_status_display }}</span>{% endif %}
+            </span>
+            {% if thread.customer %}<span class="thread-meta">{{ thread.customer.profile.display_name }}</span>{% endif %}
+            {% if thread.document_label %}
+                <span class="thread-doc">{{ thread.document_label }}</span>
+            {% endif %}
+            {% if thread.last_message %}
+                <span class="thread-meta">{{ thread.last_message.body|truncatechars:58 }}</span>
+            {% endif %}
+        </a>
+        <button class="thread-menu-btn" type="button" title="گزینه‌ها">⋮</button>
+        <div class="thread-menu-template" hidden>
+            <button class="msg-menu-item" type="button" data-pin-thread="{{ thread.id }}">{% if thread.is_pinned %}📌 لغو پین{% else %}📌 پین کردن{% endif %}</button>
+            {% if request.user.is_superuser %}
+            <button class="msg-menu-item msg-menu-item--danger" type="button" data-delete-thread="{{ thread.id }}">🗑 حذف گفتگو</button>
+            {% endif %}
+        </div>
+    </div>
 {% empty %}
     {% if thread_tab == 'by_customer' and not selected_customer_id %}
         <div class="empty-chat">برای نمایش گفتگوها، یک مشتری را از بالا انتخاب کنید.</div>
