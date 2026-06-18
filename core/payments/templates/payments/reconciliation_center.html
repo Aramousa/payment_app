@@ -66,13 +66,11 @@
         .msg-attachment { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; gap: 5px; margin-top: 8px; padding: 5px 9px; text-decoration: none; }
         .msg-attachment:hover { background: #dbeafe; }
         .chat-form { background: #fff; border-top: 1px solid #edf1f6; display: grid; gap: 8px; padding: 12px; }
-        .chat-input-row { display: block; }
+        .chat-input-row { align-items: end; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; }
         .chat-form textarea { min-height: 74px; resize: vertical; }
-        .chat-send-row { display: flex; gap: 10px; justify-content: flex-start; margin-top: 2px; }
+        .chat-send-col { display: flex; flex-direction: row; gap: 6px; align-items: flex-end; }
         .send-btn-unit { align-items: center; display: flex; flex-direction: column; gap: 3px; }
         .send-btn-label { color: #64748b; font-size: 10px; font-weight: 700; }
-        .send-icon-btn--internal { background: #d97706; }
-        .send-icon-btn--internal:hover { background: #b45309; }
         .chat-attachment-row { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
         .chat-attachment-row input[type="file"] { display: none; }
         .chat-attachment-label { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #1e3a5f; cursor: pointer; font-size: 12px; font-weight: 800; padding: 6px 11px; white-space: nowrap; }
@@ -81,6 +79,8 @@
         .chat-attachment-clear { background: transparent; border: 0; color: #b91c1c; cursor: pointer; font-size: 12px; font-weight: 800; padding: 0; }
         .send-icon-btn { align-items: center; background: #22c55e; border: 0; border-radius: 50%; color: #fff; cursor: pointer; display: inline-flex; font-family: Vazir, sans-serif; font-size: 22px; font-weight: 900; height: 42px; justify-content: center; line-height: 1; padding: 0; transform: rotate(180deg); width: 42px; }
         .send-icon-btn:hover { background: #16a34a; }
+        .send-icon-btn.send-icon-btn--internal { background: #d97706; }
+        .send-icon-btn.send-icon-btn--internal:hover { background: #b45309; }
         .inline-fields { display: grid; gap: 8px; grid-template-columns: 1fr 120px; }
         .recon-form { display: grid; gap: 10px; padding: 14px; }
         .recon-form p { margin: 0; }
@@ -205,6 +205,18 @@
                         {{ message_form.body.label_tag }}
                         <div class="chat-input-row">
                             {{ message_form.body }}
+                            <div class="chat-send-col">
+                                <div class="send-btn-unit">
+                                    <button class="send-icon-btn" type="submit" title="ارسال برای همه" aria-label="ارسال برای همه">➤</button>
+                                    <span class="send-btn-label">ارسال</span>
+                                </div>
+                                {% if not is_customer_user %}
+                                <div class="send-btn-unit">
+                                    <button class="send-icon-btn send-icon-btn--internal" type="submit" name="is_internal" value="1" title="ارسال داخلی — فقط کارکنان" aria-label="ارسال داخلی">➤</button>
+                                    <span class="send-btn-label">داخلی</span>
+                                </div>
+                                {% endif %}
+                            </div>
                         </div>
                         <div class="chat-attachment-row">
                             <label class="chat-attachment-label" for="{{ message_form.attachment.id_for_label }}">📎 پیوست فایل</label>
@@ -215,18 +227,6 @@
                         <div class="inline-fields">
                             <p>{{ message_form.document_type.label_tag }} {{ message_form.document_type }}</p>
                             <p>{{ message_form.document_id.label_tag }} {{ message_form.document_id }}</p>
-                        </div>
-                        <div class="chat-send-row">
-                            <div class="send-btn-unit">
-                                <button class="send-icon-btn" type="submit" title="ارسال برای همه" aria-label="ارسال برای همه">➤</button>
-                                <span class="send-btn-label">ارسال</span>
-                            </div>
-                            {% if not is_customer_user %}
-                            <div class="send-btn-unit">
-                                <button class="send-icon-btn send-icon-btn--internal" type="submit" name="is_internal" value="1" title="ارسال داخلی — فقط کارکنان" aria-label="ارسال داخلی">➤</button>
-                                <span class="send-btn-label">داخلی</span>
-                            </div>
-                            {% endif %}
                         </div>
                         {% if message_form.errors %}<div class="form-errors">{{ message_form.errors }}</div>{% endif %}
                     </form>
