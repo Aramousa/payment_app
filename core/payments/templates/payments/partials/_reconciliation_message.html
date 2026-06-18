@@ -47,14 +47,17 @@
                 {% endif %}
                 {% endwith %}
             {% endif %}
-            <div class="msg-actions">
-                {% if message.sender_id == request.user.id %}
-                    <button class="msg-action-btn msg-edit-btn" data-edit-msg="{{ message.id }}" title="ویرایش (تا ۵ دقیقه)">✏️</button>
-                {% endif %}
-                {% if message.sender_id == request.user.id or request.user.is_superuser %}
-                    <button class="msg-action-btn msg-delete-btn" data-delete-msg="{{ message.id }}" title="حذف پیام">🗑</button>
-                {% endif %}
+            {% if message.sender_id == request.user.id or request.user.is_superuser %}
+            <div class="msg-menu-wrap">
+                <button class="msg-menu-btn" type="button" title="گزینه‌ها">⋮</button>
+                <div class="msg-menu-dropdown" hidden>
+                    {% if message.sender_id == request.user.id %}
+                        <button class="msg-menu-item" type="button" data-edit-msg="{{ message.id }}">✏️ ویرایش</button>
+                    {% endif %}
+                    <button class="msg-menu-item msg-menu-item--danger" type="button" data-delete-msg="{{ message.id }}">🗑 حذف</button>
+                </div>
             </div>
+            {% endif %}
         {% endif %}
     </div>
 </article>

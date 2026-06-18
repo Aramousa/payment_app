@@ -63,10 +63,19 @@
         .msg-deleted-body { color: #94a3b8; font-size: 13px; font-style: italic; }
         .msg-read-receipts { color: #94a3b8; font-size: 10px; margin-top: 4px; text-align: left; }
         .msg-read-icon { margin-left: 2px; }
-        .msg-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 4px; opacity: 0; transition: opacity .15s; }
-        .msg-bubble:hover .msg-actions { opacity: 1; }
-        .msg-action-btn { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
-        .msg-action-btn:hover { background: #e2e8f0; }
+        .msg-bubble { position: relative; overflow: visible; }
+        .msg-menu-wrap { position: absolute; top: 4px; left: 6px; }
+        .msg-menu-btn { align-items: center; background: rgba(255,255,255,.85); border: none; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.15); color: #64748b; cursor: pointer; display: flex; font-size: 18px; font-weight: 900; height: 26px; justify-content: center; line-height: 1; opacity: 0; padding: 0; transition: opacity .15s; width: 26px; }
+        .msg-bubble:hover .msg-menu-btn { opacity: 1; }
+        .msg-menu-btn:focus { opacity: 1; outline: none; }
+        .msg-menu-dropdown { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.14); min-width: 130px; position: absolute; top: 30px; left: 0; z-index: 200; }
+        .msg-menu-item { background: none; border: none; cursor: pointer; display: block; font-family: Vazir, sans-serif; font-size: 13px; padding: 9px 16px; text-align: right; width: 100%; }
+        .msg-menu-item:first-child { border-radius: 8px 8px 0 0; }
+        .msg-menu-item:last-child { border-radius: 0 0 8px 8px; }
+        .msg-menu-item:only-child { border-radius: 8px; }
+        .msg-menu-item:hover { background: #f8fafc; }
+        .msg-menu-item--danger { color: #dc2626; }
+        .msg-menu-item--danger:hover { background: #fef2f2; }
         .msg-edit-form { margin-top: 4px; }
         .msg-edit-textarea { border: 1px solid #cbd5e1; border-radius: 6px; font-family: Vazir, sans-serif; font-size: 14px; line-height: 1.9; padding: 6px 8px; resize: vertical; width: 100%; }
         .msg-edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
@@ -440,6 +449,21 @@
         }
 
         document.addEventListener('click', function (e) {
+            // Three-dot menu toggle
+            var menuBtn = e.target.closest('.msg-menu-btn');
+            if (menuBtn) {
+                var dropdown = menuBtn.nextElementSibling;
+                var isOpen = !dropdown.hidden;
+                document.querySelectorAll('.msg-menu-dropdown').forEach(function (d) { d.hidden = true; });
+                if (!isOpen) { dropdown.hidden = false; }
+                return;
+            }
+
+            // Close all open menus when clicking outside
+            if (!e.target.closest('.msg-menu-wrap')) {
+                document.querySelectorAll('.msg-menu-dropdown').forEach(function (d) { d.hidden = true; });
+            }
+
             // Delete
             var delBtn = e.target.closest('[data-delete-msg]');
             if (delBtn) {
