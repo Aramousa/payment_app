@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.utils.html import format_html
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import Q
 from django.forms import inlineformset_factory
@@ -1850,10 +1851,11 @@ class ReconciliationThreadForm(forms.ModelForm):
                         except User.DoesNotExist:
                             owner_name = f'#{actual_owner_id}'
                         customer_name = customer.profile.display_name
-                        self.add_error(None, (
-                            f'سند شماره {document_id} به مشتری {owner_name} تعلق دارد، '
-                            f'اما شما قصد انتصاب آن به مشتری {customer_name} را دارید. '
-                            f'لطفا بررسی نمایید.'
+                        self.add_error(None, format_html(
+                            'سند شماره {} به مشتری <strong>{}</strong> تعلق دارد، '
+                            'اما شما قصد انتصاب آن به مشتری <strong>{}</strong> را دارید. '
+                            'لطفا بررسی نمایید.',
+                            document_id, owner_name, customer_name,
                         ))
                 except model_cls.DoesNotExist:
                     self.add_error('document_id', f'سند با شناسه {document_id} یافت نشد.')
