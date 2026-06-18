@@ -66,6 +66,7 @@
                     {% if message.sender_id == request.user.id %}
                         <button class="msg-menu-item" type="button" data-edit-msg="{{ message.id }}">✏️ ویرایش</button>
                     {% endif %}
+                    <button class="msg-menu-item" type="button" data-toggle-visibility="{{ message.id }}">{% if message.is_internal %}🌐 تبدیل به عمومی{% else %}🔒 تبدیل به داخلی{% endif %}</button>
                     <button class="msg-menu-item msg-menu-item--danger" type="button" data-delete-msg="{{ message.id }}">🗑 حذف</button>
                     {% endif %}
                 </div>

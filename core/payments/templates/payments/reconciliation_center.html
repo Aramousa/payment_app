@@ -569,6 +569,16 @@
                 return;
             }
 
+            // Toggle message visibility (internal ↔ public)
+            var toggleBtn = e.target.closest('[data-toggle-visibility]');
+            if (toggleBtn) {
+                postMsgAction({ action: 'toggle_message_visibility', message_id: toggleBtn.dataset.toggleVisibility },
+                    function (d) { replaceMsgHtml(d.message_id, d.html); },
+                    function (err) { alert(err); }
+                );
+                return;
+            }
+
             // Message info (admin / creator only)
             var infoBtn = e.target.closest('[data-info-msg]');
             if (infoBtn) {

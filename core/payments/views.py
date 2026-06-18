@@ -4287,6 +4287,34 @@ def reconciliation_center(request):
                 for _u in User.objects.filter(id__in=unread_ids).select_related('profile'):
                     unread_list.append({'name': _u.profile.display_name})
             return JsonResponse({'read': read_list, 'unread': unread_list})
+        elif action == 'toggle_message_visibility':
+            msg_id = request.POST.get('message_id')
+            msg_obj = get_object_or_404(ReconciliationMessage.objects.select_related('thread'), id=msg_id)
+            if not _can_access_reconciliation_thread(request.user, msg_obj.thread):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            if not (request.user.is_superuser or msg_obj.sender_id == request.user.id):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            if msg_obj.is_deleted:
+                return JsonResponse({'error': 'پیام حذف شده است'}, status=400)
+            new_is_internal = not msg_obj.is_internal
+            if new_is_internal and not _is_staff_user(request.user) and not request.user.is_superuser:
+                return JsonResponse({'error': 'مشتری نمی‌تواند پیام داخلی ارسال کند'}, status=403)
+            ReconciliationMessageLog.objects.create(
+                message=msg_obj, actor=request.user,
+                action=ReconciliationMessageLog.ACTION_VISIBILITY,
+                old_body='داخلی' if msg_obj.is_internal else 'عمومی',
+            )
+            msg_obj.is_internal = new_is_internal
+            msg_obj.save(update_fields=['is_internal'])
+            _thr = msg_obj.thread
+            _can_see = request.user.is_superuser or request.user.id == _thr.created_by_id
+            if _can_see:
+                msg_obj.prefetch_related_objects(['read_receipts__user__profile'])
+            html = render_to_string('payments/partials/_reconciliation_message.html', {
+                'message': msg_obj, 'can_see_receipts': _can_see,
+                'thread_created_by_id': _thr.created_by_id,
+            }, request=request)
+            return JsonResponse({'html': html, 'message_id': msg_obj.id})
 
     filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
     thread_rows = list(filtered_threads_qs[:80])
