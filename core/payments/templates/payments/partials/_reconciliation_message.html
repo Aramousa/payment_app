@@ -12,7 +12,7 @@
     <div class="msg-bubble">
         {% if message.is_deleted %}
             <div class="msg-deleted-body">🚫 این پیام حذف شده است</div>
-            <div class="msg-time">{{ message.created_at|date:"Y/m/d H:i" }}</div>
+            <div class="msg-time">{{ message.created_at|jalali_datetime }}</div>
         {% else %}
             {% if message.sender %}
                 <button class="msg-author" type="button" data-user-card-url="{% url 'user_business_card' message.sender.id %}">{{ message.sender.profile.display_name }}</button>
@@ -40,7 +40,7 @@
                 {% endif %}
             {% endif %}
             <div class="msg-time">
-                {{ message.created_at|date:"Y/m/d H:i" }}
+                {{ message.created_at|jalali_datetime }}
                 {% if message.is_edited %}<span class="msg-edited-badge">ویرایش شده</span>{% endif %}
             </div>
             <div class="msg-menu-wrap">
