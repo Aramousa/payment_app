@@ -206,6 +206,12 @@
                         <div class="chat-input-row">
                             {{ message_form.body }}
                             <div class="chat-send-col">
+                                {% if active_thread.is_internal %}
+                                <div class="send-btn-unit">
+                                    <button class="send-icon-btn send-icon-btn--internal" type="submit" title="ارسال" aria-label="ارسال">➤</button>
+                                    <span class="send-btn-label">ارسال</span>
+                                </div>
+                                {% else %}
                                 <div class="send-btn-unit">
                                     <button class="send-icon-btn" type="submit" title="ارسال برای همه" aria-label="ارسال برای همه">➤</button>
                                     <span class="send-btn-label">ارسال</span>
@@ -215,6 +221,7 @@
                                     <button class="send-icon-btn send-icon-btn--internal" type="submit" name="is_internal" value="1" title="ارسال داخلی — فقط کارکنان" aria-label="ارسال داخلی">➤</button>
                                     <span class="send-btn-label">داخلی</span>
                                 </div>
+                                {% endif %}
                                 {% endif %}
                             </div>
                         </div>
