@@ -187,10 +187,10 @@
                 </select>
             </div>
             <div>
-                <label for="pf-date-from">از تاریخ</label>
+                <label for="pf-date-from">تاریخ / از تاریخ</label>
                 <input id="pf-date-from" type="text" name="pay_date_from" value="{{ filters.pay_date_from }}" placeholder="۱۴۰۳/۰۱/۰۱" style="width:110px;">
             </div>
-            <div>
+            <div {% if not filters.pay_date_from %}style="opacity:0.38;pointer-events:none;"{% endif %} id="pf-date-to-wrap">
                 <label for="pf-date-to">تا تاریخ</label>
                 <input id="pf-date-to" type="text" name="pay_date_to" value="{{ filters.pay_date_to }}" placeholder="۱۴۰۳/۱۲/۲۹" style="width:110px;">
             </div>
@@ -521,6 +521,28 @@
                 }
             });
         }
+
+        // ─── Enable "تا تاریخ" only when "تاریخ / از تاریخ" has a value ───
+        (function () {
+            var fromEl = document.getElementById('pf-date-from');
+            var toEl   = document.getElementById('pf-date-to');
+            var toWrap = document.getElementById('pf-date-to-wrap');
+            if (!fromEl || !toEl || !toWrap) return;
+
+            function syncTo() {
+                if (fromEl.value.trim()) {
+                    toWrap.style.opacity = '';
+                    toWrap.style.pointerEvents = '';
+                } else {
+                    toEl.value = '';
+                    toWrap.style.opacity = '0.38';
+                    toWrap.style.pointerEvents = 'none';
+                }
+            }
+
+            fromEl.addEventListener('input', syncTo);
+            fromEl.addEventListener('change', syncTo);
+        })();
     });
     </script>
 

@@ -1982,7 +1982,6 @@ def _apply_record_filters(records, request, is_staff_user):
         'payer_full_name': (request.GET.get('payer_full_name') or '').strip(),
         'payer_bank_name': (request.GET.get('payer_bank_name') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
-        'pay_date': (request.GET.get('pay_date') or '').strip(),
         'pay_date_from': (request.GET.get('pay_date_from') or '').strip(),
         'pay_date_to': (request.GET.get('pay_date_to') or '').strip(),
         'status': (request.GET.get('status') or '').strip(),
@@ -2027,19 +2026,17 @@ def _apply_record_filters(records, request, is_staff_user):
         records = records.filter(amount=parsed_amount)
         filters['amount'] = _format_thousand_separator(parsed_amount)
 
-    parsed_date = _parse_jalali_date(filters['pay_date'])
-    if parsed_date:
-        records = records.filter(pay_date=parsed_date)
-    else:
-        parsed_date_from = _parse_jalali_date(filters['pay_date_from'])
-        parsed_date_to = _parse_jalali_date(filters['pay_date_to'])
-        if parsed_date_from and parsed_date_to and parsed_date_to < parsed_date_from:
-            parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
-            filters['pay_date_from'], filters['pay_date_to'] = filters['pay_date_to'], filters['pay_date_from']
-        if parsed_date_from:
-            records = records.filter(pay_date__gte=parsed_date_from)
-        if parsed_date_to:
-            records = records.filter(pay_date__lte=parsed_date_to)
+    parsed_date_from = _parse_jalali_date(filters['pay_date_from'])
+    parsed_date_to = _parse_jalali_date(filters['pay_date_to'])
+    if parsed_date_from and parsed_date_to and parsed_date_to < parsed_date_from:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        filters['pay_date_from'], filters['pay_date_to'] = filters['pay_date_to'], filters['pay_date_from']
+    if parsed_date_from and not parsed_date_to:
+        records = records.filter(pay_date=parsed_date_from)
+    elif parsed_date_from:
+        records = records.filter(pay_date__gte=parsed_date_from, pay_date__lte=parsed_date_to)
+    elif parsed_date_to:
+        records = records.filter(pay_date__lte=parsed_date_to)
 
     valid_statuses = {choice[0] for choice in PaymentRecord.STATUS_CHOICES}
     if is_staff_user:
@@ -2713,7 +2710,6 @@ def _apply_invoice_filters(records, request, is_staff_user):
         'invoice_number': (request.GET.get('invoice_number') or '').strip(),
         'reference_number': (request.GET.get('reference_number') or '').strip(),
         'amount': (request.GET.get('amount') or '').replace(',', '').strip(),
-        'invoice_date': (request.GET.get('invoice_date') or '').strip(),
         'invoice_date_from': (request.GET.get('invoice_date_from') or '').strip(),
         'invoice_date_to': (request.GET.get('invoice_date_to') or '').strip(),
         'seen': (request.GET.get('seen') or '').strip(),
@@ -2738,19 +2734,17 @@ def _apply_invoice_filters(records, request, is_staff_user):
         records = records.filter(amount=parsed_amount)
         filters['amount'] = _format_thousand_separator(parsed_amount)
 
-    parsed_date = _parse_jalali_date(filters['invoice_date'])
-    if parsed_date:
-        records = records.filter(invoice_date=parsed_date)
-    else:
-        parsed_date_from = _parse_jalali_date(filters['invoice_date_from'])
-        parsed_date_to = _parse_jalali_date(filters['invoice_date_to'])
-        if parsed_date_from and parsed_date_to and parsed_date_to < parsed_date_from:
-            parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
-            filters['invoice_date_from'], filters['invoice_date_to'] = filters['invoice_date_to'], filters['invoice_date_from']
-        if parsed_date_from:
-            records = records.filter(invoice_date__gte=parsed_date_from)
-        if parsed_date_to:
-            records = records.filter(invoice_date__lte=parsed_date_to)
+    parsed_date_from = _parse_jalali_date(filters['invoice_date_from'])
+    parsed_date_to = _parse_jalali_date(filters['invoice_date_to'])
+    if parsed_date_from and parsed_date_to and parsed_date_to < parsed_date_from:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        filters['invoice_date_from'], filters['invoice_date_to'] = filters['invoice_date_to'], filters['invoice_date_from']
+    if parsed_date_from and not parsed_date_to:
+        records = records.filter(invoice_date=parsed_date_from)
+    elif parsed_date_from:
+        records = records.filter(invoice_date__gte=parsed_date_from, invoice_date__lte=parsed_date_to)
+    elif parsed_date_to:
+        records = records.filter(invoice_date__lte=parsed_date_to)
 
     if filters['seen'] == 'seen':
         records = records.filter(customer_seen_at__isnull=False)

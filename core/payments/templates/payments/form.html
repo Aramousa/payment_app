@@ -124,7 +124,7 @@
         .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
         .filter-grid label { display: block; margin-bottom: 4px; font-size: 13px; }
         .filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .date-blocked { opacity: 0.38; pointer-events: none; }
+        .date-to-locked { opacity: 0.38; pointer-events: none; }
         .filter-actions button, .filter-actions a { border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; text-decoration: none; text-align: center; }
         .apply-btn { background: #1e3a5f; color: #fff; }
         .clear-btn { background: #6c757d; color: #fff; }
@@ -775,9 +775,8 @@
                 <div><label for="payer_bank_name_filter">نام بانک</label><input id="payer_bank_name_filter" type="text" name="payer_bank_name" value="{{ filters.payer_bank_name }}" class="bank-autocomplete-input" data-bank-type="payer" autocomplete="off"></div>
             {% endif %}
             <div><label for="amount_filter">مبلغ (ریال)</label><input id="amount_filter" class="amount-input" type="text" inputmode="numeric" dir="ltr" name="amount" value="{{ filters.amount }}"></div>
-            <div><label for="pay_date_filter">تاریخ دقیق (YYYY/MM/DD)</label><input id="pay_date_filter" class="jalali-date" type="text" name="pay_date" value="{{ filters.pay_date }}"></div>
-            <div><label for="pay_date_from_filter">از تاریخ</label><input id="pay_date_from_filter" class="jalali-date" type="text" name="pay_date_from" value="{{ filters.pay_date_from }}"></div>
-            <div><label for="pay_date_to_filter">تا تاریخ</label><input id="pay_date_to_filter" class="jalali-date" type="text" name="pay_date_to" value="{{ filters.pay_date_to }}"></div>
+            <div><label for="pay_date_from_filter">تاریخ / از تاریخ</label><input id="pay_date_from_filter" class="jalali-date" type="text" name="pay_date_from" value="{{ filters.pay_date_from }}"></div>
+            <div {% if not filters.pay_date_from %}class="date-to-locked"{% endif %}><label for="pay_date_to_filter">تا تاریخ</label><input id="pay_date_to_filter" class="jalali-date" type="text" name="pay_date_to" value="{{ filters.pay_date_to }}"></div>
             <input type="hidden" name="page" value="{{ page_obj.number }}">
             <div>
                 <label for="status">وضعیت</label>
@@ -1380,51 +1379,25 @@
             initialValue: false
         });
 
-        // ─── Mutual exclusion: exact date vs date range ───
+        // ─── Enable "تا تاریخ" only when "تاریخ / از تاریخ" has a value ───
         (function () {
-            var exactEl  = document.getElementById('pay_date_filter');
-            var fromEl   = document.getElementById('pay_date_from_filter');
-            var toEl     = document.getElementById('pay_date_to_filter');
-            if (!exactEl || !fromEl || !toEl) return;
-            var exactWrap = exactEl.parentElement;
-            var fromWrap  = fromEl.parentElement;
-            var toWrap    = toEl.parentElement;
+            var fromEl = document.getElementById('pay_date_from_filter');
+            var toEl   = document.getElementById('pay_date_to_filter');
+            var toWrap = toEl ? toEl.parentElement : null;
+            if (!fromEl || !toEl || !toWrap) return;
 
-            function onExact() {
-                if (exactEl.value.trim()) {
-                    fromEl.value = ''; toEl.value = '';
-                    fromWrap.classList.add('date-blocked');
-                    toWrap.classList.add('date-blocked');
-                    exactWrap.classList.remove('date-blocked');
+            function syncTo() {
+                if (fromEl.value.trim()) {
+                    toWrap.classList.remove('date-to-locked');
                 } else {
-                    fromWrap.classList.remove('date-blocked');
-                    toWrap.classList.remove('date-blocked');
-                }
-            }
-            function onRange() {
-                if (fromEl.value.trim() || toEl.value.trim()) {
-                    exactEl.value = '';
-                    exactWrap.classList.add('date-blocked');
-                    fromWrap.classList.remove('date-blocked');
-                    toWrap.classList.remove('date-blocked');
-                } else {
-                    exactWrap.classList.remove('date-blocked');
+                    toEl.value = '';
+                    toWrap.classList.add('date-to-locked');
                 }
             }
 
-            exactEl.addEventListener('input', onExact);
-            exactEl.addEventListener('change', onExact);
-            fromEl.addEventListener('input', onRange);
-            fromEl.addEventListener('change', onRange);
-            toEl.addEventListener('input', onRange);
-            toEl.addEventListener('change', onRange);
-
-            if (exactEl.value.trim()) {
-                fromWrap.classList.add('date-blocked');
-                toWrap.classList.add('date-blocked');
-            } else if (fromEl.value.trim() || toEl.value.trim()) {
-                exactWrap.classList.add('date-blocked');
-            }
+            fromEl.addEventListener('input', syncTo);
+            fromEl.addEventListener('change', syncTo);
+            syncTo();
         })();
 
         const amountEls = document.querySelectorAll('.amount-input');
