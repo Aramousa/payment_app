@@ -1,0 +1,137 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اتاق تماس — ویزیون</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <style>
+        body { background: #0f172a; color: #f1f5f9; display: flex; flex-direction: column; font-family: Vazir, sans-serif; margin: 0; min-height: 100vh; }
+        .call-header { align-items: center; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 12px; padding: 10px 20px; }
+        .call-header-title { font-size: 15px; font-weight: 800; }
+        .call-header-room { color: #94a3b8; font-size: 12px; }
+        .call-header-back { color: #94a3b8; font-size: 13px; text-decoration: none; }
+        .call-header-back:hover { color: #f1f5f9; }
+        .call-body { display: flex; flex: 1; gap: 0; overflow: hidden; }
+        .call-frame-wrap { flex: 1; position: relative; }
+        #jitsi-frame { height: 100%; left: 0; position: absolute; top: 0; width: 100%; }
+        .call-sidebar { background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; gap: 12px; padding: 16px; width: 280px; }
+        .call-sidebar h3 { color: #94a3b8; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; margin: 0 0 4px; text-transform: uppercase; }
+        .room-form { display: flex; flex-direction: column; gap: 8px; }
+        .room-input { background: #0f172a; border: 1px solid #334155; border-radius: 7px; color: #f1f5f9; font-family: Vazir, sans-serif; font-size: 13px; padding: 9px 12px; width: 100%; box-sizing: border-box; }
+        .room-input:focus { border-color: #3b82f6; outline: none; }
+        .room-btn { background: #2563eb; border: none; border-radius: 7px; color: #fff; cursor: pointer; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 700; padding: 9px; width: 100%; }
+        .room-btn:hover { background: #1d4ed8; }
+        .quick-rooms { display: flex; flex-direction: column; gap: 6px; }
+        .quick-room-btn { background: #0f172a; border: 1px solid #334155; border-radius: 7px; color: #cbd5e1; cursor: pointer; font-family: Vazir, sans-serif; font-size: 12px; padding: 8px 12px; text-align: right; width: 100%; }
+        .quick-room-btn:hover { background: #1e40af; border-color: #3b82f6; color: #fff; }
+        .not-configured { align-items: center; display: flex; flex: 1; flex-direction: column; gap: 16px; justify-content: center; padding: 40px; text-align: center; }
+        .not-configured h2 { font-size: 18px; margin: 0; }
+        .not-configured p { color: #94a3b8; font-size: 13px; line-height: 1.7; margin: 0; }
+        .not-configured code { background: #1e293b; border-radius: 5px; color: #38bdf8; font-size: 12px; padding: 2px 7px; }
+    </style>
+</head>
+<body>
+<div class="call-header">
+    <a class="call-header-back" href="{% url 'reconciliation_center' %}">← بازگشت به گفتگوها</a>
+    <span class="call-header-title">📹 اتاق تماس</span>
+    {% if room %}<span class="call-header-room">{{ room }}</span>{% endif %}
+</div>
+
+{% if not jitsi_configured %}
+<div class="not-configured">
+    <h2>⚙️ Jitsi پیکربندی نشده</h2>
+    <p>آدرس سرور Jitsi را در متغیر محیطی تنظیم کنید:<br>
+    <code>JITSI_SERVER_URL=meet.company.local</code></p>
+</div>
+{% else %}
+<div class="call-body">
+    <div class="call-sidebar">
+        <div>
+            <h3>ورود به اتاق</h3>
+            <div class="room-form">
+                <input class="room-input" id="roomInput" type="text" placeholder="نام اتاق (انگلیسی)" value="{{ room }}">
+                <button class="room-btn" id="joinBtn" type="button">ورود به اتاق</button>
+            </div>
+        </div>
+        <div>
+            <h3>اتاق‌های سریع</h3>
+            <div class="quick-rooms">
+                <button class="quick-room-btn" data-room="staff-general" type="button">👥 عمومی کارکنان</button>
+                <button class="quick-room-btn" data-room="finance-team" type="button">💰 تیم مالی</button>
+                <button class="quick-room-btn" data-room="sales-team" type="button">📊 تیم فروش</button>
+                <button class="quick-room-btn" data-room="commercial-team" type="button">🏪 تیم بازرگانی</button>
+                <button class="quick-room-btn" data-room="support" type="button">🎧 پشتیبانی</button>
+            </div>
+        </div>
+    </div>
+    <div class="call-frame-wrap">
+        <div id="jitsi-frame"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var JITSI_URL = '{{ jitsi_url|escapejs }}';
+    var DISPLAY_NAME = '{{ display_name|escapejs }}';
+    var currentApi = null;
+
+    function startCall(room) {
+        if (!room) return;
+        if (currentApi) { try { currentApi.dispose(); } catch(e){} }
+        var el = document.getElementById('jitsi-frame');
+        el.innerHTML = '';
+        var script = document.getElementById('jitsi-api-script');
+        function init() {
+            currentApi = new JitsiMeetExternalAPI(JITSI_URL, {
+                roomName: room,
+                parentNode: el,
+                width: '100%',
+                height: '100%',
+                userInfo: { displayName: DISPLAY_NAME },
+                configOverwrite: {
+                    startWithAudioMuted: false,
+                    startWithVideoMuted: false,
+                    disableDeepLinking: true,
+                },
+                interfaceConfigOverwrite: {
+                    SHOW_JITSI_WATERMARK: false,
+                    SHOW_BRAND_WATERMARK: false,
+                    TOOLBAR_BUTTONS: ['microphone','camera','closedcaptions','desktop','fullscreen','fodeviceselection','hangup','chat','recording','livestreaming','etherpad','sharedvideo','settings','raisehand','videoquality','filmstrip','invite','feedback','stats','shortcuts','tileview'],
+                },
+            });
+            history.replaceState(null, '', '/call/' + encodeURIComponent(room) + '/');
+        }
+        if (script) { init(); return; }
+        var s = document.createElement('script');
+        s.id = 'jitsi-api-script';
+        s.src = 'https://' + JITSI_URL + '/external_api.js';
+        s.onload = init;
+        document.head.appendChild(s);
+    }
+
+    document.getElementById('joinBtn').addEventListener('click', function () {
+        var room = document.getElementById('roomInput').value.trim().replace(/[^a-zA-Z0-9\-_]/g, '-');
+        if (room) startCall(room);
+    });
+
+    document.getElementById('roomInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('joinBtn').click();
+    });
+
+    document.querySelectorAll('[data-room]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var room = btn.dataset.room;
+            document.getElementById('roomInput').value = room;
+            startCall(room);
+        });
+    });
+
+    {% if room %}startCall('{{ room|escapejs }}');{% endif %}
+})();
+</script>
+{% endif %}
+</body>
+</html>

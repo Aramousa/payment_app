@@ -4421,6 +4421,7 @@ def reconciliation_center(request):
         'can_see_receipts': can_see_receipts,
         'can_remove_participants': can_remove_participants,
         'staff_with_messages': staff_with_messages,
+        'jitsi_url': getattr(settings, 'JITSI_SERVER_URL', '').strip().rstrip('/'),
     })
 
 
@@ -7961,3 +7962,23 @@ def warranty_staff_action(request, claim_id):
 
     return redirect('warranty_staff_detail', claim_id=claim.pk)
 
+
+
+# ─── Jitsi Meet ───────────────────────────────────────────────────────────────
+
+@login_required
+def jitsi_call(request, room=None):
+    """صفحه تماس تصویری از طریق Jitsi Meet."""
+    if not _can_access_reconciliation(request.user):
+        return HttpResponseForbidden('دسترسی ندارید.')
+    jitsi_url = getattr(settings, 'JITSI_SERVER_URL', '').strip().rstrip('/')
+    if not jitsi_url:
+        return render(request, 'payments/jitsi_call.html', {'jitsi_configured': False})
+    if room:
+        room = re.sub(r'[^a-zA-Z0-9\-_]', '-', room)[:80]
+    return render(request, 'payments/jitsi_call.html', {
+        'jitsi_configured': True,
+        'jitsi_url': jitsi_url,
+        'room': room or '',
+        'display_name': request.user.profile.display_name,
+    })

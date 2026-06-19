@@ -202,6 +202,9 @@ LANGUAGE_CODE = 'fa'
 TIME_ZONE = 'UTC'
 APP_DISPLAY_TIME_ZONE = os.getenv('APP_DISPLAY_TIME_ZONE', 'Asia/Tehran')
 
+# ─── Jitsi Meet (on-premises) ────────────────────────────────────────────────
+JITSI_SERVER_URL = os.getenv('JITSI_SERVER_URL', '')  # e.g. meet.company.local
+
 USE_I18N = True
 
 USE_TZ = True

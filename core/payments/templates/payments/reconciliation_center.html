@@ -149,6 +149,12 @@
         .primary-btn, .secondary-btn { border: 0; border-radius: 8px; cursor: pointer; font-family: Vazir, sans-serif; font-weight: 900; min-height: 38px; padding: 8px 14px; }
         .primary-btn { background: #1e3a5f; color: #fff; }
         .secondary-btn { background: #e8eef6; color: #26364d; }
+        .jitsi-toggle-btn { background: #0f766e; color: #fff; }
+        .jitsi-toggle-btn:hover { background: #0d9488; }
+        .jitsi-panel { background: #0f172a; border-bottom: 3px solid #0f766e; display: flex; flex-direction: column; height: 420px; position: relative; }
+        .jitsi-panel-inner { flex: 1; }
+        .jitsi-close-btn { background: rgba(255,255,255,.1); border: none; bottom: 8px; color: #fff; cursor: pointer; font-family: Vazir, sans-serif; font-size: 12px; padding: 5px 14px; position: absolute; left: 50%; transform: translateX(-50%); border-radius: 20px; }
+        .jitsi-close-btn:hover { background: rgba(255,255,255,.2); }
         .empty-chat { align-items: center; color: #64748b; display: flex; justify-content: center; min-height: 260px; text-align: center; }
         .chat-closed-notice { background: #f3f4f6; border-top: 1px solid #edf1f6; color: #4b5563; font-size: 13px; font-weight: 800; padding: 16px; text-align: center; }
         .participants-list { border-bottom: 1px solid #edf1f6; display: flex; flex-direction: column; gap: 0; }
@@ -234,6 +240,11 @@
                         {% if active_thread.document_url %}
                             <a class="secondary-btn" href="{{ active_thread.document_url }}">مشاهده سند</a>
                         {% endif %}
+                        {% if jitsi_url %}
+                        <button class="secondary-btn jitsi-toggle-btn" type="button" id="jitsiToggleBtn"
+                                data-room="recon-thread-{{ active_thread.id }}"
+                                title="شروع تماس تصویری">📹 تماس</button>
+                        {% endif %}
                         {% if active_thread.is_internal %}<span class="thread-internal-chip">🔒 گفتگوی داخلی</span>{% endif %}
                         <span class="status-chip{% if active_thread.status == 'closed' %} closed{% endif %}">{{ active_thread.get_status_display }}</span>
                     </div>
@@ -241,6 +252,13 @@
                     <h2>مغایرت‌گیری</h2>
                 {% endif %}
             </div>
+
+            {% if jitsi_url and active_thread %}
+            <div class="jitsi-panel" id="jitsiPanel" hidden>
+                <div class="jitsi-panel-inner" id="jitsiPanelInner"></div>
+                <button class="jitsi-close-btn" id="jitsiCloseBtn" type="button">✕ بستن تماس</button>
+            </div>
+            {% endif %}
 
             {% with last_message=active_messages|last %}
             <div class="chat-feed" {% if active_thread %}data-thread-id="{{ active_thread.id }}" data-last-message-id="{{ last_message.id|default:0 }}"{% endif %}>
@@ -763,5 +781,59 @@
         });
     })();
 </script>
+
+{% if jitsi_url and active_thread %}
+<script>
+(function () {
+    var JITSI_URL = '{{ jitsi_url|escapejs }}';
+    var DISPLAY_NAME = '{{ request.user.profile.display_name|escapejs }}';
+    var toggleBtn = document.getElementById('jitsiToggleBtn');
+    var panel = document.getElementById('jitsiPanel');
+    var panelInner = document.getElementById('jitsiPanelInner');
+    var closeBtn = document.getElementById('jitsiCloseBtn');
+    var jitsiApi = null;
+
+    function loadJitsiApi(cb) {
+        if (window.JitsiMeetExternalAPI) { cb(); return; }
+        var s = document.createElement('script');
+        s.src = 'https://' + JITSI_URL + '/external_api.js';
+        s.onload = cb;
+        document.head.appendChild(s);
+    }
+
+    function openCall(room) {
+        panel.hidden = false;
+        loadJitsiApi(function () {
+            if (jitsiApi) { try { jitsiApi.dispose(); } catch(e){} }
+            panelInner.innerHTML = '';
+            jitsiApi = new JitsiMeetExternalAPI(JITSI_URL, {
+                roomName: room,
+                parentNode: panelInner,
+                width: '100%',
+                height: '100%',
+                userInfo: { displayName: DISPLAY_NAME },
+                configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: false, disableDeepLinking: true },
+                interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false, SHOW_BRAND_WATERMARK: false },
+            });
+            jitsiApi.addEventListener('videoConferenceLeft', closeCall);
+        });
+    }
+
+    function closeCall() {
+        if (jitsiApi) { try { jitsiApi.dispose(); } catch(e){} jitsiApi = null; }
+        panel.hidden = true;
+        panelInner.innerHTML = '';
+    }
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function () {
+            if (!panel.hidden) { closeCall(); return; }
+            openCall(toggleBtn.dataset.room);
+        });
+    }
+    if (closeBtn) closeBtn.addEventListener('click', closeCall);
+})();
+</script>
+{% endif %}
 </body>
 </html>
