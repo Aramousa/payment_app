@@ -4343,6 +4343,28 @@ def reconciliation_center(request):
             thread_id = thr.id
             thr.delete()
             return JsonResponse({'deleted': True, 'thread_id': thread_id})
+        elif action == 'remove_participant':
+            thr = get_object_or_404(ReconciliationThread, id=request.POST.get('thread_id'))
+            if not _can_access_reconciliation_thread(request.user, thr):
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            _can_remove = (
+                request.user.is_superuser or
+                request.user.id == thr.created_by_id or
+                _user_role(request.user) in MANAGER_ROLES or
+                _user_role(request.user) == 'warranty_manager'
+            )
+            if not _can_remove:
+                return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
+            try:
+                participant = User.objects.get(pk=request.POST.get('participant_id'))
+            except User.DoesNotExist:
+                return JsonResponse({'error': 'کاربر یافت نشد'}, status=404)
+            if participant.id == thr.created_by_id:
+                return JsonResponse({'error': 'ایجادکننده گفتگو قابل حذف نیست'}, status=400)
+            if thr.messages.filter(sender=participant).exists():
+                return JsonResponse({'error': 'این کارشناس پیام‌هایی در گفتگو دارد و قابل حذف نیست'}, status=400)
+            thr.staff_participants.remove(participant)
+            return JsonResponse({'ok': True, 'participant_id': participant.id})
 
     filtered_threads_qs, thread_filters = _apply_reconciliation_filters(threads_qs, request)
     _pin_subq = ReconciliationThreadPin.objects.filter(user=request.user, thread=OuterRef('pk'))
@@ -4354,10 +4376,22 @@ def reconciliation_center(request):
 
     active_messages = []
     can_see_receipts = False
+    can_remove_participants = False
+    staff_with_messages = set()
     if active_thread:
         _mark_reconciliation_thread_read(active_thread, request.user)
         active_thread.document_url = _reconciliation_document_url(active_thread.document_type, active_thread.document_id, active_thread.id)
         can_see_receipts = request.user.is_superuser or request.user.id == active_thread.created_by_id
+        can_remove_participants = (
+            request.user.is_superuser or
+            request.user.id == active_thread.created_by_id or
+            _user_role(request.user) in MANAGER_ROLES or
+            _user_role(request.user) == 'warranty_manager'
+        )
+        if can_remove_participants:
+            staff_with_messages = set(
+                active_thread.messages.filter(sender__isnull=False).values_list('sender_id', flat=True).distinct()
+            )
         _msg_qs = active_thread.messages.select_related('sender', 'sender__profile', 'deleted_by', 'reply_to', 'reply_to__sender', 'reply_to__sender__profile')
         if can_see_receipts:
             _msg_qs = _msg_qs.prefetch_related(
@@ -4385,6 +4419,8 @@ def reconciliation_center(request):
         'customer_options': customer_options,
         'selected_customer_id': selected_customer_id,
         'can_see_receipts': can_see_receipts,
+        'can_remove_participants': can_remove_participants,
+        'staff_with_messages': staff_with_messages,
     })
 
 
