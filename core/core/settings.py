@@ -202,9 +202,6 @@ LANGUAGE_CODE = 'fa'
 TIME_ZONE = 'UTC'
 APP_DISPLAY_TIME_ZONE = os.getenv('APP_DISPLAY_TIME_ZONE', 'Asia/Tehran')
 
-# ─── Jitsi Meet (on-premises) ────────────────────────────────────────────────
-JITSI_SERVER_URL = os.getenv('JITSI_SERVER_URL', '')  # e.g. meet.company.local
-
 USE_I18N = True
 
 USE_TZ = True
@@ -264,7 +261,7 @@ X_FRAME_OPTIONS = 'DENY'
 # ─── django-axes: قفل حساب بعد از چند تلاش ناموفق ─────────────────────────
 AXES_FAILURE_LIMIT = int(os.getenv('AXES_FAILURE_LIMIT', '5'))
 AXES_COOLOFF_TIME = timedelta(minutes=int(os.getenv('AXES_COOLOFF_MINUTES', '15')))
-AXES_LOCKOUT_PARAMETERS = ['ip_address', 'username']
+AXES_LOCKOUT_PARAMETERS = [['ip_address', 'username']]
 AXES_RESET_ON_SUCCESS = True
 AXES_ENABLE_ADMIN = True
 AXES_LOCKOUT_TEMPLATE = 'errors/lockout.html'

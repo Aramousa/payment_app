@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>اتاق تماس — ویزیون</title>
+    <title>اتاق تماس صوتی — ویزیون</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <style>
@@ -36,15 +36,15 @@
 <body>
 <div class="call-header">
     <a class="call-header-back" href="{% url 'reconciliation_center' %}">← بازگشت به گفتگوها</a>
-    <span class="call-header-title">📹 اتاق تماس</span>
+    <span class="call-header-title">🎙️ اتاق تماس صوتی</span>
     {% if room %}<span class="call-header-room">{{ room }}</span>{% endif %}
 </div>
 
 {% if not jitsi_configured %}
 <div class="not-configured">
     <h2>⚙️ Jitsi پیکربندی نشده</h2>
-    <p>آدرس سرور Jitsi را در متغیر محیطی تنظیم کنید:<br>
-    <code>JITSI_SERVER_URL=meet.company.local</code></p>
+    <p>آدرس سرور Jitsi را از طریق پنل ادمین در بخش<br>
+    <strong>تنظیمات سیستم ← تنظیمات Jitsi Meet</strong> وارد کنید.</p>
 </div>
 {% else %}
 <div class="call-body">
@@ -93,13 +93,14 @@
                 userInfo: { displayName: DISPLAY_NAME },
                 configOverwrite: {
                     startWithAudioMuted: false,
-                    startWithVideoMuted: false,
+                    startWithVideoMuted: true,
+                    disableVideo: true,
                     disableDeepLinking: true,
                 },
                 interfaceConfigOverwrite: {
                     SHOW_JITSI_WATERMARK: false,
                     SHOW_BRAND_WATERMARK: false,
-                    TOOLBAR_BUTTONS: ['microphone','camera','closedcaptions','desktop','fullscreen','fodeviceselection','hangup','chat','recording','livestreaming','etherpad','sharedvideo','settings','raisehand','videoquality','filmstrip','invite','feedback','stats','shortcuts','tileview'],
+                    TOOLBAR_BUTTONS: ['microphone', 'hangup', 'chat', 'raisehand', 'tileview', 'settings'],
                 },
             });
             history.replaceState(null, '', '/call/' + encodeURIComponent(room) + '/');

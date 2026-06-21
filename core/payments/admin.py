@@ -498,7 +498,7 @@ class SystemSettingsAdmin(admin.ModelAdmin):
     list_display = ('session_inactivity_timeout', 'sms_provider', 'sms_notifications_enabled', 'jalali_updated_at')
     fieldsets = (
         ('تنظیمات نشست', {
-            'fields': ('session_inactivity_timeout',),
+            'fields': ('session_inactivity_timeout', 'allow_multiple_sessions'),
             'description': 'مقادیر زیر حداکثر ۶۰ ثانیه پس از ذخیره اعمال می‌شوند.',
         }),
         ('تنظیمات منو', {
@@ -521,6 +521,10 @@ class SystemSettingsAdmin(admin.ModelAdmin):
                 'sms_generic_url',
                 'sms_generic_extra',
             ),
+        }),
+        ('تنظیمات Jitsi Meet', {
+            'fields': ('jitsi_server_url',),
+            'description': 'آدرس سرور Jitsi داخلی برای تماس تصویری. بدون https:// وارد کنید — مثال: meet.company.local',
         }),
     )
 

@@ -11,21 +11,23 @@ _SESSION_EXEMPT_PREFIXES = ('/accounts/', '/admin/', '/static/', '/media/', '/sm
 _SMS_OTP_VERIFY_URL = '/sms-verify/'
 _COUNTERPARTY_ALLOWED_PREFIXES = ('/counterparty/', '/accounts/', '/admin/', '/static/', '/media/', '/profile/')
 
-# کش ساده برای timeout — هر ۶۰ ثانیه از دیتابیس می‌خواند
-_timeout_cache = {'value': None, 'ts': 0.0}
+# کش ساده برای تنظیمات نشست — هر ۶۰ ثانیه از دیتابیس می‌خواند
+_session_cache = {'timeout': None, 'allow_multi': True, 'ts': 0.0}
 
 
-def _get_inactivity_timeout():
+def _get_session_settings():
     now = time.monotonic()
-    if _timeout_cache['value'] is None or now - _timeout_cache['ts'] > 60:
+    if _session_cache['timeout'] is None or now - _session_cache['ts'] > 60:
         try:
             from .models import SystemSettings
             obj = SystemSettings.load()
-            _timeout_cache['value'] = obj.session_inactivity_timeout * 60
+            _session_cache['timeout'] = obj.session_inactivity_timeout * 60
+            _session_cache['allow_multi'] = obj.allow_multiple_sessions
         except Exception:
-            _timeout_cache['value'] = getattr(settings, 'SESSION_INACTIVITY_TIMEOUT', 30 * 60)
-        _timeout_cache['ts'] = now
-    return _timeout_cache['value']
+            _session_cache['timeout'] = getattr(settings, 'SESSION_INACTIVITY_TIMEOUT', 30 * 60)
+            _session_cache['allow_multi'] = True
+        _session_cache['ts'] = now
+    return _session_cache['timeout'], _session_cache['allow_multi']
 
 
 class SingleSessionMiddleware:
@@ -83,9 +85,11 @@ class SingleSessionMiddleware:
         session_key = request.session.session_key or ''
         user = request.user
 
+        inactivity_timeout, allow_multi = _get_session_settings()
+
         # بررسی بی‌فعالیت
         last_activity = request.session.get('_last_activity')
-        if last_activity is not None and now - last_activity > _get_inactivity_timeout():
+        if last_activity is not None and now - last_activity > inactivity_timeout:
             self._record_logout(user, session_key, 'inactivity')
             logout(request)
             messages.warning(
@@ -94,8 +98,8 @@ class SingleSessionMiddleware:
             )
             return redirect(settings.LOGIN_URL)
 
-        # بررسی ورود از دستگاه دیگر
-        if session_key:
+        # بررسی ورود از دستگاه دیگر (فقط اگر محدودیت فعال باشد)
+        if not allow_multi and session_key:
             try:
                 from .models import UserSession
                 stored = UserSession.objects.get(user=user)

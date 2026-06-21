@@ -4421,7 +4421,7 @@ def reconciliation_center(request):
         'can_see_receipts': can_see_receipts,
         'can_remove_participants': can_remove_participants,
         'staff_with_messages': staff_with_messages,
-        'jitsi_url': getattr(settings, 'JITSI_SERVER_URL', '').strip().rstrip('/'),
+        'jitsi_url': SystemSettings.load().jitsi_server_url.strip().rstrip('/'),
     })
 
 
@@ -7971,7 +7971,7 @@ def jitsi_call(request, room=None):
     """صفحه تماس تصویری از طریق Jitsi Meet."""
     if not _can_access_reconciliation(request.user):
         return HttpResponseForbidden('دسترسی ندارید.')
-    jitsi_url = getattr(settings, 'JITSI_SERVER_URL', '').strip().rstrip('/')
+    jitsi_url = SystemSettings.load().jitsi_server_url.strip().rstrip('/')
     if not jitsi_url:
         return render(request, 'payments/jitsi_call.html', {'jitsi_configured': False})
     if room:

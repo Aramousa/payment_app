@@ -240,11 +240,9 @@
                         {% if active_thread.document_url %}
                             <a class="secondary-btn" href="{{ active_thread.document_url }}">مشاهده سند</a>
                         {% endif %}
-                        {% if jitsi_url %}
                         <button class="secondary-btn jitsi-toggle-btn" type="button" id="jitsiToggleBtn"
                                 data-room="recon-thread-{{ active_thread.id }}"
-                                title="شروع تماس تصویری">📹 تماس</button>
-                        {% endif %}
+                                title="شروع تماس صوتی"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg> تماس</button>
                         {% if active_thread.is_internal %}<span class="thread-internal-chip">🔒 گفتگوی داخلی</span>{% endif %}
                         <span class="status-chip{% if active_thread.status == 'closed' %} closed{% endif %}">{{ active_thread.get_status_display }}</span>
                     </div>
@@ -253,7 +251,7 @@
                 {% endif %}
             </div>
 
-            {% if jitsi_url and active_thread %}
+            {% if active_thread %}
             <div class="jitsi-panel" id="jitsiPanel" hidden>
                 <div class="jitsi-panel-inner" id="jitsiPanelInner"></div>
                 <button class="jitsi-close-btn" id="jitsiCloseBtn" type="button">✕ بستن تماس</button>
@@ -782,7 +780,7 @@
     })();
 </script>
 
-{% if jitsi_url and active_thread %}
+{% if active_thread %}
 <script>
 (function () {
     var JITSI_URL = '{{ jitsi_url|escapejs }}';
@@ -793,6 +791,17 @@
     var closeBtn = document.getElementById('jitsiCloseBtn');
     var jitsiApi = null;
 
+    function showNotConfigured() {
+        panel.hidden = false;
+        panelInner.innerHTML =
+            '<div style="align-items:center;color:#94a3b8;display:flex;flex-direction:column;gap:10px;height:100%;justify-content:center;padding:24px;text-align:center">' +
+            '<span style="font-size:32px">📹</span>' +
+            '<strong style="color:#f1f5f9;font-size:14px">سرور Jitsi پیکربندی نشده</strong>' +
+            '<p style="font-size:12px;line-height:1.8;margin:0">برای فعال‌سازی تماس صوتی، آدرس سرور را از طریق<br>' +
+            '<strong style="color:#38bdf8">پنل ادمین ← تنظیمات سیستم ← تنظیمات Jitsi Meet</strong><br>وارد کنید.</p>' +
+            '</div>';
+    }
+
     function loadJitsiApi(cb) {
         if (window.JitsiMeetExternalAPI) { cb(); return; }
         var s = document.createElement('script');
@@ -802,6 +811,7 @@
     }
 
     function openCall(room) {
+        if (!JITSI_URL) { showNotConfigured(); return; }
         panel.hidden = false;
         loadJitsiApi(function () {
             if (jitsiApi) { try { jitsiApi.dispose(); } catch(e){} }
@@ -812,8 +822,8 @@
                 width: '100%',
                 height: '100%',
                 userInfo: { displayName: DISPLAY_NAME },
-                configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: false, disableDeepLinking: true },
-                interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false, SHOW_BRAND_WATERMARK: false },
+                configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: true, disableVideo: true, disableDeepLinking: true },
+                interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false, SHOW_BRAND_WATERMARK: false, TOOLBAR_BUTTONS: ['microphone', 'hangup', 'chat', 'raisehand', 'tileview', 'settings'] },
             });
             jitsiApi.addEventListener('videoConferenceLeft', closeCall);
         });

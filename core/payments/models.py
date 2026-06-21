@@ -1504,6 +1504,11 @@ class SystemSettings(models.Model):
         default=15,
         help_text='پس از این مدت بی‌فعالیت، کاربر به‌صورت خودکار خارج می‌شود.',
     )
+    allow_multiple_sessions = models.BooleanField(
+        'اجازه ورود همزمان از چند دستگاه',
+        default=True,
+        help_text='اگر فعال باشد، کاربر می‌تواند همزمان از چند دستگاه/مرورگر وارد شود. اگر غیرفعال باشد، ورود از دستگاه جدید نشست قبلی را خاتمه می‌دهد.',
+    )
     system_logo = models.ImageField(
         'لوگوی سامانه',
         upload_to=system_logo_upload_to,
@@ -1560,6 +1565,14 @@ class SystemSettings(models.Model):
     )
     sms_otp_expiry_minutes = models.PositiveSmallIntegerField('اعتبار کد OTP (دقیقه)', default=5)
     sms_notifications_enabled = models.BooleanField('اطلاع‌رسانی پیامکی فعال', default=False)
+
+    # ─── تنظیمات Jitsi Meet ─────────────────────────────────────────────────
+    jitsi_server_url = models.CharField(
+        'آدرس سرور Jitsi Meet',
+        max_length=255,
+        blank=True,
+        help_text='آدرس سرور Jitsi داخلی بدون https:// — مثال: meet.company.local یا 192.168.1.50:8443',
+    )
 
     updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
 
