@@ -183,10 +183,11 @@ class UploadSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'accounting_code', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'representative_name', 'representative_mobile', 'delegate_sms_to_representative', 'organization', 'city', 'province', 'role', 'avatar_preset', 'active_from', 'valid_until', 'force_password_change', 'suspended')
-    list_filter = ('role', 'city', 'province', 'force_password_change', 'suspended')
+    list_display = ('user', 'first_name', 'last_name', 'role', 'login_lock_status', 'multi_session_override', 'suspended')
+    list_filter = ('role', 'city', 'province', 'force_password_change', 'suspended', 'multi_session_override')
     search_fields = ('user__username', 'user__email', 'phone', 'mobile', 'second_mobile', 'representative_name', 'representative_mobile', 'organization', 'first_name', 'last_name')
     readonly_fields = ('user',)
+    actions = ['unlock_login', 'allow_multi_session', 'deny_multi_session', 'reset_multi_session']
     fieldsets = (
         ('اطلاعات کاربر', {
             'fields': ('user', 'first_name', 'last_name', 'phone', 'mobile', 'second_mobile', 'representative_name', 'representative_mobile', 'delegate_sms_to_representative', 'organization', 'avatar_image', 'avatar_preset')
@@ -197,7 +198,53 @@ class UserProfileAdmin(admin.ModelAdmin):
         ('اطلاعات حساب', {
             'fields': ('role', 'active_from', 'valid_until', 'force_password_change', 'suspended', 'accounting_code')
         }),
+        ('تنظیمات امنیتی', {
+            'fields': ('multi_session_override',),
+            'description': 'خالی = پیروی از تنظیم سراسری | فعال = همیشه مجاز | غیرفعال = همیشه ممنوع',
+        }),
     )
+
+    def login_lock_status(self, obj):
+        try:
+            from axes.models import AccessAttempt
+            from django.conf import settings as dj_settings
+            from django.utils import timezone as tz
+            cooloff = getattr(dj_settings, 'AXES_COOLOFF_TIME', None)
+            limit = getattr(dj_settings, 'AXES_FAILURE_LIMIT', 5)
+            qs = AccessAttempt.objects.filter(username=obj.user.username)
+            if cooloff:
+                qs = qs.filter(attempt_time__gte=tz.now() - cooloff)
+            if qs.filter(failures_since_start__gte=limit).exists():
+                return '🔒 قفل'
+            return '✅ آزاد'
+        except Exception:
+            return '—'
+    login_lock_status.short_description = 'وضعیت ورود'
+
+    @admin.action(description='🔓 آزادسازی از قفل ورود')
+    def unlock_login(self, request, queryset):
+        from axes.models import AccessAttempt
+        count = 0
+        for profile in queryset:
+            deleted, _ = AccessAttempt.objects.filter(username=profile.user.username).delete()
+            if deleted:
+                count += 1
+        self.message_user(request, f'قفل ورود {count} کاربر برداشته شد.')
+
+    @admin.action(description='✅ مجاز به ورود از چند دستگاه')
+    def allow_multi_session(self, request, queryset):
+        queryset.update(multi_session_override=True)
+        self.message_user(request, f'{queryset.count()} کاربر: ورود از چند دستگاه مجاز شد.')
+
+    @admin.action(description='🚫 ممنوع از ورود از چند دستگاه')
+    def deny_multi_session(self, request, queryset):
+        queryset.update(multi_session_override=False)
+        self.message_user(request, f'{queryset.count()} کاربر: ورود از چند دستگاه ممنوع شد.')
+
+    @admin.action(description='↩ بازگشت به تنظیم سراسری (چند دستگاه)')
+    def reset_multi_session(self, request, queryset):
+        queryset.update(multi_session_override=None)
+        self.message_user(request, f'{queryset.count()} کاربر: تنظیم چند دستگاه به حالت سراسری بازگشت.')
 
     def has_add_permission(self, request):
         # Only superusers can add new user profiles
@@ -447,6 +494,187 @@ class LoginRecordAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
 
+from .models import UserSession
+
+
+@admin.register(UserSession)
+class UserSessionAdmin(admin.ModelAdmin):
+    list_display = ('display_name', 'username', 'role', 'ip_address', 'jalali_last_activity', 'jalali_login_at', 'device_info')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'ip_address')
+    list_filter = ('user__profile__role',)
+    actions = ['force_logout']
+    ordering = ('-last_activity_at',)
+
+    def get_queryset(self, request):
+        from django.contrib.sessions.models import Session
+        valid_keys = Session.objects.filter(
+            expire_date__gt=timezone.now()
+        ).values_list('session_key', flat=True)
+        return super().get_queryset(request).select_related(
+            'user', 'user__profile'
+        ).filter(session_key__in=valid_keys)
+
+    def display_name(self, obj):
+        return obj.user.profile.display_name if hasattr(obj.user, 'profile') else obj.user.username
+    display_name.short_description = 'نام کاربر'
+
+    def username(self, obj):
+        return obj.user.username
+    username.short_description = 'نام کاربری'
+
+    def role(self, obj):
+        return obj.user.profile.get_role_display() if hasattr(obj.user, 'profile') else '—'
+    role.short_description = 'نقش'
+
+    def jalali_last_activity(self, obj):
+        return format_jalali_datetime(obj.last_activity_at) if obj.last_activity_at else '—'
+    jalali_last_activity.short_description = 'آخرین فعالیت'
+
+    def jalali_login_at(self, obj):
+        rec = obj.user.login_records.filter(session_key=obj.session_key).first()
+        return format_jalali_datetime(rec.login_at) if rec else '—'
+    jalali_login_at.short_description = 'زمان ورود'
+
+    def device_info(self, obj):
+        rec = obj.user.login_records.filter(session_key=obj.session_key).first()
+        if not rec:
+            return '—'
+        parts = [rec.browser_family, rec.os_family]
+        return ' / '.join(p for p in parts if p) or '—'
+    device_info.short_description = 'مرورگر / سیستم‌عامل'
+
+    @admin.action(description='⏏ اخراج از سیستم')
+    def force_logout(self, request, queryset):
+        from django.contrib.sessions.models import Session
+        from django.utils import timezone as _tz
+        count = 0
+        for us in queryset:
+            Session.objects.filter(session_key=us.session_key).delete()
+            LoginRecord.objects.filter(
+                user=us.user, session_key=us.session_key, logout_at__isnull=True
+            ).update(logout_at=_tz.now(), logout_reason=LoginRecord.LOGOUT_FORCED)
+            us.delete()
+            count += 1
+        self.message_user(request, f'{count} کاربر از سیستم خارج شدند.')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class LockedUserProxy(UserSession):
+    class Meta:
+        proxy = True
+        verbose_name = 'کاربر قفل‌شده'
+        verbose_name_plural = 'کاربران قفل‌شده (axes)'
+
+
+@admin.register(LockedUserProxy)
+class LockedUserAdmin(admin.ModelAdmin):
+    list_display = ('display_name', 'username', 'role', 'locked_ip', 'failures', 'jalali_locked_at', 'unlock_remaining')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name')
+    actions = ['unlock_users']
+
+    def get_queryset(self, request):
+        from axes.models import AccessAttempt
+        from django.conf import settings as dj_settings
+        from django.utils import timezone as _tz
+        cooloff = getattr(dj_settings, 'AXES_COOLOFF_TIME', None)
+        limit = getattr(dj_settings, 'AXES_FAILURE_LIMIT', 5)
+        locked_usernames = AccessAttempt.objects.filter(failures_since_start__gte=limit)
+        if cooloff:
+            locked_usernames = locked_usernames.filter(attempt_time__gte=_tz.now() - cooloff)
+        locked_set = set(locked_usernames.values_list('username', flat=True))
+        return super().get_queryset(request).select_related('user', 'user__profile').filter(
+            user__username__in=locked_set
+        )
+
+    def _get_attempt(self, obj):
+        from axes.models import AccessAttempt
+        return AccessAttempt.objects.filter(username=obj.user.username).order_by('-attempt_time').first()
+
+    def display_name(self, obj):
+        return obj.user.profile.display_name if hasattr(obj.user, 'profile') else obj.user.username
+    display_name.short_description = 'نام کاربر'
+
+    def username(self, obj):
+        return obj.user.username
+    username.short_description = 'نام کاربری'
+
+    def role(self, obj):
+        return obj.user.profile.get_role_display() if hasattr(obj.user, 'profile') else '—'
+    role.short_description = 'نقش'
+
+    def locked_ip(self, obj):
+        a = self._get_attempt(obj)
+        return a.ip_address if a else '—'
+    locked_ip.short_description = 'آدرس IP'
+
+    def failures(self, obj):
+        a = self._get_attempt(obj)
+        return f"{a.failures_since_start} بار" if a else '—'
+    failures.short_description = 'تعداد تلاش'
+
+    def jalali_locked_at(self, obj):
+        a = self._get_attempt(obj)
+        return format_jalali_datetime(a.attempt_time) if a else '—'
+    jalali_locked_at.short_description = 'زمان قفل'
+
+    def unlock_remaining(self, obj):
+        from axes.models import AccessAttempt
+        from django.conf import settings as dj_settings
+        from django.utils import timezone as _tz
+        cooloff = getattr(dj_settings, 'AXES_COOLOFF_TIME', None)
+        if not cooloff:
+            return 'دائمی'
+        a = self._get_attempt(obj)
+        if not a:
+            return '—'
+        unlock_at = a.attempt_time + cooloff
+        remaining = unlock_at - _tz.now()
+        if remaining.total_seconds() <= 0:
+            return 'آزاد شده'
+        mins = int(remaining.total_seconds() // 60)
+        return f'{mins} دقیقه دیگر'
+    unlock_remaining.short_description = 'زمان تا آزادسازی خودکار'
+
+    @admin.action(description='🔓 آزادسازی از قفل')
+    def unlock_users(self, request, queryset):
+        from axes.models import AccessAttempt
+        count = 0
+        for us in queryset:
+            deleted, _ = AccessAttempt.objects.filter(username=us.user.username).delete()
+            if deleted:
+                count += 1
+        self.message_user(request, f'قفل {count} کاربر برداشته شد.')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(FieldRequirementConfig)
 class FieldRequirementConfigAdmin(admin.ModelAdmin):
     list_display = (
@@ -523,8 +751,8 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ('تنظیمات Jitsi Meet', {
-            'fields': ('jitsi_server_url',),
-            'description': 'آدرس سرور Jitsi داخلی برای تماس تصویری. بدون https:// وارد کنید — مثال: meet.company.local',
+            'fields': ('jitsi_call_enabled', 'jitsi_server_url'),
+            'description': 'برای فعال‌سازی تماس صوتی، ابتدا آدرس سرور را وارد کنید سپس نمایش دکمه را فعال نمایید.',
         }),
     )
 

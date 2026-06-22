@@ -619,6 +619,13 @@ class UserProfile(models.Model):
     can_access_reconciliation = models.BooleanField('دسترسی مغایرت‌گیری', default=False)
     accounting_code = models.CharField('کد تفضیلی', max_length=50, blank=True)
     sms_mfa_enabled = models.BooleanField('ورود دو مرحله‌ای با پیامک', default=False)
+    multi_session_override = models.BooleanField(
+        'ورود از چند دستگاه',
+        null=True,
+        blank=True,
+        default=None,
+        help_text='خالی = پیروی از تنظیم سراسری | فعال = همیشه مجاز | غیرفعال = همیشه ممنوع',
+    )
     avatar_image = models.ImageField('عکس نمایه', upload_to=profile_avatar_upload_to, blank=True, null=True)
     avatar_preset = models.CharField('نمایه پیش‌فرض', max_length=20, choices=AVATAR_PRESET_CHOICES, default='neutral_1')
 
@@ -1416,6 +1423,8 @@ class UserSession(models.Model):
         verbose_name='کاربر',
     )
     session_key = models.CharField('کلید نشست', max_length=40, db_index=True)
+    ip_address = models.GenericIPAddressField('آدرس IP', null=True, blank=True)
+    last_activity_at = models.DateTimeField('آخرین فعالیت', null=True, blank=True)
     created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
     updated_at = models.DateTimeField('آخرین به‌روزرسانی', auto_now=True)
 
@@ -1567,11 +1576,16 @@ class SystemSettings(models.Model):
     sms_notifications_enabled = models.BooleanField('اطلاع‌رسانی پیامکی فعال', default=False)
 
     # ─── تنظیمات Jitsi Meet ─────────────────────────────────────────────────
+    jitsi_call_enabled = models.BooleanField(
+        'نمایش دکمه تماس صوتی',
+        default=False,
+        help_text='اگر فعال باشد، دکمه تماس در صفحه گفتگو نمایش داده می‌شود.',
+    )
     jitsi_server_url = models.CharField(
         'آدرس سرور Jitsi Meet',
         max_length=255,
         blank=True,
-        help_text='آدرس سرور Jitsi داخلی بدون https:// — مثال: meet.company.local یا 192.168.1.50:8443',
+        help_text='آدرس سرور Jitsi بدون https:// — مثال: meet.company.local یا 192.168.1.50:8443',
     )
 
     updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)

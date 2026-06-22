@@ -98,8 +98,11 @@ class SingleSessionMiddleware:
             )
             return redirect(settings.LOGIN_URL)
 
-        # بررسی ورود از دستگاه دیگر (فقط اگر محدودیت فعال باشد)
-        if not allow_multi and session_key:
+        # بررسی ورود از دستگاه دیگر
+        # اولویت: تنظیم شخصی کاربر > تنظیم سراسری
+        per_user = getattr(getattr(user, 'profile', None), 'multi_session_override', None)
+        effective_allow_multi = per_user if per_user is not None else allow_multi
+        if not effective_allow_multi and session_key:
             try:
                 from .models import UserSession
                 stored = UserSession.objects.get(user=user)
@@ -115,6 +118,22 @@ class SingleSessionMiddleware:
                 pass
 
         request.session['_last_activity'] = now
+
+        # به‌روزرسانی آخرین فعالیت در UserSession — حداکثر هر ۶۰ ثانیه یک‌بار
+        if now - request.session.get('_us_synced', 0) > 60:
+            try:
+                from .models import UserSession
+                from django.utils import timezone as _tz
+                xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+                _ip = (xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR', '')) or None
+                UserSession.objects.filter(user=user, session_key=session_key).update(
+                    last_activity_at=_tz.now(),
+                    ip_address=_ip,
+                )
+                request.session['_us_synced'] = now
+            except Exception:
+                pass
+
         return None
 
 

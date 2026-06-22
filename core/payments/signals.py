@@ -22,16 +22,21 @@ def enforce_single_session(sender, request, user, **kwargs):
     if not new_key:
         return
 
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    ip = (xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR', '')) or None
+
     # خروج خودکار session قبلی
     existing = UserSession.objects.filter(user=user).first()
     if existing and existing.session_key != new_key:
         Session.objects.filter(session_key=existing.session_key).delete()
         existing.session_key = new_key
-        existing.save(update_fields=['session_key', 'updated_at'])
+        existing.ip_address = ip
+        existing.last_activity_at = timezone.now()
+        existing.save(update_fields=['session_key', 'ip_address', 'last_activity_at', 'updated_at'])
     else:
         UserSession.objects.update_or_create(
             user=user,
-            defaults={'session_key': new_key},
+            defaults={'session_key': new_key, 'ip_address': ip, 'last_activity_at': timezone.now()},
         )
 
     # ثبت سابقه ورود
@@ -52,6 +57,10 @@ def record_logout(sender, request, user, **kwargs):
             session_key=session_key,
             logout_at__isnull=True,
         ).update(logout_at=timezone.now(), logout_reason=LoginRecord.LOGOUT_MANUAL)
+    except Exception:
+        pass
+    try:
+        UserSession.objects.filter(user=user).delete()
     except Exception:
         pass
 

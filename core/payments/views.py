@@ -4421,7 +4421,8 @@ def reconciliation_center(request):
         'can_see_receipts': can_see_receipts,
         'can_remove_participants': can_remove_participants,
         'staff_with_messages': staff_with_messages,
-        'jitsi_url': SystemSettings.load().jitsi_server_url.strip().rstrip('/'),
+        'jitsi_call_enabled': (_jcfg := SystemSettings.load()).jitsi_call_enabled,
+        'jitsi_url': _jcfg.jitsi_server_url.strip().rstrip('/'),
     })
 
 
