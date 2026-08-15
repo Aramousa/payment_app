@@ -307,6 +307,11 @@
         .daily-payment-notice { max-width: 980px; margin: 0 auto 14px auto; background: #f0fbf7; border: 1px solid #b9ead9; border-right: 6px solid #2f9e74; border-radius: 10px; padding: 14px; color: #124335; font-size: 14px; line-height: 2; }
         .daily-payment-notice strong { color: #0f6b50; }
         .daily-payment-expired { max-width: 980px; margin: 0 auto 14px auto; background: #fff1f1; border: 1px solid #f3a6a6; border-right: 6px solid #dc3545; border-radius: 10px; padding: 14px; color: #5b1111; font-size: 14px; line-height: 2; }
+        .payment-fieldset { grid-column: 1 / -1; border: 1px solid #dbe3ee; border-radius: 8px; padding: 12px; background: #fbfdff; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px; }
+        .payment-fieldset legend { padding: 0 8px; font-weight: 800; color: #1e3a5f; }
+        .payment-fieldset p { margin: 0; }
+        .required-star { color: #c00; font-weight: 800; margin-right: 2px; }
+        @media (max-width: 720px) { .payment-fieldset { grid-template-columns: 1fr; } }
         .customer-dashboard { max-width: 1200px; margin: 0 auto 18px; display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; }
         .dashboard-panel { background: #fff; border: 1px solid #e1e7f0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
         .dashboard-panel h3 { margin: 0; font-size: 16px; color: #1f2d3d; }
@@ -640,11 +645,43 @@
             {% for hidden in form.hidden_fields %}
                 {{ hidden }}
             {% endfor %}
+            {{ form.non_field_errors }}
+            <fieldset class="payment-fieldset">
+                <legend>حساب مبدا</legend>
+                {% for field in form.visible_fields %}
+                    {% if field.name == 'payer_account_number' or field.name == 'payer_full_name' or field.name == 'payer_bank_name' %}
+                    <p>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </fieldset>
+            <fieldset class="payment-fieldset">
+                <legend>حساب مقصد و طرف حساب <span class="required-star">*</span></legend>
+                {% for field in form.visible_fields %}
+                    {% if field.name == 'counterparty_bank_account' or field.name == 'beneficiary_bank_name' or field.name == 'beneficiary_account_number' or field.name == 'beneficiary_account_owner' %}
+                    <p>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                        {{ field }}
+                        {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+                        {{ field.errors }}
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </fieldset>
             {% for field in form.visible_fields %}
+                {% if field.name == 'amount' or field.name == 'tracking_code' or field.name == 'pay_date' %}
+                <p>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                    {{ field }}
+                    {{ field.errors }}
+                </p>
+                {% endif %}
                 {% if field.name == 'receipt_images' %}
-                {# ─── آپلود فیش با پیش‌نمایش ─── #}
                 <p class="full-row">
-                    <label>{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
+                    <label>{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
                     <label id="receipt-file-label" for="receipt-file-input">
                         <span class="upload-icon">📎</span>
                         <span id="receipt-label-text">انتخاب فایل فیش (تصویر یا PDF)</span>
@@ -654,7 +691,6 @@
                     </label>
                     {{ field.errors }}
                 </p>
-                {# پیش‌نمایش #}
                 <div id="receipt-preview-wrap">
                     <img id="receipt-preview-img" src="" alt="پیش‌نمایش فیش" style="display:none;">
                     <div id="receipt-preview-pdf" style="display:none;">
@@ -666,15 +702,6 @@
                         ✕ حذف و انتخاب مجدد
                     </button>
                 </div>
-                {% elif field.name != 'customer_notes' %}
-                    <p>
-                        <label for="{{ field.id_for_label }}">
-                            {{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}
-                        </label>
-                        {{ field }}
-                        {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
-                        {{ field.errors }}
-                    </p>
                 {% endif %}
             {% endfor %}
             <p class="full-row">
@@ -691,19 +718,6 @@
                 </select>
             </p>
             <p class="full-row">
-                <label for="destination_profile_picker">استفاده از اطلاعات مقصد قبلی</label>
-                <select id="destination_profile_picker">
-                    <option value="">انتخاب کنید</option>
-                    {% for profile in destination_profiles %}
-                        <option value="{{ forloop.counter0 }}">
-                            {{ profile.beneficiary_bank_name }} | {{ profile.beneficiary_account_number }} - {{ profile.beneficiary_account_owner }}
-                        </option>
-                    {% empty %}
-                        <option value="" disabled>اطلاعات مقصد قبلی موجود نیست</option>
-                    {% endfor %}
-                </select>
-            </p>
-            <p class="full-row">
                 <label for="{{ form.customer_notes.id_for_label }}">توضیح (اختیاری)</label>
                 {{ form.customer_notes }}
                 {% if form.customer_notes.help_text %}<span class="helptext">{{ form.customer_notes.help_text }}</span>{% endif %}
@@ -714,7 +728,7 @@
             </button>
         </form>
         {{ source_profiles|json_script:"source-profiles-data" }}
-        {{ destination_profiles|json_script:"destination-profiles-data" }}
+        {{ counterparty_accounts|json_script:"counterparty-accounts-data" }}
         {% endif %}
     {% else %}
         <h2>{% if is_pending_final_mode %}در انتظار تأیید نهایی{% elif is_history_mode %}سوابق اسناد{% else %}بررسی اسناد ارسالی{% endif %}</h2>
@@ -916,13 +930,13 @@
                         <span style="font-size:10px;color:#64748b;min-width:42px;flex-shrink:0;">مالی:</span>
                         <span class="status-pill {{ payment.finance_flag_class }}" style="font-size:10px;">&#9873; {{ payment.finance_status_label }}</span>
                     </div>
-                    {% if is_staff_user and payment.counterparty %}
+                    {% if is_staff_user and payment.counterparty_display_name %}
                     <div style="display:flex;align-items:center;gap:5px;">
                         <span style="font-size:10px;color:#64748b;min-width:42px;flex-shrink:0;">طرف‌حساب:</span>
                         {% if payment.cp_label %}
                         <span class="status-pill {{ payment.cp_class }}" style="font-size:10px;" title="{{ payment.cp_note }}">{{ payment.cp_icon }} {{ payment.cp_label }}</span>
                         {% else %}
-                        <span style="font-size:10px;color:#94a3b8;">—</span>
+                        <span style="font-size:10px;color:#94a3b8;">{{ payment.counterparty_display_name }}{% if payment.manual_counterparty_name and not payment.counterparty_id %} (دستی){% endif %}</span>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -982,7 +996,7 @@
                             <div>نام صاحب حساب مقصد: {% if payment.beneficiary_account_owner and payment.beneficiary_account_owner != 'Z' %}{{ payment.beneficiary_account_owner }}{% else %}-{% endif %}</div>
                             <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
                             <div>توضیح مشتری: {{ payment.customer_notes|default:'-' }}</div>
-                            {% if is_staff_user %}<div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>{% endif %}
+                            {% if is_staff_user %}<div>طرف حساب: {{ payment.counterparty_display_name|default:'-' }}{% if payment.manual_counterparty_name and not payment.counterparty_id %} (دستی){% endif %}</div>{% endif %}
                             {% if payment.status == 'rejected' or payment.status == 'incomplete' %}
                                 <div>توضیح کارشناس: {{ payment.last_staff_note|default:'-' }}</div>
                             {% elif is_staff_user %}
@@ -990,9 +1004,9 @@
                             {% endif %}
                         </div>
 
-                        {% if is_staff_user and payment.counterparty %}
+                        {% if is_staff_user and payment.counterparty_display_name %}
                         <div class="detail-card" style="{% if payment.cp_needs_act %}border:2px solid #f0c05a;background:#fffbeb;{% elif payment.cp_label == 'رد / ابطال' %}border:2px solid #fca5a5;background:#fff5f5;{% elif payment.cp_label == 'تایید' %}border:2px solid #86efac;background:#f0fdf4;{% endif %}">
-                            <strong>🏢 طرف حساب: {{ payment.counterparty }}</strong>
+                            <strong>🏢 طرف حساب: {{ payment.counterparty_display_name }}{% if payment.manual_counterparty_name and not payment.counterparty_id %} (دستی){% endif %}</strong>
                             <div style="margin-top:6px;">
                                 {% if payment.cp_label %}
                                     <span class="status-pill {{ payment.cp_class }}" style="font-size:12px;">{{ payment.cp_icon }} {{ payment.cp_label }}</span>
@@ -1024,7 +1038,7 @@
                                         {% for receipt in receipts %}
                                             {% with file_name=receipt.image.name|lower %}
                                                 <div class="receipt-thumb-card">
-                                                    <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
+                                                    <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
                                                         <span class="receipt-thumb-media">
                                                             {% if '.pdf' in file_name %}
                                                                 <span class="receipt-thumb-pdf">PDF</span>
@@ -1034,10 +1048,12 @@
                                                         </span>
                                                         <span class="receipt-thumb-caption">سند {{ forloop.counter }}</span>
                                                     </a>
-                                                    {% if is_staff_user and '.pdf' not in file_name %}
+                                                    {% if is_staff_user %}
                                                     <div class="receipt-thumb-actions">
-                                                        <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود سند {{ forloop.counter }}">⬇ دانلود</button>
+                                                        <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" title="دانلود سند {{ forloop.counter }}">⬇ دانلود</button>
+                                                        {% if '.pdf' not in file_name %}
                                                         <button type="button" class="button-link outline sm receipt-thumb-print" data-image-url="{% url 'receipt_file' receipt.id %}" title="چاپ سند {{ forloop.counter }}">🖨 چاپ</button>
+                                                        {% endif %}
                                                     </div>
                                                     {% endif %}
                                                 </div>
@@ -1046,7 +1062,7 @@
                                     {% elif payment.receipt_image %}
                                         {% with file_name=payment.receipt_image.name|lower %}
                                             <div class="receipt-thumb-card">
-                                                <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
+                                                <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
                                                     <span class="receipt-thumb-media">
                                                         {% if '.pdf' in file_name %}
                                                             <span class="receipt-thumb-pdf">PDF</span>
@@ -1056,10 +1072,12 @@
                                                     </span>
                                                     <span class="receipt-thumb-caption">سند</span>
                                                 </a>
-                                                {% if is_staff_user and '.pdf' not in file_name %}
+                                                {% if is_staff_user %}
                                                 <div class="receipt-thumb-actions">
-                                                    <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود سند">⬇ دانلود</button>
+                                                    <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" title="دانلود سند">⬇ دانلود</button>
+                                                    {% if '.pdf' not in file_name %}
                                                     <button type="button" class="button-link outline sm receipt-thumb-print" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" title="چاپ سند">🖨 چاپ</button>
+                                                    {% endif %}
                                                 </div>
                                                 {% endif %}
                                             </div>
@@ -1558,24 +1576,35 @@
             });
         }
 
-        const destinationPicker = document.getElementById('destination_profile_picker');
-        const destinationDataEl = document.getElementById('destination-profiles-data');
-        if (destinationPicker && destinationDataEl) {
-            const profiles = JSON.parse(destinationDataEl.textContent || '[]');
-            destinationPicker.addEventListener('change', function () {
-                const idx = parseInt(destinationPicker.value, 10);
-                if (Number.isNaN(idx) || !profiles[idx]) return;
-                const selected = profiles[idx];
+        const counterpartyAccountSelect = document.querySelector('[data-counterparty-account-select="1"]');
+        const counterpartyAccountsDataEl = document.getElementById('counterparty-accounts-data');
+        if (counterpartyAccountSelect && counterpartyAccountsDataEl) {
+            const accounts = JSON.parse(counterpartyAccountsDataEl.textContent || '[]');
+            function fillDestinationFromCounterpartyAccount() {
+                const selectedId = parseInt(counterpartyAccountSelect.value, 10);
+                const selected = accounts.find(function (account) { return account.id === selectedId; });
+                const destinationInputs = ['beneficiary_bank_name', 'beneficiary_account_number', 'beneficiary_account_owner']
+                    .map(function (name) { return document.querySelector('[name="' + name + '"]'); })
+                    .filter(Boolean);
+                if (!selected) {
+                    destinationInputs.forEach(function (input) { input.readOnly = false; });
+                    return;
+                }
                 const fieldMap = {
-                    beneficiary_bank_name: selected.beneficiary_bank_name || '',
-                    beneficiary_account_number: selected.beneficiary_account_number || '',
-                    beneficiary_account_owner: selected.beneficiary_account_owner || ''
+                    beneficiary_bank_name: selected.bank_name || '',
+                    beneficiary_account_number: selected.account_number || '',
+                    beneficiary_account_owner: selected.account_owner || ''
                 };
                 Object.keys(fieldMap).forEach(function (name) {
                     const input = document.querySelector('[name="' + name + '"]');
-                    if (input) input.value = fieldMap[name];
+                    if (input) {
+                        input.value = fieldMap[name];
+                        input.readOnly = true;
+                    }
                 });
-            });
+            }
+            counterpartyAccountSelect.addEventListener('change', fillDestinationFromCounterpartyAccount);
+            fillDestinationFromCounterpartyAccount();
         }
 
         function closeAllDetails(exceptId) {
@@ -1669,19 +1698,21 @@
             }
             if (previewToolbar) previewToolbar.classList.remove('open');
             if (rotateControls) rotateControls.classList.add('hidden');
+            if (previewPrintBtn) previewPrintBtn.style.display = '';
             activeReceiptId = null;
             activePreviewUrl = null;
             activeFileName = '';
             activeDownloadName = '';
         }
 
-        async function openPreview(url, fileName, receiptId, customerName, docNumber) {
+        async function openPreview(url, fileName, receiptId, customerName, docNumber, beneficiaryOwner) {
             activePreviewUrl = url;
             activeReceiptId = receiptId || null;
             activeFileName = fileName || '';
             const namePart = sanitizeFileNamePart(customerName);
             const numberPart = sanitizeFileNamePart(docNumber);
-            activeDownloadName = [namePart, numberPart].filter(Boolean).join(' ') || 'سند';
+            const ownerPart = sanitizeFileNamePart(beneficiaryOwner);
+            activeDownloadName = [namePart, numberPart, ownerPart].filter(Boolean).join(' - ') || 'سند';
             let isPdf = false;
             try {
                 const parsed = new URL(fileName || url, window.location.origin);
@@ -1690,21 +1721,13 @@
                 isPdf = /\.pdf(\?|#|$)/i.test((fileName || url || '').toLowerCase());
             }
             if (isPdf) {
-                try {
-                    const res = await fetch(url, { credentials: 'same-origin' });
-                    if (!res.ok) throw new Error('pdf_fetch_failed');
-                    const blob = await res.blob();
-                    pdfBlobUrl = URL.createObjectURL(blob);
-                    previewFrame.src = pdfBlobUrl;
-                } catch (e) {
-                    window.open(url, '_blank', 'noopener');
-                    return;
-                }
+                previewFrame.src = url;
                 previewFrame.style.display = 'block';
                 setPreviewImageVisible(false);
                 previewImage.src = '';
-                if (previewToolbar) previewToolbar.classList.remove('open');
+                if (previewToolbar) previewToolbar.classList.add('open');
                 if (rotateControls) rotateControls.classList.add('hidden');
+                if (previewPrintBtn) previewPrintBtn.style.display = 'none';
             } else {
                 previewImage.src = url;
                 setPreviewImageVisible(true);
@@ -1720,6 +1743,7 @@
                     if (activeReceiptId && rotateStatus) rotateStatus.textContent = '';
                 }
                 if (previewToolbar) previewToolbar.classList.add('open');
+                if (previewPrintBtn) previewPrintBtn.style.display = '';
             }
             overlay.classList.add('open');
             overlay.focus();
@@ -1791,7 +1815,8 @@
                 const receiptId = link.getAttribute('data-receipt-id') || null;
                 const customerName = link.getAttribute('data-customer-name') || '';
                 const docNumber = link.getAttribute('data-doc-number') || '';
-                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId, customerName, docNumber);
+                const beneficiaryOwner = link.getAttribute('data-beneficiary-owner') || '';
+                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId, customerName, docNumber, beneficiaryOwner);
             });
         });
 
@@ -1863,14 +1888,15 @@
         function downloadNameFromAttrs(el) {
             const namePart = sanitizeFileNamePart(el.getAttribute('data-customer-name'));
             const numberPart = sanitizeFileNamePart(el.getAttribute('data-doc-number'));
-            return [namePart, numberPart].filter(Boolean).join(' ') || 'سند';
+            const ownerPart = sanitizeFileNamePart(el.getAttribute('data-beneficiary-owner'));
+            return [namePart, numberPart, ownerPart].filter(Boolean).join(' - ') || 'سند';
         }
 
         // دکمه‌های دانلود/چاپ داخل پیش‌نمایش بزرگ
         if (previewDownloadBtn) {
             previewDownloadBtn.addEventListener('click', function () {
-                if (!activePreviewUrl || previewImage.style.display === 'none') return;
-                downloadDocumentImage(previewImage.src || activePreviewUrl, activeFileName, activeDownloadName, previewDownloadBtn);
+                if (!activePreviewUrl) return;
+                downloadDocumentImage(activePreviewUrl, activeFileName, activeDownloadName, previewDownloadBtn);
             });
         }
         if (previewPrintBtn) {

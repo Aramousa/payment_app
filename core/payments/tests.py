@@ -12,7 +12,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from .forms import DailyPaymentAssignmentForm, InvoiceUploadForm, PriceListUploadForm, ProformaInvoiceForm
-from .models import Counterparty, CustomerOrder, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, PaymentActivityLog, PaymentReceipt, PaymentRecord, PriceList, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, SystemActivityLog, UserNotification
 from .views import _staff_status_choices_for_role
 
 
@@ -87,6 +87,15 @@ class InvoiceFlowTests(TestCase):
         self.other_customer.profile.role = 'customer'
         self.other_customer.profile.force_password_change = False
         self.other_customer.profile.save()
+
+        self.counterparty = Counterparty.objects.create(name='CP Alpha')
+        self.counterparty_account = CounterpartyBankAccount.objects.create(
+            counterparty=self.counterparty,
+            bank_name='Saderat',
+            account_number='444555666',
+            account_owner='Company',
+            is_primary=True,
+        )
 
     def test_commercial_user_can_upload_invoice_for_customer(self):
         self.client.login(username='commercial1', password='pass1234')
@@ -515,6 +524,78 @@ class InvoiceFlowTests(TestCase):
         response = self.client.get(reverse('receipt_file', args=[other_receipt.id]))
         self.assertEqual(response.status_code, 403)
 
+    def test_customer_must_choose_allowed_counterparty_account_for_payment(self):
+        self.client.login(username='customer1', password='pass1234')
+
+        payload = {
+            'counterparty_bank_account': self.counterparty_account.id,
+            'payer_account_number': '111222333',
+            'payer_full_name': 'Ali Customer',
+            'payer_bank_name': 'Melli',
+            'beneficiary_bank_name': '',
+            'beneficiary_account_number': '',
+            'beneficiary_account_owner': '',
+            'amount': '250000',
+            'tracking_code': 'CP-ACCOUNT-REQ',
+            'pay_date': '1405/02/08',
+            'customer_notes': '',
+        }
+        files = {
+            'receipt_images': SimpleUploadedFile(
+                'receipt.pdf',
+                b'%PDF-1.4 receipt',
+                content_type='application/pdf',
+            ),
+        }
+        response = self.client.post(reverse('payment_create'), data={**payload, **files})
+        self.assertEqual(response.status_code, 302)
+
+        payment = PaymentRecord.objects.get(tracking_code='CP-ACCOUNT-REQ')
+        self.assertEqual(payment.counterparty, self.counterparty)
+        self.assertEqual(payment.beneficiary_bank_name, self.counterparty_account.bank_name)
+        self.assertEqual(payment.beneficiary_account_number, self.counterparty_account.account_number)
+        self.assertEqual(payment.beneficiary_account_owner, self.counterparty_account.account_owner)
+
+        manual_payload = payload.copy()
+        manual_payload['tracking_code'] = 'CP-MANUAL-REQ'
+        manual_payload['counterparty_bank_account'] = ''
+        manual_payload['beneficiary_bank_name'] = 'Manual Bank'
+        manual_payload['beneficiary_account_number'] = '999888777'
+        manual_payload['beneficiary_account_owner'] = 'Manual CP'
+        response = self.client.post(
+            reverse('payment_create'),
+            data={
+                **manual_payload,
+                'receipt_images': SimpleUploadedFile(
+                    'receipt-manual.pdf',
+                    b'%PDF-1.4 receipt manual',
+                    content_type='application/pdf',
+                ),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        payment = PaymentRecord.objects.get(tracking_code='CP-MANUAL-REQ')
+        self.assertIsNone(payment.counterparty)
+        self.assertEqual(payment.manual_counterparty_name, 'Manual CP')
+        self.assertEqual(payment.beneficiary_account_number, '999888777')
+
+        invalid_payload = payload.copy()
+        invalid_payload['tracking_code'] = 'CP-ACCOUNT-MISSING'
+        invalid_payload['counterparty_bank_account'] = ''
+        response = self.client.post(
+            reverse('payment_create'),
+            data={
+                **invalid_payload,
+                'receipt_images': SimpleUploadedFile(
+                    'receipt-2.pdf',
+                    b'%PDF-1.4 receipt two',
+                    content_type='application/pdf',
+                ),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PaymentRecord.objects.filter(tracking_code='CP-ACCOUNT-MISSING').exists())
+
     def test_uploaded_receipt_filename_is_server_generated_ascii(self):
         payment = PaymentRecord.objects.create(
             user=self.customer_user,
@@ -582,7 +663,7 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(payment.status, PaymentRecord.STATUS_APPROVED)
 
         response = self.client.get(reverse('submit'))
-        self.assertNotContains(response, 'WF-APPROVE')
+        self.assertContains(response, 'WF-APPROVE')
         response = self.client.get(reverse('payment_history'))
         self.assertContains(response, 'WF-APPROVE')
 
@@ -620,7 +701,7 @@ class InvoiceFlowTests(TestCase):
             pending_final_approval=True,
         )
 
-        for username in ['commercial1', 'finance1', 'sales1']:
+        for username in ['finance1', 'sales1']:
             with self.subTest(username=username):
                 self.client.logout()
                 self.client.login(username=username, password='pass1234')
@@ -633,6 +714,56 @@ class InvoiceFlowTests(TestCase):
                 self.assertNotContains(response, reverse('staff_update_status', args=[payment.id]))
                 self.assertNotContains(response, reverse('finance_unified_action', args=[payment.id]))
                 self.assertNotContains(response, reverse('finance_final_approve', args=[payment.id]))
+
+        self.client.logout()
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertContains(response, payment.tracking_code)
+
+    def test_commercial_can_return_approved_payment_to_temp_and_reset_finance(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='COMM-RETURN-TEMP',
+            status=PaymentRecord.STATUS_APPROVED,
+            finance_status=PaymentRecord.FINANCE_STATUS_APPROVED,
+            finance_registered_by=self.finance_user,
+            pending_final_approval=True,
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, payment.tracking_code)
+
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {
+                'status': PaymentRecord.STATUS_TEMP_COMMERCIAL,
+                'note': 'Needs commercial revision',
+                'next': reverse('submit'),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_TEMP_COMMERCIAL)
+        self.assertIsNone(payment.finance_status)
+        self.assertIsNone(payment.finance_registered_at)
+        self.assertIsNone(payment.finance_registered_by)
+        self.assertFalse(payment.pending_final_approval)
+        self.assertIsNone(payment.pending_final_approval_since)
+
+        self.client.logout()
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, payment.tracking_code)
 
     def test_staff_status_choices_for_generic_staff_role_are_not_empty(self):
         choices = _staff_status_choices_for_role('staff')

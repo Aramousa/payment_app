@@ -48,6 +48,11 @@
         .debt-summary-item strong { display: block; font-size: 12px; color: #345; margin-bottom: 6px; }
         .debt-summary-item .value { font-size: 16px; color: #111; font-weight: 700; direction: ltr; text-align: right; }
         .debt-summary-note { margin-top: 8px; color: #666; font-size: 12px; }
+        .payment-fieldset { grid-column: 1 / -1; border: 1px solid #dbe3ee; border-radius: 8px; padding: 12px; background: #fbfdff; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px; }
+        .payment-fieldset legend { padding: 0 8px; font-weight: 800; color: #1e3a5f; }
+        .payment-fieldset p { margin: 0; }
+        .required-star { color: #c00; font-weight: 800; margin-right: 2px; }
+        @media (max-width: 720px) { .payment-fieldset { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -109,10 +114,35 @@
             {% for hidden in form.hidden_fields %}
                 {{ hidden }}
             {% endfor %}
-            {% for field in form.visible_fields %}
-                {% if field.name != 'customer_notes' %}
+            {{ form.non_field_errors }}
+            <fieldset class="payment-fieldset">
+                <legend>حساب مبدا</legend>
+                {% for field in form.visible_fields %}
+                    {% if field.name == 'payer_account_number' or field.name == 'payer_full_name' or field.name == 'payer_bank_name' %}
                     <p>
-                        {{ field.label_tag }}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </fieldset>
+            <fieldset class="payment-fieldset">
+                <legend>حساب مقصد و طرف حساب <span class="required-star">*</span></legend>
+                {% for field in form.visible_fields %}
+                    {% if field.name == 'counterparty_bank_account' or field.name == 'beneficiary_bank_name' or field.name == 'beneficiary_account_number' or field.name == 'beneficiary_account_owner' %}
+                    <p>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </fieldset>
+            {% for field in form.visible_fields %}
+                {% if field.name == 'amount' or field.name == 'tracking_code' or field.name == 'pay_date' or field.name == 'receipt_images' %}
+                    <p>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
                         {{ field }}
                         {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
                         {{ field.errors }}
@@ -133,19 +163,6 @@
                 </select>
             </p>
             <p class="full-row">
-                <label for="destination_profile_picker">استفاده از اطلاعات مقصد قبلی</label>
-                <select id="destination_profile_picker">
-                    <option value="">انتخاب کنید</option>
-                    {% for profile in destination_profiles %}
-                        <option value="{{ forloop.counter0 }}">
-                            {{ profile.beneficiary_bank_name }} | {{ profile.beneficiary_account_number }} - {{ profile.beneficiary_account_owner }}
-                        </option>
-                    {% empty %}
-                        <option value="" disabled>اطلاعات مقصد قبلی موجود نیست</option>
-                    {% endfor %}
-                </select>
-            </p>
-            <p class="full-row">
                 <label for="{{ form.customer_notes.id_for_label }}">توضیح (اختیاری)</label>
                 {{ form.customer_notes }}
                 {% if form.customer_notes.help_text %}<span class="helptext">{{ form.customer_notes.help_text }}</span>{% endif %}
@@ -155,7 +172,7 @@
             <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}" class="back-link">بازگشت</a>
         </form>
         {{ source_profiles|json_script:"source-profiles-data" }}
-        {{ destination_profiles|json_script:"destination-profiles-data" }}
+        {{ counterparty_accounts|json_script:"counterparty-accounts-data" }}
     </div>
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
         <div class="preview-box" id="previewBox">
@@ -203,24 +220,35 @@
             });
         }
 
-        const destinationPicker = document.getElementById('destination_profile_picker');
-        const destinationDataEl = document.getElementById('destination-profiles-data');
-        if (destinationPicker && destinationDataEl) {
-            const profiles = JSON.parse(destinationDataEl.textContent || '[]');
-            destinationPicker.addEventListener('change', function () {
-                const idx = parseInt(destinationPicker.value, 10);
-                if (Number.isNaN(idx) || !profiles[idx]) return;
-                const selected = profiles[idx];
+        const counterpartyAccountSelect = document.querySelector('[data-counterparty-account-select="1"]');
+        const counterpartyAccountsDataEl = document.getElementById('counterparty-accounts-data');
+        if (counterpartyAccountSelect && counterpartyAccountsDataEl) {
+            const accounts = JSON.parse(counterpartyAccountsDataEl.textContent || '[]');
+            function fillDestinationFromCounterpartyAccount() {
+                const selectedId = parseInt(counterpartyAccountSelect.value, 10);
+                const selected = accounts.find(function (account) { return account.id === selectedId; });
+                const destinationInputs = ['beneficiary_bank_name', 'beneficiary_account_number', 'beneficiary_account_owner']
+                    .map(function (name) { return document.querySelector('[name="' + name + '"]'); })
+                    .filter(Boolean);
+                if (!selected) {
+                    destinationInputs.forEach(function (input) { input.readOnly = false; });
+                    return;
+                }
                 const fieldMap = {
-                    beneficiary_bank_name: selected.beneficiary_bank_name || '',
-                    beneficiary_account_number: selected.beneficiary_account_number || '',
-                    beneficiary_account_owner: selected.beneficiary_account_owner || ''
+                    beneficiary_bank_name: selected.bank_name || '',
+                    beneficiary_account_number: selected.account_number || '',
+                    beneficiary_account_owner: selected.account_owner || ''
                 };
                 Object.keys(fieldMap).forEach(function (name) {
                     const input = document.querySelector('[name="' + name + '"]');
-                    if (input) input.value = fieldMap[name];
+                    if (input) {
+                        input.value = fieldMap[name];
+                        input.readOnly = true;
+                    }
                 });
-            });
+            }
+            counterpartyAccountSelect.addEventListener('change', fillDestinationFromCounterpartyAccount);
+            fillDestinationFromCounterpartyAccount();
         }
 
         const overlay = document.getElementById('previewOverlay');

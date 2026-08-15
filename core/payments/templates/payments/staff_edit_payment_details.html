@@ -16,14 +16,18 @@
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
         .box { max-width: 980px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
         .meta { background: #f8fbff; border: 1px solid #e3efff; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
-        form { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 10px 14px; }
+        form { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 12px 14px; }
         form p { margin: 0; }
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+        .payment-fieldset { grid-column: 1 / -1; border: 1px solid #dbe3ee; border-radius: 8px; padding: 12px; background: #fbfdff; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px; }
+        .payment-fieldset legend { padding: 0 8px; font-weight: 800; color: #1e3a5f; }
+        .payment-fieldset p { margin: 0; }
+        .required-star { color: #c00; font-weight: 800; margin-right: 2px; }
         .actions { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
         .save-btn, .back-link { border: 0; border-radius: 6px; padding: 10px 14px; text-decoration: none; cursor: pointer; }
         .save-btn { background: #1e3a5f; color: #fff; }
         .back-link { background: #6c757d; color: #fff; }
-        @media (max-width: 760px) { form { grid-template-columns: 1fr; } }
+        @media (max-width: 760px) { form, .payment-fieldset { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -41,12 +45,39 @@
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ return_url }}">
-            {% for field in form %}
-                <p>
-                    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span style="color:#c00;font-weight:700;margin-right:2px;">*</span>{% endif %}</label>
-                    {{ field }}
-                    {{ field.errors }}
-                </p>
+            {{ form.non_field_errors }}
+            <fieldset class="payment-fieldset">
+                <legend>حساب مبدا</legend>
+                {% for field in form.visible_fields %}
+                    {% if field.name == 'payer_account_number' or field.name == 'payer_full_name' or field.name == 'payer_bank_name' %}
+                    <p>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </fieldset>
+            <fieldset class="payment-fieldset">
+                <legend>حساب مقصد</legend>
+                {% for field in form.visible_fields %}
+                    {% if field.name == 'beneficiary_bank_name' or field.name == 'beneficiary_account_number' or field.name == 'beneficiary_account_owner' %}
+                    <p>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </p>
+                    {% endif %}
+                {% endfor %}
+            </fieldset>
+            {% for field in form.visible_fields %}
+                {% if field.name == 'amount' or field.name == 'tracking_code' or field.name == 'pay_date' %}
+                    <p>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                        {{ field }}
+                        {{ field.errors }}
+                    </p>
+                {% endif %}
             {% endfor %}
             <div class="actions">
                 <button type="submit" class="save-btn">ثبت اطلاعات</button>

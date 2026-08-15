@@ -310,7 +310,7 @@
                                 <div>نام صاحب حساب مقصد: {% if payment.beneficiary_account_owner and payment.beneficiary_account_owner != 'Z' %}{{ payment.beneficiary_account_owner }}{% else %}-{% endif %}</div>
                                 <div>کد پیگیری: {{ payment.tracking_code|default:'-' }}</div>
                                 <div>توضیح مشتری: {{ payment.customer_notes|default:'-' }}</div>
-                                <div>طرف حساب: {{ payment.counterparty|default:'-' }}</div>
+                                <div>طرف حساب: {{ payment.counterparty_display_name|default:'-' }}{% if payment.manual_counterparty_name and not payment.counterparty_id %} (دستی){% endif %}</div>
                                 <div>آخرین توضیح کارشناس: {{ payment.last_staff_note|default:'-' }}</div>
                             </div>
 
@@ -323,7 +323,7 @@
                                             {% for receipt in receipts %}
                                                 {% with file_name=receipt.image.name|lower %}
                                                 <div class="receipt-thumb-card">
-                                                    <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
+                                                    <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند {{ forloop.counter }}">
                                                         <span class="receipt-thumb-media">
                                                             {% if '.pdf' in file_name %}
                                                                 <span class="receipt-thumb-pdf">PDF</span>
@@ -333,19 +333,19 @@
                                                         </span>
                                                         <span class="receipt-thumb-caption">سند {{ forloop.counter }}</span>
                                                     </a>
-                                                    {% if '.pdf' not in file_name %}
                                                     <div class="receipt-thumb-actions">
-                                                        <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود">⬇</button>
+                                                        <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" title="دانلود">⬇</button>
+                                                        {% if '.pdf' not in file_name %}
                                                         <button type="button" class="button-link outline sm receipt-thumb-print" data-image-url="{% url 'receipt_file' receipt.id %}" title="چاپ">🖨</button>
+                                                        {% endif %}
                                                     </div>
-                                                    {% endif %}
                                                 </div>
                                                 {% endwith %}
                                             {% endfor %}
                                         {% elif payment.receipt_image %}
                                             {% with file_name=payment.receipt_image.name|lower %}
                                             <div class="receipt-thumb-card">
-                                                <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
+                                                <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" class="receipt-preview-link receipt-thumb-link" title="مشاهده سند">
                                                     <span class="receipt-thumb-media">
                                                         {% if '.pdf' in file_name %}
                                                             <span class="receipt-thumb-pdf">PDF</span>
@@ -355,12 +355,12 @@
                                                     </span>
                                                     <span class="receipt-thumb-caption">سند</span>
                                                 </a>
-                                                {% if '.pdf' not in file_name %}
                                                 <div class="receipt-thumb-actions">
-                                                    <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" title="دانلود">⬇</button>
+                                                    <button type="button" class="button-link outline sm receipt-thumb-download" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" title="دانلود">⬇</button>
+                                                    {% if '.pdf' not in file_name %}
                                                     <button type="button" class="button-link outline sm receipt-thumb-print" data-image-url="{% url 'legacy_payment_receipt_file' payment.id %}" title="چاپ">🖨</button>
+                                                    {% endif %}
                                                 </div>
-                                                {% endif %}
                                             </div>
                                             {% endwith %}
                                         {% else %}
@@ -626,7 +626,8 @@
                 e.preventDefault(); e.stopPropagation();
                 var cn = sanitize(btn.getAttribute('data-customer-name'));
                 var dn = sanitize(btn.getAttribute('data-doc-number'));
-                dlImg(btn.getAttribute('data-image-url'), btn.getAttribute('data-file-name'), [cn,dn].filter(Boolean).join(' ') || 'سند', btn);
+                var owner = sanitize(btn.getAttribute('data-beneficiary-owner'));
+                dlImg(btn.getAttribute('data-image-url'), btn.getAttribute('data-file-name'), [cn,dn,owner].filter(Boolean).join(' - ') || 'سند', btn);
             });
         });
         document.querySelectorAll('.receipt-thumb-print').forEach(function (btn) {

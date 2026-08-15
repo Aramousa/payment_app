@@ -196,7 +196,7 @@
                     {% if receipts %}
                         {% for receipt in receipts %}
                             {% with file_name=receipt.image.name|lower %}
-                                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-doc-link receipt-preview-link" title="مشاهده سند {{ forloop.counter }}">
+                                <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" class="receipt-doc-link receipt-preview-link" title="مشاهده سند {{ forloop.counter }}">
                                     <span class="receipt-doc-media">
                                         {% if '.pdf' in file_name %}
                                             <span class="receipt-doc-pdf">📄 PDF</span>
@@ -210,7 +210,7 @@
                         {% endfor %}
                     {% elif payment.receipt_image %}
                         {% with file_name=payment.receipt_image.name|lower %}
-                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" class="receipt-doc-link receipt-preview-link" title="مشاهده سند">
+                            <a href="{% url 'legacy_payment_receipt_file' payment.id %}" data-file-name="{{ payment.receipt_image.name }}" data-customer-name="{{ payment.first_name }} {{ payment.last_name }}" data-doc-number="{{ payment.id }}" data-beneficiary-owner="{{ payment.beneficiary_account_owner }}" class="receipt-doc-link receipt-preview-link" title="مشاهده سند">
                                 <span class="receipt-doc-media">
                                     {% if '.pdf' in file_name %}
                                         <span class="receipt-doc-pdf">📄 PDF</span>
@@ -429,19 +429,21 @@
             }
             if (previewToolbar) previewToolbar.classList.remove('open');
             if (rotateControls) rotateControls.classList.add('hidden');
+            if (previewPrintBtn) previewPrintBtn.style.display = '';
             activeReceiptId = null;
             activePreviewUrl = null;
             activeFileName = '';
             activeDownloadName = '';
         }
 
-        async function openPreview(url, fileName, receiptId, customerName, docNumber) {
+        async function openPreview(url, fileName, receiptId, customerName, docNumber, beneficiaryOwner) {
             activePreviewUrl = url;
             activeReceiptId = receiptId || null;
             activeFileName = fileName || '';
             const namePart = sanitizeFileNamePart(customerName);
             const numberPart = sanitizeFileNamePart(docNumber);
-            activeDownloadName = [namePart, numberPart].filter(Boolean).join(' ') || 'سند';
+            const ownerPart = sanitizeFileNamePart(beneficiaryOwner);
+            activeDownloadName = [namePart, numberPart, ownerPart].filter(Boolean).join(' - ') || 'سند';
             let isPdf = false;
             try {
                 const parsed = new URL(fileName || url, window.location.origin);
@@ -450,21 +452,13 @@
                 isPdf = /\.pdf(\?|#|$)/i.test((fileName || url || '').toLowerCase());
             }
             if (isPdf) {
-                try {
-                    const res = await fetch(url, { credentials: 'same-origin' });
-                    if (!res.ok) throw new Error('pdf_fetch_failed');
-                    const blob = await res.blob();
-                    pdfBlobUrl = URL.createObjectURL(blob);
-                    previewFrame.src = pdfBlobUrl;
-                } catch (e) {
-                    window.open(url, '_blank', 'noopener');
-                    return;
-                }
+                previewFrame.src = url;
                 previewFrame.style.display = 'block';
                 setPreviewImageVisible(false);
                 previewImage.src = '';
-                if (previewToolbar) previewToolbar.classList.remove('open');
+                if (previewToolbar) previewToolbar.classList.add('open');
                 if (rotateControls) rotateControls.classList.add('hidden');
+                if (previewPrintBtn) previewPrintBtn.style.display = 'none';
             } else {
                 previewImage.src = url;
                 setPreviewImageVisible(true);
@@ -480,6 +474,7 @@
                     if (activeReceiptId && rotateStatus) rotateStatus.textContent = '';
                 }
                 if (previewToolbar) previewToolbar.classList.add('open');
+                if (previewPrintBtn) previewPrintBtn.style.display = '';
             }
             overlay.classList.add('open');
             overlay.focus();
@@ -551,7 +546,8 @@
                 const receiptId = link.getAttribute('data-receipt-id') || null;
                 const customerName = link.getAttribute('data-customer-name') || '';
                 const docNumber = link.getAttribute('data-doc-number') || '';
-                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId, customerName, docNumber);
+                const beneficiaryOwner = link.getAttribute('data-beneficiary-owner') || '';
+                await openPreview(link.getAttribute('href'), link.getAttribute('data-file-name'), receiptId, customerName, docNumber, beneficiaryOwner);
             });
         });
 
@@ -621,8 +617,8 @@
         // دکمه‌های دانلود/چاپ داخل پیش‌نمایش بزرگ
         if (previewDownloadBtn) {
             previewDownloadBtn.addEventListener('click', function () {
-                if (!activePreviewUrl || previewImage.style.display === 'none') return;
-                downloadDocumentImage(previewImage.src || activePreviewUrl, activeFileName, activeDownloadName, previewDownloadBtn);
+                if (!activePreviewUrl) return;
+                downloadDocumentImage(activePreviewUrl, activeFileName, activeDownloadName, previewDownloadBtn);
             });
         }
         if (previewPrintBtn) {

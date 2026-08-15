@@ -384,11 +384,13 @@ class PaymentRecord(models.Model):
         return (
             self.status == self.STATUS_APPROVED
             and self.is_finance_registered
+            and not self.manual_counterparty_name
             and (self.counterparty_id is None or self.is_counterparty_approved)
         )
 
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     counterparty = models.ForeignKey(Counterparty, on_delete=models.PROTECT, null=True, blank=True, related_name='payments')
+    manual_counterparty_name = models.CharField('طرف حساب پیشنهادی مشتری', max_length=160, blank=True, default='')
     first_name = models.CharField(max_length=50, blank=True, default='')
     last_name = models.CharField(max_length=50, blank=True, default='')
     organization = models.CharField(max_length=100, blank=True, default='')
@@ -452,6 +454,12 @@ class PaymentRecord(models.Model):
     @property
     def is_counterparty_rejected(self):
         return self.counterparty_status == self.CP_STATUS_REJECTED
+
+    @property
+    def counterparty_display_name(self):
+        if self.counterparty_id:
+            return str(self.counterparty)
+        return self.manual_counterparty_name
 
     @property
     def counterparty_decided(self):

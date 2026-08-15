@@ -511,6 +511,26 @@ def _file_response(field_file, as_attachment=False, filename=None):
     )
 
 
+def _safe_download_name_part(value, max_length=80):
+    value = str(value or '').strip()
+    if not value or value == 'Z':
+        return ''
+    value = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', ' ', value)
+    value = re.sub(r'\s+', ' ', value).strip(' .-')
+    return value[:max_length].strip(' .-')
+
+
+def _payment_receipt_download_name(payment, field_file):
+    customer_name = _safe_download_name_part(
+        f'{payment.first_name or ""} {payment.last_name or ""}'
+    )
+    doc_number = _safe_download_name_part(payment.id)
+    owner_name = _safe_download_name_part(payment.beneficiary_account_owner)
+    base_name = ' - '.join(part for part in (customer_name, doc_number, owner_name) if part) or 'سند'
+    ext = os.path.splitext((field_file.name or '').rsplit('/', 1)[-1])[1]
+    return f'{base_name}{ext}'
+
+
 @require_POST
 def safe_logout(request):
     try:
@@ -664,6 +684,7 @@ def _can_staff_act_on_payment(role, payment, is_system_admin=False):
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        PaymentRecord.STATUS_APPROVED,
     }
 
     if dept == 'commercial' or dept == 'sales':
@@ -764,6 +785,7 @@ def _sync_pending_final_flag(payment):
     should_be = (
         payment.status == PaymentRecord.STATUS_APPROVED
         and payment.finance_status == PaymentRecord.FINANCE_STATUS_APPROVED
+        and not payment.manual_counterparty_name
         and (payment.counterparty_id is None or payment.counterparty_status == PaymentRecord.CP_STATUS_APPROVED)
     )
     if should_be and not payment.pending_final_approval:
@@ -844,6 +866,7 @@ def _active_payment_records_for_user(user):
             PaymentRecord.STATUS_COMMERCIAL_REVIEW,
             PaymentRecord.STATUS_TEMP_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+            PaymentRecord.STATUS_APPROVED,
         ])
     if role == 'finance':
         return records.filter(status__in=[
@@ -1047,7 +1070,7 @@ PAYMENT_EXPORT_FIELDS = [
     _field('pay_date', 'تاریخ واریز', lambda p: _format_jalali_date(p.pay_date)),
     _field('tracking_code', 'کد پیگیری', lambda p: p.tracking_code or ''),
     _field('status', 'وضعیت', lambda p: p.get_status_display()),
-    _field('counterparty', 'طرف حساب', lambda p: p.counterparty.name if p.counterparty else ''),
+    _field('counterparty', 'طرف حساب', lambda p: p.counterparty_display_name or ''),
     _field('last_staff_note', 'آخرین توضیح کارشناس', lambda p: p.last_staff_note),
     _field('customer_notes', 'توضیح مشتری', lambda p: p.customer_notes),
     _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime(p.created_at)),
@@ -1918,6 +1941,12 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
         payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
+        _dept = _department_role(staff_role) if staff_role else ''
+        if payment.status == PaymentRecord.STATUS_APPROVED and _dept in {'commercial', 'sales'}:
+            payment.staff_allowed_choices = [
+                choice for choice in payment.staff_allowed_choices
+                if choice[0] in {PaymentRecord.STATUS_APPROVED, PaymentRecord.STATUS_TEMP_COMMERCIAL}
+            ]
         payment.can_edit_details = bool(can_edit_payment_details)
         payment.can_customer_edit = _can_customer_edit_payment(payment)
 
@@ -1927,8 +1956,6 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         ) if staff_role else False
 
         # اقدام بازرگانی — فقط بازرگانی/فروش/ادمین (نه مالی)
-        _dept = _department_role(staff_role) if staff_role else ''
-
         # تجدیدنظر بازرگانی: اگر آخرین اقدام واقعی از بازرگانی یا مدیر بوده، امکان اصلاح وجود دارد
         if not payment.staff_can_act and _dept in {'commercial', 'sales'}:
             payment.staff_can_act = _commercial_can_revise(payment, logs=_fetched_logs)
@@ -2227,6 +2254,9 @@ def _save_receipts(payment, form):
     if not payload:
         return
 
+    # فیش قبلی را حذف کن تا همیشه فقط یک فیش داشته باشیم
+    payment.receipts.all().delete()
+
     receipts = [
         PaymentReceipt(payment=payment, image=uploaded, file_hash=file_hash)
         for uploaded, file_hash in payload
@@ -2306,6 +2336,42 @@ def _destination_profiles_for_user(user):
         seen.add(key)
         profiles.append(values)
     return profiles
+
+
+def _normalize_bank_account_number(value):
+    return re.sub(r'\s+', '', str(value or '')).strip()
+
+
+def _counterparty_account_queryset_for_payment(user, active_daily_assignment=None):
+    accounts = CounterpartyBankAccount.objects.filter(
+        counterparty__status=Counterparty.STATUS_ACTIVE,
+    ).exclude(
+        account_number='',
+    ).select_related('counterparty').order_by(
+        'counterparty__name', '-is_primary', 'bank_name', 'account_number',
+    )
+    if active_daily_assignment:
+        expected_account = _normalize_bank_account_number(active_daily_assignment.plan.account_number)
+        matching_ids = [
+            account.id
+            for account in accounts
+            if _normalize_bank_account_number(account.account_number) == expected_account
+        ]
+        accounts = accounts.filter(id__in=matching_ids)
+    return accounts
+
+
+def _counterparty_account_rows(accounts):
+    return [
+        {
+            'id': account.id,
+            'counterparty': account.counterparty.name if account.counterparty_id else '',
+            'bank_name': account.bank_name or '',
+            'account_number': account.account_number or '',
+            'account_owner': account.account_owner or '',
+        }
+        for account in accounts
+    ]
 
 
 def _invoice_records_for_user(user):
@@ -2960,13 +3026,25 @@ def create_payment(request):
             'beneficiary_account_owner': active_daily_assignment.plan.account_owner,
             'pay_date': active_daily_assignment.plan.deposit_date,
         })
+    counterparty_accounts_qs = _counterparty_account_queryset_for_payment(
+        request.user,
+        active_daily_assignment=active_daily_assignment if not is_staff_user else None,
+    )
+    counterparty_accounts = list(counterparty_accounts_qs)
+    if request.method != 'POST' and len(counterparty_accounts) == 1:
+        form_initial['counterparty_bank_account'] = counterparty_accounts[0].id
 
     if request.method == 'POST':
         if not show_payment_form:
             return redirect('payment_create')
         if is_staff_user:
             return HttpResponseForbidden('کاربران واحدها امکان ثبت سند از این فرم را ندارند.')
-        form = PaymentRecordForm(request.POST, request.FILES, initial=form_initial)
+        form = PaymentRecordForm(
+            request.POST,
+            request.FILES,
+            initial=form_initial,
+            allowed_counterparty_accounts=counterparty_accounts_qs,
+        )
         valid = form.is_valid()
         if not valid:
             try:
@@ -3009,12 +3087,22 @@ def create_payment(request):
 
             if not form.errors:
                 payment = form.save(commit=False)
+                selected_counterparty_account = form.cleaned_data.get('counterparty_bank_account')
                 payment.user = request.user
                 payment.first_name = initial_data['first_name']
                 payment.last_name = initial_data['last_name']
                 payment.organization = initial_data['organization']
                 payment.city = initial_data['city']
                 payment.phone = initial_data['phone']
+                if selected_counterparty_account:
+                    payment.counterparty = selected_counterparty_account.counterparty
+                    payment.manual_counterparty_name = ''
+                    payment.beneficiary_bank_name = selected_counterparty_account.bank_name or ''
+                    payment.beneficiary_account_number = selected_counterparty_account.account_number or ''
+                    payment.beneficiary_account_owner = selected_counterparty_account.account_owner or ''
+                else:
+                    payment.counterparty = None
+                    payment.manual_counterparty_name = form.cleaned_data.get('beneficiary_account_owner') or ''
                 payment.status = PaymentRecord.STATUS_PENDING
                 payment.daily_assignment = active_daily_assignment
                 payment.save()
@@ -3023,7 +3111,10 @@ def create_payment(request):
                 _notify_payment_created(payment, request.user)
                 return redirect('success')
     else:
-        form = PaymentRecordForm(initial=form_initial)
+        form = PaymentRecordForm(
+            initial=form_initial,
+            allowed_counterparty_accounts=counterparty_accounts_qs,
+        )
 
     records = _active_payment_records_for_user(request.user)
     _mark_commercial_records_seen(records, request.user)
@@ -3057,7 +3148,8 @@ def create_payment(request):
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
         'source_profiles': _source_profiles_for_user(request.user) if not is_staff_user else [],
-        'destination_profiles': _destination_profiles_for_user(request.user) if not is_staff_user else [],
+        'destination_profiles': [],
+        'counterparty_accounts': _counterparty_account_rows(counterparty_accounts),
         'current_sort': current_sort,
         'current_sort_dir': current_sort_dir,
         'sort_base_query': sort_base_query,
@@ -3741,16 +3833,30 @@ def staff_update_status(request, payment_id):
         messages.error(request, 'این تغییر وضعیت برای نقش شما مجاز نیست.')
         return redirect(redirect_target)
 
+    department_role = _department_role(staff_role)
+    from_status = payment.status
     note = (form.cleaned_data['note'] or '').strip()
+    if (
+        from_status == PaymentRecord.STATUS_APPROVED
+        and department_role in {'commercial', 'sales'}
+        and target_status not in {PaymentRecord.STATUS_APPROVED, PaymentRecord.STATUS_TEMP_COMMERCIAL}
+    ):
+        messages.error(request, 'از وضعیت ثبت بازرگانی فقط امکان برگشت به ثبت موقت بازرگانی وجود دارد.')
+        return redirect(redirect_target)
     if target_status == PaymentRecord.STATUS_INCOMPLETE and not note:
         messages.error(request, 'برای وضعیت «ناقص»، ثبت توضیح الزامی است.')
         return redirect(redirect_target)
+    if (
+        from_status == PaymentRecord.STATUS_APPROVED
+        and target_status == PaymentRecord.STATUS_TEMP_COMMERCIAL
+        and not note
+    ):
+        messages.error(request, 'برای برگشت سند به ثبت موقت بازرگانی، ثبت توضیح الزامی است.')
+        return redirect(redirect_target)
 
-    from_status = payment.status
     payment.status = target_status
     payment.last_staff_note = note
     payment.rejection_reason = form.cleaned_data['rejection_reason'] if target_status == PaymentRecord.STATUS_REJECTED else ''
-    department_role = _department_role(staff_role)
 
     # Finance can hard-lock records on terminal decisions.
     if request.user.is_superuser:
@@ -3767,6 +3873,20 @@ def staff_update_status(request, payment_id):
         payment.counterparty = selected_counterparty
 
     update_fields = ['status', 'last_staff_note', 'rejection_reason', 'counterparty', 'is_locked']
+
+    if (
+        from_status == PaymentRecord.STATUS_APPROVED
+        and target_status == PaymentRecord.STATUS_TEMP_COMMERCIAL
+    ):
+        payment.finance_status = None
+        payment.finance_registered_at = None
+        payment.finance_registered_by = None
+        payment.pending_final_approval = False
+        payment.pending_final_approval_since = None
+        update_fields += [
+            'finance_status', 'finance_registered_at', 'finance_registered_by',
+            'pending_final_approval', 'pending_final_approval_since',
+        ]
 
     # سند رد شده: pending_final_approval پاک می‌شود تا از صف تأیید خارج شود
     if target_status == PaymentRecord.STATUS_REJECTED:
@@ -3830,17 +3950,51 @@ def edit_payment(request, payment_id):
         profile = None
 
     initial_data = _account_initial_data(request.user, profile, payment=payment)
+    counterparty_accounts_qs = _counterparty_account_queryset_for_payment(
+        request.user,
+        active_daily_assignment=payment.daily_assignment,
+    )
+    counterparty_accounts = list(counterparty_accounts_qs)
+    selected_account = None
+    if payment.counterparty_id and payment.beneficiary_account_number:
+        normalized_payment_account = _normalize_bank_account_number(payment.beneficiary_account_number)
+        selected_account = next(
+            (
+                account for account in counterparty_accounts
+                if account.counterparty_id == payment.counterparty_id
+                and _normalize_bank_account_number(account.account_number) == normalized_payment_account
+            ),
+            None,
+        )
+    if selected_account and request.method != 'POST':
+        initial_data['counterparty_bank_account'] = selected_account.id
 
     if request.method == 'POST':
-        form = PaymentRecordForm(request.POST, request.FILES, instance=payment, initial=initial_data)
+        form = PaymentRecordForm(
+            request.POST,
+            request.FILES,
+            instance=payment,
+            initial=initial_data,
+            allowed_counterparty_accounts=counterparty_accounts_qs,
+        )
         if form.is_valid():
             payment = form.save(commit=False)
+            selected_counterparty_account = form.cleaned_data.get('counterparty_bank_account')
             payment.user = request.user
             payment.first_name = initial_data['first_name']
             payment.last_name = initial_data['last_name']
             payment.organization = initial_data['organization']
             payment.city = initial_data['city']
             payment.phone = initial_data['phone']
+            if selected_counterparty_account:
+                payment.counterparty = selected_counterparty_account.counterparty
+                payment.manual_counterparty_name = ''
+                payment.beneficiary_bank_name = selected_counterparty_account.bank_name or ''
+                payment.beneficiary_account_number = selected_counterparty_account.account_number or ''
+                payment.beneficiary_account_owner = selected_counterparty_account.account_owner or ''
+            else:
+                payment.counterparty = None
+                payment.manual_counterparty_name = form.cleaned_data.get('beneficiary_account_owner') or ''
             from_status = payment.status
             payment.status = PaymentRecord.STATUS_PENDING
             payment.is_locked = False
@@ -3863,13 +4017,18 @@ def edit_payment(request, payment_id):
             messages.success(request, 'سند با موفقیت ویرایش شد و برای بررسی مجدد در صف قرار گرفت.')
             return redirect(return_url or 'submit')
     else:
-        form = PaymentRecordForm(instance=payment, initial=initial_data)
+        form = PaymentRecordForm(
+            instance=payment,
+            initial=initial_data,
+            allowed_counterparty_accounts=counterparty_accounts_qs,
+        )
 
     return render(request, 'payments/edit_payment.html', {
         'form': form,
         'payment': payment,
         'source_profiles': _source_profiles_for_user(request.user),
-        'destination_profiles': _destination_profiles_for_user(request.user),
+        'destination_profiles': [],
+        'counterparty_accounts': _counterparty_account_rows(counterparty_accounts),
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user),
         'return_url': return_url,
@@ -5721,7 +5880,9 @@ def receipt_file(request, receipt_id):
     if not _can_access_payment(request.user, receipt.payment):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فیش‌های خودتان وجود دارد.')
     _log_activity(receipt.payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده فایل فیش')
-    return _file_response(receipt.image)
+    as_attachment = request.GET.get('download') == '1'
+    filename = _payment_receipt_download_name(receipt.payment, receipt.image)
+    return _file_response(receipt.image, as_attachment=as_attachment, filename=filename)
 
 
 @login_required
@@ -5782,7 +5943,9 @@ def legacy_payment_receipt_file(request, payment_id):
     if not _can_access_payment(request.user, payment):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فیش‌های خودتان وجود دارد.')
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده فایل فیش')
-    return _file_response(payment.receipt_image)
+    as_attachment = request.GET.get('download') == '1'
+    filename = _payment_receipt_download_name(payment, payment.receipt_image)
+    return _file_response(payment.receipt_image, as_attachment=as_attachment, filename=filename)
 
 
 @login_required

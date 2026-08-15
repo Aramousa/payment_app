@@ -135,6 +135,10 @@ _frc_cache_ts: dict = {}
 _FRC_TTL = 60
 
 
+def _normalize_numeric_text(value):
+    return str(value or '').translate(str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789'))
+
+
 def _apply_field_config(form_instance, form_name: str) -> None:
     """
     اگر ادمین override تنظیم کرده (is_required != None) آن را اعمال می‌کند.
@@ -513,6 +517,13 @@ class PaymentRecordForm(forms.ModelForm):
         help_text='یک فایل تصویر یا PDF انتخاب کنید. حداکثر حجم: ۱ مگابایت.',
     )
 
+    counterparty_bank_account = forms.ModelChoiceField(
+        queryset=CounterpartyBankAccount.objects.none(),
+        required=False,
+        label='طرف حساب / حساب مقصد',
+        empty_label='انتخاب از لیست پرداخت',
+    )
+
     pay_date = jDateField(
         label='تاریخ',
         input_formats=['%Y/%m/%d'],
@@ -520,6 +531,7 @@ class PaymentRecordForm(forms.ModelForm):
     )
 
     def __init__(self, *args, **kwargs):
+        allowed_counterparty_accounts = kwargs.pop('allowed_counterparty_accounts', None)
         super().__init__(*args, **kwargs)
         self._receipt_payload = []
         self.max_upload_size = _receipt_max_upload_size()
@@ -544,6 +556,19 @@ class PaymentRecordForm(forms.ModelForm):
             if hasattr(field, 'label_suffix'):
                 field.label_suffix = ''
         self.fields['customer_notes'].required = False
+        self.fields['counterparty_bank_account'].queryset = (
+            allowed_counterparty_accounts
+            if allowed_counterparty_accounts is not None
+            else CounterpartyBankAccount.objects.filter(
+                counterparty__status=Counterparty.STATUS_ACTIVE,
+            ).select_related('counterparty')
+        )
+        self.fields['counterparty_bank_account'].label_from_instance = self._counterparty_account_label
+        self.fields['counterparty_bank_account'].required = False
+        self.fields['counterparty_bank_account'].widget.attrs['data-counterparty-account-select'] = '1'
+        for field_name in self.REQUIRED_CUSTOMER_FIELDS:
+            if field_name in self.fields and not self.fields[field_name].disabled:
+                self.fields[field_name].required = True
 
         has_existing_files = bool(self.instance and self.instance.pk and self.instance.receipts.exists())
         self.fields['receipt_images'].required = not has_existing_files
@@ -551,7 +576,7 @@ class PaymentRecordForm(forms.ModelForm):
         # اعمال تنظیمات اجباری بودن فیلدها از دیتابیس
         field_config = _get_field_required_config('payment')
         for field_name, is_req in field_config.items():
-            if field_name in self.fields and not self.fields[field_name].disabled:
+            if is_req is not None and field_name in self.fields and not self.fields[field_name].disabled:
                 self.fields[field_name].required = is_req
 
         for field_name in self.ACCOUNT_FIELDS:
@@ -566,6 +591,11 @@ class PaymentRecordForm(forms.ModelForm):
             if self.instance and getattr(self.instance, name, '') == 'Z' and not self.is_bound:
                 self.initial[name] = ''
 
+        for name in ('beneficiary_bank_name', 'beneficiary_account_number', 'beneficiary_account_owner'):
+            field = self.fields[name]
+            css_class = field.widget.attrs.get('class', '')
+            field.widget.attrs['class'] = (css_class + ' destination-field').strip()
+
         # Ensure bank name fields have autocomplete classes
         for bank_field in ['payer_bank_name', 'beneficiary_bank_name']:
             if bank_field in self.fields:
@@ -579,9 +609,20 @@ class PaymentRecordForm(forms.ModelForm):
             if field.label:
                 field.label = re.sub(r'\s*<span[^>]*>\*</span>$', '', str(field.label))
 
+    @staticmethod
+    def _counterparty_account_label(account):
+        parts = [
+            account.counterparty.name if account.counterparty_id else '',
+            account.bank_name or '',
+            account.account_number or '',
+            account.account_owner or '',
+        ]
+        return ' | '.join(part for part in parts if part)
+
     class Meta:
         model = PaymentRecord
         fields = [
+            'counterparty_bank_account',
             'payer_account_number',
             'payer_full_name',
             'payer_bank_name',
@@ -619,9 +660,12 @@ class PaymentRecordForm(forms.ModelForm):
         }
 
     def clean_amount(self):
-        amount = self.cleaned_data.get('amount')
-        if amount is None:
-            return 0
+        raw_amount = _normalize_numeric_text(self.cleaned_data.get('amount')).replace(',', '').strip()
+        if not raw_amount:
+            return None
+        if not raw_amount.isdigit():
+            raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
+        amount = int(raw_amount)
         if amount <= 0:
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
         return amount
@@ -637,6 +681,20 @@ class PaymentRecordForm(forms.ModelForm):
                 'تاریخ روی فیش را دوباره بررسی و وارد کنید.'
             )
         return pay_date
+
+    def clean(self):
+        cleaned_data = super().clean()
+        account = cleaned_data.get('counterparty_bank_account')
+        owner_name = (cleaned_data.get('beneficiary_account_owner') or '').strip()
+        if not account and not owner_name:
+            self.add_error('beneficiary_account_owner', 'انتخاب طرف حساب از لیست یا ورود نام صاحب حساب مقصد الزامی است.')
+        if account:
+            cleaned_data['beneficiary_bank_name'] = account.bank_name or ''
+            cleaned_data['beneficiary_account_number'] = account.account_number or ''
+            cleaned_data['beneficiary_account_owner'] = account.account_owner or ''
+        else:
+            cleaned_data['manual_counterparty_name'] = owner_name
+        return cleaned_data
 
     def clean_receipt_images(self):
         files = self.files.getlist('receipt_images')
@@ -681,6 +739,12 @@ class PaymentRecordForm(forms.ModelForm):
 
 
 class StaffPaymentDetailsForm(forms.ModelForm):
+    amount = forms.CharField(
+        label='مبلغ (ریال)',
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
+    )
+
     pay_date = jDateField(
         label='تاریخ',
         required=False,
@@ -725,9 +789,18 @@ class StaffPaymentDetailsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+            if hasattr(field.widget, 'attrs'):
+                field.widget.attrs.pop('required', None)
+                field.widget.attrs.pop('aria-required', None)
+            if hasattr(field, 'label_suffix'):
+                field.label_suffix = ''
+
         if not self.is_bound and self.initial.get('amount') is not None:
             try:
-                self.initial['amount'] = '{:,}'.format(int(str(self.initial['amount']).replace(',', '').strip()))
+                amount_initial = int(str(self.initial['amount']).replace(',', '').strip())
+                self.initial['amount'] = '' if amount_initial == 0 else '{:,}'.format(amount_initial)
             except (ValueError, TypeError):
                 pass
         for bank_field in ['payer_bank_name', 'beneficiary_bank_name']:
@@ -735,12 +808,18 @@ class StaffPaymentDetailsForm(forms.ModelForm):
             self.fields[bank_field].widget.attrs['class'] = (css_class + ' bank-autocomplete-input').strip()
             self.fields[bank_field].widget.attrs['data-bank-type'] = 'payer' if bank_field == 'payer_bank_name' else 'beneficiary'
             self.fields[bank_field].widget.attrs['autocomplete'] = 'off'
+
         _apply_field_config(self, 'payment_staff')
 
     def clean_amount(self):
-        amount = self.cleaned_data.get('amount')
-        if amount is None:
-            return 0
+        raw_amount = _normalize_numeric_text(self.cleaned_data.get('amount')).replace(',', '').strip()
+        if not raw_amount:
+            return None
+        if not raw_amount.isdigit():
+            raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
+        amount = int(raw_amount)
+        if amount == 0 and not self.fields['amount'].required:
+            return None
         if amount <= 0:
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
         return amount
