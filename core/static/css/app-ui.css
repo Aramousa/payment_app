@@ -309,6 +309,66 @@ h3 {
     font-family: Vazir, sans-serif !important;
 }
 
+.datepicker-container.pwt-mobile-view {
+    background: rgba(15, 23, 42, 0.45) !important;
+    direction: ltr !important;
+    height: 100dvh !important;
+    inset: 0 !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100vw !important;
+    z-index: 1000000 !important;
+}
+
+.datepicker-container.pwt-mobile-view.pwt-hide {
+    top: 100dvh !important;
+}
+
+.datepicker-container.pwt-mobile-view .datepicker-plot-area {
+    border: 0 !important;
+    border-radius: 0 !important;
+    bottom: 0 !important;
+    box-shadow: none !important;
+    height: 100dvh !important;
+    left: 0 !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    overflow: auto !important;
+    padding: max(10px, env(safe-area-inset-top)) 10px max(16px, env(safe-area-inset-bottom)) !important;
+    position: fixed !important;
+    right: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+}
+
+.datepicker-container.pwt-mobile-view .datepicker-plot-area table,
+.datepicker-container.pwt-mobile-view .datepicker-plot-area .table-days {
+    display: table !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+
+.datepicker-container.pwt-mobile-view .datepicker-day-view,
+.datepicker-container.pwt-mobile-view .datepicker-month-view,
+.datepicker-container.pwt-mobile-view .datepicker-year-view {
+    min-height: 0 !important;
+}
+
+.datepicker-container.pwt-mobile-view .datepicker-day-view .month-grid-box {
+    margin: 8px 0 0 !important;
+    min-height: 0 !important;
+}
+
+.datepicker-container.pwt-mobile-view .datepicker-day-view .table-days td,
+.datepicker-container.pwt-mobile-view .datepicker-day-view .table-days td span {
+    height: 42px !important;
+    line-height: 42px !important;
+    min-width: 0 !important;
+}
+
 .message-envelope {
     align-items: center;
     background: #eef5ff !important;
@@ -3894,8 +3954,16 @@ textarea::placeholder {
 /* Customer-facing mobile app layout: tables become readable record cards. */
 @media (max-width: 760px) {
     body:has(.app-shell-nav) {
+        font-size: 14px !important;
         padding-left: 10px !important;
         padding-right: 10px !important;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+        font-size: 16px !important;
     }
 
     .top-bar,
@@ -4016,12 +4084,12 @@ textarea::placeholder {
         border-bottom: 1px solid #eef2f7 !important;
         color: #172033 !important;
         display: grid !important;
-        font-size: 13px !important;
+        font-size: 14px !important;
         gap: 10px !important;
-        grid-template-columns: minmax(92px, 36%) minmax(0, 1fr) !important;
+        grid-template-columns: 1fr !important;
         line-height: 1.8 !important;
         min-width: 0 !important;
-        padding: 10px 12px !important;
+        padding: 11px 12px !important;
         text-align: right !important;
         white-space: normal !important;
         width: 100% !important;
@@ -4062,5 +4130,414 @@ textarea::placeholder {
 
     .file-preview iframe {
         height: 62vh !important;
+    }
+
+    .form-grid,
+    .filters,
+    .filter-grid,
+    .field-grid,
+    .customer-picker-grid,
+    .summary-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .box {
+        border-radius: 10px !important;
+        max-width: 100% !important;
+        padding: 16px !important;
+        width: 100% !important;
+    }
+
+    .recon-page {
+        padding: 10px 0 !important;
+    }
+
+    .recon-shell {
+        display: grid !important;
+        gap: 12px !important;
+        grid-template-columns: 1fr !important;
+        min-height: 0 !important;
+    }
+
+    .recon-panel {
+        border-radius: 10px !important;
+        min-width: 0 !important;
+    }
+
+    .recon-threads-aside {
+        max-height: 42vh !important;
+        order: 1 !important;
+    }
+
+    .chat-panel {
+        min-height: 68vh !important;
+        order: 2 !important;
+    }
+
+    .participants-panel,
+    .recon-side-panel {
+        order: 3 !important;
+    }
+
+    .thread-filter-row,
+    .thread-filter-actions,
+    .chat-actions {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    .thread-item {
+        padding: 12px 14px !important;
+    }
+
+    .msg-bubble {
+        max-width: 92% !important;
+    }
+
+    .chat-feed {
+        padding: 12px !important;
+    }
+}
+
+/* Modern customer app shell. */
+:root {
+    --customer-bg: #f4f7fb;
+    --customer-surface: #ffffff;
+    --customer-ink: #111827;
+    --customer-muted: #64748b;
+    --customer-line: #e2e8f0;
+    --customer-primary: #155e75;
+    --customer-primary-strong: #0f3f52;
+    --customer-accent: #22c55e;
+    --customer-warn: #f59e0b;
+    --customer-danger: #dc2626;
+    --customer-radius: 16px;
+    --customer-shadow: 0 16px 38px rgba(15, 23, 42, .09);
+}
+
+body:has(.app-customer-bottom-nav) {
+    background:
+        radial-gradient(circle at 15% -10%, rgba(34,197,94,.13), transparent 30%),
+        radial-gradient(circle at 88% 0%, rgba(21,94,117,.13), transparent 32%),
+        var(--customer-bg) !important;
+    color: var(--customer-ink) !important;
+}
+
+body:has(.app-customer-bottom-nav) .app-top-header {
+    background: rgba(255,255,255,.92) !important;
+    border-bottom: 1px solid rgba(226,232,240,.9) !important;
+    box-shadow: 0 10px 30px rgba(15,23,42,.06) !important;
+    backdrop-filter: blur(14px);
+}
+
+body:has(.app-customer-bottom-nav) .app-shell-nav {
+    background: #0f2533 !important;
+}
+
+body:has(.app-customer-bottom-nav) .section,
+body:has(.app-customer-bottom-nav) .panel,
+body:has(.app-customer-bottom-nav) .box,
+body:has(.app-customer-bottom-nav) #payment-form,
+body:has(.app-customer-bottom-nav) .filter-box,
+body:has(.app-customer-bottom-nav) .customer-info,
+body:has(.app-customer-bottom-nav) .debt-summary,
+body:has(.app-customer-bottom-nav) .daily-payment-notice,
+body:has(.app-customer-bottom-nav) .daily-payment-expired,
+body:has(.app-customer-bottom-nav) .customer-payment-alert,
+body:has(.app-customer-bottom-nav) .dashboard-panel {
+    background: rgba(255,255,255,.96) !important;
+    border: 1px solid rgba(226,232,240,.95) !important;
+    border-radius: var(--customer-radius) !important;
+    box-shadow: var(--customer-shadow) !important;
+}
+
+body:has(.app-customer-bottom-nav) .button-link,
+body:has(.app-customer-bottom-nav) .apply-btn,
+body:has(.app-customer-bottom-nav) .submit-btn,
+body:has(.app-customer-bottom-nav) .detail-link {
+    background: linear-gradient(135deg, var(--customer-primary), var(--customer-primary-strong)) !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 22px rgba(21,94,117,.2) !important;
+    color: #fff !important;
+    font-weight: 900 !important;
+}
+
+body:has(.app-customer-bottom-nav) .button-link.alt,
+body:has(.app-customer-bottom-nav) .clear-btn,
+body:has(.app-customer-bottom-nav) .back-link,
+body:has(.app-customer-bottom-nav) .cancel-link {
+    background: #eef5f8 !important;
+    border: 1px solid #dbe8ee !important;
+    box-shadow: none !important;
+    color: var(--customer-primary-strong) !important;
+}
+
+body:has(.app-customer-bottom-nav) input,
+body:has(.app-customer-bottom-nav) select,
+body:has(.app-customer-bottom-nav) textarea {
+    background: #f8fafc !important;
+    border: 1px solid #dbe4ee !important;
+    border-radius: 12px !important;
+    color: var(--customer-ink) !important;
+    min-height: 42px;
+}
+
+body:has(.app-customer-bottom-nav) input:focus,
+body:has(.app-customer-bottom-nav) select:focus,
+body:has(.app-customer-bottom-nav) textarea:focus {
+    border-color: rgba(21,94,117,.7) !important;
+    box-shadow: 0 0 0 4px rgba(21,94,117,.12) !important;
+    outline: none !important;
+}
+
+body:has(.app-customer-bottom-nav) .customer-dashboard {
+    gap: 16px !important;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-panel {
+    overflow: hidden;
+    padding: 0 !important;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-head {
+    background: linear-gradient(135deg, rgba(21,94,117,.08), rgba(34,197,94,.08));
+    border-bottom: 1px solid var(--customer-line);
+    padding: 14px 16px;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-head h3 {
+    color: var(--customer-ink) !important;
+    font-size: 16px !important;
+    font-weight: 950 !important;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-count {
+    background: #e6f7ee;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-list {
+    padding: 10px;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-row {
+    background: #f8fafc;
+    border: 1px solid #e5edf5;
+    border-radius: 14px;
+    margin-bottom: 10px;
+    padding: 12px;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-row-title {
+    color: var(--customer-ink);
+    font-weight: 950;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-row-meta,
+body:has(.app-customer-bottom-nav) .tiny,
+body:has(.app-customer-bottom-nav) .field-help {
+    color: var(--customer-muted) !important;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
+    min-height: 38px;
+}
+
+.app-customer-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 760px) {
+    body:has(.app-customer-bottom-nav) {
+        padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-header {
+        height: 58px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-nav-toggle {
+        display: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-brand .app-shell-logo {
+        height: 36px !important;
+        max-width: 132px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-logout {
+        display: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-actions {
+        gap: 8px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .notification-trigger,
+    body:has(.app-customer-bottom-nav) .message-envelope {
+        background: #eef6f8 !important;
+        border: 1px solid #d9e8ee !important;
+        border-radius: 14px !important;
+        color: var(--customer-primary-strong) !important;
+        min-height: 40px !important;
+        min-width: 40px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .top-bar {
+        display: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-mobile-app-card {
+        display: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions {
+        background: linear-gradient(135deg, #0f3f52, #155e75) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 18px 40px rgba(15,63,82,.22) !important;
+        display: grid !important;
+        gap: 10px !important;
+        margin: 4px auto 14px !important;
+        max-width: 100% !important;
+        padding: 14px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a {
+        background: rgba(255,255,255,.12) !important;
+        border: 1px solid rgba(255,255,255,.2) !important;
+        border-radius: 14px !important;
+        color: #fff !important;
+        min-height: 44px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child {
+        background: #22c55e !important;
+        color: #052e16 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info,
+    body:has(.app-customer-bottom-nav) .debt-summary,
+    body:has(.app-customer-bottom-nav) .daily-payment-notice,
+    body:has(.app-customer-bottom-nav) .daily-payment-expired,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert,
+    body:has(.app-customer-bottom-nav) .section,
+    body:has(.app-customer-bottom-nav) .panel,
+    body:has(.app-customer-bottom-nav) .box {
+        margin-bottom: 14px !important;
+        padding: 14px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-grid,
+    body:has(.app-customer-bottom-nav) .customer-info-grid,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert-stats {
+        display: grid !important;
+        gap: 10px !important;
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-item,
+    body:has(.app-customer-bottom-nav) .customer-info-item,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert-stat,
+    body:has(.app-customer-bottom-nav) .summary-card {
+        background: #f8fafc !important;
+        border: 1px solid #e5edf5 !important;
+        border-radius: 14px !important;
+        padding: 12px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-table-wrap table.app-responsive-table tbody tr {
+        border-radius: 18px !important;
+        box-shadow: 0 12px 28px rgba(15,23,42,.08) !important;
+        padding: 2px 0 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-table-wrap table.app-responsive-table tbody td {
+        padding: 12px 14px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-table-wrap table.app-responsive-table tbody td[data-label]::before {
+        color: var(--customer-primary) !important;
+        font-size: 11px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-table-tools {
+        background: #fff !important;
+        border: 1px solid #e5edf5 !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 26px rgba(15,23,42,.06) !important;
+        padding: 10px !important;
+    }
+
+    .app-customer-bottom-nav {
+        align-items: center;
+        background: rgba(255,255,255,.94);
+        border: 1px solid rgba(226,232,240,.95);
+        border-radius: 22px 22px 0 0;
+        bottom: 0;
+        box-shadow: 0 -16px 36px rgba(15,23,42,.14);
+        display: grid;
+        gap: 2px;
+        grid-template-columns: repeat(6, 1fr);
+        left: 0;
+        padding: 8px 6px max(8px, env(safe-area-inset-bottom));
+        position: fixed;
+        right: 0;
+        z-index: 1280;
+        backdrop-filter: blur(16px);
+    }
+
+    .app-customer-bottom-link {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        border-radius: 16px;
+        color: #64748b;
+        cursor: pointer;
+        display: grid;
+        font-family: Vazir, sans-serif;
+        gap: 3px;
+        justify-items: center;
+        min-height: 54px;
+        padding: 5px 2px;
+        text-decoration: none;
+    }
+
+    .app-customer-bottom-link.active,
+    .app-customer-bottom-link:focus-visible {
+        background: #e6f7ee;
+        color: #166534;
+        outline: none;
+    }
+
+    .app-customer-bottom-icon {
+        font-size: 18px;
+        line-height: 1;
+    }
+
+    .app-customer-bottom-text {
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.35;
+        max-width: 100%;
+        overflow: hidden;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-shell-nav {
+        height: calc(100vh - 58px - 76px) !important;
+        top: 58px !important;
+        width: min(88vw, 310px) !important;
+        z-index: 1270 !important;
     }
 }

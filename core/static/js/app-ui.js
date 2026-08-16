@@ -17,6 +17,35 @@
         });
     }
 
+    function enhanceCustomerBottomNav() {
+        var bottomNav = document.querySelector('.app-customer-bottom-nav');
+        if (!bottomNav || bottomNav.dataset.ready === '1') return;
+        bottomNav.dataset.ready = '1';
+
+        var currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+        bottomNav.querySelectorAll('a[href]').forEach(function (link) {
+            var href = (link.getAttribute('href') || '').split('?')[0].replace(/\/$/, '') || '/';
+            if (href === currentPath || (href !== '/' && currentPath.indexOf(href + '/') === 0)) {
+                link.classList.add('active');
+            }
+        });
+
+        var moreButton = bottomNav.querySelector('[data-customer-more-menu]');
+        var sidebar = document.getElementById('app-sidebar');
+        var overlay = document.getElementById('sb-overlay');
+        var toggle = document.getElementById('sb-toggle');
+        if (moreButton && sidebar) {
+            moreButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                var open = !sidebar.classList.contains('open');
+                sidebar.classList.toggle('open', open);
+                if (overlay) overlay.classList.toggle('show', open);
+                if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+        }
+    }
+
     /** tooltip خودکار روی سلول‌های بریده‌شده */
     function addTruncationTooltips(table) {
         requestAnimationFrame(function() {
@@ -1200,6 +1229,7 @@
         localStorage.removeItem('paymentAppTheme');
         document.documentElement.removeAttribute('data-theme');
         enhanceShellNavigation();
+        enhanceCustomerBottomNav();
         enhanceNavDropdowns();
         enhanceTables();
         document.querySelectorAll('.app-table-wrap table').forEach(function(t) {

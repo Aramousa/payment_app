@@ -606,7 +606,7 @@ def pwa_manifest(request):
 
 def pwa_service_worker(request):
     script = """
-const CACHE_NAME = 'rabasa-customer-pwa-v1';
+const CACHE_NAME = 'rabasa-customer-pwa-v3';
 const APP_SHELL = [
   '/accounts/login/',
   '/static/css/font-face.css',
@@ -1277,6 +1277,7 @@ DAILY_ASSIGNMENT_EXPORT_FIELDS = [
     _field('customer_username', 'نام کاربری مشتری', lambda a: a.customer.username),
     _field('customer_name', 'مشتری', lambda a: a.customer.get_full_name() or a.customer.username),
     _field('organization', 'مجموعه', lambda a: getattr(a.customer.profile, 'organization', '')),
+    _field('sales_user', 'کارشناس فروش', lambda a: a.sales_user.get_full_name() or a.sales_user.username if a.sales_user else ''),
     _field('expected_amount', 'مبلغ مورد انتظار', lambda a: a.expected_amount),
     _field('paid_amount', 'واریز ممیزی نشده', lambda a: a.report['paid_amount']),
     _field('confirmed_amount', 'واریز تایید شده', lambda a: a.report['confirmed_amount']),
@@ -1409,6 +1410,18 @@ def _customer_list_rows(request):
     return customer_data, filters
 
 
+def _daily_payment_sales_limited(user):
+    return bool(user and user.is_authenticated and not user.is_superuser and _user_role(user) == 'sales')
+
+
+def _daily_assignment_base_queryset():
+    return (
+        DailyPaymentAssignment.objects
+        .select_related('customer', 'customer__profile', 'sales_user')
+        .prefetch_related('payments', 'payments__receipts')
+    )
+
+
 def _enrich_daily_plans(plans):
     for plan in plans:
         assignments = list(plan.assignments.all())
@@ -1421,19 +1434,26 @@ def _enrich_daily_plans(plans):
     return plans
 
 
-def _daily_plans_for_period(start_date, end_date):
-    plans = list(
+def _daily_plans_for_period(start_date, end_date, user=None):
+    assignment_queryset = _daily_assignment_base_queryset()
+    plans_queryset = (
         DailyPaymentPlan.objects
         .select_related('created_by')
-        .prefetch_related('assignments')
         .filter(deposit_date__gte=start_date, deposit_date__lte=end_date)
+    )
+    if _daily_payment_sales_limited(user):
+        assignment_queryset = assignment_queryset.filter(sales_user=user)
+        plans_queryset = plans_queryset.filter(assignments__sales_user=user).distinct()
+    plans = list(
+        plans_queryset
+        .prefetch_related(Prefetch('assignments', queryset=assignment_queryset))
         .order_by('-deposit_date', '-id')
     )
     return _enrich_daily_plans(plans)
 
 
-def _daily_plans_for_date(selected_date):
-    return _daily_plans_for_period(selected_date, selected_date)
+def _daily_plans_for_date(selected_date, user=None):
+    return _daily_plans_for_period(selected_date, selected_date, user=user)
 
 
 def _daily_payment_period(request):
@@ -1510,13 +1530,11 @@ def _daily_period_query(mode, date_value, start_date=None, end_date=None):
     return urlencode(query)
 
 
-def _daily_assignments_for_plan(plan):
-    assignments = list(
-        plan.assignments
-        .select_related('customer', 'customer__profile')
-        .prefetch_related('payments', 'payments__receipts')
-        .all()
-    )
+def _daily_assignments_for_plan(plan, user=None):
+    assignments_queryset = _daily_assignment_base_queryset().filter(plan=plan)
+    if _daily_payment_sales_limited(user):
+        assignments_queryset = assignments_queryset.filter(sales_user=user)
+    assignments = list(assignments_queryset)
     return _enrich_daily_assignments(assignments)
 
 
@@ -1553,7 +1571,7 @@ def _enrich_daily_assignments(assignments):
 def _customer_daily_assignments_for_user(user, request=None):
     assignments = (
         DailyPaymentAssignment.objects
-        .select_related('plan', 'customer', 'customer__profile')
+        .select_related('plan', 'customer', 'customer__profile', 'sales_user')
         .prefetch_related('payments', 'payments__receipts')
         .filter(customer=user)
         .order_by('-plan__deposit_date', '-id')
@@ -2926,6 +2944,28 @@ def _published_payment_notice_for_customer(user):
     )
 
 
+def _payment_notice_splash_token(notice):
+    if not notice:
+        return ''
+    version = notice.published_at or notice.updated_at or notice.created_at
+    if version:
+        return f'{notice.id}:{int(version.timestamp())}'
+    return str(notice.id)
+
+
+def _should_show_payment_notice_splash(request, notice):
+    if not notice or notice.customer_seen_at:
+        return False
+    session_key = 'daily_payment_notice_splash_seen_ids'
+    seen_ids = request.session.get(session_key, [])
+    notice_token = _payment_notice_splash_token(notice)
+    if notice_token in {str(item) for item in seen_ids}:
+        return False
+    request.session[session_key] = [*seen_ids, notice_token]
+    request.session.modified = True
+    return True
+
+
 def _managed_users(query='', role='', status=''):
     users = User.objects.select_related('profile').order_by('username')
     if query:
@@ -3025,7 +3065,7 @@ def daily_payment_plans(request):
     else:
         plan_form = DailyPaymentPlanForm(initial={'deposit_date': _today_jalali_date()})
 
-    plans = _daily_plans_for_period(period['start_date'], period['end_date'])
+    plans = _daily_plans_for_period(period['start_date'], period['end_date'], user=request.user)
 
     return render(request, 'payments/daily_payment_plans.html', {
         'form': plan_form,
@@ -3082,27 +3122,54 @@ def daily_payment_plan_detail(request, plan_id):
         if assignment_form.is_valid():
             created_count = 0
             duplicate_count = 0
-            for customer in assignment_form.cleaned_data['customers']:
-                assignment = DailyPaymentAssignment(
-                    plan=plan,
-                    customer=customer,
-                    expected_amount=assignment_form.cleaned_data['expected_amount'],
-                    note=assignment_form.cleaned_data.get('note') or '',
-                )
-                try:
-                    assignment.save()
-                except IntegrityError:
-                    duplicate_count += 1
-                else:
-                    created_count += 1
+            customers = assignment_form.cleaned_data['customers']
+            selected_sales_user = assignment_form.cleaned_data.get('sales_user')
+            customer_sales_map = {}
+            if not selected_sales_user:
+                customer_sales_map = {
+                    item.customer_id: item.sales_user_id
+                    for item in CustomerSalesAssignment.objects.filter(
+                        customer__in=customers,
+                        sales_user__isnull=False,
+                    )
+                }
+                missing_sales_customers = [
+                    customer.get_full_name() or customer.username
+                    for customer in customers
+                    if not customer_sales_map.get(customer.id)
+                ]
+                if missing_sales_customers:
+                    assignment_form.add_error(
+                        'sales_user',
+                        'برای این مشتریان کارشناس فروش ثبت نشده است: ' + '، '.join(missing_sales_customers),
+                    )
+            if not assignment_form.errors:
+                for customer in customers:
+                    sales_user_id = selected_sales_user.id if selected_sales_user else customer_sales_map.get(customer.id)
+                    assignment = DailyPaymentAssignment(
+                        plan=plan,
+                        customer=customer,
+                        sales_user_id=sales_user_id,
+                        expected_amount=assignment_form.cleaned_data['expected_amount'],
+                        note=assignment_form.cleaned_data.get('note') or '',
+                    )
+                    try:
+                        assignment.save()
+                    except IntegrityError:
+                        duplicate_count += 1
+                    else:
+                        created_count += 1
             if created_count:
                 messages.success(request, f'تخصیص برای {created_count} مشتری ثبت شد.')
                 return redirect(detail_url)
-            assignment_form.add_error('customers', 'برای مشتریان انتخاب شده در این برنامه قبلاً تخصیص ثبت شده است.')
+            if not assignment_form.errors:
+                assignment_form.add_error('customers', 'برای مشتریان انتخاب شده در این برنامه قبلاً تخصیص ثبت شده است.')
     else:
         assignment_form = DailyPaymentAssignmentForm()
 
-    assignments = _daily_assignments_for_plan(plan)
+    assignments = _daily_assignments_for_plan(plan, user=request.user)
+    if _daily_payment_sales_limited(request.user) and not assignments:
+        return HttpResponseForbidden('برای این برنامه واریز، تخصیصی به شما ثبت نشده است.')
 
     totals = {
         'expected': sum(assignment.expected_amount for assignment in assignments),
@@ -3140,10 +3207,13 @@ def daily_payment_notices(request):
 
     selected_customer = None
     default_notice_date = _today_jalali_date() - jdatetime.timedelta(days=1)
-    selected_date = _parse_jalali_date(request.GET.get('date')) or default_notice_date
+    requested_notice_date = request.POST.get('notice_date') if request.method == 'POST' else request.GET.get('date')
+    selected_date = _parse_jalali_date(requested_notice_date) or default_notice_date
     notice = None
     preview_stats = {'payment_count': 0, 'total_amount': 0}
     initial = {'notice_date': selected_date}
+    duplicate_notice = None
+    duplicate_notice_action = ''
 
     customer_id = request.POST.get('customer') if request.method == 'POST' else request.GET.get('customer')
     if customer_id:
@@ -3178,46 +3248,79 @@ def daily_payment_notices(request):
             messages.success(request, 'اطلاعیه از پرتال مشتری برداشته شد.')
             return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date(target_notice.notice_date)}")
 
-        form = DailyPaymentNoticeForm(request.POST, instance=notice)
+        form_instance = notice
+        if not form_instance and selected_customer:
+            form_instance = DailyPaymentNotice.objects.filter(
+                customer=selected_customer,
+                notice_date=selected_date,
+            ).first()
+        form = DailyPaymentNoticeForm(request.POST, instance=form_instance)
         if form.is_valid():
             target_notice = form.save(commit=False)
             existing_notice = DailyPaymentNotice.objects.filter(
                 customer=target_notice.customer,
                 notice_date=target_notice.notice_date,
             ).first()
-            if existing_notice and (not target_notice.pk or existing_notice.pk != target_notice.pk):
-                target_notice = existing_notice
-                target_notice.payment_count = form.cleaned_data['payment_count']
-                target_notice.total_amount = form.cleaned_data['total_amount']
-                target_notice.message = form.cleaned_data.get('message') or ''
-            if not (target_notice.message or '').strip():
-                target_notice.message = _payment_notice_default_message(
-                    target_notice.customer,
-                    target_notice.notice_date,
-                    target_notice.payment_count,
-                    target_notice.total_amount,
+            if (
+                action == 'publish'
+                and existing_notice
+                and existing_notice.is_published
+                and request.POST.get('confirm_replace') != '1'
+            ):
+                duplicate_notice = existing_notice
+                duplicate_notice_action = action
+                notice = existing_notice
+                preview_stats = {
+                    'payment_count': form.cleaned_data['payment_count'],
+                    'total_amount': form.cleaned_data['total_amount'],
+                }
+                messages.warning(
+                    request,
+                    'برای این مشتری و تاریخ قبلاً اعلامیه منتشر شده است. در صورت تایید، اعلامیه قبلی ویرایش و دوباره برای مشتری نمایش داده می‌شود.',
                 )
-            if not target_notice.pk:
-                target_notice.created_by = request.user
-            if action == 'publish':
-                target_notice.is_published = True
-                target_notice.published_at = timezone.now()
-                target_notice.published_by = request.user
-                target_notice.customer_seen_at = None
-            target_notice.save()
-            if action == 'publish':
-                _notify_users(
-                    [target_notice.customer],
-                    'گزارش فیش‌های واریزی',
-                    target_notice.message,
-                    reverse('submit'),
-                    category=UserNotification.CATEGORY_PAYMENT,
-                    actor=request.user,
-                )
-                messages.success(request, 'اطلاعیه برای مشتری منتشر شد.')
             else:
-                messages.success(request, 'پیش‌نویس اطلاعیه ذخیره شد.')
-            return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date(target_notice.notice_date)}")
+                is_confirmed_republish = bool(
+                    action == 'publish'
+                    and existing_notice
+                    and existing_notice.is_published
+                    and request.POST.get('confirm_replace') == '1'
+                )
+                if existing_notice and (not target_notice.pk or existing_notice.pk != target_notice.pk):
+                    target_notice = existing_notice
+                    target_notice.payment_count = form.cleaned_data['payment_count']
+                    target_notice.total_amount = form.cleaned_data['total_amount']
+                    target_notice.message = form.cleaned_data.get('message') or ''
+                if not (target_notice.message or '').strip():
+                    target_notice.message = _payment_notice_default_message(
+                        target_notice.customer,
+                        target_notice.notice_date,
+                        target_notice.payment_count,
+                        target_notice.total_amount,
+                    )
+                if not target_notice.pk:
+                    target_notice.created_by = request.user
+                if action == 'publish':
+                    target_notice.is_published = True
+                    target_notice.published_at = timezone.now()
+                    target_notice.published_by = request.user
+                    target_notice.customer_seen_at = None
+                target_notice.save()
+                if action == 'publish':
+                    _notify_users(
+                        [target_notice.customer],
+                        'گزارش فیش‌های واریزی',
+                        target_notice.message,
+                        reverse('submit'),
+                        category=UserNotification.CATEGORY_PAYMENT,
+                        actor=request.user,
+                    )
+                    if is_confirmed_republish:
+                        messages.success(request, 'اعلامیه قبلی ویرایش و دوباره برای مشتری منتشر شد.')
+                    else:
+                        messages.success(request, 'اعلامیه برای مشتری منتشر شد.')
+                else:
+                    messages.success(request, 'پیش‌نویس اطلاعیه ذخیره شد.')
+                return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date(target_notice.notice_date)}")
     else:
         form = DailyPaymentNoticeForm(instance=notice, initial=initial)
 
@@ -3232,6 +3335,8 @@ def daily_payment_notices(request):
         'selected_date': selected_date,
         'selected_date_text': _format_jalali_date(selected_date),
         'notice': notice,
+        'duplicate_notice': duplicate_notice,
+        'duplicate_notice_action': duplicate_notice_action,
         'preview_stats': preview_stats,
         'recent_notices': recent_notices,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
@@ -3242,6 +3347,12 @@ def daily_payment_notices(request):
 @require_POST
 def daily_payment_notice_seen(request, notice_id):
     notice = get_object_or_404(DailyPaymentNotice, id=notice_id, customer=request.user, is_published=True)
+    session_key = 'daily_payment_notice_splash_seen_ids'
+    seen_ids = request.session.get(session_key, [])
+    notice_token = _payment_notice_splash_token(notice)
+    if notice_token not in {str(item) for item in seen_ids}:
+        request.session[session_key] = [*seen_ids, notice_token]
+        request.session.modified = True
     if notice.customer_seen_at is None:
         notice.customer_seen_at = timezone.now()
         notice.save(update_fields=['customer_seen_at', 'updated_at'])
@@ -3266,6 +3377,12 @@ def customer_daily_payments(request):
         ]
 
     page_obj = _paginate_queryset(request, assignments, per_page=10, page_param='page')
+    customer_notices = (
+        DailyPaymentNotice.objects
+        .filter(customer=request.user, is_published=True)
+        .select_related('published_by')
+        .order_by('-notice_date', '-published_at', '-id')[:30]
+    )
     page_base_query = _build_query_string(request, remove_keys=['page'])
     filters = {
         'start_date': (request.GET.get('start_date') or '').strip(),
@@ -3274,6 +3391,7 @@ def customer_daily_payments(request):
     }
     return render(request, 'payments/customer_daily_payments.html', {
         'assignments': page_obj,
+        'customer_notices': customer_notices,
         'page_obj': page_obj,
         'page_base_query': page_base_query,
         'filters': filters,
@@ -3413,6 +3531,11 @@ def create_payment(request):
     )
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+    customer_payment_notice = _published_payment_notice_for_customer(request.user) if not is_staff_user else None
+    show_customer_payment_notice_splash = _should_show_payment_notice_splash(
+        request,
+        customer_payment_notice,
+    ) if customer_payment_notice else False
 
     return render(request, 'payments/form.html', {
         'form': form,
@@ -3443,7 +3566,8 @@ def create_payment(request):
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user) if not is_staff_user else None,
         'customer_home_summary': _customer_home_summary(request.user) if not is_staff_user else None,
-        'customer_payment_notice': _published_payment_notice_for_customer(request.user) if not is_staff_user else None,
+        'customer_payment_notice': customer_payment_notice,
+        'show_customer_payment_notice_splash': show_customer_payment_notice_splash,
         'active_daily_assignment': active_daily_assignment,
         'expired_daily_assignment': expired_daily_assignment,
         'show_payment_form': show_payment_form,
@@ -6692,7 +6816,7 @@ def export_data(request, dataset):
             return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
         period = _daily_payment_period(request)
         fields = _selected_export_fields(request, DAILY_PLAN_EXPORT_FIELDS)
-        records = _export_scope_records(request, _daily_plans_for_period(period['start_date'], period['end_date']), page_param='page')
+        records = _export_scope_records(request, _daily_plans_for_period(period['start_date'], period['end_date'], user=request.user), page_param='page')
         return _export_response('daily_payment_plans.xlsx', 'Daily Plans', fields, records)
 
     if dataset == 'daily_assignments':
@@ -6700,7 +6824,10 @@ def export_data(request, dataset):
             return HttpResponseForbidden('خروجی برای نقش کاربری شما فعال نیست.')
         plan = get_object_or_404(DailyPaymentPlan, id=request.GET.get('plan_id'))
         fields = _selected_export_fields(request, DAILY_ASSIGNMENT_EXPORT_FIELDS)
-        records = _export_scope_records(request, _daily_assignments_for_plan(plan), page_param='page')
+        plan_assignments = _daily_assignments_for_plan(plan, user=request.user)
+        if _daily_payment_sales_limited(request.user) and not plan_assignments:
+            return HttpResponseForbidden('برای این برنامه واریز، تخصیصی به شما ثبت نشده است.')
+        records = _export_scope_records(request, plan_assignments, page_param='page')
         return _export_response('daily_assignments.xlsx', 'Assignments', fields, records)
 
     if dataset == 'customer_daily_assignments':

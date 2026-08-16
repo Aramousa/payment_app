@@ -497,12 +497,6 @@ class PaymentRecordForm(forms.ModelForm):
     }
     ACCOUNT_FIELDS = ()
     REQUIRED_CUSTOMER_FIELDS = (
-        'payer_account_number',
-        'payer_full_name',
-        'payer_bank_name',
-        'beneficiary_bank_name',
-        'beneficiary_account_number',
-        'beneficiary_account_owner',
         'amount',
         'tracking_code',
         'pay_date',
@@ -980,6 +974,12 @@ class DailyPaymentNoticeForm(forms.ModelForm):
 
 
 class DailyPaymentAssignmentForm(forms.ModelForm):
+    sales_user = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        required=False,
+        label='کارشناس فروش',
+        help_text='در صورت خالی بودن، کارشناس فروش ثبت شده برای هر مشتری استفاده می‌شود.',
+    )
     expected_amount = forms.CharField(
         label='مبلغ مورد انتظار مشتری',
         widget=forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
@@ -992,7 +992,7 @@ class DailyPaymentAssignmentForm(forms.ModelForm):
 
     class Meta:
         model = DailyPaymentAssignment
-        fields = ['customers', 'expected_amount', 'note']
+        fields = ['customers', 'sales_user', 'expected_amount', 'note']
         widgets = {
             'note': forms.Textarea(attrs={'rows': 2}),
         }
@@ -1004,6 +1004,13 @@ class DailyPaymentAssignmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['customers'].queryset = _active_customer_profiles()
         self.fields['customers'].label_from_instance = self._customer_label
+        self.fields['sales_user'].queryset = _active_sales_users()
+        self.fields['sales_user'].label_from_instance = self._sales_label
+
+    @staticmethod
+    def _sales_label(user):
+        full_name = user.get_full_name().strip()
+        return full_name or user.username
 
     @staticmethod
     def _customer_label(profile):
@@ -1038,13 +1045,6 @@ class DailyPaymentAssignmentForm(forms.ModelForm):
         widget=forms.Textarea(attrs={'rows': 2}),
         label='توضیحات',
     )
-    counterparty = forms.ModelChoiceField(
-        queryset=Counterparty.objects.all(),
-        required=False,
-        label='طرف حساب',
-    )
-
-
 class CounterpartyForm(forms.ModelForm):
     class Meta:
         model = Counterparty

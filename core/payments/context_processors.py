@@ -187,7 +187,7 @@ def _business_card_context(user, profile, role_label, display_name, counterparty
 def app_navigation(request):
     user = request.user
     if not user.is_authenticated:
-        return {'app_nav_items': [], 'app_nav_role_label': '', 'app_nav_user_display': ''}
+        return {'app_nav_items': [], 'app_nav_role_label': '', 'app_nav_user_display': '', 'app_nav_is_customer': False}
 
     role = _role_for_nav(user)
     is_staff_user = user.is_staff or user.is_superuser or role in STAFF_ROLES or role == 'admin'
@@ -324,10 +324,18 @@ def app_navigation(request):
         'counterparty':       'طرف حساب',
     }.get(role, 'کاربر')
 
+    customer_bottom_nav_items = []
+    if role == 'customer':
+        bottom_keys = ['submit', 'payment_create', 'price_lists', 'invoices', 'orders']
+        items_by_key = {item['key']: item for item in items}
+        customer_bottom_nav_items = [items_by_key[key] for key in bottom_keys if key in items_by_key]
+
     # گروه‌بندی آیتم‌ها برای dropdown منو
     return {
         'app_nav_items':  items,
         'app_nav_groups': _group_nav_items(items),
+        'app_nav_is_customer': role == 'customer',
+        'app_nav_customer_bottom_items': customer_bottom_nav_items,
         'app_nav_role_label': role_label,
         'app_nav_user_display': user.get_full_name().strip() or user.username,
         'app_nav_avatar_url': profile.avatar_url if profile else '',

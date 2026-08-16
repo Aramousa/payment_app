@@ -98,6 +98,7 @@
                 <tr>
                     <th>ردیف</th>
                     <th>مشتری</th>
+                    <th>کارشناس فروش</th>
                     <th>مبلغ مورد انتظار</th>
                     <th>واریز ممیزی نشده</th>
                     <th>واریز تایید شده</th>
@@ -117,6 +118,13 @@
                     <td>
                         <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' assignment.customer.id %}">{{ assignment.customer.get_full_name|default:assignment.customer.username }}</button><br>
                         {{ assignment.customer.profile.organization|default:'-' }}
+                    </td>
+                    <td>
+                        {% if assignment.sales_user %}
+                            <button type="button" class="user-card-link" data-user-card-url="{% url 'user_business_card' assignment.sales_user.id %}">{{ assignment.sales_user.get_full_name|default:assignment.sales_user.username }}</button>
+                        {% else %}
+                            -
+                        {% endif %}
                     </td>
                     <td class="money">{{ assignment.expected_amount|thousand_sep }}</td>
                     <td class="money">{{ assignment.report.paid_amount|thousand_sep }}</td>

@@ -4,6 +4,7 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>برنامه‌های واریز من</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
@@ -28,6 +29,10 @@
         .flag-green { background: #2e7d32; }
         .flag-red { background: #c62828; }
         .flag-yellow { background: #f9a825; color: #111; }
+        .badge { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; }
+        .badge.seen { background:#dbeafe; color:#1d4ed8; }
+        .badge.unseen { background:#fff7ed; color:#c2410c; }
+        .table-wrap { overflow-x:auto; }
     </style>
 </head>
 <body>
@@ -61,6 +66,40 @@
             <button type="submit" class="button-link">اعمال فیلتر</button>
             <a href="{% url 'customer_daily_payments' %}" class="button-link alt">حذف فیلتر</a>
         </form>
+    </div>
+
+    <div class="panel">
+        <h3>سوابق اعلامیه‌های گزارش فیش</h3>
+        <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ردیف</th>
+                    <th>تاریخ گزارش</th>
+                    <th>تعداد فیش</th>
+                    <th>جمع مبلغ</th>
+                    <th>متن اعلامیه</th>
+                    <th>زمان انتشار</th>
+                    <th>وضعیت مشاهده</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for notice in customer_notices %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ notice.notice_date|jalali_date }}</td>
+                    <td>{{ notice.payment_count|thousand_sep }}</td>
+                    <td class="money">{{ notice.total_amount|thousand_sep }} ریال</td>
+                    <td>{{ notice.message|linebreaksbr }}</td>
+                    <td>{% if notice.published_at %}{{ notice.published_at|jalali_datetime }}{% else %}-{% endif %}</td>
+                    <td>{% if notice.customer_seen_at %}<span class="badge seen">مشاهده شده</span><br>{{ notice.customer_seen_at|jalali_datetime }}{% else %}<span class="badge unseen">مشاهده نشده</span>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7">هنوز اعلامیه‌ای برای شما منتشر نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
     </div>
 
     <div class="panel">
@@ -106,6 +145,22 @@
         {% include "payments/partials/pagination.html" %}
     </div>
 
+    <script>
+    $(document).ready(function () {
+        $('.jalali-date').persianDatepicker({
+            format: 'YYYY/MM/DD',
+            observer: true,
+            autoClose: true,
+            initialValue: false,
+            initialValueType: 'persian',
+            toolbox: {
+                calendarSwitch: {
+                    enabled: false
+                }
+            }
+        });
+    });
+    </script>
     <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

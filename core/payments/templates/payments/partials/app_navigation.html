@@ -120,6 +120,21 @@
     </div>
 </nav>
 
+{% if app_nav_is_customer and app_nav_customer_bottom_items %}
+<nav class="app-customer-bottom-nav" aria-label="دسترسی سریع مشتری">
+    {% for item in app_nav_customer_bottom_items %}
+        <a class="app-customer-bottom-link" href="{{ item.url }}" data-nav-key="{{ item.key }}">
+            <span class="app-customer-bottom-icon">{{ item.icon }}</span>
+            <span class="app-customer-bottom-text">{{ item.label }}</span>
+        </a>
+    {% endfor %}
+    <button class="app-customer-bottom-link app-customer-more-tab" type="button" data-customer-more-menu aria-label="منوی بیشتر">
+        <span class="app-customer-bottom-icon">☰</span>
+        <span class="app-customer-bottom-text">بیشتر</span>
+    </button>
+</nav>
+{% endif %}
+
 <div class="user-card-modal" id="user-card-modal" aria-hidden="true">
     <div class="user-card-backdrop" data-user-card-close></div>
     <section class="user-business-card" role="dialog" aria-modal="true" aria-labelledby="user-card-title">

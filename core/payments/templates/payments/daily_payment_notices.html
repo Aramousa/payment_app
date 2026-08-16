@@ -43,6 +43,11 @@
         .recent-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fbfdff; }
         .recent-title { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; color: #172033; }
         .recent-meta { color: #64748b; font-size: 12px; line-height: 1.9; margin-top: 6px; }
+        .notice-warning { background:#fff7ed; border:1px solid #fed7aa; border-right:5px solid #f97316; color:#7c2d12; border-radius:8px; padding:12px; margin-bottom:14px; line-height:1.9; }
+        .table-wrap { overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; min-width:860px; }
+        th, td { border-bottom:1px solid #e2e8f0; padding:9px 8px; text-align:right; vertical-align:top; font-size:13px; }
+        th { background:#f8fafc; color:#334155; font-weight:900; }
         .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 800; }
         .badge.on { background: #dcfce7; color: #166534; }
         .badge.off { background: #f1f5f9; color: #475569; }
@@ -64,6 +69,13 @@
         <div class="notice-layout">
             <section class="panel">
                 <h2>آماده‌سازی و انتشار</h2>
+                {% if duplicate_notice %}
+                <div class="notice-warning">
+                    <strong>اعلامیه تکراری است.</strong>
+                    برای این مشتری در تاریخ {{ duplicate_notice.notice_date|jalali_date }} قبلاً اعلامیه منتشر شده است.
+                    با تایید شما، همان اعلامیه قبلی ویرایش می‌شود و دوباره به مشتری نمایش داده خواهد شد.
+                </div>
+                {% endif %}
                 <div class="stat-strip">
                     <div class="stat-box">
                         <strong>{{ preview_stats.payment_count|thousand_sep }}</strong>
@@ -88,30 +100,50 @@
                         </p>
                     {% endfor %}
                     <div class="actions">
+                        {% if duplicate_notice %}
+                        <input type="hidden" name="confirm_replace" value="1">
+                        <button type="submit" name="action" value="{{ duplicate_notice_action|default:'publish' }}" class="btn success">تایید و انتشار مجدد</button>
+                        <a href="{% url 'daily_payment_notices' %}?customer={{ duplicate_notice.customer_id }}&date={{ duplicate_notice.notice_date|jalali_date }}" class="btn muted">انصراف</a>
+                        {% else %}
                         <button type="submit" name="action" value="preview" class="btn muted">محاسبه خودکار</button>
                         <button type="submit" name="action" value="save" class="btn primary">ذخیره پیش‌نویس</button>
                         <button type="submit" name="action" value="publish" class="btn success">انتشار در پرتال مشتری</button>
                         <a href="{% url 'daily_payment_notices' %}" class="btn muted">پاک کردن انتخاب</a>
+                        {% endif %}
                     </div>
                 </form>
                 <div class="hint">ابتدا مشتری و تاریخ را انتخاب کنید و «محاسبه خودکار» را بزنید؛ سپس تعداد، مبلغ و متن پیام را در صورت نیاز ویرایش و منتشر کنید.</div>
             </section>
 
             <aside class="panel">
-                <h2>اطلاعیه‌های اخیر</h2>
-                <div class="recent-list">
+                <h2>سوابق اعلامیه‌های صادرشده</h2>
+                <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>مشتری</th>
+                            <th>تاریخ گزارش</th>
+                            <th>تعداد</th>
+                            <th>مبلغ</th>
+                            <th>وضعیت</th>
+                            <th>مشاهده مشتری</th>
+                            <th>انتشاردهنده</th>
+                            <th>آخرین تغییر</th>
+                            <th>عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                     {% for item in recent_notices %}
-                        <div class="recent-item">
-                            <div class="recent-title">
-                                <span>{{ item.customer.get_full_name|default:item.customer.username }}</span>
-                                {% if item.is_published %}<span class="badge on">منتشر شده</span>{% else %}<span class="badge off">پیش‌نویس</span>{% endif %}
-                            </div>
-                            <div class="recent-meta">
-                                تاریخ: {{ item.notice_date|jalali_date }}<br>
-                                تعداد: {{ item.payment_count|thousand_sep }} | مبلغ: {{ item.total_amount|thousand_sep }} ریال<br>
-                                {% if item.customer_seen_at %}<span class="badge seen">مشاهده شده</span>{% else %}<span class="badge unseen">مشاهده نشده</span>{% endif %}
-                            </div>
-                            <div class="actions" style="justify-content:flex-start;margin-top:8px;">
+                        <tr>
+                            <td>{{ item.customer.get_full_name|default:item.customer.username }}</td>
+                            <td>{{ item.notice_date|jalali_date }}</td>
+                            <td>{{ item.payment_count|thousand_sep }}</td>
+                            <td>{{ item.total_amount|thousand_sep }} ریال</td>
+                            <td>{% if item.is_published %}<span class="badge on">منتشر شده</span>{% else %}<span class="badge off">پیش‌نویس</span>{% endif %}</td>
+                            <td>{% if item.customer_seen_at %}<span class="badge seen">مشاهده شده</span><br>{{ item.customer_seen_at|jalali_datetime }}{% else %}<span class="badge unseen">مشاهده نشده</span>{% endif %}</td>
+                            <td>{% if item.published_by %}{{ item.published_by.get_full_name|default:item.published_by.username }}{% else %}-{% endif %}</td>
+                            <td>{{ item.updated_at|jalali_datetime }}</td>
+                            <td>
                                 <a class="btn muted" href="{% url 'daily_payment_notices' %}?customer={{ item.customer_id }}&date={{ item.notice_date|jalali_date }}">ویرایش</a>
                                 {% if item.is_published %}
                                 <form method="post" style="display:inline;">
@@ -120,11 +152,13 @@
                                     <button type="submit" name="action" value="unpublish" class="btn danger">لغو انتشار</button>
                                 </form>
                                 {% endif %}
-                            </div>
-                        </div>
+                            </td>
+                        </tr>
                     {% empty %}
-                        <div class="hint">هنوز اطلاعیه‌ای ثبت نشده است.</div>
+                        <tr><td colspan="9">هنوز اعلامیه‌ای ثبت نشده است.</td></tr>
                     {% endfor %}
+                    </tbody>
+                </table>
                 </div>
             </aside>
         </div>

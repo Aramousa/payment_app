@@ -657,7 +657,7 @@
                 </div>
             </div>
         </div>
-        {% if not customer_payment_notice.customer_seen_at %}
+        {% if show_customer_payment_notice_splash %}
         <div class="notice-splash open" id="noticeSplash" data-notice-id="{{ customer_payment_notice.id }}" data-seen-url="{% url 'daily_payment_notice_seen' customer_payment_notice.id %}" role="dialog" aria-modal="true">
             <div class="notice-splash-box">
                 <div class="notice-splash-top">

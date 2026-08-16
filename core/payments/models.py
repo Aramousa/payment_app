@@ -944,6 +944,14 @@ class DailyPaymentPlan(models.Model):
 class DailyPaymentAssignment(models.Model):
     plan = models.ForeignKey(DailyPaymentPlan, on_delete=models.CASCADE, related_name='assignments')
     customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='daily_payment_assignments')
+    sales_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_payment_sales_assignments',
+        verbose_name='کارشناس فروش',
+    )
     expected_amount = models.BigIntegerField('مبلغ مورد انتظار')
     note = models.TextField('توضیح', blank=True)
     created_at = models.DateTimeField('زمان ثبت', auto_now_add=True)
