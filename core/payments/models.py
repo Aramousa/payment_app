@@ -961,6 +961,53 @@ class DailyPaymentAssignment(models.Model):
         return f"{self.customer} - {self.expected_amount}"
 
 
+class DailyPaymentNotice(models.Model):
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_payment_notices')
+    notice_date = jmodels.jDateField('تاریخ اطلاعیه')
+    payment_count = models.PositiveIntegerField('تعداد فیش‌ها', default=0)
+    total_amount = models.BigIntegerField('جمع مبلغ فیش‌ها', default=0)
+    message = models.TextField('متن قابل نمایش برای مشتری', blank=True)
+    is_published = models.BooleanField('منتشر شده برای مشتری', default=False, db_index=True)
+    published_at = models.DateTimeField('زمان انتشار', null=True, blank=True)
+    published_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='published_daily_payment_notices',
+        verbose_name='منتشرکننده',
+    )
+    customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_daily_payment_notices',
+        verbose_name='ایجادکننده',
+    )
+    created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
+    updated_at = models.DateTimeField('آخرین بروزرسانی', auto_now=True)
+
+    class Meta:
+        ordering = ['-notice_date', '-updated_at', '-id']
+        constraints = [
+            models.UniqueConstraint(fields=['customer', 'notice_date'], name='uniq_daily_payment_notice_customer_date'),
+        ]
+        indexes = [
+            models.Index(fields=['customer', 'is_published', '-notice_date']),
+        ]
+        verbose_name = 'اطلاعیه روزانه فیش مشتری'
+        verbose_name_plural = 'اطلاعیه‌های روزانه فیش مشتریان'
+
+    def __str__(self):
+        return f"{self.customer} - {self.notice_date}"
+
+    @property
+    def is_seen_by_customer(self):
+        return bool(self.customer_seen_at)
+
+
 class PaymentActivityLog(models.Model):
     ACTION_CREATED              = 'created'
     ACTION_EDITED               = 'edited'

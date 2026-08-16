@@ -307,6 +307,25 @@
         .daily-payment-notice { max-width: 980px; margin: 0 auto 14px auto; background: #f0fbf7; border: 1px solid #b9ead9; border-right: 6px solid #2f9e74; border-radius: 10px; padding: 14px; color: #124335; font-size: 14px; line-height: 2; }
         .daily-payment-notice strong { color: #0f6b50; }
         .daily-payment-expired { max-width: 980px; margin: 0 auto 14px auto; background: #fff1f1; border: 1px solid #f3a6a6; border-right: 6px solid #dc3545; border-radius: 10px; padding: 14px; color: #5b1111; font-size: 14px; line-height: 2; }
+        .customer-payment-alert { max-width: 980px; margin: 0 auto 16px; border-radius: 8px; overflow: hidden; border: 1px solid #f7c948; background: #fffdf2; box-shadow: 0 12px 28px rgba(154,103,0,.16); }
+        .customer-payment-alert-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: linear-gradient(135deg,#7c4a03,#d99a13); color: #fff; padding: 12px 16px; }
+        .customer-payment-alert-head strong { font-size: 17px; }
+        .customer-payment-alert-body { padding: 14px 16px; color: #4a3412; line-height: 2; }
+        .customer-payment-alert-stats { display: grid; grid-template-columns: repeat(2,minmax(160px,1fr)); gap: 10px; margin: 12px 0; }
+        .customer-payment-alert-stat { background: #fff8d8; border: 1px solid #f3d36a; border-radius: 8px; padding: 10px; }
+        .customer-payment-alert-stat span { display: block; color: #7a5a12; font-size: 12px; }
+        .customer-payment-alert-stat b { display: block; color: #3f2a06; font-size: 22px; margin-top: 2px; }
+        .customer-payment-alert-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+        .customer-payment-alert-actions button { border: 0; border-radius: 6px; background: #1e3a5f; color: #fff; padding: 9px 14px; font-family: Vazir,sans-serif; font-weight: 800; cursor: pointer; }
+        .notice-splash { position: fixed; inset: 0; z-index: 5000; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(15,23,42,.58); backdrop-filter: blur(3px); }
+        .notice-splash.open { display: flex; }
+        .notice-splash-box { width: min(560px, 100%); background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.28); }
+        .notice-splash-top { background: linear-gradient(135deg,#18375f,#d99a13); color: #fff; padding: 18px; }
+        .notice-splash-top h3 { margin: 0; font-size: 22px; }
+        .notice-splash-content { padding: 18px; color: #243044; line-height: 2; }
+        .notice-splash-actions { padding: 0 18px 18px; display: flex; justify-content: flex-end; }
+        .notice-splash-actions button { border: 0; border-radius: 7px; padding: 10px 18px; background: #148a5b; color: #fff; font-family: Vazir,sans-serif; font-weight: 900; cursor: pointer; }
+        @media (max-width: 640px) { .customer-payment-alert-stats { grid-template-columns: 1fr; } }
         .payment-fieldset { grid-column: 1 / -1; border: 1px solid #dbe3ee; border-radius: 8px; padding: 12px; background: #fbfdff; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px; }
         .payment-fieldset legend { padding: 0 8px; font-weight: 800; color: #1e3a5f; }
         .payment-fieldset p { margin: 0; }
@@ -464,6 +483,58 @@
             برنامه واریز قبلی شما مربوط به تاریخ <strong>{{ expired_daily_assignment.plan.deposit_date|jalali_date }}</strong> بوده و منقضی شده است.
             برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
         </div>
+        {% endif %}
+        {% if customer_payment_notice %}
+        <div class="customer-payment-alert" id="customer-payment-alert" data-notice-id="{{ customer_payment_notice.id }}" data-seen-url="{% url 'daily_payment_notice_seen' customer_payment_notice.id %}">
+            <div class="customer-payment-alert-head">
+                <strong>گزارش فیش‌های واریزی شما</strong>
+                <span>{{ customer_payment_notice.notice_date|jalali_date }}</span>
+            </div>
+            <div class="customer-payment-alert-body">
+                <p>{{ customer_payment_notice.message|linebreaksbr }}</p>
+                <div class="customer-payment-alert-stats">
+                    <div class="customer-payment-alert-stat">
+                        <span>تعداد فیش‌ها</span>
+                        <b>{{ customer_payment_notice.payment_count|thousand_sep }}</b>
+                    </div>
+                    <div class="customer-payment-alert-stat">
+                        <span>جمع مبلغ</span>
+                        <b>{{ customer_payment_notice.total_amount|thousand_sep }} ریال</b>
+                    </div>
+                </div>
+                <div class="customer-payment-alert-actions">
+                    {% if not customer_payment_notice.customer_seen_at %}
+                    <button type="button" class="notice-ack-btn">متوجه شدم</button>
+                    {% endif %}
+                    <a class="button-link" href="{% url 'payment_create' %}">مشاهده فیش‌ها</a>
+                </div>
+            </div>
+        </div>
+        {% if not customer_payment_notice.customer_seen_at %}
+        <div class="notice-splash open" id="noticeSplash" data-notice-id="{{ customer_payment_notice.id }}" data-seen-url="{% url 'daily_payment_notice_seen' customer_payment_notice.id %}" role="dialog" aria-modal="true">
+            <div class="notice-splash-box">
+                <div class="notice-splash-top">
+                    <h3>گزارش فیش‌های امروز آماده است</h3>
+                </div>
+                <div class="notice-splash-content">
+                    <p>{{ customer_payment_notice.message|linebreaksbr }}</p>
+                    <div class="customer-payment-alert-stats">
+                        <div class="customer-payment-alert-stat">
+                            <span>تعداد فیش‌ها</span>
+                            <b>{{ customer_payment_notice.payment_count|thousand_sep }}</b>
+                        </div>
+                        <div class="customer-payment-alert-stat">
+                            <span>جمع مبلغ</span>
+                            <b>{{ customer_payment_notice.total_amount|thousand_sep }} ریال</b>
+                        </div>
+                    </div>
+                </div>
+                <div class="notice-splash-actions">
+                    <button type="button" class="notice-ack-btn">متوجه شدم</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% endif %}
         {% if customer_home_summary and not show_payment_form %}
         <div class="customer-dashboard">
@@ -2043,6 +2114,41 @@
         if (!wrap) return;
         wrap.querySelectorAll('.qa-panel').forEach(function(p) { p.style.display = 'none'; });
     }
+
+    (function () {
+        function getCookie(name) {
+            var value = '; ' + document.cookie;
+            var parts = value.split('; ' + name + '=');
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        function markNoticeSeen(container) {
+            if (!container || container.dataset.sent === '1') return;
+            var url = container.getAttribute('data-seen-url');
+            if (!url) return;
+            container.dataset.sent = '1';
+            fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            }).catch(function () {
+                container.dataset.sent = '0';
+            });
+        }
+
+        document.querySelectorAll('.notice-ack-btn').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var splash = document.getElementById('noticeSplash');
+                var alertBox = document.getElementById('customer-payment-alert');
+                markNoticeSeen(splash || alertBox);
+                if (splash) splash.classList.remove('open');
+                document.querySelectorAll('.notice-ack-btn').forEach(function (btn) {
+                    btn.style.display = 'none';
+                });
+            });
+        });
+    })();
     </script>
     <script src="{% static 'js/app-ui.js' %}"></script>
 

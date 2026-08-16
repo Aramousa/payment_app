@@ -23,7 +23,7 @@ from PIL import Image, ImageOps
 
 DISPLAY_TZ = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
-from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, SystemSettings, UploadSettings, UserProfile
+from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, SystemSettings, UploadSettings, UserProfile
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
 MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
@@ -814,12 +814,12 @@ class StaffPaymentDetailsForm(forms.ModelForm):
     def clean_amount(self):
         raw_amount = _normalize_numeric_text(self.cleaned_data.get('amount')).replace(',', '').strip()
         if not raw_amount:
-            return None
+            return 0
         if not raw_amount.isdigit():
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
         amount = int(raw_amount)
         if amount == 0 and not self.fields['amount'].required:
-            return None
+            return 0
         if amount <= 0:
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
         return amount
@@ -897,6 +897,86 @@ class DailyPaymentPlanForm(forms.ModelForm):
         if amount <= 0:
             raise ValidationError('مبلغ کل باید یک عدد صحیح مثبت باشد.')
         return amount
+
+
+class DailyPaymentNoticeForm(forms.ModelForm):
+    notice_date = jDateField(
+        label='تاریخ گزارش',
+        input_formats=['%Y/%m/%d'],
+        widget=jDateInput(format='%Y/%m/%d', attrs=_date_input_attrs(placeholder='1403/01/31', inputmode='numeric', dir='ltr')),
+    )
+    total_amount = forms.CharField(
+        label='جمع مبلغ فیش‌ها (ریال)',
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'amount-input', 'inputmode': 'numeric', 'dir': 'ltr'}),
+    )
+
+    class Meta:
+        model = DailyPaymentNotice
+        fields = ['customer', 'notice_date', 'payment_count', 'total_amount', 'message']
+        widgets = {
+            'payment_count': forms.NumberInput(attrs={'min': 0, 'inputmode': 'numeric', 'dir': 'ltr'}),
+            'message': forms.Textarea(attrs={'rows': 4}),
+        }
+        labels = {
+            'customer': 'مشتری',
+            'payment_count': 'تعداد فیش‌ها',
+            'message': 'متن قابل نمایش برای مشتری',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['customer'].queryset = (
+            User.objects.filter(profile__role='customer', is_active=True)
+            .select_related('profile')
+            .order_by('first_name', 'last_name', 'username')
+        )
+        self.fields['customer'].label_from_instance = self._customer_label
+        for field in self.fields.values():
+            if hasattr(field, 'label_suffix'):
+                field.label_suffix = ''
+        amount_initial = self.initial.get('total_amount')
+        if amount_initial is None and self.instance and self.instance.pk:
+            amount_initial = self.instance.total_amount
+        if amount_initial is not None:
+            try:
+                self.initial['total_amount'] = '{:,}'.format(int(str(amount_initial).replace(',', '').strip()))
+            except (ValueError, TypeError):
+                pass
+
+    @staticmethod
+    def _customer_label(user):
+        profile = getattr(user, 'profile', None)
+        full_name = user.get_full_name().strip()
+        if not full_name and profile:
+            full_name = f'{profile.first_name} {profile.last_name}'.strip()
+        parts = [full_name or 'مشتری بدون نام']
+        if profile:
+            if profile.organization:
+                parts.append(f'مجموعه: {profile.organization}')
+            location = ' / '.join(part for part in [profile.province, profile.city] if part)
+            if location:
+                parts.append(f'موقعیت: {location}')
+            contact = profile.mobile or profile.phone or profile.representative_mobile
+            if contact:
+                parts.append(f'تماس: {contact}')
+            if profile.accounting_code:
+                parts.append(f'کد تفصیلی: {profile.accounting_code}')
+        return ' | '.join(parts)
+
+    def clean_total_amount(self):
+        raw_amount = _normalize_numeric_text(self.cleaned_data.get('total_amount')).replace(',', '').strip()
+        if not raw_amount:
+            return 0
+        if not raw_amount.isdigit():
+            raise ValidationError('جمع مبلغ باید یک عدد صحیح و به ریال باشد.')
+        return int(raw_amount)
+
+    def clean_payment_count(self):
+        count = self.cleaned_data.get('payment_count') or 0
+        if count < 0:
+            raise ValidationError('تعداد فیش نمی‌تواند منفی باشد.')
+        return count
 
 
 class DailyPaymentAssignmentForm(forms.ModelForm):

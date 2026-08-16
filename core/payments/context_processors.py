@@ -248,6 +248,8 @@ def app_navigation(request):
         COMMERCIAL_ROLES = {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}
         if is_staff_user:
             items.append(_nav_item('برنامه واریز', 'daily_payment_plans', 'daily_payments', 'business', '📅'))
+        if user.is_superuser or role in COMMERCIAL_ROLES:
+            items.append(_nav_item('اطلاعیه فیش روزانه', 'daily_payment_notices', 'daily_payment_notices', 'business', '📣'))
 
         if user.is_superuser or role in COMMERCIAL_ROLES:
             items.append(_nav_item('لیست قیمت', 'price_lists', 'price_lists', 'sales', '💲'))

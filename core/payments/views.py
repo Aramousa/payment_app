@@ -35,9 +35,9 @@ from django_ratelimit.decorators import ratelimit
 from axes.helpers import get_client_ip_address
 from zoneinfo import ZoneInfo
 
-from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
+from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentNoticeForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 import os
 
 
@@ -2685,6 +2685,18 @@ def _can_manage_daily_payments(user):
     return _user_role(user) in {'staff', 'commercial', 'commercial_manager', 'finance_manager'}
 
 
+def _can_manage_daily_payment_notices(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return _user_role(user) in {
+        'finance', 'finance_manager',
+        'commercial', 'commercial_manager',
+        'sales', 'sales_manager',
+    }
+
+
 def _can_view_daily_payments(user):
     return _is_staff_user(user)
 
@@ -2759,6 +2771,44 @@ def _daily_assignment_stats(assignments):
         data['confirmed_amount'] = row['total'] or 0
         data['confirmed_count'] = row['count'] or 0
     return stats
+
+
+def _payment_notice_stats(customer, notice_date):
+    stats = PaymentRecord.objects.filter(
+        user=customer,
+        pay_date=notice_date,
+    ).exclude(
+        status=PaymentRecord.STATUS_REJECTED,
+    ).aggregate(
+        payment_count=Count('id'),
+        total_amount=Sum('amount'),
+    )
+    return {
+        'payment_count': stats['payment_count'] or 0,
+        'total_amount': stats['total_amount'] or 0,
+    }
+
+
+def _payment_notice_default_message(customer, notice_date, payment_count, total_amount):
+    customer_name = (customer.get_full_name() or customer.username).strip()
+    return (
+        f'مشتری گرامی {customer_name}، '
+        f'در تاریخ {_format_jalali_date(notice_date)} تعداد {payment_count} فیش واریزی '
+        f'با جمع مبلغ {_format_thousand_separator(total_amount)} ریال برای شما در سامانه ثبت شده است. '
+        'لطفاً اطلاعات را بررسی فرمایید و در صورت وجود مغایرت از بخش گفتگو با واحد مربوطه در ارتباط باشید.'
+    )
+
+
+def _published_payment_notice_for_customer(user):
+    if not user or not user.is_authenticated or _is_staff_user(user):
+        return None
+    return (
+        DailyPaymentNotice.objects
+        .select_related('customer', 'published_by')
+        .filter(customer=user, is_published=True)
+        .order_by('-notice_date', '-published_at', '-id')
+        .first()
+    )
 
 
 def _managed_users(query='', role='', status=''):
@@ -2967,6 +3017,121 @@ def daily_payment_plan_detail(request, plan_id):
 
 
 @login_required
+def daily_payment_notices(request):
+    if not _can_manage_daily_payment_notices(request.user):
+        return HttpResponseForbidden('شما دسترسی مدیریت اطلاعیه فیش روزانه را ندارید.')
+
+    selected_customer = None
+    default_notice_date = _today_jalali_date() - jdatetime.timedelta(days=1)
+    selected_date = _parse_jalali_date(request.GET.get('date')) or default_notice_date
+    notice = None
+    preview_stats = {'payment_count': 0, 'total_amount': 0}
+    initial = {'notice_date': selected_date}
+
+    customer_id = request.POST.get('customer') if request.method == 'POST' else request.GET.get('customer')
+    if customer_id:
+        selected_customer = User.objects.filter(id=customer_id, profile__role='customer').first()
+    if selected_customer:
+        notice = DailyPaymentNotice.objects.filter(customer=selected_customer, notice_date=selected_date).first()
+        preview_stats = _payment_notice_stats(selected_customer, selected_date)
+        initial.update({
+            'customer': selected_customer.id,
+            'payment_count': preview_stats['payment_count'],
+            'total_amount': preview_stats['total_amount'],
+            'message': _payment_notice_default_message(
+                selected_customer,
+                selected_date,
+                preview_stats['payment_count'],
+                preview_stats['total_amount'],
+            ),
+        })
+
+    if request.method == 'POST':
+        action = request.POST.get('action') or 'save'
+        if action == 'preview':
+            customer_value = request.POST.get('customer') or ''
+            date_value = request.POST.get('notice_date') or _format_jalali_date(default_notice_date)
+            query = urlencode({'customer': customer_value, 'date': date_value})
+            return redirect(f"{reverse('daily_payment_notices')}?{query}")
+        if action == 'unpublish':
+            notice_id = request.POST.get('notice_id')
+            target_notice = get_object_or_404(DailyPaymentNotice, id=notice_id)
+            target_notice.is_published = False
+            target_notice.save(update_fields=['is_published', 'updated_at'])
+            messages.success(request, 'اطلاعیه از پرتال مشتری برداشته شد.')
+            return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date(target_notice.notice_date)}")
+
+        form = DailyPaymentNoticeForm(request.POST, instance=notice)
+        if form.is_valid():
+            target_notice = form.save(commit=False)
+            existing_notice = DailyPaymentNotice.objects.filter(
+                customer=target_notice.customer,
+                notice_date=target_notice.notice_date,
+            ).first()
+            if existing_notice and (not target_notice.pk or existing_notice.pk != target_notice.pk):
+                target_notice = existing_notice
+                target_notice.payment_count = form.cleaned_data['payment_count']
+                target_notice.total_amount = form.cleaned_data['total_amount']
+                target_notice.message = form.cleaned_data.get('message') or ''
+            if not (target_notice.message or '').strip():
+                target_notice.message = _payment_notice_default_message(
+                    target_notice.customer,
+                    target_notice.notice_date,
+                    target_notice.payment_count,
+                    target_notice.total_amount,
+                )
+            if not target_notice.pk:
+                target_notice.created_by = request.user
+            if action == 'publish':
+                target_notice.is_published = True
+                target_notice.published_at = timezone.now()
+                target_notice.published_by = request.user
+                target_notice.customer_seen_at = None
+            target_notice.save()
+            if action == 'publish':
+                _notify_users(
+                    [target_notice.customer],
+                    'گزارش فیش‌های واریزی',
+                    target_notice.message,
+                    reverse('submit'),
+                    category=UserNotification.CATEGORY_PAYMENT,
+                    actor=request.user,
+                )
+                messages.success(request, 'اطلاعیه برای مشتری منتشر شد.')
+            else:
+                messages.success(request, 'پیش‌نویس اطلاعیه ذخیره شد.')
+            return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date(target_notice.notice_date)}")
+    else:
+        form = DailyPaymentNoticeForm(instance=notice, initial=initial)
+
+    recent_notices = (
+        DailyPaymentNotice.objects
+        .select_related('customer', 'published_by', 'created_by')
+        .order_by('-updated_at', '-id')[:20]
+    )
+    return render(request, 'payments/daily_payment_notices.html', {
+        'form': form,
+        'selected_customer': selected_customer,
+        'selected_date': selected_date,
+        'selected_date_text': _format_jalali_date(selected_date),
+        'notice': notice,
+        'preview_stats': preview_stats,
+        'recent_notices': recent_notices,
+        'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+    })
+
+
+@login_required
+@require_POST
+def daily_payment_notice_seen(request, notice_id):
+    notice = get_object_or_404(DailyPaymentNotice, id=notice_id, customer=request.user, is_published=True)
+    if notice.customer_seen_at is None:
+        notice.customer_seen_at = timezone.now()
+        notice.save(update_fields=['customer_seen_at', 'updated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
 def customer_daily_payments(request):
     if _is_staff_user(request.user):
         return redirect('daily_payment_plans')
@@ -3144,6 +3309,7 @@ def create_payment(request):
         'staff_user_role': staff_role,
         'staff_role_label': _staff_role_label(staff_role),
         'can_manage_counterparties': is_system_admin,
+        'can_manage_daily_payment_notices': _can_manage_daily_payment_notices(request.user),
         'can_export_records': (not is_staff_user) or is_system_admin or staff_role in {'finance', 'finance_manager', 'commercial', 'commercial_manager'},
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
@@ -3160,6 +3326,7 @@ def create_payment(request):
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user) if not is_staff_user else None,
         'customer_home_summary': _customer_home_summary(request.user) if not is_staff_user else None,
+        'customer_payment_notice': _published_payment_notice_for_customer(request.user) if not is_staff_user else None,
         'active_daily_assignment': active_daily_assignment,
         'expired_daily_assignment': expired_daily_assignment,
         'show_payment_form': show_payment_form,

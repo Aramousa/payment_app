@@ -21,6 +21,8 @@ def _to_persian_num(text):
 
 @register.filter
 def thousand_sep(value):
+    if value is None:
+        return _to_persian_num('0')
     try:
         amount = int(str(value).replace(',', '').replace('،', '').strip())
     except (ValueError, TypeError):

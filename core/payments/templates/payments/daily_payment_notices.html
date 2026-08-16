@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+{% load static payment_dates %}
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>اطلاعیه فیش‌های روزانه</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
+    <script src="{% static 'js/cleave.min.js' %}"></script>
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/persian-date.min.js' %}"></script>
+    <script src="{% static 'js/persian-datepicker.min.js' %}"></script>
+    <style>
+        body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f7fb; margin: 0; color: #172033; }
+        .page-wrap { max-width: 1180px; margin: 24px auto; padding: 0 16px 32px; }
+        .hero-band { background: linear-gradient(135deg, #18375f, #1f6f78); color: #fff; border-radius: 8px; padding: 22px; box-shadow: 0 12px 30px rgba(24,55,95,.22); }
+        .hero-band h1 { margin: 0 0 8px; font-size: 24px; }
+        .hero-band p { margin: 0; color: #e6f4f7; line-height: 1.9; }
+        .notice-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; margin-top: 16px; align-items: start; }
+        .panel { background: #fff; border: 1px solid #dce6f2; border-radius: 8px; padding: 16px; box-shadow: 0 4px 14px rgba(25,45,75,.08); }
+        .panel h2 { margin: 0 0 14px; font-size: 18px; color: #18375f; }
+        .notice-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 14px; }
+        .notice-form p { margin: 0; }
+        .notice-form label { display: block; font-weight: 800; font-size: 13px; color: #334155; margin-bottom: 5px; }
+        .notice-form input, .notice-form select, .notice-form textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 10px; font-family: Vazir, sans-serif; background: #fff; }
+        .notice-form textarea { min-height: 120px; resize: vertical; line-height: 1.9; }
+        .customer-field select { margin-top: 7px; }
+        .customer-search-input { border-color: #bfd0e6 !important; background: #f8fbff !important; }
+        .customer-search-input::placeholder { color: #94a3b8; }
+        .full-row { grid-column: 1 / -1; }
+        .stat-strip { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+        .stat-box { background: #f0fbf7; border: 1px solid #b9ead9; border-right: 5px solid #2f9e74; border-radius: 8px; padding: 12px; }
+        .stat-box strong { display: block; font-size: 24px; color: #0f6b50; margin-bottom: 4px; }
+        .stat-box span { color: #47616b; font-size: 12px; }
+        .actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+        .btn { border: 0; border-radius: 6px; padding: 10px 14px; font-family: Vazir, sans-serif; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn.primary { background: #1e3a5f; color: #fff; }
+        .btn.success { background: #148a5b; color: #fff; }
+        .btn.muted { background: #e8eef6; color: #1e3a5f; }
+        .btn.danger { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
+        .recent-list { display: grid; gap: 10px; }
+        .recent-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fbfdff; }
+        .recent-title { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; color: #172033; }
+        .recent-meta { color: #64748b; font-size: 12px; line-height: 1.9; margin-top: 6px; }
+        .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 800; }
+        .badge.on { background: #dcfce7; color: #166534; }
+        .badge.off { background: #f1f5f9; color: #475569; }
+        .badge.seen { background: #dbeafe; color: #1d4ed8; }
+        .badge.unseen { background: #fff7ed; color: #c2410c; }
+        .hint { color: #64748b; font-size: 12px; line-height: 1.8; margin-top: 8px; }
+        @media (max-width: 900px) { .notice-layout { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) { .notice-form, .stat-strip { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    {% include "payments/partials/app_navigation.html" %}
+    <main class="page-wrap">
+        <section class="hero-band">
+            <h1>اطلاعیه فیش‌های روزانه مشتری</h1>
+            <p>آمار فیش‌های یک تاریخ مشخص به صورت خودکار محاسبه می‌شود؛ متن را بازبینی کنید و سپس آن را به شکل برجسته در پرتال مشتری منتشر کنید.</p>
+        </section>
+
+        <div class="notice-layout">
+            <section class="panel">
+                <h2>آماده‌سازی و انتشار</h2>
+                <div class="stat-strip">
+                    <div class="stat-box">
+                        <strong>{{ preview_stats.payment_count|thousand_sep }}</strong>
+                        <span>تعداد فیش‌های تاریخ {{ selected_date_text }}</span>
+                    </div>
+                    <div class="stat-box">
+                        <strong>{{ preview_stats.total_amount|thousand_sep }}</strong>
+                        <span>جمع مبلغ فیش‌ها، ریال</span>
+                    </div>
+                </div>
+                <form method="post" class="notice-form">
+                    {% csrf_token %}
+                    {{ form.non_field_errors }}
+                    {% for field in form %}
+                        <p class="{% if field.name == 'message' %}full-row{% endif %}{% if field.name == 'customer' %} customer-field{% endif %}">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if field.name == 'customer' %}
+                                <input type="search" id="customer-search-input" class="customer-search-input" placeholder="جستجوی نام مشتری" autocomplete="off">
+                            {% endif %}
+                            {{ field }}
+                            {{ field.errors }}
+                        </p>
+                    {% endfor %}
+                    <div class="actions">
+                        <button type="submit" name="action" value="preview" class="btn muted">محاسبه خودکار</button>
+                        <button type="submit" name="action" value="save" class="btn primary">ذخیره پیش‌نویس</button>
+                        <button type="submit" name="action" value="publish" class="btn success">انتشار در پرتال مشتری</button>
+                        <a href="{% url 'daily_payment_notices' %}" class="btn muted">پاک کردن انتخاب</a>
+                    </div>
+                </form>
+                <div class="hint">ابتدا مشتری و تاریخ را انتخاب کنید و «محاسبه خودکار» را بزنید؛ سپس تعداد، مبلغ و متن پیام را در صورت نیاز ویرایش و منتشر کنید.</div>
+            </section>
+
+            <aside class="panel">
+                <h2>اطلاعیه‌های اخیر</h2>
+                <div class="recent-list">
+                    {% for item in recent_notices %}
+                        <div class="recent-item">
+                            <div class="recent-title">
+                                <span>{{ item.customer.get_full_name|default:item.customer.username }}</span>
+                                {% if item.is_published %}<span class="badge on">منتشر شده</span>{% else %}<span class="badge off">پیش‌نویس</span>{% endif %}
+                            </div>
+                            <div class="recent-meta">
+                                تاریخ: {{ item.notice_date|jalali_date }}<br>
+                                تعداد: {{ item.payment_count|thousand_sep }} | مبلغ: {{ item.total_amount|thousand_sep }} ریال<br>
+                                {% if item.customer_seen_at %}<span class="badge seen">مشاهده شده</span>{% else %}<span class="badge unseen">مشاهده نشده</span>{% endif %}
+                            </div>
+                            <div class="actions" style="justify-content:flex-start;margin-top:8px;">
+                                <a class="btn muted" href="{% url 'daily_payment_notices' %}?customer={{ item.customer_id }}&date={{ item.notice_date|jalali_date }}">ویرایش</a>
+                                {% if item.is_published %}
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="notice_id" value="{{ item.id }}">
+                                    <button type="submit" name="action" value="unpublish" class="btn danger">لغو انتشار</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="hint">هنوز اطلاعیه‌ای ثبت نشده است.</div>
+                    {% endfor %}
+                </div>
+            </aside>
+        </div>
+    </main>
+    <script>
+    $(document).ready(function () {
+        $('.jalali-date').persianDatepicker({
+            format: 'YYYY/MM/DD',
+            observer: true,
+            autoClose: true,
+            initialValue: true,
+            initialValueType: 'persian'
+        });
+        document.querySelectorAll('.amount-input').forEach(function (el) {
+            new Cleave(el, { numeral: true, numeralThousandsGroupStyle: 'thousand' });
+        });
+        const customerSearch = document.getElementById('customer-search-input');
+        const customerSelect = document.querySelector('select[name="customer"]');
+        if (customerSearch && customerSelect) {
+            const originalOptions = Array.from(customerSelect.options).map(function (option) {
+                return {
+                    value: option.value,
+                    text: option.text,
+                    disabled: option.disabled,
+                    selected: option.selected
+                };
+            });
+            function normalizeText(value) {
+                return (value || '')
+                    .replace(/[ي]/g, 'ی')
+                    .replace(/[ك]/g, 'ک')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .toLowerCase();
+            }
+            customerSearch.addEventListener('input', function () {
+                const query = normalizeText(customerSearch.value);
+                const selectedValue = customerSelect.value;
+                const filtered = originalOptions.filter(function (option) {
+                    return !option.value || !query || normalizeText(option.text).includes(query) || option.value === selectedValue;
+                });
+                customerSelect.innerHTML = '';
+                filtered.forEach(function (option) {
+                    const item = new Option(option.text, option.value, option.selected, option.value === selectedValue);
+                    item.disabled = option.disabled;
+                    customerSelect.add(item);
+                });
+            });
+        }
+        document.querySelectorAll('form.notice-form').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                form.querySelectorAll('.amount-input').forEach(function (input) {
+                    input.value = input.value.replace(/,/g, '');
+                });
+            });
+        });
+    });
+    </script>
+    <script src="{% static 'js/app-ui.js' %}"></script>
+</body>
+</html>
