@@ -51,6 +51,8 @@ from .views import (
     profile_password_change,
     payment_timeline,
     payment_history,
+    pwa_manifest,
+    pwa_service_worker,
     proforma_detail,
     proforma_delete,
     proforma_file,
@@ -99,6 +101,8 @@ from .views import (
 )
 
 urlpatterns = [
+    path('manifest.json', pwa_manifest, name='pwa_manifest'),
+    path('sw.js', pwa_service_worker, name='pwa_service_worker'),
     # ─── پلتفرم درخواست نمایندگی (عمومی) ───────────────────────────────────────
     path('agency/', agency_register_phone, name='agency_register'),
     path('agency/verify/', agency_register_verify, name='agency_verify'),

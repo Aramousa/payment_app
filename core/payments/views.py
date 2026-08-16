@@ -554,6 +554,121 @@ def safe_logout(request):
         return response
 
 
+def pwa_manifest(request):
+    manifest = {
+        'name': 'پرتال مشتریان راباسا',
+        'short_name': 'راباسا',
+        'description': 'ثبت و پیگیری فیش‌های واریزی مشتریان',
+        'start_url': reverse('submit'),
+        'scope': '/',
+        'display': 'standalone',
+        'dir': 'rtl',
+        'lang': 'fa',
+        'orientation': 'portrait',
+        'background_color': '#eef2f6',
+        'theme_color': '#1e3a5f',
+        'categories': ['business', 'finance', 'productivity'],
+        'icons': [
+            {
+                'src': '/static/logo/logo-top.png',
+                'sizes': '192x192',
+                'type': 'image/png',
+                'purpose': 'any',
+            },
+            {
+                'src': '/static/logo/logo-top.png',
+                'sizes': '512x512',
+                'type': 'image/png',
+                'purpose': 'any maskable',
+            },
+        ],
+        'shortcuts': [
+            {
+                'name': 'ثبت فیش جدید',
+                'short_name': 'ثبت فیش',
+                'url': reverse('payment_create'),
+                'description': 'بارگذاری سریع فیش واریزی',
+            },
+            {
+                'name': 'فیش‌های من',
+                'short_name': 'فیش‌ها',
+                'url': reverse('submit'),
+                'description': 'مشاهده وضعیت فیش‌های ثبت‌شده',
+            },
+        ],
+    }
+    return JsonResponse(
+        manifest,
+        json_dumps_params={'ensure_ascii': False},
+        content_type='application/manifest+json; charset=utf-8',
+    )
+
+
+def pwa_service_worker(request):
+    script = """
+const CACHE_NAME = 'rabasa-customer-pwa-v1';
+const APP_SHELL = [
+  '/accounts/login/',
+  '/static/css/font-face.css',
+  '/static/css/app-ui.css',
+  '/static/css/persian-datepicker.min.css',
+  '/static/js/jquery.min.js',
+  '/static/js/persian-date.min.js',
+  '/static/js/persian-datepicker.min.js',
+  '/static/js/cleave.min.js',
+  '/static/js/app-ui.js',
+  '/static/logo/logo-top.png'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(() => caches.match('/accounts/login/'))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+      return fetch(request).then(response => {
+        if (!response || response.status !== 200 || response.type !== 'basic') return response;
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
+        return response;
+      });
+    })
+  );
+});
+"""
+    response = HttpResponse(script.strip(), content_type='application/javascript; charset=utf-8')
+    response['Service-Worker-Allowed'] = '/'
+    response['Cache-Control'] = 'no-cache'
+    return response
+
+
 class SafeLoginView(LoginView):
     template_name = 'registration/login.html'
 
@@ -3019,6 +3134,8 @@ def daily_payment_plan_detail(request, plan_id):
 @login_required
 def daily_payment_notices(request):
     if not _can_manage_daily_payment_notices(request.user):
+        if _user_role(request.user) == 'customer':
+            return redirect('submit')
         return HttpResponseForbidden('شما دسترسی مدیریت اطلاعیه فیش روزانه را ندارید.')
 
     selected_customer = None

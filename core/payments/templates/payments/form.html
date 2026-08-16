@@ -5,8 +5,15 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#1e3a5f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="راباسا">
     <title>ثبت واریزی</title>
 
+    <link rel="manifest" href="{% url 'pwa_manifest' %}">
+    <link rel="apple-touch-icon" href="{% static 'logo/logo-top.png' %}">
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
@@ -289,8 +296,20 @@
         }
         #receipt-file-label:hover { border-color: #1e3a5f; background: #eef2f8; }
         #receipt-file-label.has-file { border-color: #1e3a5f; background: #eef2f8; }
-        #receipt-file-input { display: none; }
+        #receipt-file-input, #receipt-camera-input { display: none; }
         .upload-icon { font-size: 32px; display: block; margin-bottom: 6px; }
+        .mobile-camera-label {
+            display: none;
+            cursor: pointer;
+            border: 2px solid #148a5b;
+            border-radius: 10px;
+            padding: 14px;
+            background: #effbf6;
+            color: #0f6b50;
+            text-align: center;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
         @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .flash-title { margin: 0 0 10px; font-size: 16px; }
         .system-message-list { margin: 0; padding-right: 18px; text-align: right; }
@@ -346,6 +365,125 @@
         @media (max-width: 900px) { .customer-dashboard { grid-template-columns: 1fr; } }
 
         /* دکمه ارسال به گفتگو */
+        .customer-mobile-app-card { display: none; }
+        .mobile-quick-actions { display: none; }
+        @media (max-width: 760px) {
+            body { padding: 0; background: #eef3f8 !important; }
+            h2 { font-size: 18px; margin: 18px 12px 10px; }
+            .top-bar { display: none; }
+            .customer-info,
+            .debt-summary,
+            .daily-payment-notice,
+            .daily-payment-expired,
+            .customer-payment-alert,
+            .customer-dashboard,
+            .filter-box {
+                margin-left: 12px;
+                margin-right: 12px;
+                max-width: none;
+            }
+            .customer-mobile-app-card {
+                display: block;
+                margin: 10px 12px 12px;
+                padding: 14px;
+                background: #fff;
+                border: 1px solid #d8e4f1;
+                border-radius: 12px;
+                box-shadow: 0 8px 22px rgba(31,41,51,.08);
+            }
+            .customer-mobile-app-card strong { display: block; color: #173250; font-size: 15px; margin-bottom: 4px; }
+            .customer-mobile-app-card p { margin: 0; color: #52606d; font-size: 12px; line-height: 1.8; }
+            .customer-mobile-app-card button {
+                width: 100%;
+                margin-top: 10px;
+                border: 0;
+                border-radius: 10px;
+                background: #148a5b;
+                color: #fff;
+                padding: 11px 12px;
+                font-family: Vazir,sans-serif;
+                font-weight: 900;
+            }
+            .customer-mobile-app-card button[hidden] { display: none; }
+            .mobile-quick-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin: 0 12px 12px;
+            }
+            .mobile-quick-actions a {
+                border-radius: 10px;
+                padding: 12px 10px;
+                text-align: center;
+                text-decoration: none;
+                font-weight: 900;
+                color: #fff;
+                background: #1e3a5f;
+                box-shadow: 0 6px 18px rgba(30,58,95,.2);
+            }
+            .mobile-quick-actions a.secondary { background: #52606d; }
+            #payment-form {
+                margin: 0 12px 18px;
+                padding: 14px;
+                border-radius: 12px;
+                border-top: 0;
+                grid-template-columns: 1fr;
+                box-shadow: 0 8px 24px rgba(31,41,51,.08);
+            }
+            #payment-form input,
+            #payment-form select,
+            #payment-form textarea {
+                min-height: 46px;
+                border-radius: 10px;
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+            #payment-form label { font-size: 13px; font-weight: 800; color: #243447; }
+            .payment-fieldset { border-radius: 12px; padding: 12px 10px; background: #f8fbff; }
+            .payment-fieldset legend { font-size: 13px; }
+            #receipt-file-label {
+                min-height: 128px;
+                border-radius: 12px;
+                background: #f5fbff;
+                border-color: #92b7dc;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+            }
+            .mobile-camera-label { display: block; }
+            .upload-icon { font-size: 36px; }
+            #receipt-preview-img { max-height: 260px; }
+            #payment-form button[type=submit] {
+                position: sticky;
+                bottom: max(10px, env(safe-area-inset-bottom));
+                min-height: 50px;
+                border-radius: 12px;
+                font-size: 16px;
+                z-index: 5;
+            }
+            .customer-dashboard { display: grid; gap: 10px; }
+            .dashboard-panel { border-radius: 12px; padding: 12px; }
+            .dashboard-row-title { flex-direction: column; gap: 2px; }
+            .dashboard-actions .button-link {
+                flex: 1 1 130px;
+                text-align: center;
+                padding: 9px 10px;
+                border-radius: 9px;
+            }
+            .customer-info-grid,
+            .debt-summary-grid,
+            .customer-payment-alert-stats { grid-template-columns: 1fr; }
+            table {
+                display: block;
+                overflow-x: auto;
+                margin-right: 12px;
+                margin-left: 12px;
+                width: calc(100% - 24px);
+                border-radius: 12px;
+            }
+        }
+
         .btn-start-thread {
             background: none; border: 1.5px solid #1e3a5f; border-radius: 6px;
             color: #1e3a5f; padding: 4px 8px; cursor: pointer; font-family: inherit;
@@ -434,6 +572,15 @@
     {% endif %}
 
     {% if not is_staff_user %}
+        <div class="customer-mobile-app-card" id="customer-install-card">
+            <strong>پرتال مشتریان روی گوشی</strong>
+            <p>برای ثبت سریع فیش، این پرتال را مثل یک اپلیکیشن روی صفحه اصلی گوشی نصب کنید.</p>
+            <button type="button" id="install-pwa-btn" hidden>نصب اپلیکیشن</button>
+        </div>
+        <div class="mobile-quick-actions">
+            <a href="{% url 'payment_create' %}">ثبت فیش جدید</a>
+            <a class="secondary" href="{% url 'submit' %}">فیش‌های من</a>
+        </div>
         {% if not show_payment_form %}
         <div class="customer-info">
             <div class="customer-info-grid">
@@ -753,9 +900,13 @@
                 {% if field.name == 'receipt_images' %}
                 <p class="full-row">
                     <label>{{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}</label>
+                    <label class="mobile-camera-label" for="receipt-camera-input">
+                        گرفتن عکس با دوربین
+                        <input id="receipt-camera-input" type="file" name="receipt_images" accept="image/*" capture="environment">
+                    </label>
                     <label id="receipt-file-label" for="receipt-file-input">
                         <span class="upload-icon">📎</span>
-                        <span id="receipt-label-text">انتخاب فایل فیش (تصویر یا PDF)</span>
+                        <span id="receipt-label-text">انتخاب فایل فیش از گالری یا PDF</span>
                         <br><small style="color:#64748b;">{{ field.help_text }}</small>
                         <input id="receipt-file-input" type="file" name="receipt_images"
                                accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.pdf,image/*,application/pdf">
@@ -1529,6 +1680,7 @@
         // ─── پیش‌نمایش فیش ──────────────────────────────────────────
         (function () {
             const fileInput    = document.getElementById('receipt-file-input');
+            const cameraInput  = document.getElementById('receipt-camera-input');
             const fileLabel    = document.getElementById('receipt-file-label');
             const labelText    = document.getElementById('receipt-label-text');
             const previewWrap  = document.getElementById('receipt-preview-wrap');
@@ -1538,6 +1690,7 @@
             const removeBtn    = document.getElementById('receipt-remove-btn');
             const submitBtn    = document.getElementById('payment-submit-btn');
             if (!fileInput) return;
+            const receiptInputs = [fileInput, cameraInput].filter(Boolean);
 
             function fmtSize(bytes) {
                 if (bytes < 1024) return bytes + ' B';
@@ -1574,7 +1727,7 @@
             }
 
             function clearPreview() {
-                fileInput.value = '';
+                receiptInputs.forEach(function (input) { input.value = ''; });
                 previewImg.src  = '';
                 previewImg.style.display = 'none';
                 previewPdf.style.display = 'none';
@@ -1585,15 +1738,20 @@
                 if (submitBtn) submitBtn.disabled = true;
             }
 
-            fileInput.addEventListener('change', function () {
-                const files = this.files;
-                if (!files || files.length === 0) { clearPreview(); return; }
-                if (files.length > 1) {
-                    alert('فقط یک فایل مجاز است. لطفاً یک فایل انتخاب کنید.');
-                    clearPreview();
-                    return;
-                }
-                showPreview(files[0]);
+            receiptInputs.forEach(function (input) {
+                input.addEventListener('change', function () {
+                    const files = this.files;
+                    if (!files || files.length === 0) { clearPreview(); return; }
+                    if (files.length > 1) {
+                        alert('فقط یک فایل مجاز است. لطفاً یک فایل انتخاب کنید.');
+                        clearPreview();
+                        return;
+                    }
+                    receiptInputs.forEach(function (otherInput) {
+                        if (otherInput !== input) otherInput.value = '';
+                    });
+                    showPreview(files[0]);
+                });
             });
 
             if (removeBtn) {
@@ -2247,6 +2405,39 @@
 
     function closeThreadPopup() {
         document.getElementById('threadPopupOverlay').classList.remove('open');
+    }
+    (function () {
+        var deferredPrompt = null;
+        var installButton = document.getElementById('install-pwa-btn');
+        var installCard = document.getElementById('customer-install-card');
+
+        function isStandalone() {
+            return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        }
+
+        if (installCard && isStandalone()) {
+            installCard.style.display = 'none';
+        }
+
+        window.addEventListener('beforeinstallprompt', function (event) {
+            event.preventDefault();
+            deferredPrompt = event;
+            if (installButton) installButton.hidden = false;
+        });
+
+        if (installButton) {
+            installButton.addEventListener('click', function () {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.finally(function () {
+                    deferredPrompt = null;
+                    installButton.hidden = true;
+                });
+            });
+        }
+    })();
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register("{% url 'pwa_service_worker' %}").catch(function () {});
     }
     </script>
 </body>

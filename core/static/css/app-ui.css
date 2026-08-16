@@ -3782,3 +3782,285 @@ textarea::placeholder {
     height: 15px;
     width: 15px;
 }
+
+/* Mobile nav guardrails: keep the existing drawer model stable and readable. */
+.app-mobile-menu-head {
+    display: none;
+}
+
+@media (max-width: 760px) {
+    .app-top-header {
+        grid-template-columns: 46px minmax(0, 1fr) auto !important;
+        min-width: 0 !important;
+        padding-right: 64px !important;
+    }
+
+    .app-top-brand {
+        grid-column: 2 !important;
+        min-width: 0 !important;
+    }
+
+    .app-top-brand .app-shell-logo {
+        height: 38px !important;
+        max-width: 142px !important;
+        object-fit: contain !important;
+    }
+
+    .app-top-title,
+    .app-top-spacer {
+        display: none !important;
+    }
+
+    .app-nav-toggle {
+        align-items: center !important;
+        display: inline-flex !important;
+        justify-content: center !important;
+        padding: 0 !important;
+    }
+
+    .app-nav-toggle-lines {
+        position: relative !important;
+    }
+
+    .app-nav-toggle-lines,
+    .app-nav-toggle-lines::before,
+    .app-nav-toggle-lines::after {
+        background: #fff !important;
+        display: block !important;
+    }
+
+    .app-top-actions {
+        flex-wrap: nowrap !important;
+        grid-column: 3 !important;
+        min-width: 0 !important;
+    }
+
+    .app-top-logout {
+        display: block !important;
+        flex: 0 0 auto !important;
+        margin: 0 !important;
+    }
+
+    .app-top-logout button {
+        background: #b42318 !important;
+        border-color: #b42318 !important;
+        border-radius: 8px !important;
+        color: #fff !important;
+        font-size: 12px !important;
+        font-weight: 900 !important;
+        min-height: 36px !important;
+        padding: 7px 10px !important;
+        white-space: nowrap !important;
+    }
+
+    .app-user-menu {
+        display: none !important;
+    }
+
+    .app-shell-nav {
+        background: #172033 !important;
+        border-radius: 0 !important;
+        box-shadow: -12px 0 28px rgba(15,23,42,.22) !important;
+        height: calc(100vh - var(--app-header-height)) !important;
+        right: 0 !important;
+        top: var(--app-header-height) !important;
+        transform: translateX(105%) !important;
+        width: min(84vw, 280px) !important;
+        z-index: 320 !important;
+    }
+
+    .app-shell-nav.open {
+        transform: translateX(0) !important;
+    }
+
+    .app-shell-nav .app-nav-panel {
+        background: transparent !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        padding: 10px 0 18px !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        min-height: 42px !important;
+    }
+
+    .sb-overlay.show {
+        z-index: 300 !important;
+    }
+}
+
+/* Customer-facing mobile app layout: tables become readable record cards. */
+@media (max-width: 760px) {
+    body:has(.app-shell-nav) {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    .top-bar,
+    .section,
+    .panel {
+        border-radius: 10px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .top-bar {
+        align-items: stretch !important;
+        display: grid !important;
+        gap: 10px !important;
+    }
+
+    .top-bar h1,
+    .top-bar h2,
+    .top-bar h3,
+    .section h2,
+    .section h3,
+    .panel h2,
+    .panel h3 {
+        font-size: 18px !important;
+        line-height: 1.8 !important;
+        margin-bottom: 8px !important;
+    }
+
+    .top-actions,
+    .filter-actions,
+    .file-actions {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+    }
+
+    .button-link,
+    .apply-btn,
+    .clear-btn,
+    .submit-btn,
+    .detail-link,
+    .cancel-link,
+    .back-link,
+    .logout-btn {
+        align-items: center !important;
+        display: inline-flex !important;
+        justify-content: center !important;
+        min-height: 42px !important;
+        text-align: center !important;
+        width: 100% !important;
+    }
+
+    .app-table-tools {
+        align-items: stretch !important;
+        display: grid !important;
+        gap: 8px !important;
+    }
+
+    .app-table-search {
+        min-height: 42px !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table {
+        background: transparent !important;
+        border: 0 !important;
+        display: block !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table thead {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody {
+        display: grid !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr {
+        background: #fff !important;
+        border: 1px solid #dfe7f1 !important;
+        border-radius: 10px !important;
+        box-shadow: 0 8px 20px rgba(15,23,42,.07) !important;
+        display: grid !important;
+        overflow: hidden !important;
+        padding: 4px 0 !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.detail-row,
+    .app-table-wrap table.app-responsive-table tbody tr.preview-row {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.detail-row.open,
+    .app-table-wrap table.app-responsive-table tbody tr.preview-row.open {
+        display: block !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td {
+        align-items: start !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-bottom: 1px solid #eef2f7 !important;
+        color: #172033 !important;
+        display: grid !important;
+        font-size: 13px !important;
+        gap: 10px !important;
+        grid-template-columns: minmax(92px, 36%) minmax(0, 1fr) !important;
+        line-height: 1.8 !important;
+        min-width: 0 !important;
+        padding: 10px 12px !important;
+        text-align: right !important;
+        white-space: normal !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td:last-child {
+        border-bottom: 0 !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[data-label]::before {
+        color: #64748b !important;
+        content: attr(data-label);
+        font-size: 12px !important;
+        font-weight: 900 !important;
+        line-height: 1.8 !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[colspan] {
+        display: block !important;
+        grid-template-columns: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[colspan]::before {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td .file-actions,
+    .app-table-wrap table.app-responsive-table tbody td form {
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td .status,
+    .app-table-wrap table.app-responsive-table tbody td .status-badge,
+    .app-table-wrap table.app-responsive-table tbody td .flag-chip {
+        justify-self: start !important;
+        white-space: normal !important;
+    }
+
+    .file-preview iframe {
+        height: 62vh !important;
+    }
+}

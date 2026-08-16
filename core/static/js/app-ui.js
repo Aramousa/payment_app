@@ -38,6 +38,19 @@
             table.parentNode.insertBefore(wrapper, table);
             wrapper.appendChild(table);
 
+            var headers = Array.from(table.querySelectorAll('thead th')).map(function (th) {
+                return th.textContent.replace(/\s+/g, ' ').trim();
+            });
+            table.querySelectorAll('tbody tr').forEach(function (row) {
+                if (row.classList.contains('detail-row') || row.classList.contains('preview-row')) return;
+                Array.from(row.children).forEach(function (cell, cellIndex) {
+                    if (cell.tagName !== 'TD' || cell.hasAttribute('colspan')) return;
+                    var label = headers[cellIndex] || '';
+                    if (label) cell.dataset.label = label;
+                });
+            });
+            table.classList.add('app-responsive-table');
+
             addTruncationTooltips(table);
 
             if (table.dataset.noClientSearch === '1') return;
