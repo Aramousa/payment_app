@@ -8310,6 +8310,27 @@ def warranty_claim_detail(request, claim_id):
     })
 
 
+@login_required
+def warranty_claim_file(request, file_id):
+    claim_file = get_object_or_404(
+        WarrantyClaimFile.objects.select_related('claim', 'claim__user', 'claim__submitted_by'),
+        pk=file_id,
+    )
+    claim = claim_file.claim
+    can_access = (
+        claim.user_id == request.user.id or
+        claim.submitted_by_id == request.user.id or
+        _is_warranty_staff(request.user)
+    )
+    if not can_access:
+        return HttpResponseForbidden('دسترسی ندارید.')
+    return _file_response(
+        claim_file.file,
+        as_attachment=request.GET.get('download') == '1',
+        filename=claim_file.file.name.rsplit('/', 1)[-1],
+    )
+
+
 def warranty_track(request):
     result = None
     error  = None

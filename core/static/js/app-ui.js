@@ -72,10 +72,31 @@
             });
             table.querySelectorAll('tbody tr').forEach(function (row) {
                 if (row.classList.contains('detail-row') || row.classList.contains('preview-row')) return;
+                row.classList.add('app-mobile-card-row');
                 Array.from(row.children).forEach(function (cell, cellIndex) {
                     if (cell.tagName !== 'TD' || cell.hasAttribute('colspan')) return;
                     var label = headers[cellIndex] || '';
                     if (label) cell.dataset.label = label;
+                    cell.classList.add('app-card-cell');
+                    var normalizedLabel = label.replace(/\s+/g, ' ').trim();
+                    if (cellIndex === 0 || /^(ردیف|#|شناسه|کد)$/i.test(normalizedLabel)) {
+                        cell.classList.add('app-card-index');
+                    }
+                    if (/مشتری|نام|عنوان|شرح|درخواست|سند/.test(normalizedLabel) && !cell.classList.contains('app-card-index')) {
+                        cell.classList.add('app-card-title');
+                    }
+                    if (/مبلغ|بدهی|جمع|مانده|ریال/.test(normalizedLabel)) {
+                        cell.classList.add('app-card-amount');
+                    }
+                    if (/وضعیت|تایید|تأیید|مرحله|دسترسی/.test(normalizedLabel)) {
+                        cell.classList.add('app-card-status-cell');
+                    }
+                    if (/تاریخ|زمان|ثبت/.test(normalizedLabel)) {
+                        cell.classList.add('app-card-date');
+                    }
+                    if (/عملیات|اقدام|جزئیات|ویرایش|حذف/.test(normalizedLabel)) {
+                        cell.classList.add('app-card-actions-cell');
+                    }
                 });
             });
             table.classList.add('app-responsive-table');

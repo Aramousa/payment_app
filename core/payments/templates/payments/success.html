@@ -3,6 +3,7 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>ثبت موفق</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
     <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
@@ -10,49 +11,141 @@
         body {
             font-family: Vazir, sans-serif;
             direction: rtl;
-            background: #f5f6f8;
-            padding: 24px;
+            background: #f4f7fb;
+            margin: 0;
+            padding: 20px;
         }
-        .card {
-            max-width: 500px;
-            margin: 40px auto;
+        .success-shell {
+            margin: 32px auto;
+            max-width: 720px;
+            width: 100%;
+        }
+        .success-card {
             background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,.08);
-            padding: 24px;
+            border: 1px solid #dbe5ef;
+            border-radius: 18px;
+            box-shadow: 0 18px 40px rgba(15,23,42,.09);
+            overflow: hidden;
             text-align: center;
         }
-        a, button {
-            display: inline-block;
-            margin-top: 12px;
+        .success-head {
+            background: linear-gradient(135deg, #0f766e, #155e75);
+            color: #fff;
+            padding: 30px 24px 28px;
+        }
+        .success-icon {
+            align-items: center;
+            background: rgba(255,255,255,.18);
+            border: 1px solid rgba(255,255,255,.35);
+            border-radius: 999px;
+            display: inline-flex;
+            font-size: 34px;
+            font-weight: 900;
+            height: 72px;
+            justify-content: center;
+            margin-bottom: 16px;
+            width: 72px;
+        }
+        .success-head h1 {
+            color: #fff;
+            font-size: 24px;
+            line-height: 1.8;
+            margin: 0 0 8px;
+        }
+        .success-head p {
+            color: #e2f8f4;
+            font-size: 14px;
+            line-height: 1.9;
+            margin: 0;
+        }
+        .success-body {
+            padding: 22px;
+        }
+        .status-row {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            color: #334155;
+            font-size: 14px;
+            line-height: 2;
+            padding: 14px;
+            text-align: right;
+        }
+        .success-actions {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 18px;
+        }
+        .success-actions .button-link {
+            align-items: center;
+            border-radius: 12px;
+            display: inline-flex;
+            font-weight: 900;
+            justify-content: center;
+            margin: 0;
+            min-height: 48px;
             padding: 10px 14px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
             text-decoration: none;
         }
-        a {
-            background: #1e3a5f;
-            color: #fff;
-        }
-        button {
-            background: #dc3545;
-            color: #fff;
+        .success-actions .button-link.alt {
+            background: #eef5f8 !important;
+            border: 1px solid #dbe8ee !important;
+            color: #0f3f52 !important;
         }
         .logout-form {
             margin: 0;
+        }
+        @media (max-width: 760px) {
+            body {
+                padding: 10px;
+            }
+            .success-shell {
+                margin: 14px auto;
+            }
+            .success-card {
+                border-radius: 16px;
+            }
+            .success-head {
+                padding: 24px 16px 22px;
+            }
+            .success-icon {
+                font-size: 30px;
+                height: 64px;
+                width: 64px;
+            }
+            .success-head h1 {
+                font-size: 21px;
+            }
+            .success-body {
+                padding: 14px;
+            }
+            .success-actions {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
-    <div class="card">
-        <div style="font-size:48px;margin-bottom:12px;">✅</div>
-        <h2>واریزی با موفقیت ثبت شد</h2>
-        <p style="color:#64748b;font-size:14px;margin:0 0 20px;">اطلاعات واریزی شما دریافت شد و در صف بررسی قرار گرفت.</p>
-        <a href="{% url 'submit' %}" class="button-link">بازگشت به داشبورد</a>
-        <a href="{% url 'payment_create' %}" class="button-link" style="margin-right:8px;">ثبت واریزی جدید</a>
-    </div>
+    <main class="success-shell">
+        <section class="success-card">
+            <div class="success-head">
+                <div class="success-icon" aria-hidden="true">✓</div>
+                <h1>واریزی با موفقیت ثبت شد</h1>
+                <p>اطلاعات و فایل فیش شما دریافت شد و برای بررسی در صف واحد مربوطه قرار گرفت.</p>
+            </div>
+            <div class="success-body">
+                <div class="status-row">
+                    نتیجه بررسی از طریق داشبورد و وضعیت سند قابل پیگیری است. در صورت نیاز می‌توانید یک فیش جدید ثبت کنید.
+                </div>
+                <div class="success-actions">
+                    <a href="{% url 'submit' %}" class="button-link alt">بازگشت به داشبورد</a>
+                    <a href="{% url 'payment_create' %}" class="button-link">ثبت واریزی جدید</a>
+                </div>
+            </div>
+        </section>
+    </main>
     <script src="{% static 'js/app-ui.js' %}"></script>
 </body>
 </html>

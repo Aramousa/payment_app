@@ -55,9 +55,15 @@
         .act-btn.green  { background: #f0fdf4; color: #15803d; border: 1.5px solid #86efac; }
         .act-btn.purple { background: #f5f3ff; color: #6d28d9; }
         /* files */
-        .files-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-        .file-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 6px; background: #f8fafc; }
+        .files-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+        .file-item { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; font-size: 12px; color: #374151; text-decoration: none; display: grid; gap: 8px; background: #f8fafc; }
         .file-item:hover { background: #eff6ff; }
+        .warranty-file-preview { background:#fff; border:1px solid #e2e8f0; border-radius:10px; min-height:180px; overflow:hidden; }
+        .warranty-file-preview iframe { border:0; display:block; height:280px; width:100%; }
+        .warranty-file-preview img { display:block; max-height:280px; object-fit:contain; width:100%; }
+        .warranty-file-actions { display:grid; gap:8px; grid-template-columns:1fr 1fr; }
+        .warranty-file-actions a { align-items:center; background:#1e3a5f; border-radius:8px; color:#fff; display:inline-flex; justify-content:center; min-height:36px; padding:7px 10px; text-decoration:none; }
+        .warranty-file-actions a.alt { background:#eef2f8; color:#1e3a5f; }
         /* rating */
         .stars { display: flex; gap: 6px; margin: 8px 0; }
         .stars label { font-size: 28px; cursor: pointer; color: #d1d5db; }
@@ -121,9 +127,25 @@
         <h3>🖼️ فایل‌ها و تصاویر</h3>
         <div class="files-grid">
             {% for f in files %}
-            <a href="{{ f.file.url }}" target="_blank" class="file-item">
-                📎 {{ f.description|default:"فایل" }} ({{ f.uploaded_at|date:"y/m/d" }})
-            </a>
+            <div class="file-item">
+                <strong>📎 {{ f.description|default:"فایل" }}</strong>
+                <span style="color:#94a3b8;">{{ f.uploaded_at|date:"y/m/d" }}</span>
+                <div class="warranty-file-preview">
+                    {% with file_name=f.file.name|lower %}
+                        {% if ".pdf" in file_name %}
+                            <iframe src="{% url 'warranty_claim_file' f.id %}" title="نمایش فایل گارانتی"></iframe>
+                        {% elif ".jpg" in file_name or ".jpeg" in file_name or ".png" in file_name or ".gif" in file_name or ".webp" in file_name or ".bmp" in file_name %}
+                            <img src="{% url 'warranty_claim_file' f.id %}" alt="فایل گارانتی">
+                        {% else %}
+                            <div style="padding:24px;text-align:center;color:#64748b;">پیش‌نمایش این نوع فایل در مرورگر فعال نیست.</div>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                <div class="warranty-file-actions">
+                    <a href="{% url 'warranty_claim_file' f.id %}" target="_blank" rel="noopener">مشاهده</a>
+                    <a class="alt" href="{% url 'warranty_claim_file' f.id %}?download=1" download>دانلود</a>
+                </div>
+            </div>
             {% endfor %}
         </div>
     </div>
