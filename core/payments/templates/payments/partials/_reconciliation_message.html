@@ -30,7 +30,20 @@
                 {% if message.body %}<div class="msg-body">{{ message.body }}</div>{% endif %}
             </div>
             {% if message.attachment %}
-                <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">📎 {{ message.attachment_display_name|truncatechars:42 }}</a>
+                <div class="msg-attachment-card">
+                    <div class="msg-attachment-head">📎 {{ message.attachment_display_name|truncatechars:42 }}</div>
+                    {% with file_name=message.attachment_display_name|lower %}
+                        {% if ".pdf" in file_name %}
+                            <iframe class="msg-attachment-preview" src="{% url 'reconciliation_attachment_download' message.id %}" title="نمایش پیوست"></iframe>
+                        {% elif ".jpg" in file_name or ".jpeg" in file_name or ".png" in file_name or ".gif" in file_name or ".webp" in file_name or ".bmp" in file_name %}
+                            <img class="msg-attachment-preview" src="{% url 'reconciliation_attachment_download' message.id %}" alt="پیوست">
+                        {% endif %}
+                    {% endwith %}
+                    <div class="msg-attachment-actions">
+                        <a class="msg-attachment" href="{% url 'reconciliation_attachment_download' message.id %}" target="_blank" rel="noopener">مشاهده</a>
+                        <a class="msg-attachment msg-attachment-download" href="{% url 'reconciliation_attachment_download' message.id %}?download=1" download>دانلود</a>
+                    </div>
+                </div>
             {% endif %}
             {% if message.document_label %}
                 {% if message.document_url %}

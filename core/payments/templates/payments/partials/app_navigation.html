@@ -76,6 +76,10 @@
                         {% endfor %}
                     {% endif %}
                 {% endfor %}
+                <form class="app-nav-logout app-user-menu-logout" method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit">خروج</button>
+                </form>
             </div>
         </details>
 
@@ -120,15 +124,15 @@
     </div>
 </nav>
 
-{% if app_nav_is_customer and app_nav_customer_bottom_items %}
-<nav class="app-customer-bottom-nav" aria-label="دسترسی سریع مشتری">
-    {% for item in app_nav_customer_bottom_items %}
-        <a class="app-customer-bottom-link" href="{{ item.url }}" data-nav-key="{{ item.key }}">
+{% if app_nav_mobile_bottom_items %}
+<nav class="app-mobile-bottom-nav app-customer-bottom-nav{% if app_nav_is_staff %} app-staff-bottom-nav{% endif %}" aria-label="دسترسی سریع">
+    {% for item in app_nav_mobile_bottom_items %}
+        <a class="app-mobile-bottom-link app-customer-bottom-link" href="{{ item.url }}" data-nav-key="{{ item.key }}">
             <span class="app-customer-bottom-icon">{{ item.icon }}</span>
             <span class="app-customer-bottom-text">{{ item.label }}</span>
         </a>
     {% endfor %}
-    <button class="app-customer-bottom-link app-customer-more-tab" type="button" data-customer-more-menu aria-label="منوی بیشتر">
+    <button class="app-mobile-bottom-link app-customer-bottom-link app-customer-more-tab" type="button" data-customer-more-menu aria-label="منوی بیشتر">
         <span class="app-customer-bottom-icon">☰</span>
         <span class="app-customer-bottom-text">بیشتر</span>
     </button>

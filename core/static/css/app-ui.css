@@ -1,27 +1,33 @@
 :root {
-    --app-bg: #eef2f6;
+    --app-bg: #f3f6fa;
     --app-surface: #ffffff;
     --app-surface-soft: #f8fafc;
-    --app-border: #dbe3ec;
-    --app-border-strong: #c5d1dd;
-    --app-text: #1f2933;
-    --app-muted: #66788a;
+    --app-surface-tint: #f0f7f8;
+    --app-border: #d9e3ed;
+    --app-border-strong: #bfcedc;
+    --app-text: #182536;
+    --app-muted: #64748b;
     --app-primary: #1e3a5f;
-    --app-primary-dark: #152a45;
-    --app-primary-light: #eef2f8;
-    --app-success: #1a7044;
-    --app-success-dark: #145a38;
-    --app-warning: #a86405;
+    --app-primary-dark: #142844;
+    --app-primary-light: #eaf1f8;
+    --app-accent: #16837a;
+    --app-accent-dark: #0f6b64;
+    --app-accent-light: #e7f6f4;
+    --app-success: #20805a;
+    --app-success-dark: #176544;
+    --app-warning: #a16207;
+    --app-warning-light: #fff7df;
     --app-danger: #b42318;
     --app-danger-dark: #8f1c14;
-    --app-orange: #c2500a;
-    --app-orange-dark: #9e4109;
-    --app-secondary: #52606d;
-    --app-secondary-dark: #3d4e5c;
+    --app-danger-light: #fff1f0;
+    --app-orange: #bd5a13;
+    --app-orange-dark: #93410c;
+    --app-secondary: #5b6878;
+    --app-secondary-dark: #414d5b;
     --app-radius: 8px;
     --app-radius-sm: 6px;
-    --app-shadow: 0 10px 28px rgba(31, 41, 51, 0.08);
-    --app-shadow-soft: 0 4px 14px rgba(31, 41, 51, 0.06);
+    --app-shadow: 0 10px 28px rgba(24, 37, 54, 0.08);
+    --app-shadow-soft: 0 4px 14px rgba(24, 37, 54, 0.06);
     --app-shadow-menu: 0 18px 45px rgba(31, 41, 51, 0.18);
     --app-transition: 0.16s ease;
 }
@@ -630,6 +636,67 @@ h3 {
     align-items: center;
 }
 
+.top-actions,
+.filter-actions,
+.invoice-filter-actions,
+.app-filter-actions,
+.dashboard-actions,
+.file-actions,
+.form-actions,
+.action-row,
+.actions,
+.receipt-thumb-actions,
+.warranty-file-actions,
+.msg-attachment-actions,
+.avatar-cropper-actions,
+.profile-avatar-controls,
+.app-export-actions,
+.thread-filter-actions,
+.chat-actions,
+.user-card-footer {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+}
+
+.top-actions,
+.app-top-actions,
+.filter-actions,
+.invoice-filter-actions,
+.app-filter-actions,
+.form-actions,
+.action-row,
+.actions,
+.app-export-actions {
+    justify-content: flex-end;
+}
+
+.dashboard-actions,
+.file-actions,
+.receipt-thumb-actions,
+.warranty-file-actions,
+.msg-attachment-actions {
+    justify-content: flex-start;
+}
+
+.top-actions > *,
+.filter-actions > *,
+.invoice-filter-actions > *,
+.app-filter-actions > *,
+.dashboard-actions > *,
+.file-actions > *,
+.form-actions > *,
+.action-row > *,
+.actions > *,
+.receipt-thumb-actions > *,
+.warranty-file-actions > *,
+.msg-attachment-actions > *,
+.app-export-actions > * {
+    flex: 0 0 auto;
+}
+
 /* ─── Base button reset ──────────────────────────────────────── */
 .button-link,
 .back-link,
@@ -649,17 +716,19 @@ h3 {
 button[type="submit"] {
     align-items: center;
     border: 1px solid transparent;
-    border-radius: var(--app-radius-sm);
-    box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 0 rgba(255,255,255,.15) inset;
+    border-radius: 9px;
+    box-shadow: 0 1px 2px rgba(24,37,54,.06), 0 1px 0 rgba(255,255,255,.16) inset;
     cursor: pointer;
     display: inline-flex;
     font-family: Vazir, sans-serif;
     font-size: 13px;
-    font-weight: 700;
-    gap: 5px;
+    font-weight: 800;
+    gap: 6px;
     justify-content: center;
-    min-height: 36px;
-    padding: 6px 14px;
+    line-height: 1.6;
+    min-height: 38px;
+    min-width: 38px;
+    padding: 7px 14px;
     text-decoration: none;
     transition: background-color var(--app-transition),
                 box-shadow var(--app-transition),
@@ -695,7 +764,7 @@ button[type="submit"]:active {
 .expand-btn:hover,
 .apply-btn:hover {
     background: var(--app-primary-dark);
-    box-shadow: 0 4px 12px rgba(23,105,170,.25);
+    box-shadow: 0 5px 14px rgba(30,58,95,.22);
     color: #fff;
 }
 
@@ -761,15 +830,53 @@ button[type="submit"]:active {
 
 /* ─── Outlined / حاشیه‌دار ────────────────────────────────────── */
 .button-link.outline {
-    background: transparent;
-    border-color: var(--app-primary);
+    background: #fff;
+    border-color: #bfd0df;
     color: var(--app-primary);
     box-shadow: none;
 }
 
 .button-link.outline:hover {
     background: var(--app-primary-light);
+    border-color: #aabfd3;
     box-shadow: none;
+}
+
+.button-link.secondary,
+.button-link.neutral,
+.action-link.secondary,
+.action-btn.secondary {
+    background: #eef2f6 !important;
+    border-color: #d7e1eb !important;
+    color: #26384d !important;
+}
+
+.button-link.secondary:hover,
+.button-link.neutral:hover,
+.action-link.secondary:hover,
+.action-btn.secondary:hover {
+    background: #e2eaf2 !important;
+    color: #172033 !important;
+}
+
+.button-link.danger,
+.action-btn.danger,
+.action-link.danger,
+.button-link.delete,
+.delete-link,
+.danger-btn {
+    background: var(--app-danger) !important;
+    color: #fff !important;
+}
+
+.button-link.danger:hover,
+.action-btn.danger:hover,
+.action-link.danger:hover,
+.button-link.delete:hover,
+.delete-link:hover,
+.danger-btn:hover {
+    background: var(--app-danger-dark) !important;
+    color: #fff !important;
 }
 
 /* ─── Small buttons ───────────────────────────────────────────── */
@@ -779,6 +886,63 @@ button[type="submit"]:active {
     font-size: 12px;
     min-height: 30px;
     padding: 4px 10px;
+}
+
+.top-actions form,
+.filter-actions form,
+.invoice-filter-actions form,
+.app-filter-actions form,
+.dashboard-actions form,
+.file-actions form,
+.form-actions form,
+.action-row form,
+.actions form,
+.receipt-thumb-actions form,
+.warranty-file-actions form,
+.msg-attachment-actions form,
+.app-export-actions form {
+    align-items: center;
+    display: inline-flex;
+    gap: 8px;
+    margin: 0;
+}
+
+.button-link,
+.back-link,
+.clear-btn,
+.logout-btn,
+.edit-link,
+.cancel-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn,
+.submit-btn,
+.rot-btn,
+.staff-quick button,
+.staff-action button,
+button[type="submit"] {
+    max-width: 100%;
+}
+
+.button-link,
+.detail-link,
+.track-link,
+.edit-link,
+.clear-btn,
+.back-link,
+.cancel-link,
+.customer-link {
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
+.card > .button-link,
+.card > .back-link,
+.section > .button-link,
+.box > .button-link {
+    margin-top: 8px;
 }
 
 /* ─── Disabled ───────────────────────────────────────────────── */
@@ -813,6 +977,54 @@ button:disabled {
     border: 1px solid var(--app-border) !important;
     border-radius: var(--app-radius) !important;
     box-shadow: var(--app-shadow-soft) !important;
+}
+
+.section,
+.box,
+.filter-box,
+.search-box,
+.customer-header,
+.summary-card,
+.empty-message,
+.customer-info,
+.invoice-filter-box,
+.card,
+#payment-form,
+.detail-card,
+.customer-card,
+.dashboard-panel,
+.dashboard-row,
+.recon-panel,
+.action-panel,
+.app-toolbar,
+.app-filter-panel {
+    color: var(--app-text) !important;
+}
+
+.card h1,
+.card h2,
+.card h3,
+.section h1,
+.section h2,
+.section h3,
+.box h1,
+.box h2,
+.box h3,
+.dashboard-panel h1,
+.dashboard-panel h2,
+.dashboard-panel h3,
+.action-panel h1,
+.action-panel h2,
+.action-panel h3 {
+    color: var(--app-primary-dark) !important;
+}
+
+.card h3,
+.section h3,
+.box h3,
+.dashboard-panel h3,
+.action-panel h3 {
+    border-bottom-color: #e5edf4 !important;
 }
 
 .app-toolbar,
@@ -1076,11 +1288,11 @@ button:disabled {
 }
 
 .summary-card {
-    border-top: 3px solid var(--app-primary) !important;
+    border-top: 3px solid var(--app-accent) !important;
 }
 
 .summary-card .value {
-    color: var(--app-primary) !important;
+    color: var(--app-accent-dark) !important;
 }
 
 label {
@@ -1102,8 +1314,8 @@ input:focus,
 select:focus,
 textarea:focus {
     background: #fff;
-    border-color: var(--app-primary) !important;
-    box-shadow: 0 0 0 3px rgba(23, 105, 170, 0.16);
+    border-color: var(--app-accent) !important;
+    box-shadow: 0 0 0 3px rgba(22, 131, 122, 0.16);
     outline: none;
 }
 
@@ -1123,7 +1335,7 @@ table {
 }
 
 th {
-    background: #22384f !important;
+    background: var(--app-primary) !important;
     color: #fff !important;
     font-weight: 700;
     position: sticky;
@@ -1159,7 +1371,7 @@ tbody tr:not(.detail-row) {
 }
 
 tbody tr:hover:not(.detail-row) {
-    background: var(--app-surface-soft) !important;
+    background: var(--app-surface-tint) !important;
 }
 
 .detail-row,
@@ -1184,51 +1396,69 @@ tr.detail-row {
 .status-badge,
 .flag-chip {
     border-radius: 999px !important;
-    font-weight: 700;
+    font-weight: 800;
+    letter-spacing: 0;
+    min-height: 24px;
+    padding-inline: 9px !important;
     white-space: nowrap;
 }
 
 .flag-blue {
-    background: #1769aa !important;
+    background: #256f9d !important;
     color: #fff !important;
 }
 
 .flag-purple {
-    background: #6f4aa8 !important;
+    background: #665a96 !important;
     color: #fff !important;
 }
 
 .flag-teal {
-    background: #00b4a6 !important;
+    background: var(--app-accent) !important;
     color: #fff !important;
 }
 
 .flag-orange {
-    background: #f08c00 !important;
-    color: #2b1700 !important;
+    background: var(--app-warning-light) !important;
+    border: 1px solid #f1c36d !important;
+    color: #7a4600 !important;
 }
 
 .flag-gray {
-    background: #6b7280 !important;
+    background: #eef2f6 !important;
+    border: 1px solid #d7e1eb !important;
+    color: #3b4756 !important;
+}
+
+.status-badge.flag-gray,
+.status-pill.flag-gray {
+    color: #3b4756 !important;
+}
+
+.status-active,
+.status-seen {
+    background: var(--app-success) !important;
     color: #fff !important;
 }
 
 .flag-green,
-.status-active,
-.status-seen {
-    background: #237a57 !important;
+.status-approved,
+.status-resolved {
+    background: var(--app-success) !important;
     color: #fff !important;
 }
 
 .flag-red,
 .status-suspended {
-    background: #b42318 !important;
+    background: var(--app-danger) !important;
+    color: #fff !important;
 }
 
 .flag-yellow,
 .status-unseen {
-    background: #f5d36f !important;
-    color: #2b2111 !important;
+    background: var(--app-warning-light) !important;
+    border: 1px solid #f1c36d !important;
+    color: #7a4600 !important;
 }
 
 .warning-box {
@@ -3683,10 +3913,24 @@ table td {
 }
 
 table th:first-child,
-table td:first-child,
+table td:first-child {
+    text-align: center !important;
+}
+
 table th:last-child,
 table td:last-child {
-    text-align: center !important;
+    text-align: right !important;
+}
+
+table th:last-child .top-actions,
+table td:last-child .top-actions,
+table th:last-child .file-actions,
+table td:last-child .file-actions,
+table th:last-child .dashboard-actions,
+table td:last-child .dashboard-actions,
+table th:last-child .actions,
+table td:last-child .actions {
+    justify-content: flex-start;
 }
 
 .money-cell,
@@ -4303,6 +4547,32 @@ textarea::placeholder {
 
     .msg-bubble {
         max-width: 92% !important;
+    }
+
+    .msg-attachment-card {
+        max-width: 100% !important;
+    }
+
+    .msg-attachment-preview {
+        height: min(58vh, 520px) !important;
+        min-height: 300px !important;
+        width: 100% !important;
+    }
+
+    img.msg-attachment-preview {
+        height: auto !important;
+        max-height: 58vh !important;
+        object-fit: contain !important;
+    }
+
+    .msg-attachment-actions {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    .msg-attachment-actions .msg-attachment {
+        justify-content: center !important;
+        min-height: 36px !important;
     }
 
     .chat-feed {
@@ -4995,6 +5265,7 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
     min-height: 38px;
 }
 
+.app-mobile-bottom-nav,
 .app-customer-bottom-nav {
     display: none;
 }
@@ -5018,7 +5289,20 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
     }
 
     body:has(.app-customer-bottom-nav) .app-top-logout {
-        display: none !important;
+        display: block !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-logout button {
+        background: #fff1f0 !important;
+        border: 1px solid #fecaca !important;
+        border-radius: 14px !important;
+        box-shadow: none !important;
+        color: #b42318 !important;
+        font-size: 11px !important;
+        font-weight: 900 !important;
+        min-height: 40px !important;
+        min-width: 46px !important;
+        padding: 6px 8px !important;
     }
 
     body:has(.app-customer-bottom-nav) .app-top-actions {
@@ -5120,6 +5404,7 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
         padding: 10px !important;
     }
 
+    .app-mobile-bottom-nav,
     .app-customer-bottom-nav {
         align-items: center;
         background: rgba(255,255,255,.94);
@@ -5129,7 +5414,7 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
         box-shadow: 0 -16px 36px rgba(15,23,42,.14);
         display: grid;
         gap: 2px;
-        grid-template-columns: repeat(6, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
         left: 0;
         padding: 8px 6px max(8px, env(safe-area-inset-bottom));
         position: fixed;
@@ -5138,6 +5423,7 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
         backdrop-filter: blur(16px);
     }
 
+    .app-mobile-bottom-link,
     .app-customer-bottom-link {
         align-items: center;
         background: transparent;
@@ -5154,6 +5440,8 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
         text-decoration: none;
     }
 
+    .app-mobile-bottom-link.active,
+    .app-mobile-bottom-link:focus-visible,
     .app-customer-bottom-link.active,
     .app-customer-bottom-link:focus-visible {
         background: #e6f7ee;
@@ -5182,5 +5470,142 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
         top: 58px !important;
         width: min(88vw, 310px) !important;
         z-index: 1270 !important;
+    }
+}
+
+/* Staff mobile cards: dense operational records need a tighter card model than customer summaries. */
+@media (max-width: 760px) {
+    body:has(.app-staff-bottom-nav) {
+        background:
+            radial-gradient(circle at 12% -8%, rgba(22,131,122,.12), transparent 28%),
+            radial-gradient(circle at 92% 0%, rgba(30,58,95,.12), transparent 30%),
+            #f3f6fa !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody {
+        gap: 12px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody tr {
+        background: #fff !important;
+        border: 1px solid #d9e5ef !important;
+        border-radius: 14px !important;
+        box-shadow: 0 10px 24px rgba(24,37,54,.08) !important;
+        display: grid !important;
+        gap: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row::before,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody tr::before {
+        background: linear-gradient(90deg, var(--app-accent), var(--app-primary)) !important;
+        height: 3px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-cell,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody td {
+        align-items: start !important;
+        background: #fff !important;
+        border-bottom: 1px solid #edf2f7 !important;
+        display: grid !important;
+        gap: 4px !important;
+        grid-template-columns: 1fr !important;
+        line-height: 1.75 !important;
+        min-width: 0 !important;
+        padding: 9px 12px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-cell::before,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody td[data-label]::before {
+        color: #6b7d90 !important;
+        content: attr(data-label);
+        font-size: 11px !important;
+        font-weight: 900 !important;
+        line-height: 1.5 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-index {
+        align-items: center !important;
+        background: #f6fafc !important;
+        border-bottom: 1px solid #e4edf5 !important;
+        color: #24364a !important;
+        display: flex !important;
+        font-size: 12px !important;
+        font-weight: 950 !important;
+        justify-content: space-between !important;
+        min-height: 38px !important;
+        padding: 8px 12px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-title {
+        background: #ffffff !important;
+        color: #111827 !important;
+        font-size: 14px !important;
+        font-weight: 950 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-amount {
+        background: #eefaf5 !important;
+        border-bottom-color: #d4efe2 !important;
+        color: #14532d !important;
+        font-size: 15px !important;
+        font-weight: 950 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell {
+        background: #f8fafc !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell > div {
+        align-items: center !important;
+        display: grid !important;
+        gap: 5px !important;
+        grid-template-columns: minmax(58px, auto) minmax(0, 1fr) !important;
+        margin-bottom: 5px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell .status-pill,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell .status-badge,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell .flag-chip {
+        justify-self: start !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell {
+        background: #f6fafc !important;
+        border-bottom: 0 !important;
+        padding: 10px 12px 12px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell > div,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell .file-actions,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell form {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        width: 100% !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell a,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell button {
+        min-height: 40px !important;
+        width: 100% !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody tr.detail-row.open,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody tr.preview-row.open {
+        border-radius: 14px !important;
+        margin-top: -2px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .detail-card,
+    body:has(.app-staff-bottom-nav) .customer-card,
+    body:has(.app-staff-bottom-nav) .dashboard-row,
+    body:has(.app-staff-bottom-nav) .summary-card {
+        border-radius: 14px !important;
+        box-shadow: 0 8px 18px rgba(24,37,54,.07) !important;
     }
 }

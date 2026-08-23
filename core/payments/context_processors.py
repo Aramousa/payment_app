@@ -210,6 +210,10 @@ def app_navigation(request):
         return {
             'app_nav_items': cp_items,
             'app_nav_groups': _group_nav_items(cp_items),
+            'app_nav_is_customer': False,
+            'app_nav_is_staff': False,
+            'app_nav_mobile_bottom_items': cp_items,
+            'app_nav_customer_bottom_items': [],
             'app_nav_role_label': role_label,
             'app_nav_user_display': user_display,
             'app_nav_avatar_url': profile.avatar_url if profile else '',
@@ -324,18 +328,38 @@ def app_navigation(request):
         'counterparty':       'طرف حساب',
     }.get(role, 'کاربر')
 
-    customer_bottom_nav_items = []
+    mobile_bottom_nav_items = []
     if role == 'customer':
         bottom_keys = ['submit', 'payment_create', 'price_lists', 'invoices', 'orders']
         items_by_key = {item['key']: item for item in items}
-        customer_bottom_nav_items = [items_by_key[key] for key in bottom_keys if key in items_by_key]
+        mobile_bottom_nav_items = [items_by_key[key] for key in bottom_keys if key in items_by_key]
+    elif is_staff_user:
+        staff_bottom_keys_by_role = {
+            'finance': ['payment_queue', 'payment_history', 'pending_final', 'invoices', 'reconciliation'],
+            'finance_manager': ['payment_queue', 'pending_final', 'payment_history', 'customers', 'reconciliation'],
+            'commercial': ['payment_queue', 'payment_history', 'customers', 'daily_payment_notices', 'reconciliation'],
+            'commercial_manager': ['payment_queue', 'customers', 'daily_payments', 'daily_payment_notices', 'reconciliation'],
+            'sales': ['sales_dashboard', 'customers', 'orders', 'proformas', 'price_lists'],
+            'sales_manager': ['sales_dashboard', 'customers', 'sales_assignments', 'orders', 'agency'],
+            'warranty': ['warranty_staff', 'warranty_new_staff', 'warranty_my_staff', 'customers', 'reconciliation'],
+            'warranty_manager': ['warranty_staff', 'warranty_new_staff', 'warranty_my_staff', 'customers', 'reconciliation'],
+            'data_entry': ['payment_queue', 'payment_history', 'customers', 'profile_changes', 'reconciliation'],
+            'staff': ['payment_queue', 'payment_history', 'customers', 'reconciliation', 'profile'],
+            'admin': ['payment_queue', 'customers', 'users', 'access_management', 'reconciliation'],
+        }
+        fallback_keys = ['payment_queue', 'payment_history', 'customers', 'reconciliation', 'profile']
+        bottom_keys = staff_bottom_keys_by_role.get(role, fallback_keys)
+        items_by_key = {item['key']: item for item in items}
+        mobile_bottom_nav_items = [items_by_key[key] for key in bottom_keys if key in items_by_key]
 
     # گروه‌بندی آیتم‌ها برای dropdown منو
     return {
         'app_nav_items':  items,
         'app_nav_groups': _group_nav_items(items),
         'app_nav_is_customer': role == 'customer',
-        'app_nav_customer_bottom_items': customer_bottom_nav_items,
+        'app_nav_is_staff': is_staff_user,
+        'app_nav_mobile_bottom_items': mobile_bottom_nav_items,
+        'app_nav_customer_bottom_items': mobile_bottom_nav_items if role == 'customer' else [],
         'app_nav_role_label': role_label,
         'app_nav_user_display': user.get_full_name().strip() or user.username,
         'app_nav_avatar_url': profile.avatar_url if profile else '',

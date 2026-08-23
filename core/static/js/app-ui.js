@@ -18,7 +18,7 @@
     }
 
     function enhanceCustomerBottomNav() {
-        var bottomNav = document.querySelector('.app-customer-bottom-nav');
+        var bottomNav = document.querySelector('.app-mobile-bottom-nav, .app-customer-bottom-nav');
         if (!bottomNav || bottomNav.dataset.ready === '1') return;
         bottomNav.dataset.ready = '1';
 

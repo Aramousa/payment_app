@@ -119,7 +119,12 @@
         .msg-internal-badge { font-size: 11px; font-weight: 800; color: #b45309; margin-bottom: 4px; }
         .thread-internal-chip { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 999px; color: #92400e; font-size: 10px; font-weight: 800; padding: 1px 8px; white-space: nowrap; }
         .doc-link { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; margin-top: 8px; padding: 5px 8px; text-decoration: none; }
-        .msg-attachment { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; gap: 5px; margin-top: 8px; padding: 5px 9px; text-decoration: none; }
+        .msg-attachment-card { background: #f8fafc; border: 1px solid #d8e6f7; border-radius: 10px; display: grid; gap: 8px; margin-top: 8px; max-width: 100%; overflow: hidden; padding: 8px; }
+        .msg-attachment-head { color: #172033; font-size: 12px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .msg-attachment-preview { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; display: block; height: 280px; object-fit: contain; width: 100%; }
+        img.msg-attachment-preview { height: auto; max-height: 280px; }
+        .msg-attachment-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .msg-attachment { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 7px; color: #172033; display: inline-flex; font-size: 12px; font-weight: 800; gap: 5px; margin-top: 0; padding: 5px 9px; text-decoration: none; }
         .msg-attachment:hover { background: #dbeafe; }
         .chat-form { background: #fff; border-top: 1px solid #edf1f6; display: grid; gap: 8px; padding: 12px; }
         .chat-input-row { align-items: end; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; }
