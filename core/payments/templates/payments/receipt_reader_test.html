@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>تست خوانش فیش بانکی</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <style>
         .rr-wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
         .rr-card { background: #fff; border-radius: 14px; padding: 28px;
@@ -65,6 +65,7 @@
                    animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
 {% include "payments/partials/app_navigation.html" %}
@@ -222,7 +223,7 @@
     {% endif %}
 </div>
 
-<script src="{% static 'js/app-ui.js' %}"></script>
+<script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
 <script>
 (function() {
     var fileInput = document.getElementById('receipt_file');

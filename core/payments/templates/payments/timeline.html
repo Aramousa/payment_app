@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 {% load payment_dates %}
 <!DOCTYPE html>
 <html lang="fa">
@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>روال فیش #{{ payment.id }}</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f0f4f8; padding: 20px; }
         .wrap { max-width: {% if is_staff_user %}860px{% else %}680px{% endif %}; margin: 0 auto; }
@@ -139,6 +139,7 @@
             .preview-toolbar-group:not(:first-child) { padding-right: 0; border-right: 0; border-top: 1px solid #dbe3ee; padding-top: 10px; width: 100%; }
         }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -410,6 +411,13 @@
             return match ? match[1].toLowerCase() : 'jpg';
         }
 
+        function withDownloadParam(url) {
+            if (!url) return '';
+            const parsed = new URL(url, window.location.origin);
+            parsed.searchParams.set('download', '1');
+            return parsed.pathname + parsed.search + parsed.hash;
+        }
+
         function setPreviewImageVisible(visible) {
             const imageViewport = previewImage.closest('.app-image-zoom-viewport');
             if (imageViewport) {
@@ -453,7 +461,7 @@
                 isPdf = /\.pdf(\?|#|$)/i.test((fileName || url || '').toLowerCase());
             }
             if (isPdf) {
-                previewFrame.src = url;
+                previewFrame.src = window.AppPdfPreview ? window.AppPdfPreview.viewerUrl(url) : url + '#toolbar=1&navpanes=0&scrollbar=1&view=FitH';
                 previewFrame.style.display = 'block';
                 setPreviewImageVisible(false);
                 previewImage.src = '';
@@ -555,9 +563,10 @@
         // دانلود تصویر سند با نام «نام و نام‌خانوادگی مشتری + شماره سند»
         async function downloadDocumentImage(imageUrl, fileName, downloadName, button) {
             if (!imageUrl) return;
+            const downloadUrl = withDownloadParam(imageUrl);
             if (button) button.disabled = true;
             try {
-                const resp = await fetch(imageUrl, { credentials: 'same-origin' });
+                const resp = await fetch(downloadUrl, { credentials: 'same-origin' });
                 if (!resp.ok) throw new Error('download_failed');
                 const blob = await resp.blob();
                 const blobUrl = URL.createObjectURL(blob);
@@ -569,7 +578,7 @@
                 link.remove();
                 URL.revokeObjectURL(blobUrl);
             } catch (e) {
-                window.open(imageUrl, '_blank', 'noopener');
+                window.open(downloadUrl || imageUrl, '_blank', 'noopener');
             } finally {
                 if (button) button.disabled = false;
             }
@@ -656,6 +665,6 @@
         icon.textContent = open ? '−' : '+';
     }
     </script>
-    <script src="{% static 'js/app-ui.js' %}"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
 </body>
 </html>

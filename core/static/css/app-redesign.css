@@ -1,0 +1,601 @@
+/* Design A final layer. Loaded after page-level styles so the redesign is visible. */
+:root {
+    --redesign-bg: #f4f7fb;
+    --redesign-surface: #ffffff;
+    --redesign-soft: #f8fafc;
+    --redesign-border: #dce6ef;
+    --redesign-border-strong: #c7d5e3;
+    --redesign-text: #162235;
+    --redesign-muted: #66758a;
+    --redesign-primary: #183b56;
+    --redesign-primary-dark: #102a43;
+    --redesign-primary-soft: #e9f2fb;
+    --redesign-accent: #147d74;
+    --redesign-accent-dark: #0f625c;
+    --redesign-accent-soft: #e7f6f4;
+    --redesign-danger: #b42318;
+    --redesign-danger-soft: #fff1f0;
+    --redesign-shadow: 0 8px 22px rgba(15, 23, 42, .06);
+}
+
+html,
+body,
+body * {
+    letter-spacing: 0 !important;
+}
+
+body {
+    background: linear-gradient(180deg, #eef7f6 0, var(--redesign-bg) 220px) !important;
+    color: var(--redesign-text) !important;
+}
+
+.login-wrapper {
+    background:
+        linear-gradient(180deg, #eef7f6 0%, #f4f7fb 100%) !important;
+}
+
+.login-card {
+    border: 1px solid var(--redesign-border) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, .10) !important;
+    overflow: hidden !important;
+}
+
+.login-card::before {
+    background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
+    content: "" !important;
+    display: block !important;
+    height: 5px !important;
+    margin: -30px -30px 24px !important;
+}
+
+.login-btn {
+    background: linear-gradient(135deg, var(--redesign-accent), var(--redesign-primary)) !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 12px 26px rgba(20, 125, 116, .22) !important;
+}
+
+body:has(.app-shell-nav) {
+    background: var(--redesign-bg) !important;
+}
+
+.app-top-header {
+    background: linear-gradient(180deg, #ffffff 0%, #f9fcff 100%) !important;
+    border-bottom: 1px solid var(--redesign-border) !important;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, .08) !important;
+}
+
+.app-top-header::after {
+    background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
+    bottom: -1px !important;
+    content: "" !important;
+    height: 3px !important;
+    left: 0 !important;
+    position: absolute !important;
+    right: 0 !important;
+}
+
+.app-top-brand .app-shell-logo {
+    background: #fff !important;
+    border: 1px solid #edf2f7 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+.app-top-title {
+    color: var(--redesign-text) !important;
+    font-weight: 950 !important;
+}
+
+.app-shell-nav {
+    background: #fff !important;
+    border-left: 1px solid var(--redesign-border) !important;
+    box-shadow: -10px 0 30px rgba(15, 23, 42, .09) !important;
+}
+
+.app-shell-nav::before {
+    background: #f1f8f7 !important;
+    border: 1px solid #cfe9e5 !important;
+    border-radius: 8px !important;
+    color: var(--redesign-accent-dark) !important;
+    content: "نسخه طراحی جدید" !important;
+    display: block !important;
+    font-size: 12px !important;
+    font-weight: 950 !important;
+    margin: 12px 12px 8px !important;
+    padding: 8px 10px !important;
+    text-align: right !important;
+}
+
+.app-shell-nav .app-nav-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100% !important;
+}
+
+.app-shell-nav .app-nav-links {
+    gap: 6px !important;
+    padding: 8px 10px !important;
+}
+
+.app-shell-nav .sb-group-header {
+    color: var(--redesign-muted) !important;
+    font-size: 11px !important;
+    font-weight: 950 !important;
+    padding: 11px 8px 5px !important;
+}
+
+.app-shell-nav .app-nav-direct,
+.app-shell-nav .app-nav-group-panel .app-nav-link {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    color: #26384d !important;
+    font-weight: 850 !important;
+    min-height: 40px !important;
+    padding: 8px 10px !important;
+}
+
+.app-shell-nav .app-nav-direct:hover,
+.app-shell-nav .app-nav-group-panel .app-nav-link:hover,
+.app-shell-nav .app-nav-group[open] > .sb-group-header,
+.app-shell-nav .app-nav-group.active-group > .sb-group-header {
+    background: #f1f6fb !important;
+    border-color: var(--redesign-border) !important;
+    color: var(--redesign-primary) !important;
+}
+
+.app-shell-nav .app-nav-direct.active-link,
+.app-shell-nav .app-nav-group-panel .app-nav-link.active-link {
+    background: var(--redesign-accent-soft) !important;
+    border-color: #bfe7e1 !important;
+    border-right: 3px solid var(--redesign-accent) !important;
+    color: var(--redesign-accent-dark) !important;
+    font-weight: 950 !important;
+}
+
+.app-shell-nav .app-nav-icon {
+    background: #f5f8fb !important;
+    border: 1px solid #e5edf5 !important;
+    border-radius: 8px !important;
+    color: var(--redesign-primary) !important;
+}
+
+.app-shell-nav .active-link .app-nav-icon {
+    background: #dff3ef !important;
+    border-color: #bfe7e1 !important;
+    color: var(--redesign-accent-dark) !important;
+}
+
+.app-sidebar-logout {
+    background: #fff !important;
+    border-top: 1px solid #e5edf5 !important;
+    display: block !important;
+    margin-top: auto !important;
+    padding: 12px !important;
+}
+
+.app-sidebar-logout button,
+.app-top-logout button {
+    background: var(--redesign-danger-soft) !important;
+    border: 1px solid #fecaca !important;
+    border-radius: 8px !important;
+    color: var(--redesign-danger) !important;
+    font-weight: 950 !important;
+}
+
+.notification-trigger,
+.message-envelope,
+.app-user-menu summary {
+    background: var(--redesign-soft) !important;
+    border: 1px solid var(--redesign-border) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    color: var(--redesign-primary) !important;
+}
+
+.section,
+.box,
+.filter-box,
+.search-box,
+.customer-header,
+.summary-card,
+.empty-message,
+.customer-info,
+.invoice-filter-box,
+.card,
+#payment-form,
+.detail-card,
+.customer-card,
+.dashboard-panel,
+.dashboard-row,
+.recon-panel,
+.action-panel,
+.app-toolbar,
+.app-filter-panel,
+.daily-payment-notice,
+.daily-payment-expired,
+.customer-payment-alert,
+.debt-summary {
+    background: #fff !important;
+    border: 1px solid var(--redesign-border) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .055) !important;
+    color: var(--redesign-text) !important;
+}
+
+.customer-dashboard,
+.dashboard-grid,
+.summary-grid,
+.customer-info-grid,
+.debt-summary-grid {
+    gap: 14px !important;
+}
+
+.dashboard-panel,
+.dashboard-row,
+.summary-card,
+.customer-info,
+.debt-summary,
+.daily-payment-notice {
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.dashboard-panel::before,
+.summary-card::before,
+.customer-info::before,
+.debt-summary::before,
+.daily-payment-notice::before {
+    background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
+    content: "" !important;
+    display: block !important;
+    height: 4px !important;
+    left: 0 !important;
+    position: absolute !important;
+    right: 0 !important;
+    top: 0 !important;
+}
+
+.section h1,
+.section h2,
+.box h1,
+.box h2,
+.card h1,
+.card h2,
+.dashboard-panel h1,
+.dashboard-panel h2 {
+    color: var(--redesign-primary) !important;
+    font-weight: 950 !important;
+}
+
+.filter-box,
+.search-box,
+.invoice-filter-box,
+.app-filter-panel,
+.app-table-tools {
+    background: #fbfdff !important;
+}
+
+.app-table-wrap,
+.table-wrap {
+    background: #fff !important;
+    border: 1px solid var(--redesign-border) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .055) !important;
+}
+
+table {
+    color: var(--redesign-text) !important;
+}
+
+thead th,
+table th {
+    background: #f4f7fb !important;
+    border-bottom: 1px solid var(--redesign-border) !important;
+    color: #4d5f75 !important;
+    font-size: 12px !important;
+    font-weight: 950 !important;
+}
+
+tbody td {
+    border-bottom-color: #edf2f7 !important;
+}
+
+tbody tr:hover td {
+    background: #fbfdff !important;
+}
+
+input,
+select,
+textarea {
+    background: #fff !important;
+    border: 1px solid #cfdbe7 !important;
+    border-radius: 8px !important;
+    color: var(--redesign-text) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--redesign-accent) !important;
+    box-shadow: 0 0 0 3px rgba(20, 125, 116, .14) !important;
+    outline: none !important;
+}
+
+.button-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn,
+.submit-btn,
+button[type="submit"] {
+    border-radius: 8px !important;
+    font-weight: 900 !important;
+}
+
+.button-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn {
+    background: var(--redesign-primary) !important;
+    border-color: var(--redesign-primary) !important;
+    color: #fff !important;
+}
+
+.receipt-upload-card,
+#payment-form,
+.upload-zone,
+#receipt-file-label {
+    border-color: #bfe7e1 !important;
+}
+
+#receipt-file-label,
+.upload-zone {
+    background: #f1fbf9 !important;
+    border-style: dashed !important;
+    border-width: 2px !important;
+}
+
+#payment-form button[type="submit"],
+.submit-btn {
+    background: linear-gradient(135deg, var(--redesign-accent), var(--redesign-primary)) !important;
+    border: 0 !important;
+    box-shadow: 0 12px 26px rgba(20, 125, 116, .22) !important;
+    color: #fff !important;
+}
+
+.button-link.alt,
+.button-link.success,
+.submit-btn,
+.staff-quick button,
+.staff-action button {
+    background: var(--redesign-accent) !important;
+    border-color: var(--redesign-accent) !important;
+    color: #fff !important;
+}
+
+.status,
+.status-badge,
+.status-pill,
+.flag-chip {
+    border-radius: 999px !important;
+    font-size: 11px !important;
+    font-weight: 950 !important;
+    min-height: 26px !important;
+    padding: 4px 10px !important;
+}
+
+body:has(.app-staff-bottom-nav) .summary-card,
+body:has(.app-staff-bottom-nav) .dashboard-row,
+body:has(.app-staff-bottom-nav) .detail-card {
+    border-right: 3px solid var(--redesign-border) !important;
+}
+
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .summary-card,
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .customer-info,
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .debt-summary,
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payment-notice {
+    border-right: 3px solid var(--redesign-accent) !important;
+}
+
+@media (min-width: 761px) {
+    body:has(.app-shell-nav) {
+        margin-right: 224px !important;
+        padding-top: 72px !important;
+    }
+
+    body:has(.app-shell-nav) main,
+    body:has(.app-shell-nav) .content,
+    body:has(.app-shell-nav) .container,
+    body:has(.app-shell-nav) .dashboard-container,
+    body:has(.app-shell-nav) .page {
+        max-width: 1240px !important;
+    }
+
+    .app-top-header {
+        height: 64px !important;
+        padding: 0 20px !important;
+    }
+
+    .app-shell-nav {
+        height: calc(100vh - 64px) !important;
+        top: 64px !important;
+        width: 224px !important;
+    }
+
+    .app-shell-nav .app-nav-panel {
+        height: 100% !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        flex: 1 1 auto !important;
+        overflow-y: auto !important;
+    }
+
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav {
+        display: none !important;
+    }
+}
+
+@media (max-width: 760px) {
+    body:has(.app-shell-nav) {
+        margin-right: 0 !important;
+        padding-top: 58px !important;
+    }
+
+    .app-shell-nav {
+        background: #fff !important;
+        border-left: 1px solid var(--redesign-border) !important;
+        box-shadow: -20px 0 45px rgba(15, 23, 42, .2) !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        padding: 10px !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        min-height: 46px !important;
+    }
+
+    .app-table-wrap,
+    .table-wrap {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    .table-wrap table:not(.table-days) tbody tr {
+        border-radius: 8px !important;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, .06) !important;
+        position: relative !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row::before,
+    .table-wrap table:not(.table-days) tbody tr::before {
+        background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
+        content: "" !important;
+        display: block !important;
+        grid-column: 1 / -1 !important;
+        height: 4px !important;
+        width: 100% !important;
+    }
+
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav {
+        background: rgba(255, 255, 255, .98) !important;
+        border-top: 1px solid var(--redesign-border) !important;
+        box-shadow: 0 -14px 34px rgba(15, 23, 42, .14) !important;
+    }
+
+    .app-mobile-bottom-link.active,
+    .app-customer-bottom-link.active,
+    .app-mobile-bottom-link:focus-visible,
+    .app-customer-bottom-link:focus-visible {
+        background: var(--redesign-accent-soft) !important;
+        color: var(--redesign-accent-dark) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions {
+        background: #fff !important;
+        border: 1px solid var(--redesign-border) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, .06) !important;
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        margin: 8px 10px 14px !important;
+        padding: 8px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a {
+        background: #f8fafc !important;
+        border: 1px solid var(--redesign-border) !important;
+        border-radius: 8px !important;
+        box-shadow: none !important;
+        color: var(--redesign-primary) !important;
+        font-size: 13px !important;
+        font-weight: 950 !important;
+        min-height: 46px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child {
+        background: var(--redesign-accent) !important;
+        border-color: var(--redesign-accent) !important;
+        color: #fff !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info,
+    body:has(.app-customer-bottom-nav) .debt-summary,
+    body:has(.app-customer-bottom-nav) .dashboard-panel,
+    body:has(.app-customer-bottom-nav) .daily-payment-notice,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert {
+        border: 1px solid var(--redesign-border) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, .055) !important;
+        margin: 0 10px 14px !important;
+        padding: 14px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info::before,
+    body:has(.app-customer-bottom-nav) .debt-summary::before,
+    body:has(.app-customer-bottom-nav) .dashboard-panel::before,
+    body:has(.app-customer-bottom-nav) .daily-payment-notice::before {
+        height: 3px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-grid,
+    body:has(.app-customer-bottom-nav) .debt-summary-grid,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert-stats {
+        gap: 8px !important;
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item,
+    body:has(.app-customer-bottom-nav) .debt-summary-item,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert-stat {
+        background: #f8fafc !important;
+        border: 1px solid #e5edf5 !important;
+        border-radius: 8px !important;
+        box-shadow: none !important;
+        min-height: 48px !important;
+        padding: 10px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-note {
+        background: #f8fafc !important;
+        border: 1px solid #e5edf5 !important;
+        border-radius: 8px !important;
+        color: var(--redesign-muted) !important;
+        margin-top: 10px !important;
+        padding: 10px !important;
+    }
+
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav {
+        border-radius: 14px 14px 0 0 !important;
+        padding: 7px 6px max(7px, env(safe-area-inset-bottom)) !important;
+    }
+
+    .app-mobile-bottom-link,
+    .app-customer-bottom-link {
+        border-radius: 8px !important;
+        min-height: 48px !important;
+    }
+
+    .app-customer-bottom-icon {
+        font-size: 17px !important;
+    }
+
+    .app-customer-bottom-text {
+        font-size: 9.5px !important;
+    }
+}

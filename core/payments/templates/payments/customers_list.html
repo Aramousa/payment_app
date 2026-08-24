@@ -1,4 +1,4 @@
-{% load humanize %}
+﻿{% load humanize %}
 {% load static %}
 {% load payment_dates %}
 <!DOCTYPE html>
@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>لیست مشتریان</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
         h2 { text-align: center; margin-bottom: 20px; }
@@ -37,6 +37,7 @@
         .search-box { max-width: 1200px; margin: 0 auto 20px auto; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
         .search-box input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -196,6 +197,6 @@
         <div class="empty-message">هیچ مشتری ثبت نشده است.</div>
     {% endif %}
     
-    <script src="{% static 'js/app-ui.js' %}"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
 </body>
 </html>

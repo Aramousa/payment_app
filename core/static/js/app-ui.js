@@ -1,19 +1,78 @@
-(function () {
+﻿(function () {
+    function pdfViewerUrl(url) {
+        if (!url) return url;
+        var viewerParams = 'toolbar=1&navpanes=0&scrollbar=1&view=FitH';
+        var parts = String(url).split('#');
+        if (parts.length === 1) return parts[0] + '#' + viewerParams;
+        var hash = parts.slice(1).join('#');
+        if (!hash) return parts[0] + '#' + viewerParams;
+        if (/(^|&)navpanes=/.test(hash)) return url;
+        return parts[0] + '#' + hash + '&navpanes=0';
+    }
+
+    window.AppPdfPreview = window.AppPdfPreview || {};
+    window.AppPdfPreview.viewerUrl = pdfViewerUrl;
+
+    function ensureRedesignStylesheet() {
+        if (document.querySelector('link[data-app-redesign]')) return;
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/static/css/app-redesign.css?v=ui-redesign-v6';
+        link.setAttribute('data-app-redesign', '1');
+        document.head.appendChild(link);
+    }
+
     function enhanceShellNavigation() {
         document.querySelectorAll('.app-shell-nav').forEach(function (nav) {
             if (nav.dataset.navReady === '1') return;
             nav.dataset.navReady = '1';
-            var trigger = nav.querySelector('.app-nav-toggle');
+            var trigger = nav.querySelector('.app-nav-toggle') || document.getElementById('sb-toggle');
             if (!trigger) return;
+            if (trigger.dataset.shellNavReady === '1') return;
+            var overlay = document.getElementById('sb-overlay');
+
+            function setOpen(open) {
+                nav.classList.toggle('open', open);
+                if (overlay) overlay.classList.toggle('show', open);
+                trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+                document.body.classList.toggle('app-nav-open', open);
+            }
 
             trigger.addEventListener('click', function (event) {
                 event.stopPropagation();
-                var isOpen = nav.classList.toggle('open');
-                trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                setOpen(!nav.classList.contains('open'));
             });
             nav.addEventListener('click', function (event) {
                 event.stopPropagation();
             });
+            if (overlay) {
+                overlay.addEventListener('click', function () {
+                    setOpen(false);
+                });
+            }
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') setOpen(false);
+            });
+            nav.querySelectorAll('a').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    if (window.matchMedia('(max-width: 760px)').matches) setOpen(false);
+                });
+            });
+        });
+    }
+
+    function enhancePdfIframes() {
+        document.querySelectorAll('iframe').forEach(function (frame) {
+            var src = frame.getAttribute('src') || '';
+            if (!src || src.indexOf('#') !== -1) return;
+            if (
+                frame.classList.contains('preview-frame') ||
+                frame.classList.contains('receipt-preview-frame') ||
+                frame.classList.contains('msg-attachment-preview') ||
+                frame.closest('.file-preview, .warranty-file-preview, #file-preview')
+            ) {
+                frame.setAttribute('src', pdfViewerUrl(src));
+            }
         });
     }
 
@@ -34,14 +93,18 @@
         var sidebar = document.getElementById('app-sidebar');
         var overlay = document.getElementById('sb-overlay');
         var toggle = document.getElementById('sb-toggle');
+        function setSidebarOpen(open) {
+            if (!sidebar) return;
+            sidebar.classList.toggle('open', open);
+            if (overlay) overlay.classList.toggle('show', open);
+            if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.body.classList.toggle('app-nav-open', open);
+        }
         if (moreButton && sidebar) {
             moreButton.addEventListener('click', function (event) {
                 event.preventDefault();
                 event.stopPropagation();
-                var open = !sidebar.classList.contains('open');
-                sidebar.classList.toggle('open', open);
-                if (overlay) overlay.classList.toggle('show', open);
-                if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                setSidebarOpen(!sidebar.classList.contains('open'));
             });
         }
     }
@@ -72,6 +135,7 @@
             });
             table.querySelectorAll('tbody tr').forEach(function (row) {
                 if (row.classList.contains('detail-row') || row.classList.contains('preview-row')) return;
+                if (row.children.length <= 1) return;
                 row.classList.add('app-mobile-card-row');
                 Array.from(row.children).forEach(function (cell, cellIndex) {
                     if (cell.tagName !== 'TD' || cell.hasAttribute('colspan')) return;
@@ -1009,7 +1073,8 @@
                 list.innerHTML = items.map(function (item) {
                     var icon = item.icon || '🔔';
                     var time = item.time_label ? '<span class="notif-time">' + escapeHtml(item.time_label) + '</span>' : '';
-                    return '<a class="notification-item" href="' + escapeHtml(item.url) + '" data-notif-id="' + item.id + '">' +
+                    var colorStyle = item.color ? ' style="--notif-color: ' + escapeHtml(item.color) + ';"' : '';
+                    return '<a class="notification-item" href="' + escapeHtml(item.url) + '" data-notif-id="' + item.id + '"' + colorStyle + '>' +
                         '<span class="notif-icon">' + icon + '</span>' +
                         '<span class="notif-body">' +
                             '<strong class="notif-title">' + escapeHtml(item.title) + '</strong>' +
@@ -1169,9 +1234,12 @@
     document.addEventListener('click', function () {
         document.querySelectorAll('.app-shell-nav.open').forEach(function (nav) {
             nav.classList.remove('open');
-            var trigger = nav.querySelector('.app-nav-toggle');
+            var trigger = nav.querySelector('.app-nav-toggle') || document.getElementById('sb-toggle');
             if (trigger) trigger.setAttribute('aria-expanded', 'false');
         });
+        var overlay = document.getElementById('sb-overlay');
+        if (overlay) overlay.classList.remove('show');
+        document.body.classList.remove('app-nav-open');
         document.querySelectorAll('.app-nav-group[open]').forEach(function (group) {
             group.removeAttribute('open');
         });
@@ -1186,9 +1254,12 @@
         if (event.key === 'Escape') {
             document.querySelectorAll('.app-shell-nav.open').forEach(function (nav) {
                 nav.classList.remove('open');
-                var trigger = nav.querySelector('.app-nav-toggle');
+                var trigger = nav.querySelector('.app-nav-toggle') || document.getElementById('sb-toggle');
                 if (trigger) trigger.setAttribute('aria-expanded', 'false');
             });
+            var overlay = document.getElementById('sb-overlay');
+            if (overlay) overlay.classList.remove('show');
+            document.body.classList.remove('app-nav-open');
             document.querySelectorAll('.app-nav-group[open]').forEach(function (group) {
                 group.removeAttribute('open');
             });
@@ -1247,6 +1318,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        ensureRedesignStylesheet();
         localStorage.removeItem('paymentAppTheme');
         document.documentElement.removeAttribute('data-theme');
         enhanceShellNavigation();
@@ -1264,6 +1336,7 @@
         enhanceNotifications();
         enhanceZoomableImages();
         enhanceSelectSubmitOnEnter();
+        enhancePdfIframes();
         
         // Run displayOnlyFileNameInFileInputs again after a short delay
         // to catch dynamically rendered elements

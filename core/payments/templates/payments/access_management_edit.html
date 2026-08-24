@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="fa">
 <head>
@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>ویرایش دسترسی کاربر</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f6f7fb; padding: 20px; }
         .section { max-width: 640px; margin: 0 auto 18px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
@@ -32,6 +32,7 @@
         .field-error { color: #c62828; font-size: 11px; }
         .target-card { background: #eef2f8; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -70,6 +71,6 @@
         </form>
     </div>
 
-    <script src="{% static 'js/app-ui.js' %}"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
 </body>
 </html>

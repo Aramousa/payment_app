@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>اتاق تماس صوتی — ویزیون</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <style>
         body { background: #0f172a; color: #f1f5f9; display: flex; flex-direction: column; font-family: Vazir, sans-serif; margin: 0; min-height: 100vh; }
         .call-header { align-items: center; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 12px; padding: 10px 20px; }
@@ -32,6 +32,7 @@
         .not-configured p { color: #94a3b8; font-size: 13px; line-height: 1.7; margin: 0; }
         .not-configured code { background: #1e293b; border-radius: 5px; color: #38bdf8; font-size: 12px; padding: 2px 7px; }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
 <div class="call-header">

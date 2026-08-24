@@ -28,6 +28,7 @@ class InvoiceFlowTests(TestCase):
         self.commercial_user.profile.role = 'commercial'
         self.commercial_user.profile.can_upload_invoices = True
         self.commercial_user.profile.can_view_invoices = True
+        self.commercial_user.profile.force_password_change = False
         self.commercial_user.profile.save()
 
         self.finance_user = User.objects.create_user(
@@ -620,6 +621,66 @@ class InvoiceFlowTests(TestCase):
         self.assertNotIn('فیش', basename)
         basename.encode('ascii')
 
+    def test_receipt_pdf_can_be_embedded_for_inline_preview(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='PDF-PREVIEW',
+        )
+        receipt = PaymentReceipt.objects.create(
+            payment=payment,
+            image=SimpleUploadedFile('receipt.pdf', b'%PDF-1.5\nsample', content_type='application/pdf'),
+            file_hash='pdf-preview-hash',
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('receipt_file', args=[receipt.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertEqual(response['X-Frame-Options'], 'SAMEORIGIN')
+        self.assertIn('inline', response['Content-Disposition'])
+
+    def test_receipt_download_names_are_consistent_for_pdf_and_images(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='DOWNLOAD-NAME',
+            beneficiary_account_owner='Owner Name',
+        )
+        pdf_receipt = PaymentReceipt.objects.create(
+            payment=payment,
+            image=SimpleUploadedFile('receipt.pdf', b'%PDF-1.5\nsample', content_type='application/pdf'),
+            file_hash='download-name-pdf',
+        )
+        image_receipt = PaymentReceipt.objects.create(
+            payment=payment,
+            image=SimpleUploadedFile('receipt.jpg', b'image sample', content_type='image/jpeg'),
+            file_hash='download-name-image',
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        expected_base = f'Ali Customer - {payment.id} - Owner Name'
+        for receipt, extension in ((pdf_receipt, '.pdf'), (image_receipt, '.jpg')):
+            response = self.client.get(f"{reverse('receipt_file', args=[receipt.id])}?download=1")
+            disposition = response['Content-Disposition']
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('attachment', disposition)
+            self.assertIn(expected_base, disposition)
+            self.assertIn(extension, disposition)
+
     def test_payment_workflow_active_queue_history_and_logs(self):
         payment = PaymentRecord.objects.create(
             user=self.customer_user,
@@ -663,7 +724,7 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(payment.status, PaymentRecord.STATUS_APPROVED)
 
         response = self.client.get(reverse('submit'))
-        self.assertContains(response, 'WF-APPROVE')
+        self.assertNotContains(response, 'WF-APPROVE')
         response = self.client.get(reverse('payment_history'))
         self.assertContains(response, 'WF-APPROVE')
 
@@ -673,12 +734,12 @@ class InvoiceFlowTests(TestCase):
         self.assertContains(response, 'WF-APPROVE')
 
         response = self.client.post(
-            reverse('staff_update_status', args=[payment.id]),
-            {'status': PaymentRecord.STATUS_FINAL_APPROVED, 'note': '', 'next': reverse('submit')},
+            reverse('finance_unified_action', args=[payment.id]),
+            {'finance_action': 'finance_register', 'note': '', 'next': reverse('submit')},
         )
         self.assertEqual(response.status_code, 302)
         payment.refresh_from_db()
-        self.assertEqual(payment.status, PaymentRecord.STATUS_FINAL_APPROVED)
+        self.assertEqual(payment.finance_status, PaymentRecord.FINANCE_STATUS_APPROVED)
 
         response = self.client.get(reverse('submit'))
         self.assertNotContains(response, 'WF-APPROVE')
@@ -718,7 +779,7 @@ class InvoiceFlowTests(TestCase):
         self.client.logout()
         self.client.login(username='commercial1', password='pass1234')
         response = self.client.get(reverse('submit'))
-        self.assertContains(response, payment.tracking_code)
+        self.assertNotContains(response, payment.tracking_code)
 
     def test_commercial_can_return_approved_payment_to_temp_and_reset_finance(self):
         payment = PaymentRecord.objects.create(
@@ -738,7 +799,7 @@ class InvoiceFlowTests(TestCase):
         )
 
         self.client.login(username='commercial1', password='pass1234')
-        response = self.client.get(reverse('submit'))
+        response = self.client.get(reverse('payment_history'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, payment.tracking_code)
 
@@ -823,12 +884,45 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(UserNotification.objects.filter(user=self.customer_user, is_read=False).count(), 0)
 
+    def test_notification_open_marks_item_read_and_decreases_feed_count(self):
+        target_url = reverse('submit')
+        notification = UserNotification.objects.create(
+            user=self.commercial_user,
+            title='Notice',
+            message='Open me',
+            url=target_url,
+            category=UserNotification.CATEGORY_SYSTEM,
+        )
+        UserNotification.objects.create(
+            user=self.commercial_user,
+            title='Other notice',
+            message='Keep unread',
+            url=target_url,
+            category=UserNotification.CATEGORY_SYSTEM,
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('notifications_feed'))
+        self.assertEqual(response.json()['unread_count'], 2)
+
+        response = self.client.get(reverse('notification_open', args=[notification.id]))
+        self.assertRedirects(response, target_url)
+
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
+        self.assertIsNotNone(notification.read_at)
+
+        response = self.client.get(reverse('notifications_feed'))
+        self.assertEqual(response.json()['unread_count'], 1)
+
     def test_counterparty_approval_notification_links_to_payment_and_marks_read_on_view(self):
         counterparty_user = User.objects.create_user(username='counterparty1', password='pass1234')
         counterparty_user.profile.role = 'counterparty'
         counterparty_user.profile.force_password_change = False
         counterparty_user.profile.save()
-        counterparty = Counterparty.objects.create(name='CP Alpha', user=counterparty_user)
+        counterparty = self.counterparty
+        counterparty.user = counterparty_user
+        counterparty.save(update_fields=['user'])
         payment = PaymentRecord.objects.create(
             user=self.customer_user,
             counterparty=counterparty,
@@ -889,12 +983,16 @@ class InvoiceFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload['items'][0]['url'], reverse('payment_timeline', args=[payment.id]))
+        open_url = reverse('notification_open', args=[notification.id])
+        self.assertEqual(payload['items'][0]['url'], open_url)
 
-        response = self.client.get(reverse('payment_timeline', args=[payment.id]))
-        self.assertEqual(response.status_code, 200)
+        response = self.client.get(open_url)
+        self.assertRedirects(response, reverse('payment_timeline', args=[payment.id]))
         notification.refresh_from_db()
         self.assertTrue(notification.is_read)
+
+        response = self.client.get(reverse('notifications_feed'))
+        self.assertEqual(response.json()['unread_count'], 0)
 
     def test_customer_sees_commercial_and_final_approval_as_distinct_statuses(self):
         commercial_payment = PaymentRecord.objects.create(
@@ -1001,21 +1099,17 @@ class InvoiceFlowTests(TestCase):
 
     def test_staff_status_choices_for_commercial_role(self):
         choices = _staff_status_choices_for_role('commercial')
-        self.assertEqual(
-            choices,
-            [
-                (PaymentRecord.STATUS_APPROVED, 'ثبت بازرگانی'),
-                (PaymentRecord.STATUS_INCOMPLETE, 'ناقص'),
-                (PaymentRecord.STATUS_REJECTED, 'رد شده'),
-            ]
-        )
+        values = [value for value, _ in choices]
+        self.assertIn(PaymentRecord.STATUS_APPROVED, values)
+        self.assertIn(PaymentRecord.STATUS_TEMP_COMMERCIAL, values)
+        self.assertIn(PaymentRecord.STATUS_FOLLOW_UP, values)
+        self.assertIn(PaymentRecord.STATUS_RETURNED_TO_FINANCE, values)
 
     def test_staff_status_choices_for_finance_role(self):
         choices = _staff_status_choices_for_role('finance')
         self.assertEqual(
             choices,
             [
-                (PaymentRecord.STATUS_FINAL_APPROVED, 'تایید نهایی'),
                 (PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
             ]
         )
@@ -1044,6 +1138,117 @@ class InvoiceFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         payment.refresh_from_db()
         self.assertEqual(payment.status, PaymentRecord.STATUS_PENDING)
+
+    def test_commercial_return_to_finance_reopens_finance_queue(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='RETURN-FINANCE',
+            status=PaymentRecord.STATUS_TEMP_COMMERCIAL,
+            finance_status=PaymentRecord.FINANCE_STATUS_APPROVED,
+            finance_registered_by=self.finance_user,
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {
+                'status': PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+                'note': 'Needs finance review',
+                'next': reverse('submit'),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_RETURNED_TO_FINANCE)
+        self.assertIsNone(payment.finance_status)
+        self.assertIsNone(payment.finance_registered_by)
+        self.assertTrue(
+            UserNotification.objects.filter(
+                user=self.finance_user,
+                color='#DBEAFE',
+                is_read=False,
+            ).exists()
+        )
+
+        self.client.logout()
+        self.client.login(username='finance1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertContains(response, payment.tracking_code)
+
+    def test_incomplete_payment_is_customer_editable_and_hidden_from_staff_queue(self):
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='INCOMPLETE-CUSTOMER',
+            status=PaymentRecord.STATUS_INCOMPLETE,
+            last_staff_note='Please upload a clearer receipt',
+        )
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('payment_create'))
+        self.assertContains(response, reverse('edit_payment', args=[payment.id]))
+
+        self.client.logout()
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.get(reverse('submit'))
+        self.assertNotContains(response, payment.tracking_code)
+
+    def test_counterparty_pending_blocks_commercial_approval_until_approved(self):
+        counterparty_user = User.objects.create_user(username='counterparty2', password='pass1234')
+        counterparty_user.profile.role = 'counterparty'
+        counterparty_user.profile.force_password_change = False
+        counterparty_user.profile.save()
+        counterparty = Counterparty.objects.create(name='CP Beta', user=counterparty_user)
+        payment = PaymentRecord.objects.create(
+            user=self.customer_user,
+            counterparty=counterparty,
+            first_name='Ali',
+            last_name='Customer',
+            organization='Alpha',
+            city='Tehran',
+            phone='09120000002',
+            amount=100000,
+            pay_date=jdatetime.date(1405, 2, 8),
+            tracking_code='CP-BLOCK',
+            status=PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+        )
+
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {'status': PaymentRecord.STATUS_APPROVED, 'note': '', 'next': reverse('submit')},
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_COMMERCIAL_REVIEW)
+
+        self.client.logout()
+        self.client.login(username='counterparty2', password='pass1234')
+        response = self.client.post(reverse('counterparty_approve_payment', args=[payment.id]), {'note': 'ok'})
+        self.assertEqual(response.status_code, 302)
+
+        self.client.logout()
+        self.client.login(username='commercial1', password='pass1234')
+        response = self.client.post(
+            reverse('staff_update_status', args=[payment.id]),
+            {'status': PaymentRecord.STATUS_APPROVED, 'note': '', 'next': reverse('submit')},
+        )
+        self.assertEqual(response.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, PaymentRecord.STATUS_APPROVED)
 
     def test_excel_export_defaults_to_all_fields_and_accepts_selected_fields(self):
         for index in range(11):

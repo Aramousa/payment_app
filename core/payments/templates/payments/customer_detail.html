@@ -1,4 +1,4 @@
-{% load humanize %}
+﻿{% load humanize %}
 {% load static %}
 {% load payment_dates %}
 <!DOCTYPE html>
@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>اطلاعات مشتری - {{ customer_user.username }}</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <script src="{% static 'js/bank-autocomplete.js' %}?v=4"></script>
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background-color: #f7f7f7; padding: 20px; }
@@ -122,6 +122,7 @@
 
         .empty-message { max-width: 1200px; margin: 20px auto; background: #fff; padding: 40px; border-radius: 10px; text-align: center; color: #666; }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -547,7 +548,7 @@
     });
     </script>
 
-    <script src="{% static 'js/app-ui.js' %}"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
     <script>
     // ─── Row expand / collapse ───
     document.addEventListener('DOMContentLoaded', function () {
@@ -585,7 +586,7 @@
                 var frame = document.getElementById('previewFrame');
                 if (!overlay || !img || !frame) { window.open(url, '_blank', 'noopener'); return; }
                 if (name.toLowerCase().endsWith('.pdf')) {
-                    img.style.display = 'none'; frame.style.display = 'block'; frame.src = url;
+                    img.style.display = 'none'; frame.style.display = 'block'; frame.src = window.AppPdfPreview ? window.AppPdfPreview.viewerUrl(url) : url + '#toolbar=1&navpanes=0&scrollbar=1&view=FitH';
                 } else {
                     frame.style.display = 'none'; img.style.display = 'block'; img.src = url;
                 }
@@ -595,11 +596,18 @@
 
         function sanitize(t) { return (t||'').replace(/[\\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim(); }
         function ext(n) { var m=/\.([a-zA-Z0-9]{1,8})(?:[?#]|$)/.exec((n||'').split('/').pop()||''); return m?m[1].toLowerCase():'jpg'; }
+        function withDownloadParam(url) {
+            if (!url) return '';
+            var parsed = new URL(url, window.location.origin);
+            parsed.searchParams.set('download', '1');
+            return parsed.pathname + parsed.search + parsed.hash;
+        }
 
         async function dlImg(url, fname, dlName, btn) {
+            var downloadUrl = withDownloadParam(url);
             if (btn) btn.disabled = true;
             try {
-                var r = await fetch(url, {credentials:'same-origin'});
+                var r = await fetch(downloadUrl, {credentials:'same-origin'});
                 if (!r.ok) throw new Error();
                 var blob = await r.blob();
                 var burl = URL.createObjectURL(blob);
@@ -607,7 +615,7 @@
                 a.download = (dlName||'سند') + '.' + ext(fname);
                 document.body.appendChild(a); a.click(); a.remove();
                 URL.revokeObjectURL(burl);
-            } catch(e) { window.open(url,'_blank','noopener'); }
+            } catch(e) { window.open(downloadUrl || url,'_blank','noopener'); }
             finally { if (btn) btn.disabled = false; }
         }
 

@@ -53,6 +53,8 @@ STATUS_FLAG_META = {
     PaymentRecord.STATUS_REJECTED: ('رد شده', 'flag-red'),
     PaymentRecord.STATUS_INCOMPLETE: ('ناقص', 'flag-yellow'),
     PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: ('عودت به بازرگانی', 'flag-gray'),
+    PaymentRecord.STATUS_RETURNED_TO_FINANCE: ('عودت به مالی', 'flag-blue'),
+    PaymentRecord.STATUS_FOLLOW_UP: ('پیگیری', 'flag-yellow'),
 }
 STATUS_PROGRESS_FLOWS = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW],
@@ -66,6 +68,8 @@ STATUS_PROGRESS_FLOWS = {
     PaymentRecord.STATUS_REJECTED: [PaymentRecord.STATUS_REJECTED],
     PaymentRecord.STATUS_INCOMPLETE: [PaymentRecord.STATUS_INCOMPLETE],
     PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL],
+    PaymentRecord.STATUS_RETURNED_TO_FINANCE: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_RETURNED_TO_FINANCE],
+    PaymentRecord.STATUS_FOLLOW_UP: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FOLLOW_UP],
 }
 CUSTOMER_STATUSES = [
     (PaymentRecord.STATUS_PENDING, 'در حال بررسی'),
@@ -503,12 +507,15 @@ def _file_response(field_file, as_attachment=False, filename=None):
         raise Http404 from exc
     download_name = filename or field_file.name.rsplit('/', 1)[-1]
     content_type, _ = mimetypes.guess_type(download_name)
-    return FileResponse(
+    response = FileResponse(
         field_file,
         as_attachment=as_attachment,
         filename=download_name,
         content_type=content_type or 'application/octet-stream',
     )
+    if not as_attachment:
+        response['X-Frame-Options'] = 'SAMEORIGIN'
+    return response
 
 
 def _safe_download_name_part(value, max_length=80):
@@ -606,19 +613,18 @@ def pwa_manifest(request):
 
 def pwa_service_worker(request):
     script = """
-const CACHE_NAME = 'rabasa-customer-pwa-v3';
+const CACHE_NAME = 'rabasa-customer-pwa-v7';
 const APP_SHELL = [
   '/accounts/login/',
   '/static/css/font-face.css',
-  '/static/css/app-ui.css',
   '/static/css/persian-datepicker.min.css',
   '/static/js/jquery.min.js',
   '/static/js/persian-date.min.js',
   '/static/js/persian-datepicker.min.js',
   '/static/js/cleave.min.js',
-  '/static/js/app-ui.js',
   '/static/logo/logo-top.png'
 ];
+const APP_SHELL_SET = new Set(APP_SHELL);
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -643,6 +649,17 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/notifications/') ||
+    url.pathname === '/static/css/app-ui.css' ||
+    url.pathname === '/static/css/app-redesign.css' ||
+    url.pathname === '/static/js/app-ui.js'
+  ) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
+
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() => caches.match('/accounts/login/'))
@@ -650,16 +667,26 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  if (APP_SHELL_SET.has(url.pathname)) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(response => {
+          if (!response || response.status !== 200 || response.type !== 'basic') return response;
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-      return fetch(request).then(response => {
+    fetch(request).then(response => {
         if (!response || response.status !== 200 || response.type !== 'basic') return response;
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
         return response;
-      });
-    })
+      }).catch(() => caches.match(request))
   );
 });
 """
@@ -755,7 +782,9 @@ def _staff_status_choices_for_role(role):
     COMMERCIAL_CHOICES = [
         (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'در حال بررسی بازرگانی'),
         (PaymentRecord.STATUS_TEMP_COMMERCIAL,   'ثبت موقت بازرگانی'),
+        (PaymentRecord.STATUS_FOLLOW_UP,         'پیگیری'),
         (PaymentRecord.STATUS_APPROVED,           'ثبت بازرگانی'),
+        (PaymentRecord.STATUS_RETURNED_TO_FINANCE, 'عودت به مالی'),
         (PaymentRecord.STATUS_INCOMPLETE,         'ناقص'),
         (PaymentRecord.STATUS_REJECTED,           'رد شده'),
     ]
@@ -799,15 +828,19 @@ def _can_staff_act_on_payment(role, payment, is_system_admin=False):
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        PaymentRecord.STATUS_FOLLOW_UP,
         PaymentRecord.STATUS_APPROVED,
     }
+
+    if dept == 'sales' and payment.status == PaymentRecord.STATUS_APPROVED:
+        return False
 
     if dept == 'commercial' or dept == 'sales':
         return payment.status in COMMERCIAL_ACTIVE_STATUSES
 
     if dept == 'finance':
         # مالی فقط عودت به بازرگانی را از طریق این فلگ انجام می‌دهد
-        return payment.status == PaymentRecord.STATUS_APPROVED
+        return payment.status == PaymentRecord.STATUS_APPROVED and payment.is_finance_registered
 
     if is_system_admin:
         # ادمین در هر وضعیتی می‌تواند اقدام کند (برای مدیریت)
@@ -835,7 +868,6 @@ def _commercial_can_revise(payment, logs=None):
     REVISABLE = {
         PaymentRecord.STATUS_APPROVED,
         PaymentRecord.STATUS_REJECTED,
-        PaymentRecord.STATUS_INCOMPLETE,
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
     }
     if payment.status not in REVISABLE:
@@ -976,22 +1008,31 @@ def _active_payment_records_for_user(user):
 
     role = _department_role(_user_role(user))
     if role == 'commercial':
-        return records.filter(status__in=[
+        return records.filter(
+            Q(status__in=[
             PaymentRecord.STATUS_PENDING,
             PaymentRecord.STATUS_COMMERCIAL_REVIEW,
             PaymentRecord.STATUS_TEMP_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
-            PaymentRecord.STATUS_APPROVED,
-        ])
+            PaymentRecord.STATUS_FOLLOW_UP,
+            PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+            ])
+            | Q(counterparty_status=PaymentRecord.CP_STATUS_RETURNED)
+        ).exclude(status__in=[
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+            PaymentRecord.STATUS_INCOMPLETE,
+        ]).filter(pending_final_approval=False)
     if role == 'finance':
         return records.filter(status__in=[
             PaymentRecord.STATUS_PENDING,
             PaymentRecord.STATUS_COMMERCIAL_REVIEW,
             PaymentRecord.STATUS_TEMP_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+            PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+            PaymentRecord.STATUS_FOLLOW_UP,
             PaymentRecord.STATUS_APPROVED,
-            PaymentRecord.STATUS_INCOMPLETE,
-        ], pending_final_approval=False)
+        ], pending_final_approval=False).exclude(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
     if role == 'data_entry':
         return records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
@@ -1001,6 +1042,7 @@ def _active_payment_records_for_user(user):
         filtered = records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_REJECTED,
+            PaymentRecord.STATUS_INCOMPLETE,
         ]).filter(pending_final_approval=False)
         return _customer_limited_queryset_for_user(filtered, user, customer_field='user')
     return records.none()
@@ -1631,6 +1673,8 @@ def _payment_has_non_customer_operation(payment):
 
 
 def _can_customer_edit_payment(payment):
+    if payment.status == PaymentRecord.STATUS_INCOMPLETE:
+        return not payment.is_locked
     return not _payment_has_non_customer_operation(payment)
 
 
@@ -1661,8 +1705,9 @@ def _notification_payload(notification):
         'id':         notification.id,
         'title':      notification.title,
         'message':    notification.message,
-        'url':        notification.resolved_url,
+        'url':        reverse('notification_open', args=[notification.id]),
         'category':   notification.category,
+        'color':      notification.color,
         'icon':       icon,
         'time_label': time_label,
         'created_at': _format_jalali_datetime(notification.created_at),
@@ -1694,7 +1739,7 @@ def _mark_notifications_read_for_url(user, url):
     ).update(is_read=True, read_at=now)
 
 
-def _notify_users(users, title, message, url='', category=UserNotification.CATEGORY_SYSTEM, actor=None, sms_message=None):
+def _notify_users(users, title, message, url='', category=UserNotification.CATEGORY_SYSTEM, actor=None, sms_message=None, color=''):
     from .sms_service import notify_sms
     seen_user_ids = set()
     notifications = []
@@ -1709,12 +1754,67 @@ def _notify_users(users, title, message, url='', category=UserNotification.CATEG
             message=message,
             url=url,
             category=category,
+            color=color or '',
         ))
         # ارسال پیامک اطلاع‌رسانی (اگر فعال باشد)
         if sms_message:
             notify_sms(user, sms_message, purpose='notification')
     if notifications:
         UserNotification.objects.bulk_create(notifications)
+
+
+def _payment_notification_color(status=None, event=''):
+    if event == 'created':
+        return '#DDF6D2'
+    if event == 'finance_registered':
+        return '#DDF6D2'
+    if event == 'counterparty_approved':
+        return '#B5F1CC'
+    if event == 'counterparty_returned':
+        return '#FEEAC9'
+    if event == 'counterparty_rejected':
+        return '#FECACA'
+    return {
+        PaymentRecord.STATUS_APPROVED: '#B5F1CC',
+        PaymentRecord.STATUS_TEMP_COMMERCIAL: '#FEEAC9',
+        PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: '#E9D5FF',
+        PaymentRecord.STATUS_RETURNED_TO_FINANCE: '#DBEAFE',
+        PaymentRecord.STATUS_FOLLOW_UP: '#FEF3C7',
+        PaymentRecord.STATUS_REJECTED: '#FECACA',
+        PaymentRecord.STATUS_INCOMPLETE: '#FEF3C7',
+        PaymentRecord.STATUS_FINAL_APPROVED: '#DCFCE7',
+    }.get(status, '')
+
+
+def _notify_customer_payment_sms(payment):
+    if not payment.user_id:
+        return
+    from .sms_service import notify_sms
+    amount = _format_thousand_separator(payment.amount or 0)
+    date_text = _format_jalali_date(payment.pay_date)
+    tracking = payment.tracking_code or '-'
+    notify_sms(
+        payment.user,
+        f'فیش شما ثبت شد. مبلغ:{amount} ریال، تاریخ:{date_text}، پیگیری:{tracking}',
+        purpose='payment_created',
+    )
+
+
+def _notify_payment_finance_registered(payment, actor):
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
+    recipients = []
+    if payment.user_id and (not actor or payment.user_id != actor.id):
+        recipients.append(payment.user)
+    recipients.extend(_staff_notification_users(roles={'commercial', 'sales'}, exclude_user=actor))
+    _notify_users(
+        recipients,
+        'ثبت مالی فیش',
+        f'فیش #{payment.id} مشتری {customer_name} توسط مالی ثبت شد.',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+        color=_payment_notification_color(event='finance_registered'),
+    )
 
 
 def _staff_notification_users(roles=None, exclude_user=None):
@@ -1754,6 +1854,7 @@ def _notify_payment_created(payment, actor):
         reverse('payment_timeline', args=[payment.id]),
         category=UserNotification.CATEGORY_PAYMENT,
         actor=actor,
+        color=_payment_notification_color(event='created'),
     )
 
 
@@ -1770,6 +1871,10 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
         recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL:
         recipients.extend(_staff_notification_users(roles={'commercial'}, exclude_user=actor))
+    elif to_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE:
+        recipients.extend(_staff_notification_users(roles={'finance', 'commercial', 'sales'}, exclude_user=actor))
+    elif to_status == PaymentRecord.STATUS_FOLLOW_UP:
+        recipients.extend(_staff_notification_users(roles={'commercial', 'sales'}, exclude_user=actor))
     elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED, PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
         recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
 
@@ -1781,6 +1886,7 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
         reverse('payment_timeline', args=[payment.id]),
         category=UserNotification.CATEGORY_PAYMENT,
         actor=actor,
+        color=_payment_notification_color(to_status),
     )
 
 
@@ -1917,6 +2023,8 @@ def _log_text(log):
             PaymentRecord.STATUS_REJECTED:   '🚫',
             PaymentRecord.STATUS_INCOMPLETE: '⚠',
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: '↩',
+            PaymentRecord.STATUS_RETURNED_TO_FINANCE: '↪',
+            PaymentRecord.STATUS_FOLLOW_UP: '⌕',
             PaymentRecord.STATUS_COMMERCIAL_REVIEW: '🔍',
         }.get(log.to_status, '🔄')
         base = f"{icon} {role} ({actor}) فلگ بازرگانی را"
@@ -2026,6 +2134,8 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+        PaymentRecord.STATUS_FOLLOW_UP,
         PaymentRecord.STATUS_APPROVED,
         PaymentRecord.STATUS_FINAL_APPROVED,
         PaymentRecord.STATUS_REJECTED,
@@ -2112,10 +2222,10 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             if payment.can_finance_register:
                 finance_choices.append(('finance_register', 'ثبت مالی'))
             # عودت وقتی بازرگانی سند را به یکی از وضعیت‌های ثبت بازرگانی، ناقص یا رد تغییر داده باشد
-            if payment.status in {
-                PaymentRecord.STATUS_APPROVED,
-                PaymentRecord.STATUS_INCOMPLETE,
+            if payment.is_finance_registered and not payment.pending_final_approval and payment.status not in {
+                PaymentRecord.STATUS_FINAL_APPROVED,
                 PaymentRecord.STATUS_REJECTED,
+                PaymentRecord.STATUS_INCOMPLETE,
             }:
                 finance_choices.append(('return_to_commercial', 'عودت به بازرگانی'))
         payment.finance_choices = finance_choices
@@ -2240,6 +2350,8 @@ def _apply_record_filters(records, request, is_staff_user):
                 PaymentRecord.STATUS_PENDING,
                 PaymentRecord.STATUS_COMMERCIAL_REVIEW,
                 PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+                PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+                PaymentRecord.STATUS_FOLLOW_UP,
             ],
             PaymentRecord.STATUS_FINAL_APPROVED: [
                 PaymentRecord.STATUS_APPROVED,
@@ -2729,12 +2841,32 @@ def _invoice_customer_rows():
 
 
 @login_required
+@never_cache
 def notifications_feed(request):
     notifications = UserNotification.objects.filter(user=request.user, is_read=False)[:10]
     return JsonResponse({
         'unread_count': UserNotification.objects.filter(user=request.user, is_read=False).count(),
         'items': [_notification_payload(notification) for notification in notifications],
     })
+
+
+@login_required
+@never_cache
+def notification_open(request, notification_id):
+    notification = get_object_or_404(UserNotification, id=notification_id, user=request.user)
+    if not notification.is_read:
+        notification.is_read = True
+        notification.read_at = timezone.now()
+        notification.save(update_fields=['is_read', 'read_at'])
+
+    target_url = notification.resolved_url or reverse('submit')
+    if not url_has_allowed_host_and_scheme(
+        target_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        target_url = reverse('submit')
+    return redirect(target_url)
 
 
 @login_required
@@ -2777,6 +2909,7 @@ def reconciliation_attachment_download(request, message_id):
 
 @login_required
 @require_POST
+@never_cache
 def notifications_mark_read(request):
     queryset = UserNotification.objects.filter(user=request.user, is_read=False)
     notification_id = request.POST.get('id')
@@ -3509,6 +3642,7 @@ def create_payment(request):
                 _save_receipts(payment, form)
                 _log_activity(payment, request.user, PaymentActivityLog.ACTION_CREATED, to_status=payment.status)
                 _notify_payment_created(payment, request.user)
+                _notify_customer_payment_sms(payment)
                 return redirect('success')
     else:
         form = PaymentRecordForm(
@@ -4086,6 +4220,7 @@ def finance_unified_action(request, payment_id):
             'pending_final_approval', 'pending_final_approval_since',
         ])
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_REGISTERED, note=note)
+        _notify_payment_finance_registered(payment, request.user)
         if payment.pending_final_approval:
             customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
             _notify_users(
@@ -4093,6 +4228,7 @@ def finance_unified_action(request, payment_id):
                 '✅ سند آماده تأیید نهایی',
                 f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد.',
                 reverse('pending_final_approval'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+                color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
             )
         messages.success(request, f'ثبت مالی سند #{payment_id} انجام شد.')
 
@@ -4120,6 +4256,7 @@ def finance_unified_action(request, payment_id):
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
                       from_status=old_status, to_status=payment.status,
                       note=note)
+        _notify_payment_status_changed(payment, request.user, old_status, payment.status)
         messages.warning(request, f'سند #{payment_id} به بازرگانی عودت داده شد.')
 
     else:
@@ -4152,6 +4289,7 @@ def finance_register_payment(request, payment_id):
 
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_REGISTERED,
                   note=note or '')
+    _notify_payment_finance_registered(payment, request.user)
 
     if payment.pending_final_approval:
         customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment_id}')
@@ -4162,6 +4300,7 @@ def finance_register_payment(request, payment_id):
             reverse('pending_final_approval'),
             category=UserNotification.CATEGORY_SYSTEM,
             actor=request.user,
+            color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
         )
 
     messages.success(request, f'ثبت مالی سند #{payment_id} با موفقیت انجام شد.')
@@ -4254,6 +4393,19 @@ def staff_update_status(request, payment_id):
     if target_status == PaymentRecord.STATUS_INCOMPLETE and not note:
         messages.error(request, 'برای وضعیت «ناقص»، ثبت توضیح الزامی است.')
         return redirect(redirect_target)
+    if target_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE and not note:
+        messages.error(request, 'برای عودت به مالی، ثبت توضیح الزامی است.')
+        return redirect(redirect_target)
+    if target_status == PaymentRecord.STATUS_FOLLOW_UP and not note:
+        messages.error(request, 'برای وضعیت «پیگیری»، ثبت توضیح الزامی است.')
+        return redirect(redirect_target)
+    if (
+        target_status == PaymentRecord.STATUS_APPROVED
+        and payment.counterparty_id
+        and payment.counterparty_status != PaymentRecord.CP_STATUS_APPROVED
+    ):
+        messages.error(request, 'تا زمانی که طرف حساب پرداختی را تایید نکرده است، امکان ثبت بازرگانی وجود ندارد.')
+        return redirect(redirect_target)
     if (
         from_status == PaymentRecord.STATUS_APPROVED
         and target_status == PaymentRecord.STATUS_TEMP_COMMERCIAL
@@ -4296,8 +4448,24 @@ def staff_update_status(request, payment_id):
             'pending_final_approval', 'pending_final_approval_since',
         ]
 
+    if target_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE:
+        payment.finance_status = None
+        payment.finance_registered_at = None
+        payment.finance_registered_by = None
+        payment.pending_final_approval = False
+        payment.pending_final_approval_since = None
+        update_fields += [
+            'finance_status', 'finance_registered_at', 'finance_registered_by',
+            'pending_final_approval', 'pending_final_approval_since',
+        ]
+
     # سند رد شده: pending_final_approval پاک می‌شود تا از صف تأیید خارج شود
     if target_status == PaymentRecord.STATUS_REJECTED:
+        payment.pending_final_approval = False
+        payment.pending_final_approval_since = None
+        update_fields += ['pending_final_approval', 'pending_final_approval_since']
+
+    if target_status in {PaymentRecord.STATUS_RETURNED_TO_FINANCE, PaymentRecord.STATUS_FOLLOW_UP, PaymentRecord.STATUS_INCOMPLETE}:
         payment.pending_final_approval = False
         payment.pending_final_approval_since = None
         update_fields += ['pending_final_approval', 'pending_final_approval_since']
@@ -6574,6 +6742,7 @@ def counterparty_approve_payment(request, payment_id):
         '✅ تایید فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» تایید شد.' + (f' توضیح: {note}' if note else ''),
         reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+        color=_payment_notification_color(event='counterparty_approved'),
     )
     messages.success(request, f'✅ فیش #{payment_id} با موفقیت تایید شد.')
     return redirect('counterparty_dashboard')
@@ -6613,6 +6782,7 @@ def counterparty_return_payment_cp(request, payment_id):
         '⚠ عودت فیش از طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» عودت داده شد. دلیل: {note}',
         reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+        color=_payment_notification_color(event='counterparty_returned'),
     )
     messages.warning(request, f'⚠ فیش #{payment_id} به بازرگانی عودت داده شد.')
     return redirect('counterparty_dashboard')
@@ -6649,6 +6819,7 @@ def counterparty_reject_payment_cp(request, payment_id):
         '🚫 رد فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» رد/ابطال شد. دلیل: {note}',
         reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+        color=_payment_notification_color(event='counterparty_rejected'),
     )
     messages.error(request, f'🚫 فیش #{payment_id} رد/ابطال شد.')
     return redirect('counterparty_dashboard')

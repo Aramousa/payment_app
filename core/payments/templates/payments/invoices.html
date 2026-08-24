@@ -1,4 +1,4 @@
-{% load humanize %}
+﻿{% load humanize %}
 {% load static %}
 {% load payment_dates %}
 <!DOCTYPE html>
@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>فاکتورهای مشتریان</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
     <script src="{% static 'js/cleave.min.js' %}"></script>
     <script src="{% static 'js/jquery.min.js' %}"></script>
@@ -96,6 +96,7 @@
             .actions-row .submit-btn { width: 100%; }
         }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -791,6 +792,6 @@
             });
         });
     </script>
-    <script src="{% static 'js/app-ui.js' %}"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
 </body>
 </html>

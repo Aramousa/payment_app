@@ -301,6 +301,8 @@ class PaymentRecord(models.Model):
     STATUS_REJECTED = 'rejected'
     STATUS_INCOMPLETE = 'incomplete'
     STATUS_RETURNED_TO_COMMERCIAL = 'returned_commercial'
+    STATUS_RETURNED_TO_FINANCE = 'returned_finance'
+    STATUS_FOLLOW_UP = 'follow_up'
 
     STATUS_CHOICES = [
         (STATUS_PENDING, 'در حال بررسی'),
@@ -311,6 +313,8 @@ class PaymentRecord(models.Model):
         (STATUS_REJECTED, 'رد شده'),
         (STATUS_INCOMPLETE, 'ناقص'),
         (STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
+        (STATUS_RETURNED_TO_FINANCE, 'عودت به مالی'),
+        (STATUS_FOLLOW_UP, 'پیگیری'),
     ]
 
     STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING = 'commercial_approved_finance_pending'
@@ -328,6 +332,8 @@ class PaymentRecord(models.Model):
         STATUS_COMMERCIAL_REVIEW: 'در حال بررسی',
         STATUS_TEMP_COMMERCIAL: 'در حال بررسی',
         STATUS_RETURNED_TO_COMMERCIAL: 'در حال بررسی',
+        STATUS_RETURNED_TO_FINANCE: 'در حال بررسی',
+        STATUS_FOLLOW_UP: 'در حال بررسی',
         STATUS_APPROVED: 'ثبت بازرگانی',
         STATUS_FINAL_APPROVED: 'تایید نهایی',
         STATUS_REJECTED: 'رد شده',
@@ -490,6 +496,10 @@ class PaymentRecord(models.Model):
             return 'تأیید نهایی'
         if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
             return 'عودت به بازرگانی'
+        if self.status == self.STATUS_RETURNED_TO_FINANCE:
+            return 'عودت به مالی'
+        if self.status == self.STATUS_FOLLOW_UP:
+            return 'پیگیری'
         if self.status == self.STATUS_REJECTED:
             return 'رد شده'
         if self.status == self.STATUS_INCOMPLETE:
@@ -511,6 +521,10 @@ class PaymentRecord(models.Model):
             return 'flag-green'     # سبز — تأیید نهایی
         if self.status == self.STATUS_RETURNED_TO_COMMERCIAL:
             return 'flag-purple'    # بنفش کم‌رنگ — عودت
+        if self.status == self.STATUS_RETURNED_TO_FINANCE:
+            return 'flag-blue'
+        if self.status == self.STATUS_FOLLOW_UP:
+            return 'flag-yellow'
         if self.status == self.STATUS_REJECTED:
             return 'flag-red'       # قرمز
         if self.status == self.STATUS_INCOMPLETE:
@@ -528,6 +542,8 @@ class PaymentRecord(models.Model):
             return 'رد شده'
         if self.status == self.STATUS_INCOMPLETE:
             return 'ناقص — قفل'
+        if self.status == self.STATUS_RETURNED_TO_FINANCE:
+            return 'عودت به مالی'
         if self.is_finance_registered:
             return 'ثبت مالی'
         return 'در انتظار ثبت مالی'
@@ -554,11 +570,19 @@ class PaymentRecord(models.Model):
             self.STATUS_REJECTED: 'flag-red',
             self.STATUS_INCOMPLETE: 'flag-yellow',
             self.STATUS_RETURNED_TO_COMMERCIAL: 'flag-gray',
+            self.STATUS_RETURNED_TO_FINANCE: 'flag-blue',
+            self.STATUS_FOLLOW_UP: 'flag-yellow',
         }.get(self.status, 'flag-gray')
 
     @property
     def customer_flag_class(self):
-        if self.status in {self.STATUS_PENDING, self.STATUS_COMMERCIAL_REVIEW, self.STATUS_RETURNED_TO_COMMERCIAL}:
+        if self.status in {
+            self.STATUS_PENDING,
+            self.STATUS_COMMERCIAL_REVIEW,
+            self.STATUS_RETURNED_TO_COMMERCIAL,
+            self.STATUS_RETURNED_TO_FINANCE,
+            self.STATUS_FOLLOW_UP,
+        }:
             return 'flag-gray'
         if self.status == self.STATUS_APPROVED:
             return 'flag-orange'
@@ -1099,6 +1123,7 @@ class UserNotification(models.Model):
     message = models.TextField('متن اعلان')
     url = models.CharField('آدرس', max_length=255, blank=True)
     category = models.CharField('نوع', max_length=20, choices=CATEGORY_CHOICES, default=CATEGORY_SYSTEM)
+    color = models.CharField('رنگ اعلان', max_length=20, blank=True, default='')
     is_read = models.BooleanField('خوانده شده', default=False)
     created_at = models.DateTimeField('زمان ایجاد', auto_now_add=True)
     read_at = models.DateTimeField('زمان خواندن', null=True, blank=True)

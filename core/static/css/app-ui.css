@@ -210,6 +210,14 @@ h3 {
     background: var(--app-danger-dark);
 }
 
+.app-sidebar-logout {
+    display: none;
+}
+
+.app-sidebar-logout button {
+    width: 100%;
+}
+
 .notification-bell {
     display: inline-flex;
     position: relative;
@@ -313,6 +321,493 @@ h3 {
 .datepicker-container,
 .datepicker-container * {
     font-family: Vazir, sans-serif !important;
+}
+
+/* Unified mobile polish for customer and staff app surfaces. */
+@media (max-width: 760px) {
+    html,
+    body {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    body:has(.app-shell-nav) {
+        background: #f4f7fb !important;
+        padding-bottom: calc(86px + env(safe-area-inset-bottom)) !important;
+    }
+
+    body.app-nav-open {
+        overflow: hidden !important;
+        touch-action: none;
+    }
+
+    body:has(.app-shell-nav) main,
+    body:has(.app-shell-nav) .content,
+    body:has(.app-shell-nav) .container,
+    body:has(.app-shell-nav) .page,
+    body:has(.app-shell-nav) .dashboard-container {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .app-top-header {
+        align-items: center !important;
+        gap: 8px !important;
+        height: 58px !important;
+        padding: 8px 10px !important;
+        z-index: 1300 !important;
+    }
+
+    .app-top-brand {
+        flex: 1 1 auto !important;
+        gap: 6px !important;
+        min-width: 0 !important;
+    }
+
+    .app-top-title,
+    .app-nav-user-role {
+        display: none !important;
+    }
+
+    .app-top-brand .app-shell-logo {
+        height: 34px !important;
+        max-width: 124px !important;
+        object-fit: contain !important;
+    }
+
+    .app-top-actions {
+        flex: 0 0 auto !important;
+        gap: 6px !important;
+        min-width: 0 !important;
+    }
+
+    .app-user-menu summary {
+        min-height: 42px !important;
+        min-width: 42px !important;
+        padding: 4px !important;
+    }
+
+    .app-user-summary,
+    .app-user-menu-caret {
+        display: none !important;
+    }
+
+    .app-top-logout {
+        display: block !important;
+    }
+
+    .app-top-logout button,
+    .notification-trigger,
+    .message-envelope {
+        align-items: center !important;
+        border-radius: 12px !important;
+        display: inline-flex !important;
+        font-size: 12px !important;
+        font-weight: 900 !important;
+        justify-content: center !important;
+        line-height: 1.2 !important;
+        min-height: 42px !important;
+        min-width: 42px !important;
+        padding: 6px 8px !important;
+        white-space: nowrap !important;
+    }
+
+    .notification-trigger {
+        font-size: 0 !important;
+    }
+
+    .notification-trigger::before {
+        content: "\1F514";
+        font-size: 17px;
+        line-height: 1;
+    }
+
+    .message-envelope-label {
+        display: none !important;
+    }
+
+    .notification-dropdown,
+    .app-user-menu-panel {
+        left: 8px !important;
+        max-height: min(72vh, 560px) !important;
+        max-width: calc(100vw - 16px) !important;
+        overflow: auto !important;
+        right: auto !important;
+        width: min(92vw, 360px) !important;
+    }
+
+    .sb-overlay.show {
+        display: block !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 1260 !important;
+    }
+
+    .app-shell-nav {
+        bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+        box-shadow: -20px 0 42px rgba(15,23,42,.22) !important;
+        height: auto !important;
+        max-width: 330px !important;
+        right: 0 !important;
+        top: 58px !important;
+        transform: translateX(108%) !important;
+        transition: transform .22s ease !important;
+        width: min(88vw, 330px) !important;
+        z-index: 1270 !important;
+    }
+
+    .app-shell-nav.open {
+        transform: translateX(0) !important;
+    }
+
+    .app-shell-nav .app-nav-panel,
+    .app-shell-nav .app-nav-links {
+        max-height: 100% !important;
+    }
+
+    .app-shell-nav .app-nav-panel {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        align-items: center !important;
+        border-radius: 12px !important;
+        font-size: 13px !important;
+        justify-content: flex-start !important;
+        min-height: 44px !important;
+        padding: 9px 10px !important;
+        text-align: right !important;
+        white-space: normal !important;
+    }
+
+    .app-sidebar-logout {
+        background: #fff !important;
+        border-top: 1px solid #e5edf5 !important;
+        display: block !important;
+        flex: 0 0 auto !important;
+        margin: 0 !important;
+        padding: 10px 12px calc(12px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .app-sidebar-logout button {
+        align-items: center !important;
+        background: #fff1f0 !important;
+        border: 1px solid #fecaca !important;
+        border-radius: 12px !important;
+        color: #b42318 !important;
+        display: inline-flex !important;
+        font-size: 13px !important;
+        font-weight: 950 !important;
+        gap: 7px !important;
+        justify-content: center !important;
+        min-height: 44px !important;
+        width: 100% !important;
+    }
+
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav {
+        border-radius: 20px 20px 0 0 !important;
+        grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)) !important;
+        min-height: calc(70px + env(safe-area-inset-bottom)) !important;
+        z-index: 1285 !important;
+    }
+
+    .app-mobile-bottom-link,
+    .app-customer-bottom-link {
+        min-height: 52px !important;
+        min-width: 0 !important;
+        padding: 5px 2px !important;
+    }
+
+    .app-customer-bottom-text {
+        font-size: 10px !important;
+        line-height: 1.35 !important;
+        max-width: 100% !important;
+    }
+
+    .app-table-tools,
+    .filters,
+    .filter-form,
+    .search-form,
+    .toolbar,
+    .actions-bar {
+        align-items: stretch !important;
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+    }
+
+    .app-table-tools input,
+    .app-table-tools select,
+    .filters input,
+    .filters select,
+    .filter-form input,
+    .filter-form select,
+    .search-form input,
+    .search-form select {
+        min-height: 44px !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap,
+    .table-wrap {
+        border: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table,
+    .table-wrap table:not(.table-days) {
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table thead,
+    .table-wrap table:not(.table-days) thead {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody,
+    .table-wrap table:not(.table-days) tbody {
+        display: grid !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    .table-wrap table:not(.table-days) tbody tr {
+        background: #fff !important;
+        border: 1px solid #dbe6ef !important;
+        border-radius: 14px !important;
+        box-shadow: 0 10px 22px rgba(15,23,42,.07) !important;
+        display: grid !important;
+        gap: 0 !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        overflow: hidden !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.detail-row,
+    .app-table-wrap table.app-responsive-table tbody tr.preview-row,
+    .table-wrap table:not(.table-days) tbody tr.detail-row,
+    .table-wrap table:not(.table-days) tbody tr.preview-row {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.detail-row.open,
+    .app-table-wrap table.app-responsive-table tbody tr.preview-row.open,
+    .table-wrap table:not(.table-days) tbody tr.detail-row.open,
+    .table-wrap table:not(.table-days) tbody tr.preview-row.open {
+        display: block !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td,
+    .table-wrap table:not(.table-days) tbody td {
+        border: 0 !important;
+        border-bottom: 1px solid #eef3f8 !important;
+        display: block !important;
+        min-height: 58px !important;
+        min-width: 0 !important;
+        overflow-wrap: anywhere !important;
+        padding: 10px 12px !important;
+        text-align: right !important;
+        white-space: normal !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[data-label]::before,
+    .table-wrap table:not(.table-days) tbody td[data-label]::before {
+        color: #64748b !important;
+        content: attr(data-label);
+        display: block !important;
+        font-size: 11px !important;
+        font-weight: 900 !important;
+        line-height: 1.4 !important;
+        margin-bottom: 4px !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td.app-card-index,
+    .app-table-wrap table.app-responsive-table tbody td.app-card-title,
+    .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell,
+    .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell,
+    .app-table-wrap table.app-responsive-table tbody td[colspan],
+    .table-wrap table:not(.table-days) tbody td[colspan] {
+        grid-column: 1 / -1 !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[colspan],
+    .table-wrap table:not(.table-days) tbody td[colspan] {
+        min-height: 0 !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[colspan]::before,
+    .table-wrap table:not(.table-days) tbody td[colspan]::before {
+        content: none !important;
+    }
+
+    .app-card-actions-cell,
+    td[data-label*="عملیات"],
+    td[data-label*="دانلود"],
+    td[data-label*="نمایش"] {
+        background: #f8fafc !important;
+    }
+
+    .app-card-actions-cell > div,
+    .app-card-actions-cell .file-actions,
+    td[data-label*="عملیات"] > div,
+    td[data-label*="دانلود"] .file-actions,
+    td[data-label*="نمایش"] .file-actions {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        width: 100% !important;
+    }
+
+    .app-card-actions-cell a,
+    .app-card-actions-cell button,
+    .file-actions a,
+    .file-actions button,
+    td[data-label*="عملیات"] a,
+    td[data-label*="عملیات"] button,
+    td[data-label*="دانلود"] a,
+    td[data-label*="دانلود"] button,
+    td[data-label*="نمایش"] a,
+    td[data-label*="نمایش"] button {
+        align-items: center !important;
+        display: inline-flex !important;
+        justify-content: center !important;
+        min-height: 42px !important;
+        width: 100% !important;
+    }
+
+    form,
+    .form-grid,
+    .field-grid,
+    .form-row,
+    .input-grid,
+    .info-grid,
+    .summary-grid,
+    .dashboard-grid,
+    .customer-info-grid,
+    .debt-summary-grid {
+        max-width: 100% !important;
+    }
+
+    .form-grid,
+    .field-grid,
+    .input-grid,
+    .info-grid,
+    .summary-grid,
+    .dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    input,
+    select,
+    textarea,
+    button,
+    .button-link,
+    .edit-link,
+    .track-link {
+        font-family: Vazir, Tahoma, Arial, sans-serif !important;
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+        min-height: 44px !important;
+    }
+
+    button,
+    .button-link,
+    .edit-link,
+    .track-link {
+        min-height: 42px !important;
+    }
+
+    .preview-overlay,
+    .modal-overlay,
+    .receipt-modal,
+    .image-modal {
+        padding: 8px !important;
+    }
+
+    .preview-box,
+    .modal-box,
+    .receipt-modal-content,
+    .image-modal-content,
+    .user-business-card {
+        border-radius: 16px !important;
+        max-height: calc(100vh - 24px) !important;
+        max-width: calc(100vw - 16px) !important;
+        overflow: auto !important;
+        width: calc(100vw - 16px) !important;
+    }
+
+    .preview-frame,
+    iframe.preview-frame,
+    .receipt-preview-frame,
+    .pdf-preview,
+    object,
+    embed {
+        height: min(72vh, 680px) !important;
+        max-height: 72vh !important;
+        min-height: min(360px, 58vh) !important;
+        width: 100% !important;
+    }
+
+    img.preview-image,
+    .receipt-preview-image,
+    .zoomable-image {
+        height: auto !important;
+        max-height: 72vh !important;
+        max-width: 100% !important;
+        object-fit: contain !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    .table-wrap table:not(.table-days) tbody tr {
+        grid-template-columns: 1fr !important;
+    }
+
+    .app-card-actions-cell > div,
+    .app-card-actions-cell .file-actions,
+    td[data-label*="عملیات"] > div,
+    td[data-label*="دانلود"] .file-actions,
+    td[data-label*="نمایش"] .file-actions {
+        grid-template-columns: 1fr !important;
+    }
+
+    .app-top-logout button {
+        font-size: 0 !important;
+        padding: 6px !important;
+    }
+
+    .app-top-logout button::before {
+        content: "\238B";
+        font-size: 18px;
+        line-height: 1;
+    }
 }
 
 .datepicker-container.pwt-mobile-view {
@@ -595,6 +1090,7 @@ h3 {
 }
 
 .notification-item {
+    background: linear-gradient(90deg, var(--notif-color, #fff) 0 5px, #fff 5px 100%);
     border-bottom: 1px solid #eef2f6;
     color: #243447;
     font-size: 13px;
@@ -602,7 +1098,7 @@ h3 {
 }
 
 .notification-item:hover {
-    background: #f5f9ff;
+    background: linear-gradient(90deg, var(--notif-color, #f5f9ff) 0 5px, #f5f9ff 5px 100%);
 }
 
 .notification-empty {
@@ -1404,35 +1900,38 @@ tr.detail-row {
 }
 
 .flag-blue {
-    background: #256f9d !important;
+    background: #1e88e5 !important;
+    border-color: #1e88e5 !important;
     color: #fff !important;
 }
 
 .flag-purple {
-    background: #665a96 !important;
+    background: #7b1fa2 !important;
+    border-color: #7b1fa2 !important;
     color: #fff !important;
 }
 
 .flag-teal {
-    background: var(--app-accent) !important;
+    background: #00897b !important;
+    border-color: #00897b !important;
     color: #fff !important;
 }
 
 .flag-orange {
-    background: var(--app-warning-light) !important;
-    border: 1px solid #f1c36d !important;
-    color: #7a4600 !important;
+    background: #f97316 !important;
+    border-color: #f97316 !important;
+    color: #fff !important;
 }
 
 .flag-gray {
-    background: #eef2f6 !important;
-    border: 1px solid #d7e1eb !important;
-    color: #3b4756 !important;
+    background: #64748b !important;
+    border-color: #64748b !important;
+    color: #fff !important;
 }
 
 .status-badge.flag-gray,
 .status-pill.flag-gray {
-    color: #3b4756 !important;
+    color: #fff !important;
 }
 
 .status-active,
@@ -1444,21 +1943,23 @@ tr.detail-row {
 .flag-green,
 .status-approved,
 .status-resolved {
-    background: var(--app-success) !important;
+    background: #2e7d32 !important;
+    border-color: #2e7d32 !important;
     color: #fff !important;
 }
 
 .flag-red,
 .status-suspended {
-    background: var(--app-danger) !important;
+    background: #c62828 !important;
+    border-color: #c62828 !important;
     color: #fff !important;
 }
 
 .flag-yellow,
 .status-unseen {
-    background: var(--app-warning-light) !important;
-    border: 1px solid #f1c36d !important;
-    color: #7a4600 !important;
+    background: #f9a825 !important;
+    border-color: #f9a825 !important;
+    color: #111827 !important;
 }
 
 .warning-box {
@@ -5607,5 +6108,888 @@ body:has(.app-customer-bottom-nav) .dashboard-actions .button-link {
     body:has(.app-staff-bottom-nav) .summary-card {
         border-radius: 14px !important;
         box-shadow: 0 8px 18px rgba(24,37,54,.07) !important;
+    }
+}
+
+/* Staff mobile cards v2: compact two-column operational layout. */
+@media (max-width: 760px) {
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody tr {
+        align-items: stretch !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        padding: 0 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row::before,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody tr::before {
+        grid-column: 1 / -1 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-cell,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody td {
+        border-bottom: 1px solid #eef3f7 !important;
+        border-left: 1px solid #eef3f7 !important;
+        display: block !important;
+        min-height: 68px !important;
+        padding: 9px 10px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-cell:nth-child(2n),
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody td:nth-child(2n) {
+        border-left: 0 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-cell::before,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody td[data-label]::before {
+        display: block !important;
+        margin-bottom: 3px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-index,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-title,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell,
+    body:has(.app-staff-bottom-nav) .table-wrap table:not(.table-days) tbody td[colspan] {
+        grid-column: 1 / -1 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-index {
+        border-left: 0 !important;
+        min-height: 40px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-title {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%) !important;
+        border-left: 0 !important;
+        min-height: 58px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-amount {
+        min-height: 64px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell {
+        border-left: 0 !important;
+        min-height: 0 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell > div {
+        background: #fff !important;
+        border: 1px solid #e4edf5 !important;
+        border-radius: 10px !important;
+        grid-template-columns: minmax(54px, auto) minmax(0, 1fr) !important;
+        margin: 0 0 6px !important;
+        padding: 6px 7px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell > div:last-child {
+        margin-bottom: 0 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell {
+        border-left: 0 !important;
+        min-height: 0 !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell::before {
+        color: var(--app-primary) !important;
+        font-size: 12px !important;
+        margin-bottom: 7px !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell > div,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell .file-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell form {
+        grid-column: auto !important;
+    }
+
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell form button,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell .button-link,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell .edit-link,
+    body:has(.app-staff-bottom-nav) .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell .track-link {
+        border-radius: 10px !important;
+        font-size: 12px !important;
+        min-height: 38px !important;
+        padding: 6px 8px !important;
+    }
+}
+
+/* Final mobile pass: keep all app sections usable in WebView/PWA widths. */
+@media (max-width: 760px) {
+    html,
+    body {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    body:has(.app-shell-nav) {
+        background: #f4f7fb !important;
+        padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+    }
+
+    body.app-nav-open {
+        overflow: hidden !important;
+        touch-action: none !important;
+    }
+
+    body:has(.app-shell-nav) main,
+    body:has(.app-shell-nav) .content,
+    body:has(.app-shell-nav) .container,
+    body:has(.app-shell-nav) .dashboard-container,
+    body:has(.app-shell-nav) .page {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .app-top-header {
+        gap: 8px !important;
+        height: 58px !important;
+        padding: 8px 10px !important;
+        z-index: 1300 !important;
+    }
+
+    .app-top-brand {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+
+    .app-top-title,
+    .app-user-summary,
+    .app-user-menu-caret {
+        display: none !important;
+    }
+
+    .app-top-brand .app-shell-logo {
+        height: 34px !important;
+        max-width: 124px !important;
+        object-fit: contain !important;
+    }
+
+    .app-top-actions {
+        flex: 0 0 auto !important;
+        gap: 6px !important;
+        min-width: 0 !important;
+    }
+
+    .app-user-menu summary,
+    .app-top-logout button,
+    .notification-trigger,
+    .message-envelope {
+        align-items: center !important;
+        border-radius: 12px !important;
+        display: inline-flex !important;
+        justify-content: center !important;
+        min-height: 42px !important;
+        min-width: 42px !important;
+        padding: 6px 8px !important;
+        white-space: nowrap !important;
+    }
+
+    .notification-trigger {
+        font-size: 0 !important;
+    }
+
+    .notification-trigger::before {
+        content: "\1F514";
+        font-size: 17px;
+    }
+
+    .message-envelope-label {
+        display: none !important;
+    }
+
+    .notification-dropdown,
+    .app-user-menu-panel {
+        left: 8px !important;
+        max-height: min(72vh, 560px) !important;
+        max-width: calc(100vw - 16px) !important;
+        overflow: auto !important;
+        right: auto !important;
+        width: min(92vw, 360px) !important;
+    }
+
+    .sb-overlay.show {
+        display: block !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 1260 !important;
+    }
+
+    .app-shell-nav,
+    body:has(.app-customer-bottom-nav) .app-shell-nav {
+        bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+        height: auto !important;
+        max-width: 330px !important;
+        right: 0 !important;
+        top: 58px !important;
+        transform: translateX(108%) !important;
+        transition: transform .22s ease !important;
+        width: min(88vw, 330px) !important;
+        z-index: 1270 !important;
+    }
+
+    .app-shell-nav.open,
+    body:has(.app-customer-bottom-nav) .app-shell-nav.open {
+        transform: translateX(0) !important;
+    }
+
+    .app-shell-nav .app-nav-panel,
+    .app-shell-nav .app-nav-links {
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow-y: auto !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        align-items: center !important;
+        border-radius: 12px !important;
+        font-size: 13px !important;
+        justify-content: flex-start !important;
+        min-height: 44px !important;
+        padding: 9px 10px !important;
+        text-align: right !important;
+        white-space: normal !important;
+    }
+
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav {
+        border-radius: 20px 20px 0 0 !important;
+        grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)) !important;
+        min-height: calc(70px + env(safe-area-inset-bottom)) !important;
+        z-index: 1285 !important;
+    }
+
+    .app-mobile-bottom-link,
+    .app-customer-bottom-link {
+        min-height: 52px !important;
+        min-width: 0 !important;
+    }
+
+    .app-table-tools,
+    .filters,
+    .filter-form,
+    .search-form,
+    .toolbar,
+    .actions-bar {
+        align-items: stretch !important;
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap,
+    .table-wrap {
+        border: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table,
+    .table-wrap table:not(.table-days) {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table thead,
+    .table-wrap table:not(.table-days) thead {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody,
+    .table-wrap table:not(.table-days) tbody {
+        display: grid !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    .table-wrap table:not(.table-days) tbody tr {
+        background: #fff !important;
+        border: 1px solid #dbe6ef !important;
+        border-radius: 14px !important;
+        box-shadow: 0 10px 22px rgba(15,23,42,.07) !important;
+        display: grid !important;
+        gap: 0 !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        overflow: hidden !important;
+        width: 100% !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.detail-row,
+    .app-table-wrap table.app-responsive-table tbody tr.preview-row,
+    .table-wrap table:not(.table-days) tbody tr.detail-row,
+    .table-wrap table:not(.table-days) tbody tr.preview-row {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.detail-row.open,
+    .app-table-wrap table.app-responsive-table tbody tr.preview-row.open,
+    .table-wrap table:not(.table-days) tbody tr.detail-row.open,
+    .table-wrap table:not(.table-days) tbody tr.preview-row.open {
+        display: block !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td,
+    .table-wrap table:not(.table-days) tbody td {
+        border: 0 !important;
+        border-bottom: 1px solid #eef3f8 !important;
+        display: block !important;
+        min-height: 58px !important;
+        min-width: 0 !important;
+        overflow-wrap: anywhere !important;
+        padding: 10px 12px !important;
+        text-align: right !important;
+        white-space: normal !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[data-label]::before,
+    .table-wrap table:not(.table-days) tbody td[data-label]::before {
+        color: #64748b !important;
+        content: attr(data-label);
+        display: block !important;
+        font-size: 11px !important;
+        font-weight: 900 !important;
+        margin-bottom: 4px !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td.app-card-index,
+    .app-table-wrap table.app-responsive-table tbody td.app-card-title,
+    .app-table-wrap table.app-responsive-table tbody td.app-card-status-cell,
+    .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell,
+    .app-table-wrap table.app-responsive-table tbody td[colspan],
+    .table-wrap table:not(.table-days) tbody td[colspan] {
+        grid-column: 1 / -1 !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td[colspan]::before,
+    .table-wrap table:not(.table-days) tbody td[colspan]::before {
+        content: none !important;
+    }
+
+    .app-card-actions-cell > div,
+    .app-card-actions-cell .file-actions,
+    td[data-label*="عملیات"] > div,
+    td[data-label*="دانلود"] .file-actions,
+    td[data-label*="نمایش"] .file-actions {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        width: 100% !important;
+    }
+
+    .app-card-actions-cell a,
+    .app-card-actions-cell button,
+    .file-actions a,
+    .file-actions button,
+    td[data-label*="عملیات"] a,
+    td[data-label*="عملیات"] button,
+    td[data-label*="دانلود"] a,
+    td[data-label*="دانلود"] button,
+    td[data-label*="نمایش"] a,
+    td[data-label*="نمایش"] button {
+        align-items: center !important;
+        display: inline-flex !important;
+        justify-content: center !important;
+        min-height: 42px !important;
+        width: 100% !important;
+    }
+
+    .form-grid,
+    .field-grid,
+    .input-grid,
+    .info-grid,
+    .summary-grid,
+    .dashboard-grid,
+    .customer-info-grid,
+    .debt-summary-grid {
+        grid-template-columns: 1fr !important;
+        max-width: 100% !important;
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+        min-height: 44px !important;
+    }
+
+    button,
+    .button-link,
+    .edit-link,
+    .track-link {
+        min-height: 42px !important;
+    }
+
+    .preview-overlay,
+    .modal-overlay,
+    .receipt-modal,
+    .image-modal {
+        padding: 8px !important;
+    }
+
+    .preview-box,
+    .modal-box,
+    .receipt-modal-content,
+    .image-modal-content,
+    .user-business-card {
+        border-radius: 16px !important;
+        max-height: calc(100vh - 24px) !important;
+        max-width: calc(100vw - 16px) !important;
+        overflow: auto !important;
+        width: calc(100vw - 16px) !important;
+    }
+
+    .preview-frame,
+    iframe.preview-frame,
+    .receipt-preview-frame,
+    .pdf-preview,
+    object,
+    embed {
+        height: min(72vh, 680px) !important;
+        max-height: 72vh !important;
+        min-height: min(360px, 58vh) !important;
+        width: 100% !important;
+    }
+
+    img.preview-image,
+    .receipt-preview-image,
+    .zoomable-image {
+        height: auto !important;
+        max-height: 72vh !important;
+        max-width: 100% !important;
+        object-fit: contain !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    .table-wrap table:not(.table-days) tbody tr {
+        grid-template-columns: 1fr !important;
+    }
+
+    .app-card-actions-cell > div,
+    .app-card-actions-cell .file-actions,
+    td[data-label*="عملیات"] > div,
+    td[data-label*="دانلود"] .file-actions,
+    td[data-label*="نمایش"] .file-actions {
+        grid-template-columns: 1fr !important;
+    }
+
+    .app-top-logout button {
+        font-size: 0 !important;
+        padding: 6px !important;
+    }
+
+    .app-top-logout button::before {
+        content: "\238B";
+        font-size: 18px;
+    }
+}
+
+/* Design A rollout: quiet operational UI shared by desktop and mobile. */
+:root {
+    --app-bg: #f4f7fb;
+    --app-surface: #ffffff;
+    --app-surface-soft: #f8fafc;
+    --app-border: #dce6ef;
+    --app-border-strong: #c7d5e3;
+    --app-text: #162235;
+    --app-muted: #66758a;
+    --app-primary: #183b56;
+    --app-primary-dark: #102a43;
+    --app-primary-light: #e9f2fb;
+    --app-accent: #147d74;
+    --app-accent-dark: #0f625c;
+    --app-accent-light: #e7f6f4;
+    --app-success: #22845d;
+    --app-success-dark: #176544;
+    --app-warning: #a16207;
+    --app-warning-light: #fff7df;
+    --app-danger: #b42318;
+    --app-danger-dark: #8f1c14;
+    --app-danger-light: #fff1f0;
+    --app-radius: 8px;
+    --app-radius-sm: 6px;
+    --app-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+    --app-shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+body {
+    background: #f4f7fb !important;
+    color: var(--app-text) !important;
+}
+
+body:has(.app-shell-nav) {
+    background: #f4f7fb !important;
+}
+
+body:has(.app-shell-nav) main,
+body:has(.app-shell-nav) .content,
+body:has(.app-shell-nav) .container,
+body:has(.app-shell-nav) .dashboard-container,
+body:has(.app-shell-nav) .page {
+    max-width: 1240px !important;
+}
+
+.app-top-header {
+    background: rgba(255, 255, 255, .97) !important;
+    border-bottom: 1px solid #dce6ef !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .06) !important;
+}
+
+.app-top-brand .app-shell-logo {
+    background: #fff !important;
+    border: 1px solid #edf2f7 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+.app-top-title {
+    color: #162235 !important;
+    font-weight: 900 !important;
+}
+
+.app-shell-nav {
+    background: #ffffff !important;
+    border-left: 1px solid #dce6ef !important;
+    box-shadow: -8px 0 24px rgba(15, 23, 42, .07) !important;
+}
+
+.app-shell-nav .app-nav-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100% !important;
+}
+
+.app-shell-nav .app-nav-links {
+    gap: 6px !important;
+    padding: 8px 10px !important;
+}
+
+.app-shell-nav .sb-group-header {
+    color: #66758a !important;
+    font-size: 11px !important;
+    font-weight: 950 !important;
+    padding: 11px 8px 5px !important;
+}
+
+.app-shell-nav .app-nav-direct,
+.app-shell-nav .app-nav-group-panel .app-nav-link {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    color: #26384d !important;
+    font-weight: 800 !important;
+    min-height: 40px !important;
+    padding: 8px 10px !important;
+}
+
+.app-shell-nav .app-nav-direct:hover,
+.app-shell-nav .app-nav-group-panel .app-nav-link:hover,
+.app-shell-nav .app-nav-group[open] > .sb-group-header,
+.app-shell-nav .app-nav-group.active-group > .sb-group-header {
+    background: #f1f6fb !important;
+    border-color: #dce6ef !important;
+    color: var(--app-primary) !important;
+}
+
+.app-shell-nav .app-nav-direct.active-link,
+.app-shell-nav .app-nav-group-panel .app-nav-link.active-link {
+    background: var(--app-accent-light) !important;
+    border-color: #bfe7e1 !important;
+    border-right: 3px solid var(--app-accent) !important;
+    color: #0f625c !important;
+    font-weight: 950 !important;
+}
+
+.app-shell-nav .app-nav-icon {
+    background: #f5f8fb !important;
+    border: 1px solid #e5edf5 !important;
+    border-radius: 8px !important;
+    color: var(--app-primary) !important;
+}
+
+.app-shell-nav .active-link .app-nav-icon {
+    background: #dff3ef !important;
+    border-color: #bfe7e1 !important;
+    color: var(--app-accent-dark) !important;
+}
+
+.app-sidebar-logout {
+    background: #fff !important;
+    border-top: 1px solid #e5edf5 !important;
+    display: block !important;
+    margin-top: auto !important;
+    padding: 12px !important;
+}
+
+.app-sidebar-logout button {
+    background: #fff1f0 !important;
+    border: 1px solid #fecaca !important;
+    border-radius: 8px !important;
+    color: #b42318 !important;
+    font-weight: 950 !important;
+    min-height: 42px !important;
+    width: 100% !important;
+}
+
+.notification-trigger,
+.message-envelope,
+.app-user-menu summary,
+.app-top-logout button {
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+.notification-trigger,
+.message-envelope,
+.app-user-menu summary {
+    background: #f8fafc !important;
+    border: 1px solid #dce6ef !important;
+    color: var(--app-primary) !important;
+}
+
+.app-top-logout button {
+    background: #fff1f0 !important;
+    border: 1px solid #fecaca !important;
+    color: #b42318 !important;
+}
+
+.section,
+.box,
+.filter-box,
+.search-box,
+.customer-header,
+.summary-card,
+.empty-message,
+.customer-info,
+.invoice-filter-box,
+.card,
+#payment-form,
+.detail-card,
+.customer-card,
+.dashboard-panel,
+.dashboard-row,
+.recon-panel,
+.action-panel,
+.app-toolbar,
+.app-filter-panel,
+.daily-payment-notice,
+.daily-payment-expired,
+.customer-payment-alert,
+.debt-summary {
+    background: #fff !important;
+    border: 1px solid #dce6ef !important;
+    border-radius: 8px !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .055) !important;
+}
+
+.section:hover,
+.box:hover,
+.card:hover,
+.summary-card:hover,
+.dashboard-row:hover,
+.customer-card:hover {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .075) !important;
+}
+
+.filter-box,
+.search-box,
+.invoice-filter-box,
+.app-filter-panel,
+.app-table-tools {
+    background: #fbfdff !important;
+}
+
+.app-table-wrap,
+.table-wrap {
+    background: #fff !important;
+    border: 1px solid #dce6ef !important;
+    border-radius: 8px !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .055) !important;
+}
+
+table {
+    color: #162235 !important;
+}
+
+thead th {
+    background: #f4f7fb !important;
+    border-bottom: 1px solid #dce6ef !important;
+    color: #4d5f75 !important;
+    font-size: 12px !important;
+    font-weight: 950 !important;
+}
+
+tbody td {
+    border-bottom-color: #edf2f7 !important;
+}
+
+tbody tr:hover td {
+    background: #fbfdff !important;
+}
+
+input,
+select,
+textarea {
+    background: #fff !important;
+    border: 1px solid #cfdbe7 !important;
+    border-radius: 8px !important;
+    color: #162235 !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--app-accent) !important;
+    box-shadow: 0 0 0 3px rgba(20, 125, 116, .14) !important;
+    outline: none !important;
+}
+
+.button-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn,
+.submit-btn,
+button[type="submit"] {
+    border-radius: 8px !important;
+    font-weight: 900 !important;
+}
+
+.button-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn {
+    background: var(--app-primary) !important;
+}
+
+.button-link.alt,
+.button-link.success,
+.submit-btn {
+    background: var(--app-accent) !important;
+}
+
+.status,
+.status-badge,
+.status-pill,
+.flag-chip {
+    border-radius: 999px !important;
+    font-size: 11px !important;
+    font-weight: 950 !important;
+    min-height: 26px !important;
+    padding: 4px 10px !important;
+}
+
+body:has(.app-staff-bottom-nav) .summary-card,
+body:has(.app-staff-bottom-nav) .dashboard-row,
+body:has(.app-staff-bottom-nav) .detail-card {
+    border-right: 3px solid #dce6ef !important;
+}
+
+body:has(.app-staff-bottom-nav) .dashboard-row-title,
+body:has(.app-staff-bottom-nav) .card h2,
+body:has(.app-staff-bottom-nav) .section h2,
+body:has(.app-staff-bottom-nav) .box h2 {
+    color: #162235 !important;
+}
+
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .summary-card,
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .customer-info,
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .debt-summary,
+body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payment-notice {
+    border-right: 3px solid var(--app-accent) !important;
+}
+
+@media (min-width: 761px) {
+    body:has(.app-shell-nav) {
+        margin-right: 224px !important;
+        padding-top: 72px !important;
+    }
+
+    .app-top-header {
+        height: 64px !important;
+        padding: 0 20px !important;
+    }
+
+    .app-shell-nav {
+        height: calc(100vh - 64px) !important;
+        top: 64px !important;
+        width: 224px !important;
+    }
+
+    .app-shell-nav .app-nav-panel {
+        height: 100% !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        flex: 1 1 auto !important;
+        overflow-y: auto !important;
+    }
+
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav {
+        display: none !important;
+    }
+}
+
+@media (max-width: 760px) {
+    body:has(.app-shell-nav) {
+        margin-right: 0 !important;
+        padding-top: 58px !important;
+    }
+
+    .app-shell-nav {
+        background: #fff !important;
+        border-left: 1px solid #dce6ef !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        padding: 10px !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        min-height: 46px !important;
+    }
+
+    .app-table-wrap,
+    .table-wrap {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
+    .table-wrap table:not(.table-days) tbody tr {
+        border-radius: 8px !important;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, .06) !important;
+    }
+
+    .app-card-actions-cell a,
+    .app-card-actions-cell button,
+    .file-actions a,
+    .file-actions button,
+    td[data-label*="عملیات"] a,
+    td[data-label*="عملیات"] button,
+    td[data-label*="دانلود"] a,
+    td[data-label*="دانلود"] button,
+    td[data-label*="نمایش"] a,
+    td[data-label*="نمایش"] button {
+        border-radius: 8px !important;
     }
 }

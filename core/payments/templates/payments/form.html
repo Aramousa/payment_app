@@ -1,4 +1,4 @@
-{% load humanize %}
+﻿{% load humanize %}
 {% load static %}
 {% load payment_dates %}
 <!DOCTYPE html>
@@ -15,7 +15,7 @@
     <link rel="manifest" href="{% url 'pwa_manifest' %}">
     <link rel="apple-touch-icon" href="{% static 'logo/logo-top.png' %}">
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
 
     <script src="{% static 'js/cleave.min.js' %}"></script>
@@ -539,6 +539,7 @@
         #threadPopupActions { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end; }
 
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -1392,7 +1393,7 @@
                                 <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <select name="status" required style="margin-bottom:6px;" onchange="this.closest('form').querySelector('.rejection-reason-box').style.display = (this.value === 'rejected') ? 'block' : 'none';">
+                                    <select name="status" required style="margin-bottom:6px;" onchange="var form=this.closest('form'); form.querySelector('.rejection-reason-box').style.display = (this.value === 'rejected') ? 'block' : 'none'; form.querySelector('textarea[name=note]').required = ['rejected','incomplete','returned_finance','follow_up'].indexOf(this.value) !== -1;">
                                         {% for value, label in payment.staff_allowed_choices %}
                                             <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
                                         {% endfor %}
@@ -1428,6 +1429,9 @@
                                     var noteField = form.querySelector('textarea[name="note"]');
                                     if (reasonSelect && noteField && reasonSelect.value === 'other') {
                                         noteField.placeholder = 'توضیح دلیل «سایر» (الزامی)';
+                                    }
+                                    if (statusSelect && noteField && ['rejected','incomplete','returned_finance','follow_up'].indexOf(statusSelect.value) !== -1) {
+                                        noteField.required = true;
                                     }
                                 })();
                                 </script>
@@ -1907,6 +1911,13 @@
             return match ? match[1].toLowerCase() : 'jpg';
         }
 
+        function withDownloadParam(url) {
+            if (!url) return '';
+            const parsed = new URL(url, window.location.origin);
+            parsed.searchParams.set('download', '1');
+            return parsed.pathname + parsed.search + parsed.hash;
+        }
+
         function setPreviewImageVisible(visible) {
             const imageViewport = previewImage.closest('.app-image-zoom-viewport');
             if (imageViewport) {
@@ -1950,7 +1961,7 @@
                 isPdf = /\.pdf(\?|#|$)/i.test((fileName || url || '').toLowerCase());
             }
             if (isPdf) {
-                previewFrame.src = url;
+                previewFrame.src = window.AppPdfPreview ? window.AppPdfPreview.viewerUrl(url) : url + '#toolbar=1&navpanes=0&scrollbar=1&view=FitH';
                 previewFrame.style.display = 'block';
                 setPreviewImageVisible(false);
                 previewImage.src = '';
@@ -2053,9 +2064,10 @@
         // (تابع عمومی — هم از داخل پیش‌نمایش بزرگ و هم مستقیماً از روی هر بندانگشتی صدا زده می‌شود)
         async function downloadDocumentImage(imageUrl, fileName, downloadName, button) {
             if (!imageUrl) return;
+            const downloadUrl = withDownloadParam(imageUrl);
             if (button) button.disabled = true;
             try {
-                const resp = await fetch(imageUrl, { credentials: 'same-origin' });
+                const resp = await fetch(downloadUrl, { credentials: 'same-origin' });
                 if (!resp.ok) throw new Error('download_failed');
                 const blob = await resp.blob();
                 const blobUrl = URL.createObjectURL(blob);
@@ -2067,7 +2079,7 @@
                 link.remove();
                 URL.revokeObjectURL(blobUrl);
             } catch (e) {
-                window.open(imageUrl, '_blank', 'noopener');
+                window.open(downloadUrl || imageUrl, '_blank', 'noopener');
             } finally {
                 if (button) button.disabled = false;
             }
@@ -2308,7 +2320,7 @@
         });
     })();
     </script>
-    <script src="{% static 'js/app-ui.js' %}"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
 
     <!-- ─── Popup ارسال به گفتگو ─── -->
     <div id="threadPopupOverlay">

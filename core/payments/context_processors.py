@@ -399,7 +399,13 @@ def unread_notifications(request):
 
     notifications = UserNotification.objects.filter(user=request.user, is_read=False)
     items = [
-        {'id': n.id, 'title': n.title, 'message': n.message, 'url': n.resolved_url}
+        {
+            'id': n.id,
+            'title': n.title,
+            'message': n.message,
+            'url': reverse('notification_open', args=[n.id]),
+            'color': n.color,
+        }
         for n in notifications[:5]
     ]
     return {'unread_notifications': {'total': notifications.count(), 'items': items}}

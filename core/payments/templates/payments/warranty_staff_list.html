@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>مدیریت گارانتی</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f4f7fb; }
         .wrap { max-width: 1300px; margin: 0 auto; padding: 20px 16px; }
@@ -62,6 +62,7 @@
         code { font-size: 11px; letter-spacing: 1px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
         @media (max-width: 900px) { .filter-grid { grid-template-columns: 1fr 1fr; } }
     </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
 </head>
 <body>
 {% include "payments/partials/app_navigation.html" %}
@@ -169,6 +170,6 @@
     </div>
     {% endif %}
 </div>
-<script src="{% static 'js/app-ui.js' %}"></script>
+<script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
 </body>
 </html>
