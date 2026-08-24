@@ -1,4 +1,4 @@
-# مستندات عملکرد سامانه مدیریت مشتریان
+﻿# مستندات عملکرد سامانه مدیریت مشتریان
 
 آخرین به‌روزرسانی: 1405/06/02  
 مبنای مستند: وضعیت فعلی کدهای `payments/models.py`، `payments/views.py`، `payments/forms.py` و مسیرهای `payments/urls.py`
@@ -622,8 +622,8 @@ PWA:
 
 - مسیر manifest: `manifest.json`
 - مسیر service worker: `sw.js`
-- نسخه cache فعلی در کد: `rabasa-customer-pwa-v14`
-- فایل‌های CSS/JS با نسخه `ui-redesign-v14` cache-bust می‌شوند.
+- نسخه cache فعلی در کد: `rabasa-customer-pwa-v15`
+- فایل‌های CSS/JS با نسخه `ui-redesign-v15` cache-bust می‌شوند.
 
 ## 19. امنیت و اعتبارسنجی فایل‌ها
 

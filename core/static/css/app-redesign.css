@@ -1818,3 +1818,65 @@ body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payme
         visibility: hidden !important;
     }
 }
+
+/* Mobile staff header fix v15: prevent duplicated notification text and keep left controls inset. */
+@media (max-width: 760px) {
+    body:has(.app-shell-nav) .app-top-header {
+        box-sizing: border-box !important;
+        column-gap: 8px !important;
+        left: 0 !important;
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+        right: 0 !important;
+        width: 100% !important;
+    }
+
+    body:has(.app-shell-nav) .app-top-actions {
+        align-items: center !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex: 0 1 auto !important;
+        gap: 6px !important;
+        justify-content: flex-start !important;
+        margin-left: 0 !important;
+        max-width: min(58vw, 236px) !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        padding-left: 2px !important;
+    }
+
+    body:has(.app-shell-nav) .notification-trigger {
+        align-items: center !important;
+        color: transparent !important;
+        display: inline-flex !important;
+        font-size: 0 !important;
+        justify-content: center !important;
+        line-height: 1 !important;
+        min-height: 38px !important;
+        min-width: 46px !important;
+        overflow: hidden !important;
+        padding: 0 8px !important;
+        white-space: nowrap !important;
+    }
+
+    body:has(.app-shell-nav) .notification-trigger::before {
+        color: #12324f !important;
+        content: "اعلان" !important;
+        display: inline-block !important;
+        font-size: 11px !important;
+        font-weight: 950 !important;
+        line-height: 1 !important;
+        -webkit-text-fill-color: #12324f !important;
+    }
+
+    body:has(.app-shell-nav) .message-envelope {
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 38px !important;
+        min-width: 40px !important;
+    }
+
+    body:has(.app-shell-nav) .app-nav-toggle {
+        right: max(12px, env(safe-area-inset-right)) !important;
+    }
+}
