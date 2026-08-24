@@ -15,7 +15,7 @@
     <link rel="manifest" href="{% url 'pwa_manifest' %}">
     <link rel="apple-touch-icon" href="{% static 'logo/logo-top.png' %}">
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v6">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v14">
     <link rel="stylesheet" href="{% static 'css/persian-datepicker.min.css' %}">
 
     <script src="{% static 'js/cleave.min.js' %}"></script>
@@ -539,7 +539,7 @@
         #threadPopupActions { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end; }
 
     </style>
-    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v6">
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v14">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -583,13 +583,51 @@
             <a class="secondary" href="{% url 'submit' %}">فیش‌های من</a>
         </div>
         {% if not show_payment_form %}
+        <section class="customer-mobile-home-card">
+            <div class="customer-mobile-home-top">
+                <div>
+                    <span class="customer-mobile-eyebrow">پرتال مشتریان</span>
+                    <h1>{{ customer_info.first_name|default:'' }} {{ customer_info.last_name|default:'' }}</h1>
+                    <p>{{ customer_info.organization|default:'-' }}{% if customer_info.city %}، {{ customer_info.city }}{% endif %}</p>
+                </div>
+                <span class="customer-mobile-status">فعال</span>
+            </div>
+            {% if customer_debt %}
+            <div class="customer-mobile-balance">
+                <span>بدهی فعلی</span>
+                <strong>{{ customer_debt.review_debt|thousand_sep }} ریال</strong>
+            </div>
+            <div class="customer-mobile-mini-stats">
+                <div>
+                    <span>بدهی تایید شده</span>
+                    <strong>{{ customer_debt.confirmed_debt|thousand_sep }} ریال</strong>
+                </div>
+                <div>
+                    <span>در انتظار تایید</span>
+                    <strong>{{ customer_debt.pending_review_payment_total|thousand_sep }} ریال</strong>
+                </div>
+            </div>
+            {% endif %}
+        </section>
+        <section class="customer-mobile-profile-sheet">
+            <div class="customer-mobile-section-title">مشخصات مشتری</div>
+            <div class="customer-mobile-profile-list">
+                <div><span>نام</span><strong>{{ customer_info.first_name|default:'-' }}</strong></div>
+                <div><span>نام خانوادگی</span><strong>{{ customer_info.last_name|default:'-' }}</strong></div>
+                <div><span>مجموعه</span><strong>{{ customer_info.organization|default:'-' }}</strong></div>
+                <div><span>شهر</span><strong>{{ customer_info.city|default:'-' }}</strong></div>
+                <div><span>شماره تلفن</span><strong dir="ltr">{{ customer_info.phone|default:'-' }}</strong></div>
+            </div>
+        </section>
+        {% endif %}
+        {% if not show_payment_form %}
         <div class="customer-info">
             <div class="customer-info-grid">
-                <div class="customer-info-item"><strong>نام:</strong> {{ customer_info.first_name|default:'-' }}</div>
-                <div class="customer-info-item"><strong>نام خانوادگی:</strong> {{ customer_info.last_name|default:'-' }}</div>
-                <div class="customer-info-item"><strong>مجموعه:</strong> {{ customer_info.organization|default:'-' }}</div>
-                <div class="customer-info-item"><strong>شهر:</strong> {{ customer_info.city|default:'-' }}</div>
-                <div class="customer-info-item"><strong>شماره تلفن:</strong> {{ customer_info.phone|default:'-' }}</div>
+                <div class="customer-info-item"><strong>نام</strong><span>{{ customer_info.first_name|default:'-' }}</span></div>
+                <div class="customer-info-item"><strong>نام خانوادگی</strong><span>{{ customer_info.last_name|default:'-' }}</span></div>
+                <div class="customer-info-item"><strong>مجموعه</strong><span>{{ customer_info.organization|default:'-' }}</span></div>
+                <div class="customer-info-item"><strong>شهر</strong><span>{{ customer_info.city|default:'-' }}</span></div>
+                <div class="customer-info-item"><strong>شماره تلفن</strong><span>{{ customer_info.phone|default:'-' }}</span></div>
             </div>
         </div>
         {% endif %}
@@ -2320,7 +2358,7 @@
         });
     })();
     </script>
-    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v6"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v14"></script>
 
     <!-- ─── Popup ارسال به گفتگو ─── -->
     <div id="threadPopupOverlay">

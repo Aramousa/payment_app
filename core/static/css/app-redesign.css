@@ -1,4 +1,4 @@
-/* Design A final layer. Loaded after page-level styles so the redesign is visible. */
+﻿/* Design A final layer. Loaded after page-level styles so the redesign is visible. */
 :root {
     --redesign-bg: #f4f7fb;
     --redesign-surface: #ffffff;
@@ -17,6 +17,8 @@
     --redesign-danger-soft: #fff1f0;
     --redesign-shadow: 0 8px 22px rgba(15, 23, 42, .06);
 }
+
+
 
 html,
 body,
@@ -92,20 +94,6 @@ body:has(.app-shell-nav) {
     background: #fff !important;
     border-left: 1px solid var(--redesign-border) !important;
     box-shadow: -10px 0 30px rgba(15, 23, 42, .09) !important;
-}
-
-.app-shell-nav::before {
-    background: #f1f8f7 !important;
-    border: 1px solid #cfe9e5 !important;
-    border-radius: 8px !important;
-    color: var(--redesign-accent-dark) !important;
-    content: "نسخه طراحی جدید" !important;
-    display: block !important;
-    font-size: 12px !important;
-    font-weight: 950 !important;
-    margin: 12px 12px 8px !important;
-    padding: 8px 10px !important;
-    text-align: right !important;
 }
 
 .app-shell-nav .app-nav-panel {
@@ -597,5 +585,1236 @@ body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payme
 
     .app-customer-bottom-text {
         font-size: 9.5px !important;
+    }
+}
+
+/* Design A mobile correction: reduce legacy boxed UI and make the customer portal calmer. */
+@media (max-width: 760px) {
+    body:has(.app-customer-bottom-nav) {
+        background: #f6f8fb !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-header {
+        background: #fff !important;
+        border-bottom: 1px solid #e6edf5 !important;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, .045) !important;
+        height: 56px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-header::after {
+        content: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-brand .app-shell-logo {
+        border-color: #edf2f7 !important;
+        height: 34px !important;
+        max-width: 128px !important;
+        padding: 3px 7px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-actions {
+        gap: 6px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .notification-trigger,
+    body:has(.app-customer-bottom-nav) .message-envelope,
+    body:has(.app-customer-bottom-nav) .app-top-logout button {
+        background: #f8fafc !important;
+        border: 1px solid #e2eaf2 !important;
+        border-radius: 8px !important;
+        box-shadow: none !important;
+        min-height: 38px !important;
+        min-width: 38px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-logout button {
+        background: #fff7f7 !important;
+        color: #b42318 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions {
+        background: transparent !important;
+        border: 0 !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        box-shadow: none !important;
+        gap: 8px !important;
+        margin: 12px 12px 14px !important;
+        padding: 0 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a {
+        background: #fff !important;
+        border: 1px solid #dfe8f1 !important;
+        border-radius: 8px !important;
+        color: #183b56 !important;
+        font-size: 13px !important;
+        font-weight: 850 !important;
+        min-height: 48px !important;
+        padding: 0 10px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child {
+        background: #148378 !important;
+        border-color: #148378 !important;
+        color: #fff !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info,
+    body:has(.app-customer-bottom-nav) .debt-summary,
+    body:has(.app-customer-bottom-nav) .daily-payment-notice,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert {
+        background: #fff !important;
+        border: 1px solid #e1e9f2 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, .045) !important;
+        margin: 0 12px 14px !important;
+        padding: 12px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info::before,
+    body:has(.app-customer-bottom-nav) .debt-summary::before,
+    body:has(.app-customer-bottom-nav) .daily-payment-notice::before,
+    body:has(.app-customer-bottom-nav) .dashboard-panel::before {
+        content: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info {
+        border-left: 1px solid #e1e9f2 !important;
+        border-right: 0 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-grid {
+        background: transparent !important;
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item {
+        align-items: flex-start !important;
+        background: #f8fafc !important;
+        border: 1px solid #e5edf5 !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        min-height: 58px !important;
+        padding: 9px 10px !important;
+        row-gap: 3px !important;
+        text-align: right !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item:last-child {
+        border-bottom: 1px solid #e5edf5 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item strong {
+        color: #64748b !important;
+        display: block !important;
+        font-size: 11px !important;
+        font-weight: 850 !important;
+        margin: 0 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item span,
+    body:has(.app-customer-bottom-nav) .customer-info-item div:not(strong) {
+        color: #102033 !important;
+        font-size: 12.5px !important;
+        font-weight: 800 !important;
+        line-height: 1.7 !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary {
+        border-left: 1px solid #e1e9f2 !important;
+        border-right: 0 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-grid {
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-item {
+        background: #f8fafc !important;
+        border: 1px solid #e5edf5 !important;
+        border-radius: 8px !important;
+        min-height: 78px !important;
+        padding: 10px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-item strong {
+        color: #66758a !important;
+        font-size: 11.5px !important;
+        margin-bottom: 5px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-item .value {
+        color: #111827 !important;
+        font-size: 15px !important;
+        font-weight: 950 !important;
+        line-height: 1.6 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-note {
+        background: #f8fafc !important;
+        border: 1px solid #e5edf5 !important;
+        border-radius: 8px !important;
+        color: #66758a !important;
+        font-size: 11.5px !important;
+        line-height: 1.9 !important;
+        margin-top: 8px !important;
+        padding: 9px 10px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .dashboard-panel {
+        border-left: 1px solid #e1e9f2 !important;
+        border-right: 0 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-mobile-bottom-nav,
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-nav {
+        background: rgba(255, 255, 255, .98) !important;
+        border: 1px solid #e5edf5 !important;
+        border-bottom: 0 !important;
+        border-radius: 14px 14px 0 0 !important;
+        box-shadow: 0 -10px 26px rgba(15, 23, 42, .11) !important;
+    }
+
+    @media (max-width: 430px) {
+        body:has(.app-customer-bottom-nav) .customer-info-grid,
+        body:has(.app-customer-bottom-nav) .debt-summary-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+}
+
+/* Mobile app visual v9: decisive customer shell matching the approved compact app direction. */
+@media (max-width: 760px) {
+    body:has(.app-customer-bottom-nav) {
+        background: #eef3f7 !important;
+        min-height: 100vh !important;
+        padding: 0 0 92px !important;
+    }
+
+    body:has(.app-customer-bottom-nav)::before {
+        background: #ffffff !important;
+        border-bottom: 1px solid #dde8f1 !important;
+        content: "" !important;
+        height: 54px !important;
+        left: 0 !important;
+        position: fixed !important;
+        right: 0 !important;
+        top: 0 !important;
+        z-index: 880 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-header {
+        align-items: center !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        display: flex !important;
+        height: 54px !important;
+        inset: 0 0 auto !important;
+        padding: 8px 12px !important;
+        position: sticky !important;
+        z-index: 900 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-header::after,
+    body:has(.app-customer-bottom-nav) .customer-mobile-app-card,
+    body:has(.app-customer-bottom-nav) .top-bar,
+    body:has(.app-customer-bottom-nav) .app-top-logout,
+    body:has(.app-customer-bottom-nav) > .app-nav-toggle {
+        display: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-brand {
+        order: 3 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-brand .app-shell-logo {
+        background: #fff !important;
+        border: 1px solid #e4edf5 !important;
+        border-radius: 9px !important;
+        box-shadow: none !important;
+        height: 34px !important;
+        max-width: 126px !important;
+        object-fit: contain !important;
+        padding: 4px 8px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-title {
+        display: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-spacer {
+        flex: 1 1 auto !important;
+        order: 2 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-top-actions {
+        align-items: center !important;
+        display: flex !important;
+        gap: 7px !important;
+        order: 1 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .notification-trigger,
+    body:has(.app-customer-bottom-nav) .message-envelope {
+        align-items: center !important;
+        background: #f7fafc !important;
+        border: 1px solid #dfe9f2 !important;
+        border-radius: 9px !important;
+        box-shadow: none !important;
+        color: #0f2f4f !important;
+        display: inline-flex !important;
+        font-size: 12px !important;
+        font-weight: 850 !important;
+        height: 38px !important;
+        justify-content: center !important;
+        min-height: 38px !important;
+        min-width: 38px !important;
+        padding: 0 10px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .notification-badge {
+        background: #d92d20 !important;
+        border: 2px solid #fff !important;
+        box-shadow: 0 4px 10px rgba(217, 45, 32, .22) !important;
+        font-size: 10px !important;
+        min-width: 20px !important;
+        top: -8px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions {
+        background: #ffffff !important;
+        border: 1px solid #dfe9f2 !important;
+        border-radius: 13px !important;
+        box-shadow: 0 10px 26px rgba(15, 35, 55, .07) !important;
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        margin: 22px 14px 14px !important;
+        padding: 7px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a {
+        align-items: center !important;
+        background: #f8fbfd !important;
+        border: 1px solid #dfe9f2 !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+        color: #16324f !important;
+        display: flex !important;
+        font-size: 13px !important;
+        font-weight: 950 !important;
+        justify-content: center !important;
+        min-height: 48px !important;
+        padding: 0 10px !important;
+        text-decoration: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child {
+        background: #16877c !important;
+        border-color: #16877c !important;
+        color: #fff !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child::before {
+        content: "+" !important;
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        margin-left: 7px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .mobile-quick-actions a.secondary::before {
+        content: "≡" !important;
+        font-size: 17px !important;
+        font-weight: 900 !important;
+        margin-left: 7px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info,
+    body:has(.app-customer-bottom-nav) .debt-summary,
+    body:has(.app-customer-bottom-nav) .daily-payment-notice,
+    body:has(.app-customer-bottom-nav) .daily-payment-expired,
+    body:has(.app-customer-bottom-nav) .customer-payment-alert,
+    body:has(.app-customer-bottom-nav) .customer-dashboard,
+    body:has(.app-customer-bottom-nav) .dashboard-panel,
+    body:has(.app-customer-bottom-nav) .filter-box {
+        background: #ffffff !important;
+        border: 1px solid #dfe9f2 !important;
+        border-radius: 13px !important;
+        box-shadow: 0 10px 26px rgba(15, 35, 55, .07) !important;
+        margin: 0 14px 14px !important;
+        max-width: none !important;
+        overflow: hidden !important;
+        padding: 12px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info::before,
+    body:has(.app-customer-bottom-nav) .debt-summary::before,
+    body:has(.app-customer-bottom-nav) .daily-payment-notice::before,
+    body:has(.app-customer-bottom-nav) .dashboard-panel::before {
+        content: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-grid {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item {
+        background: #f7fafc !important;
+        border: 1px solid #e3edf5 !important;
+        border-radius: 10px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        min-height: 64px !important;
+        padding: 9px 10px !important;
+        text-align: right !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item strong {
+        color: #6a7a8e !important;
+        font-size: 10.5px !important;
+        font-weight: 850 !important;
+        line-height: 1.6 !important;
+        margin: 0 0 2px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item span {
+        color: #0e2238 !important;
+        font-size: 13px !important;
+        font-weight: 950 !important;
+        line-height: 1.7 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item:nth-child(5) {
+        grid-column: span 2 !important;
+        min-height: 56px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-grid {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-item {
+        background: #f7fafc !important;
+        border: 1px solid #e3edf5 !important;
+        border-radius: 10px !important;
+        min-height: 82px !important;
+        padding: 10px !important;
+        text-align: right !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-item strong {
+        color: #66758a !important;
+        display: block !important;
+        font-size: 10.5px !important;
+        font-weight: 850 !important;
+        line-height: 1.7 !important;
+        margin-bottom: 4px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-item .value {
+        color: #0e2238 !important;
+        direction: rtl !important;
+        font-size: 14px !important;
+        font-weight: 950 !important;
+        line-height: 1.7 !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .debt-summary-note {
+        background: #f7fafc !important;
+        border: 1px solid #e3edf5 !important;
+        border-radius: 10px !important;
+        color: #66758a !important;
+        font-size: 11.5px !important;
+        line-height: 1.9 !important;
+        margin-top: 8px !important;
+        padding: 9px 10px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-mobile-bottom-nav,
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-nav {
+        align-items: center !important;
+        background: rgba(255, 255, 255, .98) !important;
+        border: 1px solid #dfe9f2 !important;
+        border-bottom: 0 !important;
+        border-radius: 18px 18px 0 0 !important;
+        bottom: 0 !important;
+        box-shadow: 0 -14px 34px rgba(15, 35, 55, .13) !important;
+        display: grid !important;
+        gap: 4px !important;
+        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        left: 0 !important;
+        min-height: 66px !important;
+        padding: 8px 8px max(8px, env(safe-area-inset-bottom)) !important;
+        position: fixed !important;
+        right: 0 !important;
+        z-index: 950 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-mobile-bottom-link,
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-link {
+        align-items: center !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 12px !important;
+        box-shadow: none !important;
+        color: #53657a !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 3px !important;
+        justify-content: center !important;
+        min-height: 50px !important;
+        min-width: 0 !important;
+        padding: 5px 2px !important;
+        text-decoration: none !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-mobile-bottom-link.active,
+    body:has(.app-customer-bottom-nav) .app-mobile-bottom-link.active-link,
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-link.active,
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-link.active-link {
+        background: #e1f3f1 !important;
+        color: #0f766e !important;
+        font-weight: 950 !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-icon {
+        color: inherit !important;
+        font-size: 18px !important;
+        height: 20px !important;
+        line-height: 20px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-text {
+        color: inherit !important;
+        display: block !important;
+        font-size: 9px !important;
+        font-weight: 850 !important;
+        line-height: 1.4 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-align: center !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .app-customer-more-tab .app-customer-bottom-icon {
+        font-size: 20px !important;
+    }
+
+    @media (max-width: 390px) {
+        body:has(.app-customer-bottom-nav) .app-customer-bottom-text {
+            font-size: 8.5px !important;
+        }
+
+        body:has(.app-customer-bottom-nav) .customer-info-grid,
+        body:has(.app-customer-bottom-nav) .debt-summary-grid {
+            grid-template-columns: 1fr !important;
+        }
+
+        body:has(.app-customer-bottom-nav) .customer-info-item:nth-child(5) {
+            grid-column: auto !important;
+        }
+    }
+}
+
+/* Mobile app visual v10: native-like customer dashboard, not a squeezed web page. */
+.customer-mobile-home-card,
+.customer-mobile-profile-sheet {
+    display: none;
+}
+
+@media (max-width: 760px) {
+    body:has(.customer-mobile-home-card) {
+        background:
+            radial-gradient(circle at 80% -80px, rgba(22, 135, 124, .18), transparent 240px),
+            linear-gradient(180deg, #f7fbfd 0, #edf3f7 260px, #f3f6f9 100%) !important;
+        padding-bottom: 104px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-top-header {
+        background: rgba(255, 255, 255, .92) !important;
+        backdrop-filter: blur(18px) !important;
+        border-bottom: 1px solid rgba(221, 232, 241, .78) !important;
+        height: 58px !important;
+        padding: 9px 14px !important;
+        position: sticky !important;
+        top: 0 !important;
+    }
+
+    body:has(.customer-mobile-home-card)::before {
+        display: none !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-top-brand .app-shell-logo {
+        border-radius: 10px !important;
+        height: 34px !important;
+        max-width: 124px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-user-menu {
+        display: none !important;
+    }
+
+    body:has(.customer-mobile-home-card) .notification-trigger {
+        color: transparent !important;
+        font-size: 0 !important;
+        padding: 0 !important;
+        width: 40px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .notification-trigger::before {
+        color: #12324f !important;
+        content: "اعلان" !important;
+        font-size: 10.5px !important;
+        font-weight: 950 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .message-envelope {
+        font-size: 0 !important;
+        padding: 0 !important;
+        width: 40px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .message-envelope-icon {
+        font-size: 16px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .message-envelope-label {
+        display: none !important;
+    }
+
+    body:has(.customer-mobile-home-card) .mobile-quick-actions {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        gap: 10px !important;
+        margin: 16px 16px 12px !important;
+        padding: 0 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .mobile-quick-actions a {
+        border-radius: 14px !important;
+        min-height: 52px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .mobile-quick-actions a:first-child {
+        background: linear-gradient(135deg, #14877c, #0f665f) !important;
+        border-color: transparent !important;
+        box-shadow: 0 14px 26px rgba(20, 135, 124, .22) !important;
+    }
+
+    body:has(.customer-mobile-home-card) .mobile-quick-actions a.secondary {
+        background: #ffffff !important;
+        border-color: #dfe9f2 !important;
+        color: #17324d !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-home-card,
+    body:has(.customer-mobile-home-card) .customer-mobile-profile-sheet {
+        display: block !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-info,
+    body:has(.customer-mobile-home-card) .debt-summary {
+        display: none !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-home-card {
+        background:
+            linear-gradient(135deg, rgba(15, 47, 79, .96), rgba(17, 125, 116, .94)),
+            #12324f !important;
+        border: 0 !important;
+        border-radius: 22px !important;
+        box-shadow: 0 22px 42px rgba(16, 42, 67, .20) !important;
+        color: #fff !important;
+        margin: 0 16px 14px !important;
+        overflow: hidden !important;
+        padding: 18px !important;
+        position: relative !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-home-card::after {
+        background: rgba(255, 255, 255, .12) !important;
+        border-radius: 999px !important;
+        content: "" !important;
+        height: 160px !important;
+        left: -60px !important;
+        position: absolute !important;
+        top: -70px !important;
+        width: 160px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-home-top {
+        align-items: flex-start !important;
+        display: flex !important;
+        gap: 12px !important;
+        justify-content: space-between !important;
+        position: relative !important;
+        z-index: 1 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-eyebrow,
+    body:has(.customer-mobile-home-card) .customer-mobile-home-top p,
+    body:has(.customer-mobile-home-card) .customer-mobile-balance span,
+    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats span {
+        color: rgba(255, 255, 255, .72) !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-eyebrow {
+        display: block !important;
+        font-size: 11px !important;
+        font-weight: 850 !important;
+        margin-bottom: 5px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-home-top h1 {
+        color: #fff !important;
+        font-size: 21px !important;
+        font-weight: 950 !important;
+        line-height: 1.45 !important;
+        margin: 0 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-home-top p {
+        font-size: 12px !important;
+        line-height: 1.8 !important;
+        margin: 2px 0 0 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-status {
+        background: rgba(255, 255, 255, .16) !important;
+        border: 1px solid rgba(255, 255, 255, .22) !important;
+        border-radius: 999px !important;
+        color: #fff !important;
+        flex: 0 0 auto !important;
+        font-size: 11px !important;
+        font-weight: 950 !important;
+        padding: 5px 10px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-balance {
+        margin-top: 18px !important;
+        position: relative !important;
+        z-index: 1 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-balance span {
+        display: block !important;
+        font-size: 11px !important;
+        font-weight: 850 !important;
+        margin-bottom: 5px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-balance strong {
+        color: #fff !important;
+        direction: rtl !important;
+        display: block !important;
+        font-size: 22px !important;
+        font-weight: 950 !important;
+        line-height: 1.55 !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        margin-top: 14px !important;
+        position: relative !important;
+        z-index: 1 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats div {
+        background: rgba(255, 255, 255, .13) !important;
+        border: 1px solid rgba(255, 255, 255, .16) !important;
+        border-radius: 14px !important;
+        padding: 10px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats span {
+        display: block !important;
+        font-size: 10.5px !important;
+        font-weight: 800 !important;
+        margin-bottom: 4px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats strong {
+        color: #fff !important;
+        display: block !important;
+        font-size: 12.5px !important;
+        font-weight: 950 !important;
+        line-height: 1.7 !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-profile-sheet {
+        background: #fff !important;
+        border: 1px solid #dfe9f2 !important;
+        border-radius: 18px !important;
+        box-shadow: 0 16px 34px rgba(15, 35, 55, .08) !important;
+        margin: 0 16px 14px !important;
+        padding: 14px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-section-title {
+        color: #17324d !important;
+        font-size: 14px !important;
+        font-weight: 950 !important;
+        margin-bottom: 10px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-profile-list {
+        display: grid !important;
+        gap: 0 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-profile-list div {
+        align-items: center !important;
+        border-bottom: 1px solid #edf2f7 !important;
+        display: flex !important;
+        gap: 12px !important;
+        justify-content: space-between !important;
+        min-height: 42px !important;
+        padding: 7px 0 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-profile-list div:last-child {
+        border-bottom: 0 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-profile-list span {
+        color: #6a7a8e !important;
+        font-size: 11.5px !important;
+        font-weight: 850 !important;
+    }
+
+    body:has(.customer-mobile-home-card) .customer-mobile-profile-list strong {
+        color: #102a43 !important;
+        font-size: 13px !important;
+        font-weight: 950 !important;
+        line-height: 1.6 !important;
+        text-align: left !important;
+    }
+
+    body:has(.customer-mobile-home-card) .daily-payment-notice,
+    body:has(.customer-mobile-home-card) .daily-payment-expired,
+    body:has(.customer-mobile-home-card) .customer-payment-alert,
+    body:has(.customer-mobile-home-card) .customer-dashboard,
+    body:has(.customer-mobile-home-card) .dashboard-panel {
+        border-radius: 18px !important;
+        margin-left: 16px !important;
+        margin-right: 16px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-mobile-bottom-nav,
+    body:has(.customer-mobile-home-card) .app-customer-bottom-nav {
+        background: rgba(255, 255, 255, .88) !important;
+        backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(215, 226, 238, .95) !important;
+        border-radius: 24px !important;
+        bottom: 12px !important;
+        box-shadow: 0 18px 42px rgba(15, 35, 55, .18) !important;
+        left: 12px !important;
+        min-height: 70px !important;
+        right: 12px !important;
+        width: auto !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-mobile-bottom-link,
+    body:has(.customer-mobile-home-card) .app-customer-bottom-link {
+        border-radius: 18px !important;
+        min-height: 54px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-mobile-bottom-link.active,
+    body:has(.customer-mobile-home-card) .app-mobile-bottom-link.active-link,
+    body:has(.customer-mobile-home-card) .app-customer-bottom-link.active,
+    body:has(.customer-mobile-home-card) .app-customer-bottom-link.active-link {
+        background: #12324f !important;
+        color: #fff !important;
+        box-shadow: 0 10px 20px rgba(18, 50, 79, .18) !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-customer-bottom-icon {
+        font-size: 17px !important;
+    }
+
+    body:has(.customer-mobile-home-card) .app-customer-bottom-text {
+        font-size: 8.5px !important;
+        font-weight: 900 !important;
+    }
+
+    @media (max-width: 390px) {
+        body:has(.customer-mobile-home-card) .customer-mobile-balance strong {
+            font-size: 19px !important;
+        }
+
+        body:has(.customer-mobile-home-card) .customer-mobile-mini-stats {
+            grid-template-columns: 1fr !important;
+        }
+    }
+}
+
+/* Desktop rescue v11: keep mobile/PWA navigation from leaking into the web layout. */
+@media (min-width: 761px) {
+    body:has(.app-shell-nav) {
+        margin-right: 224px !important;
+        padding-bottom: 0 !important;
+        padding-top: 72px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) {
+        margin-right: 224px !important;
+        padding-bottom: 0 !important;
+    }
+
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav,
+    body:has(.app-customer-bottom-nav) .app-mobile-bottom-nav,
+    body:has(.app-customer-bottom-nav) .app-customer-bottom-nav {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    .app-top-header,
+    body:has(.app-customer-bottom-nav) .app-top-header {
+        align-items: center !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f9fcff 100%) !important;
+        border-bottom: 1px solid var(--redesign-border) !important;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, .08) !important;
+        display: flex !important;
+        height: 64px !important;
+        left: 0 !important;
+        padding: 0 20px !important;
+        position: fixed !important;
+        right: 0 !important;
+        top: 0 !important;
+        width: auto !important;
+        z-index: 900 !important;
+    }
+
+    .app-top-header::after,
+    body:has(.app-customer-bottom-nav) .app-top-header::after {
+        background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
+        bottom: -1px !important;
+        content: "" !important;
+        display: block !important;
+        height: 3px !important;
+        left: 0 !important;
+        position: absolute !important;
+        right: 0 !important;
+    }
+
+    .app-shell-nav,
+    body:has(.app-customer-bottom-nav) .app-shell-nav {
+        background: #ffffff !important;
+        border-left: 1px solid var(--redesign-border) !important;
+        border-radius: 0 !important;
+        bottom: 0 !important;
+        box-shadow: -10px 0 30px rgba(15, 23, 42, .09) !important;
+        display: block !important;
+        height: calc(100vh - 64px) !important;
+        left: auto !important;
+        margin: 0 !important;
+        max-width: none !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        position: fixed !important;
+        right: 0 !important;
+        top: 64px !important;
+        transform: none !important;
+        visibility: visible !important;
+        width: 224px !important;
+        z-index: 850 !important;
+    }
+
+    .app-shell-nav .app-nav-panel {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        min-height: 0 !important;
+    }
+
+    .app-shell-nav .app-nav-links {
+        align-items: stretch !important;
+        display: flex !important;
+        flex: 1 1 auto !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+        justify-content: flex-start !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        padding: 10px !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        align-items: center !important;
+        background: transparent !important;
+        border: 1px solid transparent !important;
+        border-radius: 8px !important;
+        color: #26384d !important;
+        display: flex !important;
+        flex-direction: row !important;
+        font-size: 12px !important;
+        font-weight: 900 !important;
+        gap: 8px !important;
+        justify-content: flex-start !important;
+        min-height: 40px !important;
+        padding: 8px 10px !important;
+        text-align: right !important;
+        text-decoration: none !important;
+        white-space: normal !important;
+        width: 100% !important;
+    }
+
+    .app-shell-nav .app-nav-direct:hover,
+    .app-shell-nav .app-nav-group-panel .app-nav-link:hover,
+    .app-shell-nav .app-nav-group[open] > .sb-group-header,
+    .app-shell-nav .app-nav-group.active-group > .sb-group-header {
+        background: var(--redesign-primary-soft) !important;
+        border-color: #d8e7f6 !important;
+        color: var(--redesign-primary) !important;
+    }
+
+    .app-shell-nav .app-nav-direct.active-link,
+    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link {
+        background: var(--redesign-accent-soft) !important;
+        border-color: #c7ebe6 !important;
+        color: var(--redesign-accent-dark) !important;
+    }
+
+    .app-shell-nav .app-nav-group-panel {
+        background: #f8fafc !important;
+        border: 1px solid #edf2f7 !important;
+        border-radius: 8px !important;
+        display: grid !important;
+        gap: 4px !important;
+        margin: 4px 0 8px !important;
+        padding: 5px !important;
+    }
+
+    .app-sidebar-logout {
+        border-top: 1px solid var(--redesign-border) !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 10px !important;
+    }
+}
+
+/* Desktop polish v12: readable nav captions, customer labels, and logout affordance. */
+@media (min-width: 761px) {
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link,
+    .app-shell-nav .app-nav-text,
+    .app-shell-nav .app-nav-icon {
+        color: #17324d !important;
+        opacity: 1 !important;
+        text-shadow: none !important;
+    }
+
+    .app-shell-nav .app-nav-icon {
+        align-items: center !important;
+        background: #eef6f5 !important;
+        border: 1px solid #d5ebe8 !important;
+        border-radius: 999px !important;
+        display: inline-flex !important;
+        flex: 0 0 26px !important;
+        height: 26px !important;
+        justify-content: center !important;
+        line-height: 1 !important;
+        width: 26px !important;
+    }
+
+    .app-shell-nav .app-nav-direct.active-link .app-nav-text,
+    .app-shell-nav .app-nav-direct.active-link .app-nav-icon,
+    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link .app-nav-text,
+    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link .app-nav-icon {
+        color: var(--redesign-accent-dark) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info {
+        border-left: 1px solid #dfe9f2 !important;
+        border-right: 0 !important;
+        padding: 14px !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-grid {
+        display: grid !important;
+        gap: 10px !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item {
+        align-items: flex-start !important;
+        background: #f8fafc !important;
+        border: 1px solid #e3edf5 !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 4px !important;
+        justify-content: center !important;
+        min-height: 58px !important;
+        padding: 9px 11px !important;
+        text-align: right !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item strong {
+        color: #64748b !important;
+        display: block !important;
+        font-size: 11px !important;
+        font-weight: 850 !important;
+        line-height: 1.5 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+
+    body:has(.app-customer-bottom-nav) .customer-info-item span {
+        color: #0f2137 !important;
+        display: block !important;
+        font-size: 13px !important;
+        font-weight: 950 !important;
+        line-height: 1.7 !important;
+        overflow-wrap: anywhere !important;
+        width: 100% !important;
+    }
+
+    .app-sidebar-logout button {
+        align-items: center !important;
+        background: #fff5f5 !important;
+        border: 1px solid #ffd0d0 !important;
+        border-radius: 8px !important;
+        color: #b42318 !important;
+        display: flex !important;
+        font-size: 12px !important;
+        font-weight: 950 !important;
+        gap: 7px !important;
+        justify-content: center !important;
+        min-height: 40px !important;
+        width: 100% !important;
+    }
+
+    .app-sidebar-logout button span[aria-hidden="true"] {
+        color: #d92d20 !important;
+        font-size: 15px !important;
+        line-height: 1 !important;
+    }
+}
+
+/* Desktop header/nav polish v13: right brand, left actions, fully readable sidebar text. */
+@media (min-width: 761px) {
+    .app-top-header,
+    body:has(.app-customer-bottom-nav) .app-top-header {
+        direction: rtl !important;
+        gap: 16px !important;
+        justify-content: flex-start !important;
+    }
+
+    .app-top-brand,
+    body:has(.app-customer-bottom-nav) .app-top-brand {
+        align-items: center !important;
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        gap: 10px !important;
+        margin-left: auto !important;
+        margin-right: 0 !important;
+        order: 1 !important;
+    }
+
+    .app-top-spacer {
+        display: block !important;
+        flex: 1 1 auto !important;
+        order: 2 !important;
+    }
+
+    .app-top-actions,
+    body:has(.app-customer-bottom-nav) .app-top-actions {
+        direction: rtl !important;
+        justify-content: flex-end !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        order: 3 !important;
+    }
+
+    .app-top-title {
+        color: #102a43 !important;
+        display: inline-block !important;
+        font-size: 13px !important;
+        font-weight: 950 !important;
+        white-space: nowrap !important;
+    }
+
+    .app-shell-nav,
+    .app-shell-nav *,
+    .app-shell-nav a,
+    .app-shell-nav a:visited,
+    .app-shell-nav summary,
+    .app-shell-nav summary span,
+    .app-shell-nav .app-nav-text,
+    .app-shell-nav .app-nav-icon {
+        color: #102a43 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #102a43 !important;
+    }
+
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        background: transparent !important;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+    }
+
+    .app-shell-nav .app-nav-direct:hover,
+    .app-shell-nav .app-nav-direct:hover *,
+    .app-shell-nav .app-nav-group-panel .app-nav-link:hover,
+    .app-shell-nav .app-nav-group-panel .app-nav-link:hover *,
+    .app-shell-nav .app-nav-group[open] > .sb-group-header,
+    .app-shell-nav .app-nav-group[open] > .sb-group-header *,
+    .app-shell-nav .app-nav-group.active-group > .sb-group-header,
+    .app-shell-nav .app-nav-group.active-group > .sb-group-header * {
+        color: var(--redesign-primary) !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: var(--redesign-primary) !important;
+    }
+
+    .app-shell-nav .app-nav-direct.active-link,
+    .app-shell-nav .app-nav-direct.active-link *,
+    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link,
+    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link * {
+        color: var(--redesign-accent-dark) !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: var(--redesign-accent-dark) !important;
+    }
+
+    .app-shell-nav .app-nav-icon {
+        color: #147d74 !important;
+        -webkit-text-fill-color: #147d74 !important;
+    }
+}
+
+/* Desktop header cleanup v14: logout lives in the sidebar, so hide the duplicate top button. */
+@media (min-width: 761px) {
+    .app-top-logout,
+    body:has(.app-customer-bottom-nav) .app-top-logout {
+        display: none !important;
+        visibility: hidden !important;
     }
 }

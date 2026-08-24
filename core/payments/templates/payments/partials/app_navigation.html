@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 {% if request.user.is_authenticated and app_nav_items %}
 {% now "U" as app_nav_cache_buster %}
 
@@ -125,7 +125,7 @@
         <form class="app-nav-logout app-sidebar-logout" method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button type="submit">
-                <span aria-hidden="true">⎋</span>
+                <span aria-hidden="true">&#x23FB;</span>
                 <span>خروج</span>
             </button>
         </form>
@@ -230,7 +230,7 @@
     if (!sidebar) return;
 
     var currentPath = window.location.pathname.replace(/\/$/, '');
-    document.querySelectorAll('.app-nav-link').forEach(function(link) {
+    document.querySelectorAll('.app-nav-link, .app-mobile-bottom-link[href]').forEach(function(link) {
         var href = link.getAttribute('href') || '';
         var path = href.split('?')[0].replace(/\/$/, '');
         if (path && (path === currentPath || (path !== '' && currentPath.indexOf(path + '/') === 0))) {
