@@ -1,24 +1,35 @@
-﻿/* Design A final layer. Loaded after page-level styles so the redesign is visible. */
+/*
+   Clean Design A rebuild.
+   This file intentionally replaces the previous layered overrides with one
+   cohesive visual system for desktop and mobile/PWA screens.
+*/
+
 :root {
-    --redesign-bg: #f4f7fb;
-    --redesign-surface: #ffffff;
-    --redesign-soft: #f8fafc;
-    --redesign-border: #dce6ef;
-    --redesign-border-strong: #c7d5e3;
-    --redesign-text: #162235;
-    --redesign-muted: #66758a;
-    --redesign-primary: #183b56;
-    --redesign-primary-dark: #102a43;
-    --redesign-primary-soft: #e9f2fb;
-    --redesign-accent: #147d74;
-    --redesign-accent-dark: #0f625c;
-    --redesign-accent-soft: #e7f6f4;
-    --redesign-danger: #b42318;
-    --redesign-danger-soft: #fff1f0;
-    --redesign-shadow: 0 8px 22px rgba(15, 23, 42, .06);
+    --a-bg: #f3f7fb;
+    --a-bg-top: #f8fbfd;
+    --a-surface: #ffffff;
+    --a-soft: #f7fafc;
+    --a-line: #dbe6ef;
+    --a-line-strong: #c7d6e3;
+    --a-text: #102033;
+    --a-muted: #65758a;
+    --a-primary: #12324f;
+    --a-primary-hover: #0e2840;
+    --a-accent: #16877c;
+    --a-accent-hover: #0f6f66;
+    --a-accent-soft: #e7f6f4;
+    --a-danger: #b42318;
+    --a-danger-soft: #fff1f0;
+    --a-warning: #b7791f;
+    --a-warning-soft: #fff7df;
+    --a-success: #157347;
+    --a-success-soft: #e7f7ed;
+    --a-shadow: 0 10px 26px rgba(15, 35, 55, .075);
+    --a-shadow-soft: 0 5px 16px rgba(15, 35, 55, .055);
+    --a-radius: 8px;
+    --a-header-h: 66px;
+    --a-sidebar-w: 232px;
 }
-
-
 
 html,
 body,
@@ -26,161 +37,391 @@ body * {
     letter-spacing: 0 !important;
 }
 
+html,
 body {
-    background: linear-gradient(180deg, #eef7f6 0, var(--redesign-bg) 220px) !important;
-    color: var(--redesign-text) !important;
+    max-width: 100%;
 }
 
-.login-wrapper {
+body {
     background:
-        linear-gradient(180deg, #eef7f6 0%, #f4f7fb 100%) !important;
+        radial-gradient(circle at 82% -160px, rgba(22, 135, 124, .16), transparent 320px),
+        linear-gradient(180deg, var(--a-bg-top) 0, var(--a-bg) 260px, var(--a-bg) 100%) !important;
+    color: var(--a-text) !important;
+    direction: rtl;
+    font-family: Vazir, Tahoma, Arial, sans-serif !important;
+    overflow-x: hidden;
 }
 
-.login-card {
-    border: 1px solid var(--redesign-border) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 18px 42px rgba(15, 23, 42, .10) !important;
-    overflow: hidden !important;
+a {
+    text-decoration: none !important;
 }
 
-.login-card::before {
-    background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
-    content: "" !important;
-    display: block !important;
-    height: 5px !important;
-    margin: -30px -30px 24px !important;
+img,
+svg,
+video,
+canvas,
+iframe {
+    max-width: 100%;
 }
 
-.login-btn {
-    background: linear-gradient(135deg, var(--redesign-accent), var(--redesign-primary)) !important;
-    border: 0 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 12px 26px rgba(20, 125, 116, .22) !important;
-}
-
-body:has(.app-shell-nav) {
-    background: var(--redesign-bg) !important;
-}
-
+/* Header */
 .app-top-header {
-    background: linear-gradient(180deg, #ffffff 0%, #f9fcff 100%) !important;
-    border-bottom: 1px solid var(--redesign-border) !important;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, .08) !important;
+    align-items: center !important;
+    background: rgba(255, 255, 255, .94) !important;
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(219, 230, 239, .95) !important;
+    box-shadow: 0 8px 22px rgba(15, 35, 55, .06) !important;
+    display: flex !important;
+    gap: 14px !important;
+    height: var(--a-header-h) !important;
+    left: 0 !important;
+    padding: 0 20px !important;
+    position: fixed !important;
+    right: 0 !important;
+    top: 0 !important;
+    width: auto !important;
+    z-index: 900 !important;
 }
 
 .app-top-header::after {
-    background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
-    bottom: -1px !important;
-    content: "" !important;
-    height: 3px !important;
-    left: 0 !important;
-    position: absolute !important;
-    right: 0 !important;
+    content: none !important;
+}
+
+.app-top-brand {
+    align-items: center !important;
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    gap: 10px !important;
+    margin-left: auto !important;
+    min-width: 0 !important;
+    order: 1 !important;
 }
 
 .app-top-brand .app-shell-logo {
     background: #fff !important;
-    border: 1px solid #edf2f7 !important;
-    border-radius: 8px !important;
+    border: 1px solid #e5edf5 !important;
+    border-radius: var(--a-radius) !important;
     box-shadow: none !important;
+    height: 42px !important;
+    object-fit: contain !important;
+    padding: 4px 10px !important;
 }
 
 .app-top-title {
-    color: var(--redesign-text) !important;
+    color: var(--a-text) !important;
+    display: inline-block !important;
+    font-size: 13px !important;
+    font-weight: 950 !important;
+    line-height: 1.5 !important;
+    white-space: nowrap !important;
+}
+
+.app-top-spacer {
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    order: 2 !important;
+}
+
+.app-top-actions {
+    align-items: center !important;
+    display: flex !important;
+    flex: 0 0 auto !important;
+    gap: 8px !important;
+    justify-content: flex-start !important;
+    order: 3 !important;
+}
+
+.notification-trigger,
+.message-envelope,
+.app-user-menu summary {
+    align-items: center !important;
+    background: var(--a-soft) !important;
+    border: 1px solid var(--a-line) !important;
+    border-radius: var(--a-radius) !important;
+    box-shadow: none !important;
+    color: var(--a-primary) !important;
+    display: inline-flex !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+    gap: 6px !important;
+    min-height: 40px !important;
+    padding: 0 12px !important;
+    white-space: nowrap !important;
+}
+
+.notification-trigger:hover,
+.message-envelope:hover,
+.app-user-menu summary:hover {
+    background: var(--a-accent-soft) !important;
+    border-color: #c5e8e3 !important;
+    color: var(--a-accent-hover) !important;
+}
+
+.notification-bell {
+    position: relative !important;
+}
+
+.notification-badge,
+.message-envelope-badge {
+    align-items: center !important;
+    background: #d92d20 !important;
+    border: 2px solid #fff !important;
+    border-radius: 999px !important;
+    color: #fff !important;
+    display: inline-flex !important;
+    font-size: 10px !important;
+    font-weight: 950 !important;
+    height: 20px !important;
+    justify-content: center !important;
+    min-width: 20px !important;
+    padding: 0 5px !important;
+}
+
+.notification-badge.zero,
+.message-envelope-badge.zero {
+    display: none !important;
+}
+
+.message-envelope-icon {
+    line-height: 1 !important;
+}
+
+.app-user-menu summary {
+    cursor: pointer !important;
+    list-style: none !important;
+}
+
+.app-user-menu summary::-webkit-details-marker {
+    display: none !important;
+}
+
+.app-user-avatar {
+    align-items: center !important;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    flex: 0 0 30px !important;
+    height: 30px !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    width: 30px !important;
+}
+
+.app-user-avatar img {
+    height: 100% !important;
+    object-fit: cover !important;
+    width: 100% !important;
+}
+
+.app-user-summary {
+    display: grid !important;
+    gap: 0 !important;
+    line-height: 1.35 !important;
+    text-align: right !important;
+}
+
+.app-nav-user-name {
+    color: var(--a-text) !important;
+    font-size: 12px !important;
     font-weight: 950 !important;
 }
 
+.app-nav-user-role {
+    color: var(--a-muted) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+}
+
+.app-user-menu-panel,
+.notification-dropdown {
+    background: #fff !important;
+    border: 1px solid var(--a-line) !important;
+    border-radius: var(--a-radius) !important;
+    box-shadow: var(--a-shadow) !important;
+    color: var(--a-text) !important;
+}
+
+.notification-dropdown {
+    max-width: min(380px, calc(100vw - 24px)) !important;
+}
+
+.notification-actions {
+    border-bottom: 1px solid #edf2f7 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    padding: 10px !important;
+}
+
+.notification-item,
+.notification-empty {
+    color: var(--a-text) !important;
+    display: block !important;
+    line-height: 1.8 !important;
+    padding: 10px 12px !important;
+}
+
+.notification-item {
+    border-bottom: 1px solid #edf2f7 !important;
+}
+
+.app-top-logout {
+    display: none !important;
+}
+
+/* Sidebar */
 .app-shell-nav {
     background: #fff !important;
-    border-left: 1px solid var(--redesign-border) !important;
-    box-shadow: -10px 0 30px rgba(15, 23, 42, .09) !important;
+    border-left: 1px solid var(--a-line) !important;
+    box-shadow: -12px 0 34px rgba(15, 35, 55, .085) !important;
+    height: calc(100vh - var(--a-header-h)) !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    right: 0 !important;
+    top: var(--a-header-h) !important;
+    width: var(--a-sidebar-w) !important;
+    z-index: 850 !important;
 }
 
 .app-shell-nav .app-nav-panel {
     display: flex !important;
     flex-direction: column !important;
-    min-height: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
 }
 
 .app-shell-nav .app-nav-links {
-    gap: 6px !important;
-    padding: 8px 10px !important;
-}
-
-.app-shell-nav .sb-group-header {
-    color: var(--redesign-muted) !important;
-    font-size: 11px !important;
-    font-weight: 950 !important;
-    padding: 11px 8px 5px !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    gap: 5px !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 10px !important;
 }
 
 .app-shell-nav .app-nav-direct,
+.app-shell-nav .sb-group-header,
 .app-shell-nav .app-nav-group-panel .app-nav-link {
+    align-items: center !important;
     background: transparent !important;
     border: 1px solid transparent !important;
-    border-radius: 8px !important;
-    color: #26384d !important;
-    font-weight: 850 !important;
-    min-height: 40px !important;
+    border-radius: var(--a-radius) !important;
+    color: var(--a-primary) !important;
+    display: flex !important;
+    flex-direction: row !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+    gap: 8px !important;
+    line-height: 1.6 !important;
+    min-height: 42px !important;
     padding: 8px 10px !important;
+    text-align: right !important;
+    white-space: normal !important;
+    width: 100% !important;
+    -webkit-text-fill-color: var(--a-primary) !important;
+}
+
+.app-shell-nav .sb-group-header {
+    color: #53677e !important;
+    cursor: pointer !important;
+    -webkit-text-fill-color: #53677e !important;
+}
+
+.app-shell-nav .sb-group-header::-webkit-details-marker {
+    display: none !important;
+}
+
+.app-shell-nav .app-nav-icon {
+    align-items: center !important;
+    background: #f4f8fb !important;
+    border: 1px solid #e0eaf2 !important;
+    border-radius: var(--a-radius) !important;
+    color: var(--a-accent-hover) !important;
+    display: inline-flex !important;
+    flex: 0 0 28px !important;
+    height: 28px !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    width: 28px !important;
+    -webkit-text-fill-color: var(--a-accent-hover) !important;
 }
 
 .app-shell-nav .app-nav-direct:hover,
 .app-shell-nav .app-nav-group-panel .app-nav-link:hover,
 .app-shell-nav .app-nav-group[open] > .sb-group-header,
 .app-shell-nav .app-nav-group.active-group > .sb-group-header {
-    background: #f1f6fb !important;
-    border-color: var(--redesign-border) !important;
-    color: var(--redesign-primary) !important;
+    background: #f1f7fb !important;
+    border-color: #dce8f2 !important;
 }
 
 .app-shell-nav .app-nav-direct.active-link,
 .app-shell-nav .app-nav-group-panel .app-nav-link.active-link {
-    background: var(--redesign-accent-soft) !important;
+    background: var(--a-accent-soft) !important;
     border-color: #bfe7e1 !important;
-    border-right: 3px solid var(--redesign-accent) !important;
-    color: var(--redesign-accent-dark) !important;
-    font-weight: 950 !important;
+    color: var(--a-accent-hover) !important;
+    -webkit-text-fill-color: var(--a-accent-hover) !important;
 }
 
-.app-shell-nav .app-nav-icon {
-    background: #f5f8fb !important;
-    border: 1px solid #e5edf5 !important;
-    border-radius: 8px !important;
-    color: var(--redesign-primary) !important;
-}
-
-.app-shell-nav .active-link .app-nav-icon {
+.app-shell-nav .app-nav-direct.active-link .app-nav-icon,
+.app-shell-nav .app-nav-group-panel .app-nav-link.active-link .app-nav-icon {
     background: #dff3ef !important;
     border-color: #bfe7e1 !important;
-    color: var(--redesign-accent-dark) !important;
+}
+
+.app-nav-group-panel {
+    background: #f8fafc !important;
+    border: 1px solid #edf2f7 !important;
+    border-radius: var(--a-radius) !important;
+    display: grid !important;
+    gap: 4px !important;
+    margin: 4px 0 8px !important;
+    padding: 5px !important;
 }
 
 .app-sidebar-logout {
-    background: #fff !important;
-    border-top: 1px solid #e5edf5 !important;
-    display: block !important;
+    border-top: 1px solid var(--a-line) !important;
     margin-top: auto !important;
-    padding: 12px !important;
+    padding: 10px !important;
 }
 
 .app-sidebar-logout button,
-.app-top-logout button {
-    background: var(--redesign-danger-soft) !important;
+.app-top-logout button,
+.app-user-menu-logout button {
+    align-items: center !important;
+    background: var(--a-danger-soft) !important;
     border: 1px solid #fecaca !important;
-    border-radius: 8px !important;
-    color: var(--redesign-danger) !important;
+    border-radius: var(--a-radius) !important;
+    color: var(--a-danger) !important;
+    display: inline-flex !important;
+    font-size: 12px !important;
     font-weight: 950 !important;
+    gap: 7px !important;
+    justify-content: center !important;
+    min-height: 40px !important;
+    width: 100% !important;
 }
 
-.notification-trigger,
-.message-envelope,
-.app-user-menu summary {
-    background: var(--redesign-soft) !important;
-    border: 1px solid var(--redesign-border) !important;
-    border-radius: 8px !important;
-    box-shadow: none !important;
-    color: var(--redesign-primary) !important;
+/* Main layout */
+body:has(.app-shell-nav) {
+    margin-right: var(--a-sidebar-w) !important;
+    padding-top: calc(var(--a-header-h) + 10px) !important;
+}
+
+body:has(.app-shell-nav) main,
+body:has(.app-shell-nav) .content,
+body:has(.app-shell-nav) .container,
+body:has(.app-shell-nav) .dashboard-container,
+body:has(.app-shell-nav) .page,
+body:has(.app-shell-nav) .wrap,
+body:has(.app-shell-nav) .page-wrap {
+    box-sizing: border-box !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    max-width: 1180px !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    width: 100% !important;
 }
 
 .section,
@@ -205,45 +446,64 @@ body:has(.app-shell-nav) {
 .daily-payment-notice,
 .daily-payment-expired,
 .customer-payment-alert,
+.debt-summary,
+.table-wrap,
+.app-table-wrap,
+.login-card {
+    background: var(--a-surface) !important;
+    border: 1px solid var(--a-line) !important;
+    border-radius: var(--a-radius) !important;
+    box-shadow: var(--a-shadow-soft) !important;
+    color: var(--a-text) !important;
+}
+
+.dashboard-panel::before,
+.dashboard-row::before,
+.summary-card::before,
+.customer-info::before,
+.debt-summary::before,
+.daily-payment-notice::before,
+.customer-payment-alert::before,
+.login-card::before {
+    content: none !important;
+}
+
+.section,
+.box,
+.customer-header,
+.summary-card,
+.customer-info,
+.card,
+#payment-form,
+.detail-card,
+.customer-card,
+.dashboard-panel,
+.dashboard-row,
+.recon-panel,
+.action-panel,
+.daily-payment-notice,
+.customer-payment-alert,
 .debt-summary {
-    background: #fff !important;
-    border: 1px solid var(--redesign-border) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 6px 18px rgba(15, 23, 42, .055) !important;
-    color: var(--redesign-text) !important;
+    padding: 16px !important;
 }
 
 .customer-dashboard,
 .dashboard-grid,
 .summary-grid,
+.summary-cards,
 .customer-info-grid,
-.debt-summary-grid {
+.debt-summary-grid,
+.customer-payment-alert-stats {
+    display: grid !important;
     gap: 14px !important;
 }
 
-.dashboard-panel,
-.dashboard-row,
-.summary-card,
-.customer-info,
-.debt-summary,
-.daily-payment-notice {
-    overflow: hidden !important;
-    position: relative !important;
-}
-
-.dashboard-panel::before,
-.summary-card::before,
-.customer-info::before,
-.debt-summary::before,
-.daily-payment-notice::before {
-    background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
-    content: "" !important;
-    display: block !important;
-    height: 4px !important;
-    left: 0 !important;
-    position: absolute !important;
-    right: 0 !important;
-    top: 0 !important;
+.summary-cards,
+.summary-grid,
+.customer-info-grid,
+.debt-summary-grid,
+.customer-payment-alert-stats {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
 }
 
 .section h1,
@@ -253,63 +513,118 @@ body:has(.app-shell-nav) {
 .card h1,
 .card h2,
 .dashboard-panel h1,
-.dashboard-panel h2 {
-    color: var(--redesign-primary) !important;
+.dashboard-panel h2,
+.dashboard-panel h3,
+.page-title,
+.section-title {
+    color: var(--a-primary) !important;
     font-weight: 950 !important;
+    line-height: 1.6 !important;
 }
 
-.filter-box,
-.search-box,
-.invoice-filter-box,
-.app-filter-panel,
-.app-table-tools {
-    background: #fbfdff !important;
+.summary-card {
+    align-content: center !important;
+    display: grid !important;
+    min-height: 86px !important;
+    text-align: right !important;
 }
 
-.app-table-wrap,
-.table-wrap {
-    background: #fff !important;
-    border: 1px solid var(--redesign-border) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 6px 18px rgba(15, 23, 42, .055) !important;
+.summary-card h3,
+.summary-card span,
+.customer-info-item strong,
+.debt-summary-item span,
+.customer-payment-alert-stat span {
+    color: var(--a-muted) !important;
+    font-size: 11px !important;
+    font-weight: 850 !important;
+    line-height: 1.6 !important;
+    margin: 0 0 5px !important;
 }
 
-table {
-    color: var(--redesign-text) !important;
-}
-
-thead th,
-table th {
-    background: #f4f7fb !important;
-    border-bottom: 1px solid var(--redesign-border) !important;
-    color: #4d5f75 !important;
-    font-size: 12px !important;
+.summary-card .value,
+.summary-card strong,
+.customer-info-item span,
+.debt-summary-item strong,
+.customer-payment-alert-stat strong {
+    color: var(--a-text) !important;
+    font-size: 16px !important;
     font-weight: 950 !important;
+    line-height: 1.7 !important;
+    overflow-wrap: anywhere !important;
 }
 
-tbody td {
-    border-bottom-color: #edf2f7 !important;
+.customer-info-item,
+.debt-summary-item,
+.customer-payment-alert-stat {
+    background: var(--a-soft) !important;
+    border: 1px solid #e3edf5 !important;
+    border-radius: var(--a-radius) !important;
+    display: grid !important;
+    min-height: 58px !important;
+    padding: 10px !important;
 }
 
-tbody tr:hover td {
-    background: #fbfdff !important;
+/* Forms */
+label {
+    color: var(--a-text) !important;
+    font-weight: 850 !important;
 }
 
 input,
 select,
-textarea {
+textarea,
+.form-control,
+.form-select {
     background: #fff !important;
     border: 1px solid #cfdbe7 !important;
-    border-radius: 8px !important;
-    color: var(--redesign-text) !important;
+    border-radius: var(--a-radius) !important;
+    color: var(--a-text) !important;
+    font-family: Vazir, Tahoma, Arial, sans-serif !important;
+    min-height: 42px !important;
+}
+
+textarea {
+    min-height: 92px !important;
 }
 
 input:focus,
 select:focus,
-textarea:focus {
-    border-color: var(--redesign-accent) !important;
-    box-shadow: 0 0 0 3px rgba(20, 125, 116, .14) !important;
-    outline: none !important;
+textarea:focus,
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--a-accent) !important;
+    box-shadow: 0 0 0 3px rgba(22, 135, 124, .14) !important;
+    outline: 0 !important;
+}
+
+.required-star,
+.asteriskField {
+    color: var(--a-danger) !important;
+    font-weight: 950 !important;
+}
+
+.receipt-upload-card,
+.upload-zone,
+#receipt-file-label {
+    background: #f1fbf9 !important;
+    border: 2px dashed #bfe7e1 !important;
+    border-radius: var(--a-radius) !important;
+}
+
+/* Buttons */
+.button-link,
+.customer-link,
+.detail-link,
+.track-link,
+.expand-btn,
+.apply-btn,
+.submit-btn,
+.btn,
+button[type="submit"] {
+    border-radius: var(--a-radius) !important;
+    font-family: Vazir, Tahoma, Arial, sans-serif !important;
+    font-weight: 900 !important;
+    min-height: 40px !important;
 }
 
 .button-link,
@@ -318,970 +633,419 @@ textarea:focus {
 .track-link,
 .expand-btn,
 .apply-btn,
-.submit-btn,
-button[type="submit"] {
-    border-radius: 8px !important;
-    font-weight: 900 !important;
-}
-
-.button-link,
-.customer-link,
-.detail-link,
-.track-link,
-.expand-btn,
-.apply-btn {
-    background: var(--redesign-primary) !important;
-    border-color: var(--redesign-primary) !important;
+.btn-primary,
+.btn-success {
+    background: var(--a-primary) !important;
+    border-color: var(--a-primary) !important;
     color: #fff !important;
 }
 
-.receipt-upload-card,
-#payment-form,
-.upload-zone,
-#receipt-file-label {
-    border-color: #bfe7e1 !important;
-}
-
-#receipt-file-label,
-.upload-zone {
-    background: #f1fbf9 !important;
-    border-style: dashed !important;
-    border-width: 2px !important;
+.button-link:hover,
+.customer-link:hover,
+.detail-link:hover,
+.track-link:hover,
+.expand-btn:hover,
+.apply-btn:hover,
+.btn-primary:hover,
+.btn-success:hover {
+    background: var(--a-primary-hover) !important;
+    border-color: var(--a-primary-hover) !important;
+    color: #fff !important;
 }
 
 #payment-form button[type="submit"],
-.submit-btn {
-    background: linear-gradient(135deg, var(--redesign-accent), var(--redesign-primary)) !important;
-    border: 0 !important;
-    box-shadow: 0 12px 26px rgba(20, 125, 116, .22) !important;
+.submit-btn,
+.button-link.success,
+.staff-quick button,
+.staff-action button {
+    background: var(--a-accent) !important;
+    border-color: var(--a-accent) !important;
     color: #fff !important;
+}
+
+#payment-form button[type="submit"]:hover,
+.submit-btn:hover,
+.button-link.success:hover,
+.staff-quick button:hover,
+.staff-action button:hover {
+    background: var(--a-accent-hover) !important;
+    border-color: var(--a-accent-hover) !important;
 }
 
 .button-link.alt,
-.button-link.success,
-.submit-btn,
-.staff-quick button,
-.staff-action button {
-    background: var(--redesign-accent) !important;
-    border-color: var(--redesign-accent) !important;
+.btn-secondary {
+    background: #eef4f8 !important;
+    border-color: var(--a-line) !important;
+    color: var(--a-primary) !important;
+}
+
+.btn-danger,
+.button-link.danger {
+    background: var(--a-danger) !important;
+    border-color: var(--a-danger) !important;
     color: #fff !important;
 }
 
+/* Flags and badges */
 .status,
 .status-badge,
 .status-pill,
-.flag-chip {
+.flag-chip,
+.badge {
     border-radius: 999px !important;
     font-size: 11px !important;
     font-weight: 950 !important;
-    min-height: 26px !important;
-    padding: 4px 10px !important;
+    line-height: 1.5 !important;
+    min-height: 24px !important;
+    padding: 4px 9px !important;
 }
 
-body:has(.app-staff-bottom-nav) .summary-card,
-body:has(.app-staff-bottom-nav) .dashboard-row,
-body:has(.app-staff-bottom-nav) .detail-card {
-    border-right: 3px solid var(--redesign-border) !important;
+.flag-green,
+.status-approved,
+.badge-success {
+    background: var(--a-success-soft) !important;
+    color: var(--a-success) !important;
 }
 
-body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .summary-card,
-body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .customer-info,
-body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .debt-summary,
-body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payment-notice {
-    border-right: 3px solid var(--redesign-accent) !important;
+.flag-yellow,
+.flag-orange,
+.status-pending,
+.badge-warning {
+    background: var(--a-warning-soft) !important;
+    color: var(--a-warning) !important;
 }
 
+.flag-red,
+.status-rejected,
+.badge-danger {
+    background: var(--a-danger-soft) !important;
+    color: var(--a-danger) !important;
+}
+
+.flag-blue,
+.badge-info {
+    background: #e8f2ff !important;
+    color: #175cd3 !important;
+}
+
+/* Tables */
+.app-table-wrap,
+.table-wrap {
+    overflow: hidden !important;
+}
+
+table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    color: var(--a-text) !important;
+    margin: 0 !important;
+    width: 100% !important;
+}
+
+thead th,
+table th {
+    background: #f2f7fb !important;
+    border-bottom: 1px solid var(--a-line) !important;
+    color: #506276 !important;
+    font-size: 12px !important;
+    font-weight: 950 !important;
+}
+
+tbody td {
+    border-bottom: 1px solid #edf2f7 !important;
+}
+
+tbody tr:hover td {
+    background: #fbfdff !important;
+}
+
+/* Customer mobile home card from the existing template */
+.customer-mobile-home-card,
+.customer-mobile-profile-sheet {
+    display: none;
+}
+
+/* Login */
+.login-wrapper {
+    background:
+        radial-gradient(circle at 80% -120px, rgba(22, 135, 124, .18), transparent 320px),
+        linear-gradient(180deg, #f8fbfd 0%, var(--a-bg) 100%) !important;
+}
+
+.login-card {
+    overflow: hidden !important;
+}
+
+.login-btn {
+    background: var(--a-accent) !important;
+    border: 0 !important;
+    border-radius: var(--a-radius) !important;
+    color: #fff !important;
+}
+
+/* Desktop */
 @media (min-width: 761px) {
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav,
+    .app-nav-toggle,
+    .sb-overlay {
+        display: none !important;
+        visibility: hidden !important;
+    }
+}
+
+/* Mobile/PWA */
+@media (max-width: 760px) {
+    :root {
+        --a-header-h: 58px;
+    }
+
+    html,
+    body {
+        overflow-x: hidden !important;
+    }
+
     body:has(.app-shell-nav) {
-        margin-right: 224px !important;
-        padding-top: 72px !important;
+        margin: 0 !important;
+        padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+        padding-top: calc(var(--a-header-h) + 10px) !important;
     }
 
     body:has(.app-shell-nav) main,
     body:has(.app-shell-nav) .content,
     body:has(.app-shell-nav) .container,
     body:has(.app-shell-nav) .dashboard-container,
-    body:has(.app-shell-nav) .page {
-        max-width: 1240px !important;
-    }
-
-    .app-top-header {
-        height: 64px !important;
-        padding: 0 20px !important;
-    }
-
-    .app-shell-nav {
-        height: calc(100vh - 64px) !important;
-        top: 64px !important;
-        width: 224px !important;
-    }
-
-    .app-shell-nav .app-nav-panel {
-        height: 100% !important;
-    }
-
-    .app-shell-nav .app-nav-links {
-        flex: 1 1 auto !important;
-        overflow-y: auto !important;
-    }
-
-    .app-mobile-bottom-nav,
-    .app-customer-bottom-nav {
-        display: none !important;
-    }
-}
-
-@media (max-width: 760px) {
-    body:has(.app-shell-nav) {
-        margin-right: 0 !important;
-        padding-top: 58px !important;
-    }
-
-    .app-shell-nav {
-        background: #fff !important;
-        border-left: 1px solid var(--redesign-border) !important;
-        box-shadow: -20px 0 45px rgba(15, 23, 42, .2) !important;
-    }
-
-    .app-shell-nav .app-nav-links {
-        padding: 10px !important;
-    }
-
-    .app-shell-nav .app-nav-direct,
-    .app-shell-nav .sb-group-header,
-    .app-shell-nav .app-nav-group-panel .app-nav-link {
-        min-height: 46px !important;
-    }
-
-    .app-table-wrap,
-    .table-wrap {
-        background: transparent !important;
-        border: 0 !important;
-        box-shadow: none !important;
-    }
-
-    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row,
-    .table-wrap table:not(.table-days) tbody tr {
-        border-radius: 8px !important;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, .06) !important;
-        position: relative !important;
-    }
-
-    .app-table-wrap table.app-responsive-table tbody tr.app-mobile-card-row::before,
-    .table-wrap table:not(.table-days) tbody tr::before {
-        background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
-        content: "" !important;
-        display: block !important;
-        grid-column: 1 / -1 !important;
-        height: 4px !important;
+    body:has(.app-shell-nav) .page,
+    body:has(.app-shell-nav) .wrap,
+    body:has(.app-shell-nav) .page-wrap {
+        margin: 0 auto !important;
+        max-width: 100% !important;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
         width: 100% !important;
     }
 
-    .app-mobile-bottom-nav,
-    .app-customer-bottom-nav {
-        background: rgba(255, 255, 255, .98) !important;
-        border-top: 1px solid var(--redesign-border) !important;
-        box-shadow: 0 -14px 34px rgba(15, 23, 42, .14) !important;
-    }
-
-    .app-mobile-bottom-link.active,
-    .app-customer-bottom-link.active,
-    .app-mobile-bottom-link:focus-visible,
-    .app-customer-bottom-link:focus-visible {
-        background: var(--redesign-accent-soft) !important;
-        color: var(--redesign-accent-dark) !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions {
-        background: #fff !important;
-        border: 1px solid var(--redesign-border) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, .06) !important;
+    .app-top-header {
         display: grid !important;
-        gap: 8px !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        margin: 8px 10px 14px !important;
-        padding: 8px !important;
+        grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto !important;
+        height: var(--a-header-h) !important;
+        padding: 8px 12px !important;
     }
 
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a {
-        background: #f8fafc !important;
-        border: 1px solid var(--redesign-border) !important;
-        border-radius: 8px !important;
-        box-shadow: none !important;
-        color: var(--redesign-primary) !important;
-        font-size: 13px !important;
-        font-weight: 950 !important;
-        min-height: 46px !important;
+    .app-top-brand {
+        grid-column: 1 !important;
+        margin-left: 0 !important;
+        min-width: 0 !important;
     }
 
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child {
-        background: var(--redesign-accent) !important;
-        border-color: var(--redesign-accent) !important;
-        color: #fff !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info,
-    body:has(.app-customer-bottom-nav) .debt-summary,
-    body:has(.app-customer-bottom-nav) .dashboard-panel,
-    body:has(.app-customer-bottom-nav) .daily-payment-notice,
-    body:has(.app-customer-bottom-nav) .customer-payment-alert {
-        border: 1px solid var(--redesign-border) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, .055) !important;
-        margin: 0 10px 14px !important;
-        padding: 14px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info::before,
-    body:has(.app-customer-bottom-nav) .debt-summary::before,
-    body:has(.app-customer-bottom-nav) .dashboard-panel::before,
-    body:has(.app-customer-bottom-nav) .daily-payment-notice::before {
-        height: 3px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-grid,
-    body:has(.app-customer-bottom-nav) .debt-summary-grid,
-    body:has(.app-customer-bottom-nav) .customer-payment-alert-stats {
-        gap: 8px !important;
-        grid-template-columns: 1fr 1fr !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item,
-    body:has(.app-customer-bottom-nav) .debt-summary-item,
-    body:has(.app-customer-bottom-nav) .customer-payment-alert-stat {
-        background: #f8fafc !important;
-        border: 1px solid #e5edf5 !important;
-        border-radius: 8px !important;
-        box-shadow: none !important;
-        min-height: 48px !important;
-        padding: 10px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-note {
-        background: #f8fafc !important;
-        border: 1px solid #e5edf5 !important;
-        border-radius: 8px !important;
-        color: var(--redesign-muted) !important;
-        margin-top: 10px !important;
-        padding: 10px !important;
-    }
-
-    .app-mobile-bottom-nav,
-    .app-customer-bottom-nav {
-        border-radius: 14px 14px 0 0 !important;
-        padding: 7px 6px max(7px, env(safe-area-inset-bottom)) !important;
-    }
-
-    .app-mobile-bottom-link,
-    .app-customer-bottom-link {
-        border-radius: 8px !important;
-        min-height: 48px !important;
-    }
-
-    .app-customer-bottom-icon {
-        font-size: 17px !important;
-    }
-
-    .app-customer-bottom-text {
-        font-size: 9.5px !important;
-    }
-}
-
-/* Design A mobile correction: reduce legacy boxed UI and make the customer portal calmer. */
-@media (max-width: 760px) {
-    body:has(.app-customer-bottom-nav) {
-        background: #f6f8fb !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-header {
-        background: #fff !important;
-        border-bottom: 1px solid #e6edf5 !important;
-        box-shadow: 0 4px 14px rgba(15, 23, 42, .045) !important;
-        height: 56px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-header::after {
-        content: none !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-brand .app-shell-logo {
-        border-color: #edf2f7 !important;
+    .app-top-brand .app-shell-logo {
         height: 34px !important;
         max-width: 128px !important;
         padding: 3px 7px !important;
     }
 
-    body:has(.app-customer-bottom-nav) .app-top-actions {
+    .app-top-title {
+        display: none !important;
+    }
+
+    .app-top-spacer {
+        grid-column: 2 !important;
+    }
+
+    .app-top-actions {
+        grid-column: 3 !important;
         gap: 6px !important;
+        max-width: 178px !important;
+        min-width: 0 !important;
     }
 
-    body:has(.app-customer-bottom-nav) .notification-trigger,
-    body:has(.app-customer-bottom-nav) .message-envelope,
-    body:has(.app-customer-bottom-nav) .app-top-logout button {
-        background: #f8fafc !important;
-        border: 1px solid #e2eaf2 !important;
-        border-radius: 8px !important;
-        box-shadow: none !important;
-        min-height: 38px !important;
-        min-width: 38px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-logout button {
-        background: #fff7f7 !important;
-        color: #b42318 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions {
-        background: transparent !important;
-        border: 0 !important;
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        box-shadow: none !important;
-        gap: 8px !important;
-        margin: 12px 12px 14px !important;
-        padding: 0 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a {
-        background: #fff !important;
-        border: 1px solid #dfe8f1 !important;
-        border-radius: 8px !important;
-        color: #183b56 !important;
-        font-size: 13px !important;
-        font-weight: 850 !important;
-        min-height: 48px !important;
-        padding: 0 10px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child {
-        background: #148378 !important;
-        border-color: #148378 !important;
-        color: #fff !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info,
-    body:has(.app-customer-bottom-nav) .debt-summary,
-    body:has(.app-customer-bottom-nav) .daily-payment-notice,
-    body:has(.app-customer-bottom-nav) .customer-payment-alert {
-        background: #fff !important;
-        border: 1px solid #e1e9f2 !important;
-        border-radius: 8px !important;
-        box-shadow: 0 4px 14px rgba(15, 23, 42, .045) !important;
-        margin: 0 12px 14px !important;
-        padding: 12px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info::before,
-    body:has(.app-customer-bottom-nav) .debt-summary::before,
-    body:has(.app-customer-bottom-nav) .daily-payment-notice::before,
-    body:has(.app-customer-bottom-nav) .dashboard-panel::before {
-        content: none !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info {
-        border-left: 1px solid #e1e9f2 !important;
-        border-right: 0 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-grid {
-        background: transparent !important;
-        display: grid !important;
-        gap: 8px !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item {
-        align-items: flex-start !important;
-        background: #f8fafc !important;
-        border: 1px solid #e5edf5 !important;
-        border-radius: 8px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        min-height: 58px !important;
-        padding: 9px 10px !important;
-        row-gap: 3px !important;
-        text-align: right !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item:last-child {
-        border-bottom: 1px solid #e5edf5 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item strong {
-        color: #64748b !important;
-        display: block !important;
-        font-size: 11px !important;
-        font-weight: 850 !important;
-        margin: 0 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item span,
-    body:has(.app-customer-bottom-nav) .customer-info-item div:not(strong) {
-        color: #102033 !important;
-        font-size: 12.5px !important;
-        font-weight: 800 !important;
-        line-height: 1.7 !important;
-        overflow-wrap: anywhere !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary {
-        border-left: 1px solid #e1e9f2 !important;
-        border-right: 0 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-grid {
-        gap: 8px !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-item {
-        background: #f8fafc !important;
-        border: 1px solid #e5edf5 !important;
-        border-radius: 8px !important;
-        min-height: 78px !important;
-        padding: 10px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-item strong {
-        color: #66758a !important;
-        font-size: 11.5px !important;
-        margin-bottom: 5px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-item .value {
-        color: #111827 !important;
-        font-size: 15px !important;
-        font-weight: 950 !important;
-        line-height: 1.6 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-note {
-        background: #f8fafc !important;
-        border: 1px solid #e5edf5 !important;
-        border-radius: 8px !important;
-        color: #66758a !important;
-        font-size: 11.5px !important;
-        line-height: 1.9 !important;
-        margin-top: 8px !important;
-        padding: 9px 10px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .dashboard-panel {
-        border-left: 1px solid #e1e9f2 !important;
-        border-right: 0 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-mobile-bottom-nav,
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-nav {
-        background: rgba(255, 255, 255, .98) !important;
-        border: 1px solid #e5edf5 !important;
-        border-bottom: 0 !important;
-        border-radius: 14px 14px 0 0 !important;
-        box-shadow: 0 -10px 26px rgba(15, 23, 42, .11) !important;
-    }
-
-    @media (max-width: 430px) {
-        body:has(.app-customer-bottom-nav) .customer-info-grid,
-        body:has(.app-customer-bottom-nav) .debt-summary-grid {
-            grid-template-columns: 1fr !important;
-        }
-    }
-}
-
-/* Mobile app visual v9: decisive customer shell matching the approved compact app direction. */
-@media (max-width: 760px) {
-    body:has(.app-customer-bottom-nav) {
-        background: #eef3f7 !important;
-        min-height: 100vh !important;
-        padding: 0 0 92px !important;
-    }
-
-    body:has(.app-customer-bottom-nav)::before {
-        background: #ffffff !important;
-        border-bottom: 1px solid #dde8f1 !important;
-        content: "" !important;
-        height: 54px !important;
-        left: 0 !important;
-        position: fixed !important;
-        right: 0 !important;
-        top: 0 !important;
-        z-index: 880 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-header {
-        align-items: center !important;
-        background: transparent !important;
-        border: 0 !important;
-        box-shadow: none !important;
-        display: flex !important;
-        height: 54px !important;
-        inset: 0 0 auto !important;
-        padding: 8px 12px !important;
-        position: sticky !important;
-        z-index: 900 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-header::after,
-    body:has(.app-customer-bottom-nav) .customer-mobile-app-card,
-    body:has(.app-customer-bottom-nav) .top-bar,
-    body:has(.app-customer-bottom-nav) .app-top-logout,
-    body:has(.app-customer-bottom-nav) > .app-nav-toggle {
+    .app-user-menu {
         display: none !important;
     }
 
-    body:has(.app-customer-bottom-nav) .app-top-brand {
-        order: 3 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-brand .app-shell-logo {
-        background: #fff !important;
-        border: 1px solid #e4edf5 !important;
-        border-radius: 9px !important;
-        box-shadow: none !important;
-        height: 34px !important;
-        max-width: 126px !important;
-        object-fit: contain !important;
-        padding: 4px 8px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-title {
-        display: none !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-spacer {
-        flex: 1 1 auto !important;
-        order: 2 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-top-actions {
-        align-items: center !important;
-        display: flex !important;
-        gap: 7px !important;
-        order: 1 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .notification-trigger,
-    body:has(.app-customer-bottom-nav) .message-envelope {
-        align-items: center !important;
-        background: #f7fafc !important;
-        border: 1px solid #dfe9f2 !important;
-        border-radius: 9px !important;
-        box-shadow: none !important;
-        color: #0f2f4f !important;
-        display: inline-flex !important;
-        font-size: 12px !important;
-        font-weight: 850 !important;
+    .notification-trigger,
+    .message-envelope {
         height: 38px !important;
         justify-content: center !important;
         min-height: 38px !important;
-        min-width: 38px !important;
-        padding: 0 10px !important;
+        min-width: 40px !important;
+        padding: 0 8px !important;
     }
 
-    body:has(.app-customer-bottom-nav) .notification-badge {
-        background: #d92d20 !important;
-        border: 2px solid #fff !important;
-        box-shadow: 0 4px 10px rgba(217, 45, 32, .22) !important;
-        font-size: 10px !important;
-        min-width: 20px !important;
-        top: -8px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions {
-        background: #ffffff !important;
-        border: 1px solid #dfe9f2 !important;
-        border-radius: 13px !important;
-        box-shadow: 0 10px 26px rgba(15, 35, 55, .07) !important;
-        display: grid !important;
-        gap: 8px !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        margin: 22px 14px 14px !important;
-        padding: 7px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a {
-        align-items: center !important;
-        background: #f8fbfd !important;
-        border: 1px solid #dfe9f2 !important;
-        border-radius: 10px !important;
-        box-shadow: none !important;
-        color: #16324f !important;
-        display: flex !important;
-        font-size: 13px !important;
-        font-weight: 950 !important;
-        justify-content: center !important;
-        min-height: 48px !important;
-        padding: 0 10px !important;
-        text-decoration: none !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child {
-        background: #16877c !important;
-        border-color: #16877c !important;
-        color: #fff !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a:first-child::before {
-        content: "+" !important;
-        font-size: 18px !important;
-        font-weight: 900 !important;
-        margin-left: 7px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .mobile-quick-actions a.secondary::before {
-        content: "≡" !important;
-        font-size: 17px !important;
-        font-weight: 900 !important;
-        margin-left: 7px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info,
-    body:has(.app-customer-bottom-nav) .debt-summary,
-    body:has(.app-customer-bottom-nav) .daily-payment-notice,
-    body:has(.app-customer-bottom-nav) .daily-payment-expired,
-    body:has(.app-customer-bottom-nav) .customer-payment-alert,
-    body:has(.app-customer-bottom-nav) .customer-dashboard,
-    body:has(.app-customer-bottom-nav) .dashboard-panel,
-    body:has(.app-customer-bottom-nav) .filter-box {
-        background: #ffffff !important;
-        border: 1px solid #dfe9f2 !important;
-        border-radius: 13px !important;
-        box-shadow: 0 10px 26px rgba(15, 35, 55, .07) !important;
-        margin: 0 14px 14px !important;
-        max-width: none !important;
-        overflow: hidden !important;
-        padding: 12px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info::before,
-    body:has(.app-customer-bottom-nav) .debt-summary::before,
-    body:has(.app-customer-bottom-nav) .daily-payment-notice::before,
-    body:has(.app-customer-bottom-nav) .dashboard-panel::before {
-        content: none !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-grid {
-        display: grid !important;
-        gap: 8px !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item {
-        background: #f7fafc !important;
-        border: 1px solid #e3edf5 !important;
-        border-radius: 10px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        min-height: 64px !important;
-        padding: 9px 10px !important;
-        text-align: right !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item strong {
-        color: #6a7a8e !important;
-        font-size: 10.5px !important;
-        font-weight: 850 !important;
-        line-height: 1.6 !important;
-        margin: 0 0 2px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item span {
-        color: #0e2238 !important;
-        font-size: 13px !important;
-        font-weight: 950 !important;
-        line-height: 1.7 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item:nth-child(5) {
-        grid-column: span 2 !important;
-        min-height: 56px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-grid {
-        display: grid !important;
-        gap: 8px !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-item {
-        background: #f7fafc !important;
-        border: 1px solid #e3edf5 !important;
-        border-radius: 10px !important;
-        min-height: 82px !important;
-        padding: 10px !important;
-        text-align: right !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-item strong {
-        color: #66758a !important;
-        display: block !important;
-        font-size: 10.5px !important;
-        font-weight: 850 !important;
-        line-height: 1.7 !important;
-        margin-bottom: 4px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-item .value {
-        color: #0e2238 !important;
-        direction: rtl !important;
-        font-size: 14px !important;
-        font-weight: 950 !important;
-        line-height: 1.7 !important;
-        overflow-wrap: anywhere !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .debt-summary-note {
-        background: #f7fafc !important;
-        border: 1px solid #e3edf5 !important;
-        border-radius: 10px !important;
-        color: #66758a !important;
-        font-size: 11.5px !important;
-        line-height: 1.9 !important;
-        margin-top: 8px !important;
-        padding: 9px 10px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-mobile-bottom-nav,
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-nav {
-        align-items: center !important;
-        background: rgba(255, 255, 255, .98) !important;
-        border: 1px solid #dfe9f2 !important;
-        border-bottom: 0 !important;
-        border-radius: 18px 18px 0 0 !important;
-        bottom: 0 !important;
-        box-shadow: 0 -14px 34px rgba(15, 35, 55, .13) !important;
-        display: grid !important;
-        gap: 4px !important;
-        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-        left: 0 !important;
-        min-height: 66px !important;
-        padding: 8px 8px max(8px, env(safe-area-inset-bottom)) !important;
-        position: fixed !important;
-        right: 0 !important;
-        z-index: 950 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-mobile-bottom-link,
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-link {
-        align-items: center !important;
-        background: transparent !important;
-        border: 0 !important;
-        border-radius: 12px !important;
-        box-shadow: none !important;
-        color: #53657a !important;
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 3px !important;
-        justify-content: center !important;
-        min-height: 50px !important;
-        min-width: 0 !important;
-        padding: 5px 2px !important;
-        text-decoration: none !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-mobile-bottom-link.active,
-    body:has(.app-customer-bottom-nav) .app-mobile-bottom-link.active-link,
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-link.active,
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-link.active-link {
-        background: #e1f3f1 !important;
-        color: #0f766e !important;
-        font-weight: 950 !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-icon {
-        color: inherit !important;
-        font-size: 18px !important;
-        height: 20px !important;
-        line-height: 20px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-text {
-        color: inherit !important;
-        display: block !important;
-        font-size: 9px !important;
-        font-weight: 850 !important;
-        line-height: 1.4 !important;
-        max-width: 100% !important;
-        overflow: hidden !important;
-        text-align: center !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .app-customer-more-tab .app-customer-bottom-icon {
-        font-size: 20px !important;
-    }
-
-    @media (max-width: 390px) {
-        body:has(.app-customer-bottom-nav) .app-customer-bottom-text {
-            font-size: 8.5px !important;
-        }
-
-        body:has(.app-customer-bottom-nav) .customer-info-grid,
-        body:has(.app-customer-bottom-nav) .debt-summary-grid {
-            grid-template-columns: 1fr !important;
-        }
-
-        body:has(.app-customer-bottom-nav) .customer-info-item:nth-child(5) {
-            grid-column: auto !important;
-        }
-    }
-}
-
-/* Mobile app visual v10: native-like customer dashboard, not a squeezed web page. */
-.customer-mobile-home-card,
-.customer-mobile-profile-sheet {
-    display: none;
-}
-
-@media (max-width: 760px) {
-    body:has(.customer-mobile-home-card) {
-        background:
-            radial-gradient(circle at 80% -80px, rgba(22, 135, 124, .18), transparent 240px),
-            linear-gradient(180deg, #f7fbfd 0, #edf3f7 260px, #f3f6f9 100%) !important;
-        padding-bottom: 104px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .app-top-header {
-        background: rgba(255, 255, 255, .92) !important;
-        backdrop-filter: blur(18px) !important;
-        border-bottom: 1px solid rgba(221, 232, 241, .78) !important;
-        height: 58px !important;
-        padding: 9px 14px !important;
-        position: sticky !important;
-        top: 0 !important;
-    }
-
-    body:has(.customer-mobile-home-card)::before {
-        display: none !important;
-    }
-
-    body:has(.customer-mobile-home-card) .app-top-brand .app-shell-logo {
-        border-radius: 10px !important;
-        height: 34px !important;
-        max-width: 124px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .app-user-menu {
-        display: none !important;
-    }
-
-    body:has(.customer-mobile-home-card) .notification-trigger {
+    .notification-trigger {
         color: transparent !important;
         font-size: 0 !important;
-        padding: 0 !important;
-        width: 40px !important;
+        overflow: hidden !important;
+        width: 48px !important;
     }
 
-    body:has(.customer-mobile-home-card) .notification-trigger::before {
-        color: #12324f !important;
+    .notification-trigger::before {
+        color: var(--a-primary) !important;
         content: "اعلان" !important;
-        font-size: 10.5px !important;
+        font-size: 11px !important;
         font-weight: 950 !important;
+        -webkit-text-fill-color: var(--a-primary) !important;
     }
 
-    body:has(.customer-mobile-home-card) .message-envelope {
-        font-size: 0 !important;
-        padding: 0 !important;
-        width: 40px !important;
+    .message-envelope-label {
+        display: none !important;
     }
 
-    body:has(.customer-mobile-home-card) .message-envelope-icon {
+    .message-envelope-icon {
         font-size: 16px !important;
     }
 
-    body:has(.customer-mobile-home-card) .message-envelope-label {
+    .notification-dropdown {
+        left: 10px !important;
+        max-width: calc(100vw - 20px) !important;
+        right: auto !important;
+        width: min(360px, calc(100vw - 20px)) !important;
+    }
+
+    .app-nav-toggle {
+        align-items: center !important;
+        background: #fff !important;
+        border: 1px solid var(--a-line) !important;
+        border-radius: var(--a-radius) !important;
+        box-shadow: var(--a-shadow-soft) !important;
+        display: inline-flex !important;
+        height: 40px !important;
+        justify-content: center !important;
+        position: fixed !important;
+        right: 12px !important;
+        top: 68px !important;
+        width: 40px !important;
+        z-index: 940 !important;
+    }
+
+    .app-shell-nav {
+        bottom: 0 !important;
+        height: 100vh !important;
+        max-width: min(84vw, 320px) !important;
+        padding-top: 10px !important;
+        top: 0 !important;
+        transform: translateX(105%) !important;
+        transition: transform .22s ease !important;
+        width: min(84vw, 320px) !important;
+        z-index: 960 !important;
+    }
+
+    .app-shell-nav.open {
+        transform: translateX(0) !important;
+    }
+
+    .sb-overlay {
+        background: rgba(16, 32, 51, .38) !important;
+        bottom: 0 !important;
         display: none !important;
+        left: 0 !important;
+        position: fixed !important;
+        right: 0 !important;
+        top: 0 !important;
+        z-index: 950 !important;
     }
 
-    body:has(.customer-mobile-home-card) .mobile-quick-actions {
-        background: transparent !important;
-        border: 0 !important;
-        box-shadow: none !important;
-        gap: 10px !important;
-        margin: 16px 16px 12px !important;
-        padding: 0 !important;
-    }
-
-    body:has(.customer-mobile-home-card) .mobile-quick-actions a {
-        border-radius: 14px !important;
-        min-height: 52px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .mobile-quick-actions a:first-child {
-        background: linear-gradient(135deg, #14877c, #0f665f) !important;
-        border-color: transparent !important;
-        box-shadow: 0 14px 26px rgba(20, 135, 124, .22) !important;
-    }
-
-    body:has(.customer-mobile-home-card) .mobile-quick-actions a.secondary {
-        background: #ffffff !important;
-        border-color: #dfe9f2 !important;
-        color: #17324d !important;
-    }
-
-    body:has(.customer-mobile-home-card) .customer-mobile-home-card,
-    body:has(.customer-mobile-home-card) .customer-mobile-profile-sheet {
+    .sb-overlay.show {
         display: block !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-info,
-    body:has(.customer-mobile-home-card) .debt-summary {
-        display: none !important;
+    .app-shell-nav .app-nav-links {
+        padding: 12px !important;
     }
 
+    .app-shell-nav .app-nav-direct,
+    .app-shell-nav .sb-group-header,
+    .app-shell-nav .app-nav-group-panel .app-nav-link {
+        min-height: 48px !important;
+        padding: 9px 10px !important;
+    }
+
+    .section,
+    .box,
+    .filter-box,
+    .search-box,
+    .customer-header,
+    .summary-card,
+    .empty-message,
+    .customer-info,
+    .invoice-filter-box,
+    .card,
+    #payment-form,
+    .detail-card,
+    .customer-card,
+    .dashboard-panel,
+    .dashboard-row,
+    .recon-panel,
+    .action-panel,
+    .app-toolbar,
+    .app-filter-panel,
+    .daily-payment-notice,
+    .daily-payment-expired,
+    .customer-payment-alert,
+    .debt-summary {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: 14px !important;
+        width: 100% !important;
+    }
+
+    .customer-dashboard,
+    .dashboard-grid,
+    .summary-grid,
+    .summary-cards,
+    .customer-info-grid,
+    .debt-summary-grid,
+    .customer-payment-alert-stats {
+        grid-template-columns: 1fr !important;
+    }
+
+    .customer-mobile-home-card,
     body:has(.customer-mobile-home-card) .customer-mobile-home-card {
-        background:
-            linear-gradient(135deg, rgba(15, 47, 79, .96), rgba(17, 125, 116, .94)),
-            #12324f !important;
+        background: linear-gradient(160deg, #12324f 0%, #16877c 100%) !important;
         border: 0 !important;
-        border-radius: 22px !important;
-        box-shadow: 0 22px 42px rgba(16, 42, 67, .20) !important;
+        border-radius: var(--a-radius) !important;
+        box-shadow: 0 14px 28px rgba(18, 50, 79, .18) !important;
         color: #fff !important;
-        margin: 0 16px 14px !important;
+        display: block !important;
+        margin: 12px 0 14px !important;
         overflow: hidden !important;
         padding: 18px !important;
         position: relative !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-home-card::after {
+    .customer-mobile-home-card::after {
         background: rgba(255, 255, 255, .12) !important;
         border-radius: 999px !important;
         content: "" !important;
-        height: 160px !important;
-        left: -60px !important;
+        height: 170px !important;
+        left: -70px !important;
         position: absolute !important;
-        top: -70px !important;
-        width: 160px !important;
+        top: -80px !important;
+        width: 170px !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-home-top {
-        align-items: flex-start !important;
-        display: flex !important;
-        gap: 12px !important;
-        justify-content: space-between !important;
+    .customer-mobile-home-top,
+    .customer-mobile-balance,
+    .customer-mobile-mini-stats {
         position: relative !important;
         z-index: 1 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-eyebrow,
-    body:has(.customer-mobile-home-card) .customer-mobile-home-top p,
-    body:has(.customer-mobile-home-card) .customer-mobile-balance span,
-    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats span {
-        color: rgba(255, 255, 255, .72) !important;
+    .customer-mobile-home-top {
+        align-items: flex-start !important;
+        display: flex !important;
+        gap: 12px !important;
+        justify-content: space-between !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-eyebrow {
-        display: block !important;
-        font-size: 11px !important;
-        font-weight: 850 !important;
-        margin-bottom: 5px !important;
+    .customer-mobile-eyebrow,
+    .customer-mobile-home-top p,
+    .customer-mobile-balance span,
+    .customer-mobile-mini-stats span {
+        color: rgba(255, 255, 255, .74) !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-home-top h1 {
+    .customer-mobile-home-top h1 {
         color: #fff !important;
         font-size: 21px !important;
         font-weight: 950 !important;
@@ -1289,13 +1053,7 @@ body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payme
         margin: 0 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-home-top p {
-        font-size: 12px !important;
-        line-height: 1.8 !important;
-        margin: 2px 0 0 !important;
-    }
-
-    body:has(.customer-mobile-home-card) .customer-mobile-status {
+    .customer-mobile-status {
         background: rgba(255, 255, 255, .16) !important;
         border: 1px solid rgba(255, 255, 255, .22) !important;
         border-radius: 999px !important;
@@ -1306,22 +1064,12 @@ body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payme
         padding: 5px 10px !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-balance {
+    .customer-mobile-balance {
         margin-top: 18px !important;
-        position: relative !important;
-        z-index: 1 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-balance span {
-        display: block !important;
-        font-size: 11px !important;
-        font-weight: 850 !important;
-        margin-bottom: 5px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .customer-mobile-balance strong {
+    .customer-mobile-balance strong {
         color: #fff !important;
-        direction: rtl !important;
         display: block !important;
         font-size: 22px !important;
         font-weight: 950 !important;
@@ -1329,30 +1077,21 @@ body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payme
         overflow-wrap: anywhere !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats {
+    .customer-mobile-mini-stats {
         display: grid !important;
         gap: 8px !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         margin-top: 14px !important;
-        position: relative !important;
-        z-index: 1 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats div {
+    .customer-mobile-mini-stats div {
         background: rgba(255, 255, 255, .13) !important;
         border: 1px solid rgba(255, 255, 255, .16) !important;
-        border-radius: 14px !important;
+        border-radius: var(--a-radius) !important;
         padding: 10px !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats span {
-        display: block !important;
-        font-size: 10.5px !important;
-        font-weight: 800 !important;
-        margin-bottom: 4px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .customer-mobile-mini-stats strong {
+    .customer-mobile-mini-stats strong {
         color: #fff !important;
         display: block !important;
         font-size: 12.5px !important;
@@ -1361,28 +1100,22 @@ body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payme
         overflow-wrap: anywhere !important;
     }
 
+    .customer-mobile-profile-sheet,
     body:has(.customer-mobile-home-card) .customer-mobile-profile-sheet {
         background: #fff !important;
-        border: 1px solid #dfe9f2 !important;
-        border-radius: 18px !important;
-        box-shadow: 0 16px 34px rgba(15, 35, 55, .08) !important;
-        margin: 0 16px 14px !important;
+        border: 1px solid var(--a-line) !important;
+        border-radius: var(--a-radius) !important;
+        box-shadow: var(--a-shadow-soft) !important;
+        display: block !important;
+        margin: 0 0 14px !important;
         padding: 14px !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-section-title {
-        color: #17324d !important;
-        font-size: 14px !important;
-        font-weight: 950 !important;
-        margin-bottom: 10px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .customer-mobile-profile-list {
+    .customer-mobile-profile-list {
         display: grid !important;
-        gap: 0 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-profile-list div {
+    .customer-mobile-profile-list div {
         align-items: center !important;
         border-bottom: 1px solid #edf2f7 !important;
         display: flex !important;
@@ -1392,491 +1125,210 @@ body:not(:has(.app-staff-bottom-nav)):has(.app-customer-bottom-nav) .daily-payme
         padding: 7px 0 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-profile-list div:last-child {
+    .customer-mobile-profile-list div:last-child {
         border-bottom: 0 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-profile-list span {
-        color: #6a7a8e !important;
+    .customer-mobile-profile-list span {
+        color: var(--a-muted) !important;
         font-size: 11.5px !important;
         font-weight: 850 !important;
     }
 
-    body:has(.customer-mobile-home-card) .customer-mobile-profile-list strong {
-        color: #102a43 !important;
+    .customer-mobile-profile-list strong {
+        color: var(--a-text) !important;
         font-size: 13px !important;
         font-weight: 950 !important;
         line-height: 1.6 !important;
         text-align: left !important;
     }
 
-    body:has(.customer-mobile-home-card) .daily-payment-notice,
-    body:has(.customer-mobile-home-card) .daily-payment-expired,
-    body:has(.customer-mobile-home-card) .customer-payment-alert,
-    body:has(.customer-mobile-home-card) .customer-dashboard,
-    body:has(.customer-mobile-home-card) .dashboard-panel {
-        border-radius: 18px !important;
-        margin-left: 16px !important;
-        margin-right: 16px !important;
+    .mobile-quick-actions {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        display: grid !important;
+        gap: 10px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        margin: 12px 0 14px !important;
+        padding: 0 !important;
     }
 
-    body:has(.customer-mobile-home-card) .app-mobile-bottom-nav,
-    body:has(.customer-mobile-home-card) .app-customer-bottom-nav {
-        background: rgba(255, 255, 255, .88) !important;
-        backdrop-filter: blur(20px) !important;
-        border: 1px solid rgba(215, 226, 238, .95) !important;
-        border-radius: 24px !important;
-        bottom: 12px !important;
-        box-shadow: 0 18px 42px rgba(15, 35, 55, .18) !important;
-        left: 12px !important;
-        min-height: 70px !important;
-        right: 12px !important;
-        width: auto !important;
-    }
-
-    body:has(.customer-mobile-home-card) .app-mobile-bottom-link,
-    body:has(.customer-mobile-home-card) .app-customer-bottom-link {
-        border-radius: 18px !important;
-        min-height: 54px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .app-mobile-bottom-link.active,
-    body:has(.customer-mobile-home-card) .app-mobile-bottom-link.active-link,
-    body:has(.customer-mobile-home-card) .app-customer-bottom-link.active,
-    body:has(.customer-mobile-home-card) .app-customer-bottom-link.active-link {
-        background: #12324f !important;
-        color: #fff !important;
-        box-shadow: 0 10px 20px rgba(18, 50, 79, .18) !important;
-    }
-
-    body:has(.customer-mobile-home-card) .app-customer-bottom-icon {
-        font-size: 17px !important;
-    }
-
-    body:has(.customer-mobile-home-card) .app-customer-bottom-text {
-        font-size: 8.5px !important;
+    .mobile-quick-actions a {
+        align-items: center !important;
+        background: #fff !important;
+        border: 1px solid var(--a-line) !important;
+        border-radius: var(--a-radius) !important;
+        color: var(--a-primary) !important;
+        display: inline-flex !important;
+        font-size: 13px !important;
         font-weight: 900 !important;
+        justify-content: center !important;
+        min-height: 48px !important;
+        padding: 8px 10px !important;
+        text-align: center !important;
+    }
+
+    .mobile-quick-actions a:first-child {
+        background: var(--a-accent) !important;
+        border-color: var(--a-accent) !important;
+        color: #fff !important;
+    }
+
+    /* Bottom nav */
+    .app-mobile-bottom-nav,
+    .app-customer-bottom-nav {
+        background: rgba(255, 255, 255, .94) !important;
+        backdrop-filter: blur(18px) !important;
+        border: 1px solid rgba(207, 220, 232, .92) !important;
+        border-radius: var(--a-radius) !important;
+        bottom: 10px !important;
+        box-shadow: 0 14px 34px rgba(15, 35, 55, .16) !important;
+        display: grid !important;
+        gap: 4px !important;
+        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        left: 10px !important;
+        min-height: 66px !important;
+        padding: 6px !important;
+        position: fixed !important;
+        right: 10px !important;
+        width: auto !important;
+        z-index: 920 !important;
+    }
+
+    .app-mobile-bottom-link,
+    .app-customer-bottom-link {
+        align-items: center !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: var(--a-radius) !important;
+        color: #42556c !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 3px !important;
+        justify-content: center !important;
+        min-height: 52px !important;
+        padding: 4px 2px !important;
+        text-align: center !important;
+    }
+
+    .app-mobile-bottom-link.active,
+    .app-mobile-bottom-link.active-link,
+    .app-customer-bottom-link.active,
+    .app-customer-bottom-link.active-link,
+    .app-mobile-bottom-link:focus-visible,
+    .app-customer-bottom-link:focus-visible {
+        background: var(--a-accent-soft) !important;
+        color: var(--a-accent-hover) !important;
+        outline: 0 !important;
+    }
+
+    .app-customer-bottom-icon {
+        font-size: 16px !important;
+        line-height: 1 !important;
+    }
+
+    .app-customer-bottom-text {
+        font-size: 9px !important;
+        font-weight: 900 !important;
+        line-height: 1.35 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* Table to mobile cards */
+    .app-table-wrap,
+    .table-wrap {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+    }
+
+    .app-table-wrap table.app-responsive-table,
+    .table-wrap table:not(.table-days) {
+        display: block !important;
+    }
+
+    .app-table-wrap table.app-responsive-table thead,
+    .table-wrap table:not(.table-days) thead {
+        display: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody,
+    .table-wrap table:not(.table-days) tbody {
+        display: grid !important;
+        gap: 10px !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr,
+    .table-wrap table:not(.table-days) tbody tr {
+        background: #fff !important;
+        border: 1px solid var(--a-line) !important;
+        border-radius: var(--a-radius) !important;
+        box-shadow: var(--a-shadow-soft) !important;
+        display: grid !important;
+        gap: 8px !important;
+        overflow: hidden !important;
+        padding: 12px !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody tr::before,
+    .table-wrap table:not(.table-days) tbody tr::before {
+        content: none !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td,
+    .table-wrap table:not(.table-days) tbody td {
+        border: 0 !important;
+        display: flex !important;
+        gap: 10px !important;
+        justify-content: space-between !important;
+        min-height: 30px !important;
+        padding: 0 !important;
+        text-align: left !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td::before,
+    .table-wrap table:not(.table-days) tbody td[data-label]::before {
+        color: var(--a-muted) !important;
+        content: attr(data-label) !important;
+        flex: 0 0 auto !important;
+        font-size: 11px !important;
+        font-weight: 850 !important;
+        text-align: right !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell,
+    .table-wrap table:not(.table-days) tbody td.app-card-actions-cell {
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: 1fr !important;
+        padding-top: 8px !important;
+    }
+
+    .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell a,
+    .app-table-wrap table.app-responsive-table tbody td.app-card-actions-cell button,
+    .table-wrap table:not(.table-days) tbody td.app-card-actions-cell a,
+    .table-wrap table:not(.table-days) tbody td.app-card-actions-cell button {
+        width: 100% !important;
     }
 
     @media (max-width: 390px) {
-        body:has(.customer-mobile-home-card) .customer-mobile-balance strong {
-            font-size: 19px !important;
+        .app-mobile-bottom-nav,
+        .app-customer-bottom-nav {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            min-height: 118px !important;
         }
 
-        body:has(.customer-mobile-home-card) .customer-mobile-mini-stats {
+        body:has(.app-shell-nav) {
+            padding-bottom: calc(148px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .customer-mobile-mini-stats {
             grid-template-columns: 1fr !important;
         }
-    }
-}
-
-/* Desktop rescue v11: keep mobile/PWA navigation from leaking into the web layout. */
-@media (min-width: 761px) {
-    body:has(.app-shell-nav) {
-        margin-right: 224px !important;
-        padding-bottom: 0 !important;
-        padding-top: 72px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) {
-        margin-right: 224px !important;
-        padding-bottom: 0 !important;
-    }
-
-    .app-mobile-bottom-nav,
-    .app-customer-bottom-nav,
-    body:has(.app-customer-bottom-nav) .app-mobile-bottom-nav,
-    body:has(.app-customer-bottom-nav) .app-customer-bottom-nav {
-        display: none !important;
-        visibility: hidden !important;
-    }
-
-    .app-top-header,
-    body:has(.app-customer-bottom-nav) .app-top-header {
-        align-items: center !important;
-        background: linear-gradient(180deg, #ffffff 0%, #f9fcff 100%) !important;
-        border-bottom: 1px solid var(--redesign-border) !important;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, .08) !important;
-        display: flex !important;
-        height: 64px !important;
-        left: 0 !important;
-        padding: 0 20px !important;
-        position: fixed !important;
-        right: 0 !important;
-        top: 0 !important;
-        width: auto !important;
-        z-index: 900 !important;
-    }
-
-    .app-top-header::after,
-    body:has(.app-customer-bottom-nav) .app-top-header::after {
-        background: linear-gradient(90deg, var(--redesign-accent), var(--redesign-primary)) !important;
-        bottom: -1px !important;
-        content: "" !important;
-        display: block !important;
-        height: 3px !important;
-        left: 0 !important;
-        position: absolute !important;
-        right: 0 !important;
-    }
-
-    .app-shell-nav,
-    body:has(.app-customer-bottom-nav) .app-shell-nav {
-        background: #ffffff !important;
-        border-left: 1px solid var(--redesign-border) !important;
-        border-radius: 0 !important;
-        bottom: 0 !important;
-        box-shadow: -10px 0 30px rgba(15, 23, 42, .09) !important;
-        display: block !important;
-        height: calc(100vh - 64px) !important;
-        left: auto !important;
-        margin: 0 !important;
-        max-width: none !important;
-        overflow: hidden !important;
-        padding: 0 !important;
-        position: fixed !important;
-        right: 0 !important;
-        top: 64px !important;
-        transform: none !important;
-        visibility: visible !important;
-        width: 224px !important;
-        z-index: 850 !important;
-    }
-
-    .app-shell-nav .app-nav-panel {
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100% !important;
-        min-height: 0 !important;
-    }
-
-    .app-shell-nav .app-nav-links {
-        align-items: stretch !important;
-        display: flex !important;
-        flex: 1 1 auto !important;
-        flex-direction: column !important;
-        flex-wrap: nowrap !important;
-        gap: 6px !important;
-        justify-content: flex-start !important;
-        min-height: 0 !important;
-        overflow-y: auto !important;
-        padding: 10px !important;
-    }
-
-    .app-shell-nav .app-nav-direct,
-    .app-shell-nav .sb-group-header,
-    .app-shell-nav .app-nav-group-panel .app-nav-link {
-        align-items: center !important;
-        background: transparent !important;
-        border: 1px solid transparent !important;
-        border-radius: 8px !important;
-        color: #26384d !important;
-        display: flex !important;
-        flex-direction: row !important;
-        font-size: 12px !important;
-        font-weight: 900 !important;
-        gap: 8px !important;
-        justify-content: flex-start !important;
-        min-height: 40px !important;
-        padding: 8px 10px !important;
-        text-align: right !important;
-        text-decoration: none !important;
-        white-space: normal !important;
-        width: 100% !important;
-    }
-
-    .app-shell-nav .app-nav-direct:hover,
-    .app-shell-nav .app-nav-group-panel .app-nav-link:hover,
-    .app-shell-nav .app-nav-group[open] > .sb-group-header,
-    .app-shell-nav .app-nav-group.active-group > .sb-group-header {
-        background: var(--redesign-primary-soft) !important;
-        border-color: #d8e7f6 !important;
-        color: var(--redesign-primary) !important;
-    }
-
-    .app-shell-nav .app-nav-direct.active-link,
-    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link {
-        background: var(--redesign-accent-soft) !important;
-        border-color: #c7ebe6 !important;
-        color: var(--redesign-accent-dark) !important;
-    }
-
-    .app-shell-nav .app-nav-group-panel {
-        background: #f8fafc !important;
-        border: 1px solid #edf2f7 !important;
-        border-radius: 8px !important;
-        display: grid !important;
-        gap: 4px !important;
-        margin: 4px 0 8px !important;
-        padding: 5px !important;
-    }
-
-    .app-sidebar-logout {
-        border-top: 1px solid var(--redesign-border) !important;
-        display: block !important;
-        margin: 0 !important;
-        padding: 10px !important;
-    }
-}
-
-/* Desktop polish v12: readable nav captions, customer labels, and logout affordance. */
-@media (min-width: 761px) {
-    .app-shell-nav .app-nav-direct,
-    .app-shell-nav .sb-group-header,
-    .app-shell-nav .app-nav-group-panel .app-nav-link,
-    .app-shell-nav .app-nav-text,
-    .app-shell-nav .app-nav-icon {
-        color: #17324d !important;
-        opacity: 1 !important;
-        text-shadow: none !important;
-    }
-
-    .app-shell-nav .app-nav-icon {
-        align-items: center !important;
-        background: #eef6f5 !important;
-        border: 1px solid #d5ebe8 !important;
-        border-radius: 999px !important;
-        display: inline-flex !important;
-        flex: 0 0 26px !important;
-        height: 26px !important;
-        justify-content: center !important;
-        line-height: 1 !important;
-        width: 26px !important;
-    }
-
-    .app-shell-nav .app-nav-direct.active-link .app-nav-text,
-    .app-shell-nav .app-nav-direct.active-link .app-nav-icon,
-    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link .app-nav-text,
-    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link .app-nav-icon {
-        color: var(--redesign-accent-dark) !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info {
-        border-left: 1px solid #dfe9f2 !important;
-        border-right: 0 !important;
-        padding: 14px !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-grid {
-        display: grid !important;
-        gap: 10px !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item {
-        align-items: flex-start !important;
-        background: #f8fafc !important;
-        border: 1px solid #e3edf5 !important;
-        border-radius: 8px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 4px !important;
-        justify-content: center !important;
-        min-height: 58px !important;
-        padding: 9px 11px !important;
-        text-align: right !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item strong {
-        color: #64748b !important;
-        display: block !important;
-        font-size: 11px !important;
-        font-weight: 850 !important;
-        line-height: 1.5 !important;
-        margin: 0 !important;
-        width: 100% !important;
-    }
-
-    body:has(.app-customer-bottom-nav) .customer-info-item span {
-        color: #0f2137 !important;
-        display: block !important;
-        font-size: 13px !important;
-        font-weight: 950 !important;
-        line-height: 1.7 !important;
-        overflow-wrap: anywhere !important;
-        width: 100% !important;
-    }
-
-    .app-sidebar-logout button {
-        align-items: center !important;
-        background: #fff5f5 !important;
-        border: 1px solid #ffd0d0 !important;
-        border-radius: 8px !important;
-        color: #b42318 !important;
-        display: flex !important;
-        font-size: 12px !important;
-        font-weight: 950 !important;
-        gap: 7px !important;
-        justify-content: center !important;
-        min-height: 40px !important;
-        width: 100% !important;
-    }
-
-    .app-sidebar-logout button span[aria-hidden="true"] {
-        color: #d92d20 !important;
-        font-size: 15px !important;
-        line-height: 1 !important;
-    }
-}
-
-/* Desktop header/nav polish v13: right brand, left actions, fully readable sidebar text. */
-@media (min-width: 761px) {
-    .app-top-header,
-    body:has(.app-customer-bottom-nav) .app-top-header {
-        direction: rtl !important;
-        gap: 16px !important;
-        justify-content: flex-start !important;
-    }
-
-    .app-top-brand,
-    body:has(.app-customer-bottom-nav) .app-top-brand {
-        align-items: center !important;
-        display: inline-flex !important;
-        flex: 0 0 auto !important;
-        gap: 10px !important;
-        margin-left: auto !important;
-        margin-right: 0 !important;
-        order: 1 !important;
-    }
-
-    .app-top-spacer {
-        display: block !important;
-        flex: 1 1 auto !important;
-        order: 2 !important;
-    }
-
-    .app-top-actions,
-    body:has(.app-customer-bottom-nav) .app-top-actions {
-        direction: rtl !important;
-        justify-content: flex-end !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        order: 3 !important;
-    }
-
-    .app-top-title {
-        color: #102a43 !important;
-        display: inline-block !important;
-        font-size: 13px !important;
-        font-weight: 950 !important;
-        white-space: nowrap !important;
-    }
-
-    .app-shell-nav,
-    .app-shell-nav *,
-    .app-shell-nav a,
-    .app-shell-nav a:visited,
-    .app-shell-nav summary,
-    .app-shell-nav summary span,
-    .app-shell-nav .app-nav-text,
-    .app-shell-nav .app-nav-icon {
-        color: #102a43 !important;
-        opacity: 1 !important;
-        -webkit-text-fill-color: #102a43 !important;
-    }
-
-    .app-shell-nav .app-nav-direct,
-    .app-shell-nav .sb-group-header,
-    .app-shell-nav .app-nav-group-panel .app-nav-link {
-        background: transparent !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-    }
-
-    .app-shell-nav .app-nav-direct:hover,
-    .app-shell-nav .app-nav-direct:hover *,
-    .app-shell-nav .app-nav-group-panel .app-nav-link:hover,
-    .app-shell-nav .app-nav-group-panel .app-nav-link:hover *,
-    .app-shell-nav .app-nav-group[open] > .sb-group-header,
-    .app-shell-nav .app-nav-group[open] > .sb-group-header *,
-    .app-shell-nav .app-nav-group.active-group > .sb-group-header,
-    .app-shell-nav .app-nav-group.active-group > .sb-group-header * {
-        color: var(--redesign-primary) !important;
-        opacity: 1 !important;
-        -webkit-text-fill-color: var(--redesign-primary) !important;
-    }
-
-    .app-shell-nav .app-nav-direct.active-link,
-    .app-shell-nav .app-nav-direct.active-link *,
-    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link,
-    .app-shell-nav .app-nav-group-panel .app-nav-link.active-link * {
-        color: var(--redesign-accent-dark) !important;
-        opacity: 1 !important;
-        -webkit-text-fill-color: var(--redesign-accent-dark) !important;
-    }
-
-    .app-shell-nav .app-nav-icon {
-        color: #147d74 !important;
-        -webkit-text-fill-color: #147d74 !important;
-    }
-}
-
-/* Desktop header cleanup v14: logout lives in the sidebar, so hide the duplicate top button. */
-@media (min-width: 761px) {
-    .app-top-logout,
-    body:has(.app-customer-bottom-nav) .app-top-logout {
-        display: none !important;
-        visibility: hidden !important;
-    }
-}
-
-/* Mobile staff header fix v15: prevent duplicated notification text and keep left controls inset. */
-@media (max-width: 760px) {
-    body:has(.app-shell-nav) .app-top-header {
-        box-sizing: border-box !important;
-        column-gap: 8px !important;
-        left: 0 !important;
-        padding-left: max(12px, env(safe-area-inset-left)) !important;
-        padding-right: max(12px, env(safe-area-inset-right)) !important;
-        right: 0 !important;
-        width: 100% !important;
-    }
-
-    body:has(.app-shell-nav) .app-top-actions {
-        align-items: center !important;
-        box-sizing: border-box !important;
-        display: flex !important;
-        flex: 0 1 auto !important;
-        gap: 6px !important;
-        justify-content: flex-start !important;
-        margin-left: 0 !important;
-        max-width: min(58vw, 236px) !important;
-        min-width: 0 !important;
-        overflow: visible !important;
-        padding-left: 2px !important;
-    }
-
-    body:has(.app-shell-nav) .notification-trigger {
-        align-items: center !important;
-        color: transparent !important;
-        display: inline-flex !important;
-        font-size: 0 !important;
-        justify-content: center !important;
-        line-height: 1 !important;
-        min-height: 38px !important;
-        min-width: 46px !important;
-        overflow: hidden !important;
-        padding: 0 8px !important;
-        white-space: nowrap !important;
-    }
-
-    body:has(.app-shell-nav) .notification-trigger::before {
-        color: #12324f !important;
-        content: "اعلان" !important;
-        display: inline-block !important;
-        font-size: 11px !important;
-        font-weight: 950 !important;
-        line-height: 1 !important;
-        -webkit-text-fill-color: #12324f !important;
-    }
-
-    body:has(.app-shell-nav) .message-envelope {
-        align-items: center !important;
-        justify-content: center !important;
-        min-height: 38px !important;
-        min-width: 40px !important;
-    }
-
-    body:has(.app-shell-nav) .app-nav-toggle {
-        right: max(12px, env(safe-area-inset-right)) !important;
     }
 }

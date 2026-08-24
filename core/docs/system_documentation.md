@@ -622,8 +622,8 @@ PWA:
 
 - مسیر manifest: `manifest.json`
 - مسیر service worker: `sw.js`
-- نسخه cache فعلی در کد: `rabasa-customer-pwa-v15`
-- فایل‌های CSS/JS با نسخه `ui-redesign-v15` cache-bust می‌شوند.
+- نسخه cache فعلی در کد: `rabasa-customer-pwa-v17`
+- فایل‌های CSS/JS با نسخه `ui-redesign-v17` cache-bust می‌شوند.
 
 ## 19. امنیت و اعتبارسنجی فایل‌ها
 

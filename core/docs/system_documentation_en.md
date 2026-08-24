@@ -678,8 +678,8 @@ PWA details:
 
 - manifest route: `manifest.json`
 - service worker route: `sw.js`
-- current cache name in code: `rabasa-customer-pwa-v15`
-- current static busting token: `ui-redesign-v15`
+- current cache name in code: `rabasa-customer-pwa-v17`
+- current static busting token: `ui-redesign-v17`
 
 ## 19. Main URL Map
 

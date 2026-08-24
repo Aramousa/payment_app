@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>تخصیص مشتریان فروش</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v15">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v17">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f7f7f7; padding: 20px; }
         .top-bar, .section { max-width: 1180px; margin: 0 auto 16px; }
@@ -24,7 +24,7 @@
         .summary-card strong { display: block; font-size: 18px; }
         .tiny { color: #66788a; font-size: 12px; }
     </style>
-    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v15">
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v17">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -150,6 +150,6 @@
         {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
     </div>
 
-    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v15"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v17"></script>
 </body>
 </html>

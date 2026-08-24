@@ -613,7 +613,7 @@ def pwa_manifest(request):
 
 def pwa_service_worker(request):
     script = """
-const CACHE_NAME = 'rabasa-customer-pwa-v14';
+const CACHE_NAME = 'rabasa-customer-pwa-v17';
 const APP_SHELL = [
   '/accounts/login/',
   '/static/css/font-face.css',

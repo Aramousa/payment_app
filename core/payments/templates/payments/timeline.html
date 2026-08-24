@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>روال فیش #{{ payment.id }}</title>
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v15">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v17">
     <style>
         body { font-family: Vazir, sans-serif; direction: rtl; background: #f0f4f8; padding: 20px; }
         .wrap { max-width: {% if is_staff_user %}860px{% else %}680px{% endif %}; margin: 0 auto; }
@@ -139,7 +139,7 @@
             .preview-toolbar-group:not(:first-child) { padding-right: 0; border-right: 0; border-top: 1px solid #dbe3ee; padding-top: 10px; width: 100%; }
         }
     </style>
-    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v15">
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v17">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -665,6 +665,6 @@
         icon.textContent = open ? '−' : '+';
     }
     </script>
-    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v15"></script>
+    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v17"></script>
 </body>
 </html>

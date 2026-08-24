@@ -17,7 +17,7 @@
         if (document.querySelector('link[data-app-redesign]')) return;
         var link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = '/static/css/app-redesign.css?v=ui-redesign-v15';
+        link.href = '/static/css/app-redesign.css?v=ui-redesign-v17';
         link.setAttribute('data-app-redesign', '1');
         document.head.appendChild(link);
     }
