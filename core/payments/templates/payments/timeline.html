@@ -317,6 +317,67 @@
             {% endif %}
         </div>
 
+        <!-- عملیات ابطال — بازرگانی -->
+        {% if payment.can_void %}
+        <div class="card" style="border-right: 4px solid #dc2626;">
+            <h3 style="margin:0 0 12px;font-size:15px;color:#dc2626;">🚫 ابطال سند</h3>
+            <p style="font-size:12px;color:#64748b;margin:0 0 12px;">
+                در صورتی که طرف حساب به‌صورت شفاهی یا سیستمی اعلام کرده که این فیش مورد تأیید نیست،
+                می‌توانید سند را ابطال کنید. واحد مالی برای تأیید ابطال مطلع خواهد شد.
+            </p>
+            <form method="post" action="{% url 'commercial_void_payment' payment.id %}"
+                  onsubmit="return confirm('آیا مطمئن هستید که این سند را ابطال می‌کنید؟ این عملیات برگشت‌پذیر نیست.');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <div style="margin-bottom:8px;">
+                    <label style="display:block;font-size:12px;color:#374151;font-weight:700;margin-bottom:4px;">دلیل ابطال <span style="color:#dc2626;">*</span></label>
+                    <textarea name="void_reason" required maxlength="500"
+                              style="width:100%;border:1.5px solid #fca5a5;border-radius:7px;padding:8px 10px;font-family:Vazir,sans-serif;font-size:13px;min-height:70px;resize:vertical;"
+                              placeholder="توضیح دهید چرا این سند ابطال می‌شود…"></textarea>
+                </div>
+                <button type="submit"
+                        style="background:#dc2626;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-family:Vazir,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">
+                    🚫 ابطال سند
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- تأیید ابطال — مالی (برگشت ثبت مالی + تأیید در یک مرحله) -->
+        {% if payment.can_finance_confirm_void %}
+        <div class="card" style="border-right: 4px solid #dc2626;">
+            <h3 style="margin:0 0 12px;font-size:15px;color:#dc2626;">✅ تأیید ابطال سند</h3>
+            {% if payment.void_reason %}
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:7px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#7f1d1d;">
+                <strong>دلیل ابطال از بازرگانی:</strong> {{ payment.void_reason }}
+            </div>
+            {% endif %}
+            {% if payment.finance_status == 'finance_ok' %}
+            <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#92400e;">
+                ⚠ این سند دارای ثبت مالی است. با تأیید ابطال، ثبت مالی نیز به‌صورت خودکار برگشت خواهد خورد.
+            </div>
+            {% endif %}
+            <p style="font-size:12px;color:#64748b;margin:0 0 12px;">
+                پس از اطمینان از ابطال سند در سیستم حسابداری، تأیید کنید.
+            </p>
+            <form method="post" action="{% url 'finance_confirm_void' payment.id %}"
+                  onsubmit="return confirm('آیا ابطال سند در سیستم حسابداری انجام شده است؟');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'voided_payments_dashboard' %}">
+                <div style="margin-bottom:8px;">
+                    <label style="display:block;font-size:12px;color:#374151;font-weight:700;margin-bottom:4px;">توضیح یا شماره سند (اختیاری)</label>
+                    <textarea name="note" maxlength="500"
+                              style="width:100%;border:1.5px solid #fca5a5;border-radius:7px;padding:8px 10px;font-family:Vazir,sans-serif;font-size:13px;min-height:50px;resize:vertical;"
+                              placeholder="شماره سند باطل‌شده در سیستم حسابداری…"></textarea>
+                </div>
+                <button type="submit"
+                        style="background:#dc2626;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-family:Vazir,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">
+                    ✅ تأیید ابطال
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
         <!-- فرم افزودن توضیح (فقط مشتری) -->
         {% if can_add_note %}
         <div class="note-form-card">

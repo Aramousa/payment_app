@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load payment_dates %}
+
+{% block title %}اسناد باطل شده{% endblock %}
+
+{% block head %}
+<style>
+    .void-page { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .void-header { display: flex; justify-content: space-between; align-items: center;
+                   flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .void-header h2 { margin: 0; font-size: 20px; color: #1a2f4e; }
+
+    .void-info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
+                     padding: 14px 16px; margin-bottom: 20px; font-size: 13px; color: #1e40af; }
+    .void-info-box strong { display: block; margin-bottom: 6px; font-size: 14px; }
+
+    .table-wrap { background: #fff; border-radius: 10px; overflow: hidden;
+                  box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: linear-gradient(135deg, #0d1b2e, #1a2f4e); color: #fff;
+         padding: 11px 12px; font-size: 12px; font-weight: 700; text-align: right; }
+    td { padding: 11px 12px; border-bottom: 1px solid #eef0f5; font-size: 13px;
+         color: #334155; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    .customer-name { font-weight: 700; color: #1a2f4e; }
+    .amount-cell { font-weight: 700; color: #1e3a5f; direction: ltr; text-align: right; }
+    .void-reason-cell { max-width: 220px; color: #dc2626; font-size: 12px; }
+    .void-date { font-size: 11px; color: #64748b; }
+    .voided-by { font-size: 12px; color: #7c3aed; }
+
+    .finance-badge {
+        display: inline-block; border-radius: 12px; padding: 3px 10px;
+        font-size: 11px; font-weight: 700;
+    }
+    .fb-registered { background: #fef3c7; color: #92400e; }
+    .fb-none       { background: #f0fdf4; color: #166534; }
+
+    .action-cell { min-width: 160px; }
+    .confirm-form { display: flex; flex-direction: column; gap: 5px; }
+    .confirm-note { border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 8px;
+                    font-family: Vazir, sans-serif; font-size: 12px; width: 100%;
+                    resize: vertical; min-height: 44px; }
+
+    .btn-confirm {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        color: #fff; border: none; border-radius: 7px;
+        padding: 8px 14px; font-family: Vazir, sans-serif;
+        font-size: 12px; font-weight: 700; cursor: pointer;
+        transition: opacity .15s;
+    }
+    .btn-confirm:hover { opacity: .85; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; margin: 0; }
+
+    .pagination { display: flex; justify-content: center; gap: 8px;
+                  padding: 16px; flex-wrap: wrap; }
+    .pagination a, .pagination span {
+        padding: 6px 12px; border-radius: 6px; font-size: 13px;
+        border: 1px solid #d1d5db; text-decoration: none; color: #1a2f4e;
+    }
+    .pagination .current { background: #1a2f4e; color: #fff; border-color: #1a2f4e; }
+
+    .timeline-link { color: #1a2f4e; text-decoration: none; font-weight: 700; }
+    .timeline-link:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="void-page">
+
+    <div class="void-header">
+        <h2>🚫 اسناد باطل شده — در انتظار تأیید مالی</h2>
+        <a href="{% url 'submit' %}" style="font-size:13px;color:#64748b;text-decoration:none;">← بازگشت به داشبورد</a>
+    </div>
+
+    <div class="void-info-box">
+        <strong>📋 راهنما:</strong>
+        اسناد زیر توسط بازرگانی برای ابطال به مالی ارسال شده‌اند.
+        با کلیک روی «تأیید ابطال»، سیستم به‌صورت خودکار ثبت مالی را برگشت می‌زند (در صورت وجود) و سند را باطل می‌کند.
+    </div>
+
+    {% if records.object_list %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>مشتری</th>
+                    <th>مبلغ (ریال)</th>
+                    <th>دلیل ابطال</th>
+                    <th>ابطال‌کننده (بازرگانی)</th>
+                    <th>تاریخ</th>
+                    <th>ثبت مالی</th>
+                    {% if can_act %}<th>عملیات</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records.object_list %}
+                <tr>
+                    <td>
+                        <a href="{% url 'payment_timeline' record.id %}" class="timeline-link">#{{ record.id }}</a>
+                    </td>
+                    <td>
+                        <div class="customer-name">{{ record.first_name }} {{ record.last_name }}</div>
+                        {% if record.user %}
+                        <div style="font-size:11px;color:#64748b;">{{ record.user.username }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="amount-cell">{{ record.amount|floatformat:0|intcomma }}</td>
+                    <td class="void-reason-cell">{{ record.void_reason|default:'—' }}</td>
+                    <td class="voided-by">
+                        {% if record.voided_by %}
+                            {{ record.voided_by.get_full_name|default:record.voided_by.username }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="void-date">
+                        {% if record.voided_at %}{{ record.voided_at|jalali_datetime }}{% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if record.finance_status == 'finance_ok' %}
+                            <span class="finance-badge fb-registered">ثبت شده — نیاز به برگشت</span>
+                        {% else %}
+                            <span class="finance-badge fb-none">ثبت نشده</span>
+                        {% endif %}
+                    </td>
+                    {% if can_act %}
+                    <td class="action-cell">
+                        <form method="post" action="{% url 'finance_confirm_void' record.id %}"
+                              class="confirm-form"
+                              onsubmit="return confirm('آیا تأیید می‌کنید که ابطال این سند انجام شده است؟{% if record.finance_status == 'finance_ok' %} ثبت مالی نیز به‌صورت خودکار برگشت خواهد خورد.{% endif %}');">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'voided_payments_dashboard' %}">
+                            <textarea class="confirm-note" name="note"
+                                      placeholder="توضیح یا شماره سند (اختیاری)…"></textarea>
+                            <button type="submit" class="btn-confirm">✅ تأیید ابطال</button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if records.has_other_pages %}
+    <div class="pagination">
+        {% if records.has_previous %}
+            <a href="?page={{ records.previous_page_number }}">«</a>
+        {% endif %}
+        {% for num in records.paginator.page_range %}
+            {% if records.number == num %}
+                <span class="current">{{ num }}</span>
+            {% else %}
+                <a href="?page={{ num }}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if records.has_next %}
+            <a href="?page={{ records.next_page_number }}">»</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">✅</div>
+        <p>هیچ سند ابطال‌شده‌ای در انتظار تأیید مالی وجود ندارد.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

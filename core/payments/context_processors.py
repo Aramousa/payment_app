@@ -246,6 +246,15 @@ def app_navigation(request):
         items.append(_nav_item('صف کاری اسناد', 'submit', 'payment_queue', 'documents', '📥'))
         if _can_see_pending_final_nav(user, role):
             items.append(_nav_item('در انتظار تأیید نهایی', 'pending_final_approval', 'pending_final', 'documents', '⏳'))
+        if user.is_superuser or role in {'finance', 'finance_manager'}:
+            from .models import PaymentRecord as _PR
+            _voided_count = _PR.objects.filter(
+                status=_PR.STATUS_RETURNED_TO_FINANCE, is_void_return=True
+            ).count()
+            items.append(_nav_item(
+                f'اسناد باطل شده' + (f' ({_voided_count})' if _voided_count else ''),
+                'voided_payments_dashboard', 'voided_payments', 'documents', '🚫',
+            ))
         items.append(_nav_item('سوابق اسناد', 'payment_history', 'payment_history', 'documents', '🗂️'))
         items.append(_nav_item('مشتریان', 'customers_list', 'customers', 'customers', '👥'))
 

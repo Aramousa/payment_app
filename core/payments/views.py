@@ -54,7 +54,6 @@ STATUS_FLAG_META = {
     PaymentRecord.STATUS_INCOMPLETE: ('ناقص', 'flag-yellow'),
     PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: ('عودت به بازرگانی', 'flag-gray'),
     PaymentRecord.STATUS_RETURNED_TO_FINANCE: ('عودت به مالی', 'flag-blue'),
-    PaymentRecord.STATUS_FOLLOW_UP: ('پیگیری', 'flag-yellow'),
 }
 STATUS_PROGRESS_FLOWS = {
     PaymentRecord.STATUS_COMMERCIAL_REVIEW: [PaymentRecord.STATUS_COMMERCIAL_REVIEW],
@@ -69,7 +68,6 @@ STATUS_PROGRESS_FLOWS = {
     PaymentRecord.STATUS_INCOMPLETE: [PaymentRecord.STATUS_INCOMPLETE],
     PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL],
     PaymentRecord.STATUS_RETURNED_TO_FINANCE: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_RETURNED_TO_FINANCE],
-    PaymentRecord.STATUS_FOLLOW_UP: [PaymentRecord.STATUS_COMMERCIAL_REVIEW, PaymentRecord.STATUS_FOLLOW_UP],
 }
 CUSTOMER_STATUSES = [
     (PaymentRecord.STATUS_PENDING, 'در حال بررسی'),
@@ -613,7 +611,7 @@ def pwa_manifest(request):
 
 def pwa_service_worker(request):
     script = """
-const CACHE_NAME = 'rabasa-customer-pwa-v17';
+const CACHE_NAME = 'rabasa-customer-pwa-v19';
 const APP_SHELL = [
   '/accounts/login/',
   '/static/css/font-face.css',
@@ -782,7 +780,6 @@ def _staff_status_choices_for_role(role):
     COMMERCIAL_CHOICES = [
         (PaymentRecord.STATUS_COMMERCIAL_REVIEW, 'در حال بررسی بازرگانی'),
         (PaymentRecord.STATUS_TEMP_COMMERCIAL,   'ثبت موقت بازرگانی'),
-        (PaymentRecord.STATUS_FOLLOW_UP,         'پیگیری'),
         (PaymentRecord.STATUS_APPROVED,           'ثبت بازرگانی'),
         (PaymentRecord.STATUS_RETURNED_TO_FINANCE, 'عودت به مالی'),
         (PaymentRecord.STATUS_INCOMPLETE,         'ناقص'),
@@ -828,7 +825,6 @@ def _can_staff_act_on_payment(role, payment, is_system_admin=False):
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
-        PaymentRecord.STATUS_FOLLOW_UP,
         PaymentRecord.STATUS_APPROVED,
     }
 
@@ -904,18 +900,40 @@ def _can_finance_register(role, payment, is_system_admin=False):
     role = _department_role(role)
     if role != 'finance':
         return False
-    # مالی می‌تواند ثبت کند مگر:
-    # - سند رد شده (rejected)
-    # - سند تأیید نهایی شده (final_approved)
-    # - سند ناقص است و در انتظار اصلاح مشتری (incomplete)
-    # - قبلاً ثبت مالی انجام شده
     return (
         payment.status not in {
             PaymentRecord.STATUS_REJECTED,
             PaymentRecord.STATUS_FINAL_APPROVED,
             PaymentRecord.STATUS_INCOMPLETE,
+            PaymentRecord.STATUS_VOID_CONFIRMED,
         }
         and not payment.is_finance_registered
+    )
+
+
+def _can_commercial_void(role, payment, is_system_admin=False):
+    """آیا بازرگانی می‌تواند سند را برای ابطال به مالی عودت دهد؟
+    مجاز از «ثبت موقت بازرگانی» یا «ثبت بازرگانی» — مشروط بر اینکه ثبت مالی انجام شده باشد."""
+    if not is_system_admin:
+        dept = _department_role(role)
+        if dept not in {'commercial', 'sales'}:
+            return False
+    return (
+        payment.status in {PaymentRecord.STATUS_APPROVED, PaymentRecord.STATUS_TEMP_COMMERCIAL}
+        and payment.finance_status == PaymentRecord.FINANCE_STATUS_APPROVED
+    )
+
+
+def _can_finance_confirm_void(role, payment, is_system_admin=False):
+    """آیا مالی می‌تواند ابطال را تأیید کند؟
+    برگشت ثبت مالی (در صورت نیاز) و تأیید ابطال در یک مرحله انجام می‌شود."""
+    if not is_system_admin:
+        dept = _department_role(role)
+        if dept != 'finance':
+            return False
+    return (
+        payment.status == PaymentRecord.STATUS_RETURNED_TO_FINANCE
+        and payment.is_void_return
     )
 
 
@@ -1014,7 +1032,6 @@ def _active_payment_records_for_user(user):
             PaymentRecord.STATUS_COMMERCIAL_REVIEW,
             PaymentRecord.STATUS_TEMP_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
-            PaymentRecord.STATUS_FOLLOW_UP,
             PaymentRecord.STATUS_RETURNED_TO_FINANCE,
             ])
             | Q(counterparty_status=PaymentRecord.CP_STATUS_RETURNED)
@@ -1030,7 +1047,6 @@ def _active_payment_records_for_user(user):
             PaymentRecord.STATUS_TEMP_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
             PaymentRecord.STATUS_RETURNED_TO_FINANCE,
-            PaymentRecord.STATUS_FOLLOW_UP,
             PaymentRecord.STATUS_APPROVED,
         ], pending_final_approval=False).exclude(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
     if role == 'data_entry':
@@ -1779,10 +1795,10 @@ def _payment_notification_color(status=None, event=''):
         PaymentRecord.STATUS_TEMP_COMMERCIAL: '#FEEAC9',
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: '#E9D5FF',
         PaymentRecord.STATUS_RETURNED_TO_FINANCE: '#DBEAFE',
-        PaymentRecord.STATUS_FOLLOW_UP: '#FEF3C7',
         PaymentRecord.STATUS_REJECTED: '#FECACA',
         PaymentRecord.STATUS_INCOMPLETE: '#FEF3C7',
         PaymentRecord.STATUS_FINAL_APPROVED: '#DCFCE7',
+        PaymentRecord.STATUS_VOID_CONFIRMED: '#FEE2E2',
     }.get(status, '')
 
 
@@ -1873,8 +1889,6 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
         recipients.extend(_staff_notification_users(roles={'commercial'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE:
         recipients.extend(_staff_notification_users(roles={'finance', 'commercial', 'sales'}, exclude_user=actor))
-    elif to_status == PaymentRecord.STATUS_FOLLOW_UP:
-        recipients.extend(_staff_notification_users(roles={'commercial', 'sales'}, exclude_user=actor))
     elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED, PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
         recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
 
@@ -1888,6 +1902,57 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
         actor=actor,
         color=_payment_notification_color(to_status),
     )
+
+
+def _notify_payment_void_initiated(payment, actor):
+    """اطلاع‌رسانی ابطال سند توسط بازرگانی — به مالی و مشتری."""
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
+    # رنگ #DBEAFE طبق بخش ۴۴ الگوریتم برای «عودت به مالی»
+    _notify_users(
+        list(_staff_notification_users(roles={'finance'}, exclude_user=actor)),
+        '🚫 ابطال سند — نیاز به اقدام مالی',
+        f'سند #{payment.id} مشتری {customer_name} توسط بازرگانی برای ابطال عودت داده شد. '
+        f'لطفاً ابتدا ثبت مالی را برگشت بزنید، سپس ابطال را تأیید کنید.',
+        reverse('voided_payments_dashboard'),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+        color='#DBEAFE',
+    )
+    if payment.user_id and (not actor or payment.user_id != actor.id):
+        _notify_users(
+            [payment.user],
+            '🚫 درخواست ابطال فیش',
+            f'درخواست ابطال برای فیش #{payment.id} شما ثبت شد.',
+            reverse('payment_timeline', args=[payment.id]),
+            category=UserNotification.CATEGORY_PAYMENT,
+            actor=actor,
+            color='#FECACA',
+        )
+
+
+def _notify_payment_void_confirmed(payment, actor):
+    """اطلاع‌رسانی تأیید ابطال توسط مالی — به بازرگانی و مشتری."""
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
+    # رنگ #FECACA طبق بخش ۴۴ الگوریتم برای «ابطال نهایی سند»
+    _notify_users(
+        list(_staff_notification_users(roles={'commercial', 'sales'}, exclude_user=actor)),
+        '🚫 ابطال نهایی سند',
+        f'ابطال سند #{payment.id} مشتری {customer_name} توسط واحد مالی تأیید شد و سند باطل شد.',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+        color='#FECACA',
+    )
+    if payment.user_id and (not actor or payment.user_id != actor.id):
+        _notify_users(
+            [payment.user],
+            '🚫 ابطال فیش شما',
+            f'فیش #{payment.id} شما باطل شد.',
+            reverse('payment_timeline', args=[payment.id]),
+            category=UserNotification.CATEGORY_PAYMENT,
+            actor=actor,
+            color='#FECACA',
+        )
 
 
 def _notify_payment_edited(payment, actor, title='ویرایش فیش واریزی'):
@@ -2024,7 +2089,6 @@ def _log_text(log):
             PaymentRecord.STATUS_INCOMPLETE: '⚠',
             PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL: '↩',
             PaymentRecord.STATUS_RETURNED_TO_FINANCE: '↪',
-            PaymentRecord.STATUS_FOLLOW_UP: '⌕',
             PaymentRecord.STATUS_COMMERCIAL_REVIEW: '🔍',
         }.get(log.to_status, '🔄')
         base = f"{icon} {role} ({actor}) فلگ بازرگانی را"
@@ -2051,6 +2115,13 @@ def _log_text(log):
     if log.action == PaymentActivityLog.ACTION_CP_REJECTED:
         return f"🚫 طرف حساب ({actor}) فیش را رد کرد."
 
+    if log.action == PaymentActivityLog.ACTION_VOID_INITIATED:
+        return f"🚫 {role} ({actor}) سند را برای ابطال به مالی عودت داد."
+    if log.action == PaymentActivityLog.ACTION_FINANCE_VOID_REVERSED:
+        return f"↩ {role} ({actor}) ثبت مالی سند را برگشت زد."
+    if log.action == PaymentActivityLog.ACTION_VOID_CONFIRM:
+        return f"✅ {role} ({actor}) ابطال سند را تأیید کرد."
+
     return f"🔄 {role} ({actor}) عملیاتی انجام داد."
 
 
@@ -2069,6 +2140,10 @@ def _customer_log_text(log):
         return ''
     if log.action == PaymentActivityLog.ACTION_FINAL_APPROVED:
         return 'فیش تأیید نهایی شد.'
+    if log.action == PaymentActivityLog.ACTION_VOID_INITIATED:
+        return 'درخواست ابطال فیش ثبت شد.'
+    if log.action == PaymentActivityLog.ACTION_VOID_CONFIRM:
+        return 'ابطال فیش تأیید شد.'
     # ثبت مالی و بررسی‌های داخلی نشان داده نمی‌شود
     return ''
 
@@ -2135,7 +2210,6 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
         PaymentRecord.STATUS_RETURNED_TO_FINANCE,
-        PaymentRecord.STATUS_FOLLOW_UP,
         PaymentRecord.STATUS_APPROVED,
         PaymentRecord.STATUS_FINAL_APPROVED,
         PaymentRecord.STATUS_REJECTED,
@@ -2212,6 +2286,12 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             staff_role, payment, is_system_admin=is_system_admin, user=acting_user,
         ) if staff_role else False
         payment.can_delegate = _can_delegate_final_approval(staff_role, is_system_admin)
+        payment.can_void = _can_commercial_void(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
+        payment.can_finance_confirm_void = _can_finance_confirm_void(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
 
         # وضعیت‌های مجاز مالی (برای dropdown)
         dept = _department_role(staff_role) if staff_role else ''
@@ -2351,7 +2431,6 @@ def _apply_record_filters(records, request, is_staff_user):
                 PaymentRecord.STATUS_COMMERCIAL_REVIEW,
                 PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
                 PaymentRecord.STATUS_RETURNED_TO_FINANCE,
-                PaymentRecord.STATUS_FOLLOW_UP,
             ],
             PaymentRecord.STATUS_FINAL_APPROVED: [
                 PaymentRecord.STATUS_APPROVED,
@@ -4346,6 +4425,119 @@ def finance_final_approve(request, payment_id):
 
 @login_required
 @require_POST
+def commercial_void_payment(request, payment_id):
+    """ابطال سند توسط بازرگانی — پس از ثبت مالی."""
+    redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or reverse('submit'))
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    role = _user_role(request.user)
+
+    if not _can_commercial_void(role, payment, request.user.is_superuser):
+        messages.error(request, 'ابطال سند فقط پس از ثبت مالی و توسط واحد بازرگانی مجاز است.')
+        return redirect(redirect_target)
+
+    void_reason = (request.POST.get('void_reason') or '').strip()
+    if not void_reason:
+        messages.error(request, 'ثبت دلیل ابطال الزامی است.')
+        return redirect(redirect_target)
+
+    old_status = payment.status
+    payment.status = PaymentRecord.STATUS_RETURNED_TO_FINANCE
+    payment.is_void_return = True
+    payment.void_reason = void_reason
+    payment.voided_at = timezone.now()
+    payment.voided_by = request.user
+    payment.is_locked = True
+    payment.pending_final_approval = False
+    payment.pending_final_approval_since = None
+    # finance_status دست‌نخورده باقی می‌ماند
+    payment.save(update_fields=[
+        'status', 'is_void_return', 'void_reason', 'voided_at', 'voided_by',
+        'is_locked', 'pending_final_approval', 'pending_final_approval_since',
+    ])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_VOID_INITIATED,
+                  from_status=old_status, to_status=payment.status, note=void_reason)
+    _notify_payment_void_initiated(payment, request.user)
+    messages.success(request, f'سند #{payment_id} برای ابطال به واحد مالی ارسال شد.')
+    return redirect(redirect_target)
+
+
+@login_required
+@require_POST
+def finance_confirm_void(request, payment_id):
+    """تأیید ابطال سند توسط مالی."""
+    redirect_target = _safe_next_url(
+        request,
+        default=request.META.get('HTTP_REFERER') or reverse('voided_payments_dashboard'),
+    )
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    role = _user_role(request.user)
+
+    if not _can_finance_confirm_void(role, payment, request.user.is_superuser):
+        messages.error(request, 'تأیید ابطال فقط توسط واحد مالی و روی اسناد عودت ابطال مجاز است.')
+        return redirect(redirect_target)
+
+    note = (request.POST.get('note') or '').strip()
+
+    # اگر ثبت مالی برقرار است، ابتدا آن را برگشت می‌زنیم و لاگ می‌کنیم
+    if payment.finance_status == PaymentRecord.FINANCE_STATUS_APPROVED:
+        payment.finance_status = None
+        payment.finance_registered_at = None
+        payment.finance_registered_by = None
+        payment.save(update_fields=['finance_status', 'finance_registered_at', 'finance_registered_by'])
+        _log_activity(payment, request.user, PaymentActivityLog.ACTION_FINANCE_VOID_REVERSED,
+                      from_status=PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+                      to_status=PaymentRecord.STATUS_RETURNED_TO_FINANCE, note=note)
+
+    payment.status = PaymentRecord.STATUS_VOID_CONFIRMED
+    payment.void_confirmed_at = timezone.now()
+    payment.void_confirmed_by = request.user
+    payment.save(update_fields=['status', 'void_confirmed_at', 'void_confirmed_by'])
+
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_VOID_CONFIRM,
+                  from_status=PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+                  to_status=PaymentRecord.STATUS_VOID_CONFIRMED,
+                  note=note)
+    _notify_payment_void_confirmed(payment, request.user)
+    messages.success(request, f'ابطال سند #{payment_id} با موفقیت تأیید شد.')
+    return redirect(redirect_target)
+
+
+@login_required
+def voided_payments_dashboard(request):
+    """داشبورد اسناد باطل شده — واحد مالی می‌تواند ابطال را تأیید کند."""
+    role = _user_role(request.user)
+    dept = _department_role(role)
+    if dept != 'finance' and not request.user.is_superuser:
+        return HttpResponseForbidden('دسترسی به این بخش فقط برای واحد مالی مجاز است.')
+
+    is_system_admin = request.user.is_superuser
+    records = (
+        PaymentRecord.objects
+        .filter(status=PaymentRecord.STATUS_RETURNED_TO_FINANCE, is_void_return=True)
+        .select_related(
+            'user', 'user__profile',
+            'voided_by', 'voided_by__profile',
+        )
+        .prefetch_related('receipts')
+        .order_by('voided_at')
+    )
+    page_obj = _paginate_queryset(request, records, per_page=20)
+    can_act = dept == 'finance' or is_system_admin
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+
+    return render(request, 'payments/voided_dashboard.html', {
+        'records': page_obj,
+        'page_obj': page_obj,
+        'is_staff_user': True,
+        'staff_user_role': role,
+        'user_display_name': user_display_name,
+        'can_act': can_act,
+    })
+
+
+@login_required
+@require_POST
 def staff_update_status(request, payment_id):
     redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or '')
     if not redirect_target:
@@ -4395,9 +4587,6 @@ def staff_update_status(request, payment_id):
         return redirect(redirect_target)
     if target_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE and not note:
         messages.error(request, 'برای عودت به مالی، ثبت توضیح الزامی است.')
-        return redirect(redirect_target)
-    if target_status == PaymentRecord.STATUS_FOLLOW_UP and not note:
-        messages.error(request, 'برای وضعیت «پیگیری»، ثبت توضیح الزامی است.')
         return redirect(redirect_target)
     if (
         target_status == PaymentRecord.STATUS_APPROVED
@@ -4449,13 +4638,11 @@ def staff_update_status(request, payment_id):
         ]
 
     if target_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE:
-        payment.finance_status = None
-        payment.finance_registered_at = None
-        payment.finance_registered_by = None
+        # فلگ مالی دست‌نخورده باقی می‌ماند — مالی باید سند را مجدداً بررسی کند
+        # بدون تغییر finance_status, finance_registered_at, finance_registered_by
         payment.pending_final_approval = False
         payment.pending_final_approval_since = None
         update_fields += [
-            'finance_status', 'finance_registered_at', 'finance_registered_by',
             'pending_final_approval', 'pending_final_approval_since',
         ]
 
@@ -4465,7 +4652,7 @@ def staff_update_status(request, payment_id):
         payment.pending_final_approval_since = None
         update_fields += ['pending_final_approval', 'pending_final_approval_since']
 
-    if target_status in {PaymentRecord.STATUS_RETURNED_TO_FINANCE, PaymentRecord.STATUS_FOLLOW_UP, PaymentRecord.STATUS_INCOMPLETE}:
+    if target_status in {PaymentRecord.STATUS_RETURNED_TO_FINANCE, PaymentRecord.STATUS_INCOMPLETE}:
         payment.pending_final_approval = False
         payment.pending_final_approval_since = None
         update_fields += ['pending_final_approval', 'pending_final_approval_since']
@@ -4665,6 +4852,10 @@ def payment_timeline(request, payment_id):
         and payment.user_id == request.user.id
         and payment.status != PaymentRecord.STATUS_FINAL_APPROVED
     )
+    staff_role = _user_role(request.user) if is_staff_user else ''
+    is_system_admin = request.user.is_superuser
+    payment.can_void = _can_commercial_void(staff_role, payment, is_system_admin) if is_staff_user else False
+    payment.can_finance_confirm_void = _can_finance_confirm_void(staff_role, payment, is_system_admin) if is_staff_user else False
     return render(request, 'payments/timeline.html', {
         'payment': payment,
         'logs': logs,

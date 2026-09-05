@@ -302,7 +302,7 @@ class PaymentRecord(models.Model):
     STATUS_INCOMPLETE = 'incomplete'
     STATUS_RETURNED_TO_COMMERCIAL = 'returned_commercial'
     STATUS_RETURNED_TO_FINANCE = 'returned_finance'
-    STATUS_FOLLOW_UP = 'follow_up'
+    STATUS_VOID_CONFIRMED = 'void_confirmed'
 
     STATUS_CHOICES = [
         (STATUS_PENDING, 'در حال بررسی'),
@@ -314,7 +314,7 @@ class PaymentRecord(models.Model):
         (STATUS_INCOMPLETE, 'ناقص'),
         (STATUS_RETURNED_TO_COMMERCIAL, 'عودت به بازرگانی'),
         (STATUS_RETURNED_TO_FINANCE, 'عودت به مالی'),
-        (STATUS_FOLLOW_UP, 'پیگیری'),
+        (STATUS_VOID_CONFIRMED, 'باطل شده'),
     ]
 
     STAFF_FILTER_COMMERCIAL_APPROVED_FINANCE_PENDING = 'commercial_approved_finance_pending'
@@ -333,11 +333,11 @@ class PaymentRecord(models.Model):
         STATUS_TEMP_COMMERCIAL: 'در حال بررسی',
         STATUS_RETURNED_TO_COMMERCIAL: 'در حال بررسی',
         STATUS_RETURNED_TO_FINANCE: 'در حال بررسی',
-        STATUS_FOLLOW_UP: 'در حال بررسی',
         STATUS_APPROVED: 'ثبت بازرگانی',
         STATUS_FINAL_APPROVED: 'تایید نهایی',
         STATUS_REJECTED: 'رد شده',
         STATUS_INCOMPLETE: 'ناقص',
+        STATUS_VOID_CONFIRMED: 'باطل شده',
     }
 
     # ─── دلیل رد فیش/سند — برای دسته‌بندی و جستجوی فیش‌های رد شده ──────────
@@ -427,6 +427,43 @@ class PaymentRecord(models.Model):
     last_edited_at = models.DateTimeField('آخرین ویرایش', null=True, blank=True)
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
 
+    # ─── فیلدهای ابطال ────────────────────────────────────────────────────────
+    is_void_return = models.BooleanField(
+        'عودت برای ابطال', default=False,
+        help_text='اگر True باشد، این عودت به مالی برای ابطال سند است نه بررسی مجدد.',
+        db_index=True,
+    )
+    void_reason = models.TextField('دلیل ابطال', blank=True)
+    voided_at = models.DateTimeField('زمان ابطال', null=True, blank=True)
+    voided_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='voided_payments',
+        verbose_name='ابطال‌کننده',
+    )
+    void_confirmed_at = models.DateTimeField('زمان تأیید ابطال', null=True, blank=True)
+    void_confirmed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='void_confirmed_payments',
+        verbose_name='تأیید‌کننده ابطال',
+    )
+
+    # ─── ویرایش مدیر سیستم ───────────────────────────────────────────────────
+    needs_admin_review = models.BooleanField(
+        'نیاز به بررسی مدیر', default=False, db_index=True,
+    )
+    is_admin_edited = models.BooleanField(
+        'ویرایش‌شده توسط مدیر', default=False, db_index=True,
+    )
+    admin_edited_at = models.DateTimeField('زمان ویرایش مدیر', null=True, blank=True)
+    admin_edited_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='admin_edited_payments',
+        verbose_name='ویرایش‌کننده (مدیر)',
+    )
+
     # تصمیم طرف حساب روی فیش
     CP_STATUS_APPROVED = 'cp_approved'
     CP_STATUS_RETURNED = 'cp_returned'
@@ -498,8 +535,6 @@ class PaymentRecord(models.Model):
             return 'عودت به بازرگانی'
         if self.status == self.STATUS_RETURNED_TO_FINANCE:
             return 'عودت به مالی'
-        if self.status == self.STATUS_FOLLOW_UP:
-            return 'پیگیری'
         if self.status == self.STATUS_REJECTED:
             return 'رد شده'
         if self.status == self.STATUS_INCOMPLETE:
@@ -523,8 +558,6 @@ class PaymentRecord(models.Model):
             return 'flag-purple'    # بنفش کم‌رنگ — عودت
         if self.status == self.STATUS_RETURNED_TO_FINANCE:
             return 'flag-blue'
-        if self.status == self.STATUS_FOLLOW_UP:
-            return 'flag-yellow'
         if self.status == self.STATUS_REJECTED:
             return 'flag-red'       # قرمز
         if self.status == self.STATUS_INCOMPLETE:
@@ -571,7 +604,6 @@ class PaymentRecord(models.Model):
             self.STATUS_INCOMPLETE: 'flag-yellow',
             self.STATUS_RETURNED_TO_COMMERCIAL: 'flag-gray',
             self.STATUS_RETURNED_TO_FINANCE: 'flag-blue',
-            self.STATUS_FOLLOW_UP: 'flag-yellow',
         }.get(self.status, 'flag-gray')
 
     @property
@@ -581,7 +613,6 @@ class PaymentRecord(models.Model):
             self.STATUS_COMMERCIAL_REVIEW,
             self.STATUS_RETURNED_TO_COMMERCIAL,
             self.STATUS_RETURNED_TO_FINANCE,
-            self.STATUS_FOLLOW_UP,
         }:
             return 'flag-gray'
         if self.status == self.STATUS_APPROVED:
@@ -1051,18 +1082,28 @@ class PaymentActivityLog(models.Model):
     ACTION_CP_APPROVED          = 'cp_approved'
     ACTION_CP_RETURNED          = 'cp_returned'
     ACTION_CP_REJECTED          = 'cp_rejected'
+    ACTION_VOID_INITIATED        = 'void_initiated'
+    ACTION_VOID_CONFIRM          = 'void_confirm'
+    ACTION_FINANCE_VOID_REVERSED = 'finance_void_rev'
+    ACTION_ADMIN_REVIEW_REQ      = 'admin_review_req'
+    ACTION_ADMIN_EDITED          = 'admin_edited'
 
     ACTION_CHOICES = [
-        (ACTION_CREATED,          'ثبت سند'),
-        (ACTION_EDITED,           'ویرایش سند'),
-        (ACTION_STATUS_CHANGED,   'تغییر وضعیت بازرگانی'),
-        (ACTION_VIEWED,           'مشاهده'),
-        (ACTION_CUSTOMER_NOTE,    'توضیح مشتری'),
-        (ACTION_FINANCE_REGISTERED,'ثبت مالی'),
-        (ACTION_FINAL_APPROVED,   'تأیید نهایی'),
-        (ACTION_CP_APPROVED,      'تایید طرف حساب'),
-        (ACTION_CP_RETURNED,      'عودت/ناقص از طرف حساب'),
-        (ACTION_CP_REJECTED,      'رد/ابطال توسط طرف حساب'),
+        (ACTION_CREATED,              'ثبت سند'),
+        (ACTION_EDITED,               'ویرایش سند'),
+        (ACTION_STATUS_CHANGED,       'تغییر وضعیت بازرگانی'),
+        (ACTION_VIEWED,               'مشاهده'),
+        (ACTION_CUSTOMER_NOTE,        'توضیح مشتری'),
+        (ACTION_FINANCE_REGISTERED,   'ثبت مالی'),
+        (ACTION_FINAL_APPROVED,       'تأیید نهایی'),
+        (ACTION_CP_APPROVED,          'تایید طرف حساب'),
+        (ACTION_CP_RETURNED,          'عودت/ناقص از طرف حساب'),
+        (ACTION_CP_REJECTED,          'رد/ابطال توسط طرف حساب'),
+        (ACTION_VOID_INITIATED,       'عودت به مالی برای ابطال'),
+        (ACTION_FINANCE_VOID_REVERSED,'برگشت ثبت مالی'),
+        (ACTION_VOID_CONFIRM,         'تأیید ابطال توسط مالی'),
+        (ACTION_ADMIN_REVIEW_REQ,     'ارسال به صف بررسی مدیر'),
+        (ACTION_ADMIN_EDITED,         'ویرایش توسط مدیر سیستم'),
     ]
 
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')
