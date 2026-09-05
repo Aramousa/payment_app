@@ -1441,7 +1441,7 @@
                                 <form class="staff-action" method="post" action="{% url 'staff_update_status' payment.id %}">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <select name="status" required style="margin-bottom:6px;" onchange="var form=this.closest('form'); form.querySelector('.rejection-reason-box').style.display = (this.value === 'rejected') ? 'block' : 'none'; form.querySelector('textarea[name=note]').required = ['rejected','incomplete','returned_finance','follow_up'].indexOf(this.value) !== -1;">
+                                    <select name="status" required style="margin-bottom:6px;" onchange="var form=this.closest('form'); form.querySelector('.rejection-reason-box').style.display = (this.value === 'rejected') ? 'block' : 'none'; form.querySelector('textarea[name=note]').required = ['rejected','incomplete','returned_finance'].indexOf(this.value) !== -1;">
                                         {% for value, label in payment.staff_allowed_choices %}
                                             <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
                                         {% endfor %}
@@ -1478,7 +1478,7 @@
                                     if (reasonSelect && noteField && reasonSelect.value === 'other') {
                                         noteField.placeholder = 'توضیح دلیل «سایر» (الزامی)';
                                     }
-                                    if (statusSelect && noteField && ['rejected','incomplete','returned_finance','follow_up'].indexOf(statusSelect.value) !== -1) {
+                                    if (statusSelect && noteField && ['rejected','incomplete','returned_finance'].indexOf(statusSelect.value) !== -1) {
                                         noteField.required = true;
                                     }
                                 })();
