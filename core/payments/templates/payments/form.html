@@ -147,6 +147,16 @@
 
         tr.summary-row { cursor: pointer; }
         tr.summary-row:hover { background: #f5f9ff; }
+        tr.admin-edited-row td:first-child { position: relative; }
+        tr.admin-edited-row td:first-child::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 0; height: 0;
+            border-style: solid;
+            border-width: 10px 10px 0 0;
+            border-color: #f59e0b transparent transparent transparent;
+        }
         tr.detail-row { display: none; background: #fafafa; }
         tr.detail-row.open { display: table-row; }
         tr.detail-row td { white-space: normal !important; overflow: visible !important; }
@@ -1143,7 +1153,7 @@
         </thead>
         <tbody>
             {% for payment in records %}
-            <tr class="summary-row{% if payment.cp_needs_act %} cp-returned-row{% endif %}" data-row="{{ payment.id }}"
+            <tr class="summary-row{% if payment.cp_needs_act %} cp-returned-row{% endif %}{% if payment.is_admin_edited %} admin-edited-row{% endif %}" data-row="{{ payment.id }}"
                 {% if payment.cp_needs_act %}style="background:#fffbeb;"{% endif %}>
                 {% if is_pending_final_mode and can_bulk_final_approve %}
                 <td onclick="event.stopPropagation()">

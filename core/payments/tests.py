@@ -1102,7 +1102,6 @@ class InvoiceFlowTests(TestCase):
         values = [value for value, _ in choices]
         self.assertIn(PaymentRecord.STATUS_APPROVED, values)
         self.assertIn(PaymentRecord.STATUS_TEMP_COMMERCIAL, values)
-        self.assertIn(PaymentRecord.STATUS_FOLLOW_UP, values)
         self.assertIn(PaymentRecord.STATUS_RETURNED_TO_FINANCE, values)
 
     def test_staff_status_choices_for_finance_role(self):

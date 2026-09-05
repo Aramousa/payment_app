@@ -255,6 +255,20 @@ def app_navigation(request):
                 f'اسناد باطل شده' + (f' ({_voided_count})' if _voided_count else ''),
                 'voided_payments_dashboard', 'voided_payments', 'documents', '🚫',
             ))
+        if user.is_superuser or role in {'commercial', 'commercial_manager', 'sales', 'sales_manager'}:
+            from .models import PaymentRecord as _PR
+            _temp_count = _PR.objects.filter(status=_PR.STATUS_TEMP_COMMERCIAL).count()
+            items.append(_nav_item(
+                f'در جریان پیگیری' + (f' ({_temp_count})' if _temp_count else ''),
+                'temp_commercial_dashboard', 'temp_commercial', 'documents', '📋',
+            ))
+        if user.is_superuser:
+            from .models import PaymentRecord as _PR
+            _admin_q_count = _PR.objects.filter(needs_admin_review=True).count()
+            items.append(_nav_item(
+                f'صف بررسی مدیر' + (f' ({_admin_q_count})' if _admin_q_count else ''),
+                'admin_review_queue', 'admin_review_queue', 'documents', '📨',
+            ))
         items.append(_nav_item('سوابق اسناد', 'payment_history', 'payment_history', 'documents', '🗂️'))
         items.append(_nav_item('مشتریان', 'customers_list', 'customers', 'customers', '👥'))
 

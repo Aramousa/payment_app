@@ -378,6 +378,32 @@
         </div>
         {% endif %}
 
+        <!-- ارسال به صف بررسی مدیر — بازرگانی -->
+        {% if payment.can_request_admin_review %}
+        <div class="card" style="border-right: 4px solid #f59e0b;">
+            <h3 style="margin:0 0 12px;font-size:15px;color:#92400e;">📨 بازگشت به صف بررسی</h3>
+            <p style="font-size:12px;color:#64748b;margin:0 0 12px;">
+                در صورتی که سند نیاز به بررسی یا ویرایش توسط مدیر سیستم دارد،
+                می‌توانید آن را به صف بررسی مدیر ارسال کنید.
+            </p>
+            <form method="post" action="{% url 'request_admin_review' payment.id %}"
+                  onsubmit="return confirm('آیا مطمئن هستید که این سند را به صف بررسی مدیر ارسال می‌کنید؟');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <div style="margin-bottom:8px;">
+                    <label style="display:block;font-size:12px;color:#374151;font-weight:700;margin-bottom:4px;">توضیح (اختیاری)</label>
+                    <textarea name="note" maxlength="500"
+                              style="width:100%;border:1.5px solid #fcd34d;border-radius:7px;padding:8px 10px;font-family:Vazir,sans-serif;font-size:13px;min-height:60px;resize:vertical;"
+                              placeholder="دلیل ارسال به مدیر را بنویسید…"></textarea>
+                </div>
+                <button type="submit"
+                        style="background:#d97706;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-family:Vazir,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">
+                    📨 ارسال به صف بررسی مدیر
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
         <!-- فرم افزودن توضیح (فقط مشتری) -->
         {% if can_add_note %}
         <div class="note-form-card">

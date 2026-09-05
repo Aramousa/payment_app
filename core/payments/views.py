@@ -937,6 +937,22 @@ def _can_finance_confirm_void(role, payment, is_system_admin=False):
     )
 
 
+def _can_request_admin_review(role, payment, is_system_admin=False):
+    """آیا بازرگانی می‌تواند سند را به صف بررسی مدیر بفرستد؟
+    مجاز از: ثبت موقت، ثبت بازرگانی، ناقص، رد شده — فقط توسط بازرگانی."""
+    if is_system_admin:
+        return True
+    dept = _department_role(role)
+    if dept not in {'commercial', 'sales'}:
+        return False
+    return payment.status in {
+        PaymentRecord.STATUS_TEMP_COMMERCIAL,
+        PaymentRecord.STATUS_APPROVED,
+        PaymentRecord.STATUS_INCOMPLETE,
+        PaymentRecord.STATUS_REJECTED,
+    }
+
+
 def _ready_for_final_q():
     """فیلتر ORM اسناد در انتظار تأیید نهایی — از روی فلگ ذخیره‌شده"""
     return Q(pending_final_approval=True)
@@ -1881,16 +1897,24 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
     if payment.user_id and (not actor or payment.user_id != actor.id):
         recipients.append(payment.user)
 
+    finance_registered = payment.finance_status == PaymentRecord.FINANCE_STATUS_APPROVED
     if to_status == PaymentRecord.STATUS_APPROVED:
         recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_TEMP_COMMERCIAL:
-        recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
+        # فقط اگر مالی قبلاً ثبت کرده — باید از تغییر وضعیت آگاه شود
+        if finance_registered:
+            recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL:
         recipients.extend(_staff_notification_users(roles={'commercial'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE:
         recipients.extend(_staff_notification_users(roles={'finance', 'commercial', 'sales'}, exclude_user=actor))
-    elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED, PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
+    elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED}:
         recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
+    elif to_status in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
+        roles = {'commercial'}
+        if finance_registered:
+            roles.add('finance')
+        recipients.extend(_staff_notification_users(roles=roles, exclude_user=actor))
 
     customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
     _notify_users(
@@ -2122,6 +2146,12 @@ def _log_text(log):
     if log.action == PaymentActivityLog.ACTION_VOID_CONFIRM:
         return f"✅ {role} ({actor}) ابطال سند را تأیید کرد."
 
+    if log.action == PaymentActivityLog.ACTION_ADMIN_REVIEW_REQ:
+        return f"📨 {role} ({actor}) سند را به صف بررسی مدیر ارسال کرد."
+    if log.action == PaymentActivityLog.ACTION_ADMIN_EDITED:
+        note_part = f' — {log.note}' if log.note else ''
+        return f"🛠 مدیر سیستم ({actor}) سند را ویرایش کرد{note_part}."
+
     return f"🔄 {role} ({actor}) عملیاتی انجام داد."
 
 
@@ -2144,6 +2174,8 @@ def _customer_log_text(log):
         return 'درخواست ابطال فیش ثبت شد.'
     if log.action == PaymentActivityLog.ACTION_VOID_CONFIRM:
         return 'ابطال فیش تأیید شد.'
+    if log.action == PaymentActivityLog.ACTION_ADMIN_EDITED:
+        return 'اطلاعات فیش تغییر کرد...'
     # ثبت مالی و بررسی‌های داخلی نشان داده نمی‌شود
     return ''
 
@@ -2290,6 +2322,9 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
         payment.can_finance_confirm_void = _can_finance_confirm_void(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
+        payment.can_request_admin_review = _can_request_admin_review(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
 
@@ -4537,6 +4572,170 @@ def voided_payments_dashboard(request):
 
 
 @login_required
+def temp_commercial_dashboard(request):
+    """داشبورد «در جریان پیگیری» — اسناد در وضعیت ثبت موقت بازرگانی."""
+    role = _user_role(request.user)
+    dept = _department_role(role)
+    if dept not in {'commercial', 'sales'} and not request.user.is_superuser:
+        return HttpResponseForbidden('دسترسی به این بخش فقط برای واحد بازرگانی مجاز است.')
+
+    records = (
+        PaymentRecord.objects
+        .filter(status=PaymentRecord.STATUS_TEMP_COMMERCIAL)
+        .select_related('user', 'user__profile', 'counterparty')
+        .prefetch_related('receipts')
+        .order_by('-updated_at')
+    )
+    page_obj = _paginate_queryset(request, records, per_page=25)
+    records_enriched = _enrich_records(
+        page_obj.object_list,
+        staff_role=role,
+        is_system_admin=request.user.is_superuser,
+        acting_user=request.user,
+    )
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+    return render(request, 'payments/temp_commercial_dashboard.html', {
+        'records': page_obj,
+        'records_enriched': records_enriched,
+        'is_staff_user': True,
+        'staff_user_role': role,
+        'user_display_name': user_display_name,
+    })
+
+
+@login_required
+@require_POST
+def request_admin_review(request, payment_id):
+    """ارسال سند به صف بررسی مدیر — توسط بازرگانی."""
+    redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or reverse('submit'))
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+    role = _user_role(request.user)
+
+    if not _can_request_admin_review(role, payment, request.user.is_superuser):
+        messages.error(request, 'ارسال به صف بررسی مدیر در وضعیت کنونی مجاز نیست.')
+        return redirect(redirect_target)
+
+    note = (request.POST.get('note') or '').strip()
+    payment.needs_admin_review = True
+    payment.save(update_fields=['needs_admin_review'])
+    _log_activity(payment, request.user, PaymentActivityLog.ACTION_ADMIN_REVIEW_REQ, note=note)
+
+    # اطلاع‌رسانی به superuser
+    superusers = list(User.objects.filter(is_superuser=True, is_active=True))
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or f'#{payment.id}'
+    _notify_users(
+        superusers,
+        '📨 درخواست بررسی مدیر',
+        f'سند #{payment.id} مشتری {customer_name} توسط بازرگانی برای بررسی مدیر ارسال شد.',
+        reverse('admin_review_queue'),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=request.user,
+        color='#FEF3C7',
+    )
+    messages.success(request, 'سند به صف بررسی مدیر ارسال شد.')
+    return redirect(redirect_target)
+
+
+@login_required
+def admin_review_queue(request):
+    """صف بررسی مدیر — فقط superuser."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('دسترسی به این بخش فقط برای مدیر سیستم مجاز است.')
+
+    records = (
+        PaymentRecord.objects
+        .filter(needs_admin_review=True)
+        .select_related('user', 'user__profile', 'counterparty')
+        .prefetch_related('receipts')
+        .order_by('-updated_at')
+    )
+    page_obj = _paginate_queryset(request, records, per_page=25)
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+    return render(request, 'payments/admin_review_queue.html', {
+        'records': page_obj,
+        'is_staff_user': True,
+        'staff_user_role': _user_role(request.user),
+        'user_display_name': user_display_name,
+    })
+
+
+@login_required
+def admin_edit_payment(request, payment_id):
+    """ویرایش کامل سند توسط مدیر سیستم — با لاگ کامل قبل/بعد."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('دسترسی به این بخش فقط برای مدیر سیستم مجاز است.')
+
+    payment = get_object_or_404(PaymentRecord, id=payment_id)
+
+    ADMIN_EDITABLE_FIELDS = [
+        'first_name', 'last_name', 'phone', 'amount', 'bank_name',
+        'account_number', 'payment_date', 'description',
+        'status', 'finance_status', 'needs_admin_review',
+        'is_void_return', 'pending_final_approval',
+    ]
+
+    if request.method == 'POST':
+        before = {f: getattr(payment, f) for f in ADMIN_EDITABLE_FIELDS}
+        changed = []
+        for field in ADMIN_EDITABLE_FIELDS:
+            raw = request.POST.get(field)
+            if raw is None:
+                continue
+            old_val = getattr(payment, field)
+            model_field = PaymentRecord._meta.get_field(field)
+            if model_field.get_internal_type() == 'BooleanField':
+                new_val = raw in ('1', 'true', 'True', 'on')
+            elif model_field.get_internal_type() in ('DecimalField', 'IntegerField'):
+                try:
+                    new_val = type(old_val)(raw) if old_val is not None else model_field.to_python(raw)
+                except (ValueError, TypeError):
+                    continue
+            else:
+                new_val = raw or None if model_field.null else raw
+            if new_val != old_val:
+                setattr(payment, field, new_val)
+                changed.append(f'{field}: «{old_val}» → «{new_val}»')
+
+        if changed:
+            from django.utils import timezone as tz
+            payment.is_admin_edited = True
+            payment.needs_admin_review = False
+            payment.admin_edited_at = tz.now()
+            payment.admin_edited_by = request.user
+            payment.save()
+            change_summary = ' | '.join(changed)
+            _log_activity(payment, request.user, PaymentActivityLog.ACTION_ADMIN_EDITED, note=change_summary)
+
+            # اطلاع‌رسانی به بازرگانی و مالی
+            customer_name = f"{payment.first_name} {payment.last_name}".strip() or f'#{payment.id}'
+            notif_recipients = list(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=request.user))
+            _notify_users(
+                notif_recipients,
+                '🛠 ویرایش توسط مدیر',
+                f'سند #{payment.id} مشتری {customer_name} توسط مدیر سیستم ویرایش شد.',
+                reverse('payment_timeline', args=[payment.id]),
+                category=UserNotification.CATEGORY_PAYMENT,
+                actor=request.user,
+                color='#FEF3C7',
+            )
+            messages.success(request, f'سند با موفقیت ویرایش شد. ({len(changed)} فیلد تغییر کرد)')
+        else:
+            messages.info(request, 'تغییری ذخیره نشد.')
+        return redirect(reverse('payment_timeline', args=[payment.id]))
+
+    role = _user_role(request.user)
+    user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+    return render(request, 'payments/admin_edit_payment.html', {
+        'payment': payment,
+        'status_choices': PaymentRecord.STATUS_CHOICES,
+        'finance_status_choices': PaymentRecord.FINANCE_STATUS_CHOICES,
+        'is_staff_user': True,
+        'staff_user_role': role,
+        'user_display_name': user_display_name,
+    })
+
+
+@login_required
 @require_POST
 def staff_update_status(request, payment_id):
     redirect_target = _safe_next_url(request, default=request.META.get('HTTP_REFERER') or '')
@@ -4856,6 +5055,7 @@ def payment_timeline(request, payment_id):
     is_system_admin = request.user.is_superuser
     payment.can_void = _can_commercial_void(staff_role, payment, is_system_admin) if is_staff_user else False
     payment.can_finance_confirm_void = _can_finance_confirm_void(staff_role, payment, is_system_admin) if is_staff_user else False
+    payment.can_request_admin_review = _can_request_admin_review(staff_role, payment, is_system_admin) if is_staff_user else False
     return render(request, 'payments/timeline.html', {
         'payment': payment,
         'logs': logs,

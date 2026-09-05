@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load payment_dates %}
+
+{% block title %}ویرایش سند #{{ payment.id }} — مدیر سیستم{% endblock %}
+
+{% block head %}
+<style>
+    .edit-page { max-width: 860px; margin: 0 auto; padding: 20px; }
+    .edit-header { display: flex; justify-content: space-between; align-items: center;
+                   flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .edit-header h2 { margin: 0; font-size: 20px; color: #1a2f4e; }
+
+    .warning-box { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 10px;
+                   padding: 14px 16px; margin-bottom: 20px; font-size: 13px; color: #92400e; }
+    .warning-box strong { display: block; margin-bottom: 6px; font-size: 14px; }
+
+    .current-info { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+                    padding: 14px 16px; margin-bottom: 24px; font-size: 13px; }
+    .current-info h3 { margin: 0 0 10px; font-size: 14px; color: #1a2f4e; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+    .info-item { font-size: 12px; }
+    .info-item .label { color: #64748b; font-size: 11px; }
+    .info-item .value { font-weight: 700; color: #1a2f4e; }
+
+    .form-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+                 padding: 24px; }
+    .form-card h3 { margin: 0 0 20px; font-size: 15px; color: #1a2f4e;
+                    border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .form-section { margin-bottom: 24px; }
+    .form-section h4 { font-size: 13px; color: #64748b; margin: 0 0 12px;
+                       text-transform: uppercase; letter-spacing: 0.05em; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .field-row.single { grid-template-columns: 1fr; }
+    .field-group { display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: 12px; font-weight: 700; color: #374151; }
+    input[type=text], input[type=number], select, textarea {
+        width: 100%; padding: 8px 10px; border: 1px solid #d1d5db;
+        border-radius: 7px; font-family: Vazir, sans-serif; font-size: 13px;
+        background: #fff; box-sizing: border-box;
+    }
+    input:focus, select:focus, textarea:focus {
+        outline: none; border-color: #1a2f4e; box-shadow: 0 0 0 2px rgba(26,47,78,.1);
+    }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+    .checkbox-row input[type=checkbox] { width: auto; }
+    .checkbox-row label { margin: 0; font-weight: normal; }
+
+    .status-warning { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 7px;
+                      padding: 10px 12px; font-size: 12px; color: #c2410c; margin-bottom: 12px; }
+
+    .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px;
+               border-top: 1px solid #e2e8f0; }
+    .btn-save { background: linear-gradient(135deg, #d97706, #b45309); color: #fff;
+                border: none; border-radius: 8px; padding: 10px 24px; font-family: Vazir, sans-serif;
+                font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-save:hover { opacity: .85; }
+    .btn-cancel { background: #f1f5f9; color: #64748b; border: 1px solid #d1d5db;
+                  border-radius: 8px; padding: 10px 20px; font-family: Vazir, sans-serif;
+                  font-size: 14px; text-decoration: none; }
+    .btn-cancel:hover { background: #e2e8f0; }
+
+    @media(max-width:600px) { .field-row { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="edit-page">
+
+    <div class="edit-header">
+        <h2>🛠 ویرایش سند #{{ payment.id }} — مدیر سیستم</h2>
+        <a href="{% url 'admin_review_queue' %}" style="font-size:13px;color:#64748b;text-decoration:none;">← صف بررسی مدیر</a>
+    </div>
+
+    <div class="warning-box">
+        <strong>⚠ توجه — ویرایش با لاگ کامل:</strong>
+        تمامی تغییرات با مقادیر قبل و بعد ثبت می‌شود.
+        بازرگانی و مالی پس از ذخیره اطلاع‌رسانی دریافت می‌کنند.
+        پس از ویرایش، فلگ <strong>is_admin_edited</strong> فعال می‌شود
+        و سند در داشبورد هر دو بخش نمایش داده می‌شود.
+    </div>
+
+    <div class="current-info">
+        <h3>وضعیت کنونی سند</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">مشتری</div>
+                <div class="value">{{ payment.first_name }} {{ payment.last_name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">وضعیت بازرگانی</div>
+                <div class="value">{{ payment.get_status_display }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">وضعیت مالی</div>
+                <div class="value">{% if payment.finance_status == 'finance_ok' %}ثبت شده{% else %}ثبت نشده{% endif %}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">مبلغ</div>
+                <div class="value">{{ payment.amount|floatformat:0|intcomma }} ریال</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>فرم ویرایش کامل</h3>
+        <form method="post" action="{% url 'admin_edit_payment' payment.id %}">
+            {% csrf_token %}
+
+            <div class="form-section">
+                <h4>اطلاعات مشتری</h4>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label for="f_first_name">نام</label>
+                        <input type="text" id="f_first_name" name="first_name" value="{{ payment.first_name }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="f_last_name">نام خانوادگی</label>
+                        <input type="text" id="f_last_name" name="last_name" value="{{ payment.last_name }}">
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label for="f_phone">شماره تماس</label>
+                        <input type="text" id="f_phone" name="phone" value="{{ payment.phone }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="f_amount">مبلغ (ریال)</label>
+                        <input type="number" id="f_amount" name="amount" value="{{ payment.amount }}" step="1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>اطلاعات پرداخت</h4>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label for="f_bank_name">نام بانک</label>
+                        <input type="text" id="f_bank_name" name="bank_name" value="{{ payment.bank_name }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="f_account_number">شماره حساب / شبا</label>
+                        <input type="text" id="f_account_number" name="account_number" value="{{ payment.account_number }}">
+                    </div>
+                </div>
+                <div class="field-row single">
+                    <div class="field-group">
+                        <label for="f_payment_date">تاریخ واریز</label>
+                        <input type="text" id="f_payment_date" name="payment_date" value="{{ payment.payment_date|default:'' }}">
+                    </div>
+                </div>
+                <div class="field-row single">
+                    <div class="field-group">
+                        <label for="f_description">توضیحات</label>
+                        <textarea id="f_description" name="description" rows="3">{{ payment.description }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>فلگ‌های وضعیت</h4>
+                <div class="status-warning">
+                    ⚠ تغییر این فلگ‌ها مستقیماً وضعیت سند را تغییر می‌دهد. با دقت اقدام کنید.
+                </div>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label for="f_status">وضعیت بازرگانی</label>
+                        <select id="f_status" name="status">
+                            {% for val, label in status_choices %}
+                            <option value="{{ val }}" {% if payment.status == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label for="f_finance_status">وضعیت مالی</label>
+                        <select id="f_finance_status" name="finance_status">
+                            <option value="" {% if not payment.finance_status %}selected{% endif %}>ثبت نشده</option>
+                            {% for val, label in finance_status_choices %}
+                            <option value="{{ val }}" {% if payment.finance_status == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="f_needs_admin_review" name="needs_admin_review" value="1"
+                           {% if payment.needs_admin_review %}checked{% endif %}>
+                    <label for="f_needs_admin_review">needs_admin_review (در صف بررسی مدیر)</label>
+                </div>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="f_is_void_return" name="is_void_return" value="1"
+                           {% if payment.is_void_return %}checked{% endif %}>
+                    <label for="f_is_void_return">is_void_return (عودت ابطال)</label>
+                </div>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="f_pending_final_approval" name="pending_final_approval" value="1"
+                           {% if payment.pending_final_approval %}checked{% endif %}>
+                    <label for="f_pending_final_approval">pending_final_approval (در انتظار تأیید نهایی)</label>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <a href="{% url 'payment_timeline' payment.id %}" class="btn-cancel">انصراف</a>
+                <button type="submit" class="btn-save"
+                        onclick="return confirm('آیا از ذخیره تغییرات اطمینان دارید؟ تمام تغییرات لاگ می‌شوند.')">
+                    💾 ذخیره تغییرات
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
