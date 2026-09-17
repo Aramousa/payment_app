@@ -449,6 +449,15 @@ class PaymentRecord(models.Model):
         verbose_name='تأیید‌کننده ابطال',
     )
 
+    # ─── تایید رد سند توسط مالی ──────────────────────────────────────────────
+    rejection_confirmed_at = models.DateTimeField('زمان تایید رد توسط مالی', null=True, blank=True)
+    rejection_confirmed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='rejection_confirmed_payments',
+        verbose_name='تایید‌کننده رد (مالی)',
+    )
+
     # ─── ویرایش مدیر سیستم ───────────────────────────────────────────────────
     needs_admin_review = models.BooleanField(
         'نیاز به بررسی مدیر', default=False, db_index=True,
@@ -1087,6 +1096,8 @@ class PaymentActivityLog(models.Model):
     ACTION_FINANCE_VOID_REVERSED = 'finance_void_rev'
     ACTION_ADMIN_REVIEW_REQ      = 'admin_review_req'
     ACTION_ADMIN_EDITED          = 'admin_edited'
+    ACTION_FINANCE_REJECTION_REVERSED = 'finance_rej_rev'
+    ACTION_REJECTION_CONFIRMED        = 'rejection_confirm'
 
     ACTION_CHOICES = [
         (ACTION_CREATED,              'ثبت سند'),
@@ -1104,6 +1115,8 @@ class PaymentActivityLog(models.Model):
         (ACTION_VOID_CONFIRM,         'تأیید ابطال توسط مالی'),
         (ACTION_ADMIN_REVIEW_REQ,     'ارسال به صف بررسی مدیر'),
         (ACTION_ADMIN_EDITED,         'ویرایش توسط مدیر سیستم'),
+        (ACTION_FINANCE_REJECTION_REVERSED, 'برگشت ثبت مالی (رد سند)'),
+        (ACTION_REJECTION_CONFIRMED,        'تایید رد توسط مالی'),
     ]
 
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')

@@ -1,6 +1,6 @@
 ﻿# Customer Management System Documentation
 
-Last updated: 2026-08-24  
+Last updated: 2026-09-05  
 Code reference: `payments/models.py`, `payments/views.py`, `payments/forms.py`, `payments/urls.py`  
 Related workflow chart: `docs/payment_receipt_workflow_flowchart.md`
 
@@ -27,7 +27,7 @@ Roles are stored mainly in `UserProfile.role`; Django `is_staff` and `is_superus
 | `counterparty` | Counterparty user. Can see payment records assigned to its `Counterparty` record and approve/return/reject them. |
 | `finance` | Finance staff. Can register finance actions and return records to commercial when needed. |
 | `finance_manager` | Finance manager. Has broader finance access, final approval/delegation access, and may import accounting codes when the feature is enabled. |
-| `commercial` | Commercial staff. Can register commercial review, temporary registration, return to finance, reject, mark incomplete, follow up, and assign counterparties. |
+| `commercial` | Commercial staff. Can register commercial review, temporary registration, void return to finance, reject, mark incomplete, request admin review, and assign counterparties. |
 | `commercial_manager` | Commercial manager. Has broader commercial access and may import accounting codes when the feature is enabled. |
 | `sales` | Sales staff. Can view assigned customers, assigned customer documents, orders, and daily payment expectations. |
 | `sales_manager` | Sales manager. Can manage sales assignments and broader sales workflows. |
@@ -152,15 +152,35 @@ Status: Under review
 | Code | Label | Business meaning |
 | --- | --- | --- |
 | `pending` | Under review | Customer submitted the receipt. Staff action is needed. |
-| `commercial_review` | Commercial review | Commercial review is in progress. |
-| `temp_commercial` | Temporary commercial registration | Commercial has entered a temporary/non-final state, usually due to visual or amount uncertainty. |
+| `commercial_review` | Commercial review | Record enters commercial review automatically on creation. |
+| `temp_commercial` | Temporary commercial registration | Commercial has entered a temporary/non-final state. Record appears in the "In Progress" commercial dashboard. |
 | `approved` | Commercial registered | Commercial registration is done. |
 | `final_approved` | Final approved | Final approval is complete. |
 | `rejected` | Rejected | Record is locked and removed from operational flow. |
 | `incomplete` | Incomplete | Company staff cannot operate; customer must correct the record based on staff note. |
 | `returned_commercial` | Returned to commercial | Finance returned the record to commercial. |
-| `returned_finance` | Returned to finance | Commercial returned the record to finance. |
-| `follow_up` | Follow-up | Record requires investigation, customer statement, or bank/account mismatch follow-up. |
+| `returned_finance` | Returned to finance | Commercial returned the record to finance. If `is_void_return=True`, this is a void request. |
+| `void_confirmed` | Voided | Void is confirmed by finance. Record exits all operational dashboards. |
+
+> **Removed**: `follow_up` status has been fully removed. Cases requiring additional investigation are handled via the "Return to Admin Queue" action.
+
+### 4.2.1 Admin Edit Flags
+
+Two additional boolean fields on `PaymentRecord` manage superuser editing:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `needs_admin_review` | BooleanField | Record is in the admin review queue. |
+| `is_admin_edited` | BooleanField | Record was edited by a superuser. Table rows show a small orange triangle in the corner. |
+| `admin_edited_at` | DateTimeField | Timestamp of the last admin edit. |
+| `admin_edited_by` | ForeignKey | The superuser who edited the record. |
+
+### 4.2.2 Void Flags
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `is_void_return` | BooleanField | This `returned_finance` is a void request, not a regular return. |
+| `void_reason` | TextField | Void reason entered by commercial. |
 
 ### 4.3 Finance Flag
 
@@ -184,17 +204,41 @@ When finance registers a receipt:
 
 Commercial staff can act on a receipt while finance can also act independently.
 
-Allowed commercial decisions:
+#### From "Commercial Review" state
 
-- Register commercial: status becomes `approved`; notification color `#B5F1CC`.
-- Temporary commercial registration: status becomes `temp_commercial`; notification color `#FEEAC9`.
-- Return to finance: status becomes `returned_finance`; notification color `#DBEAFE`; record returns to operational dashboards.
-- Reject: status becomes `rejected`; notification color `#FECACA`; record is locked from further operational action.
-- Mark incomplete: status becomes `incomplete`; staff operations stop; customer must correct the record.
-- Follow up: status becomes `follow_up`; used for mismatches, bank return cases, counterparty disagreement, or request for customer statement.
-- Assign counterparty: sets `PaymentRecord.counterparty`; the receipt becomes visible to that counterparty.
+| Action | Result | Notification color |
+| --- | --- | --- |
+| Temporary commercial registration | `temp_commercial` | `#FEEAC9` |
+| Commercial registration | `approved` | `#B5F1CC` |
+| Mark incomplete | `incomplete` | — |
+| Reject | `rejected` | `#FECACA` |
+| Request admin review | `needs_admin_review=True` | `#FEF3C7` |
 
-Every commercial action should:
+#### From "Temporary commercial registration" (`temp_commercial`)
+
+Record is visible in the "In Progress" commercial dashboard. Finance can also see it if `finance_status == finance_ok`.
+
+| Action | Condition | Result |
+| --- | --- | --- |
+| Commercial registration | — | `approved` |
+| Void return to finance | `finance_status == finance_ok` | `returned_finance + is_void_return=True` |
+| Mark incomplete | — | `incomplete`; finance notified if registered |
+| Reject | — | `rejected`; finance notified if registered |
+| Request admin review | — | `needs_admin_review=True` |
+
+#### From "Commercial registered" (`approved`)
+
+| Action | Condition | Result |
+| --- | --- | --- |
+| Temporary commercial registration | — | `temp_commercial`; finance notified if registered |
+| Void return to finance | `finance_status == finance_ok` | `returned_finance + is_void_return=True` |
+| Mark incomplete | — | `incomplete` |
+| Reject | — | `rejected` |
+| Request admin review | — | `needs_admin_review=True` |
+
+> **Rule for "Return to Finance"**: This action is exclusively for voiding a payment. It is irreversible except by a superuser. Condition: `finance_status == finance_ok`.
+
+Every commercial action must:
 
 - validate user permission
 - validate state transition
@@ -202,6 +246,34 @@ Every commercial action should:
 - create `PaymentActivityLog`
 - create relevant `UserNotification`
 - keep history available to all authorized users
+
+### 4.4.1 Void Workflow
+
+```
+Commercial (from temp_commercial or approved, requires finance_ok)
+  → Return to finance (is_void_return=True)
+Finance — Voided Documents dashboard
+  → Confirm void (single step)
+    - If finance_status == finance_ok: finance registration is reversed automatically
+    - status = void_confirmed
+    - Notify commercial + customer (color #FECACA)
+```
+
+### 4.4.2 Admin Review Queue Workflow
+
+```
+Commercial (from temp_commercial, approved, incomplete, or rejected)
+  → Request admin review
+    → needs_admin_review=True
+    → Notify superuser (color #FEF3C7)
+Superuser — Admin Review Queue dashboard
+  → Open full edit form for the record
+    - All changes logged with before/after values
+    - Customers see only "Details changed..." in history
+    - is_admin_edited=True, needs_admin_review=False
+    - Notify commercial + finance (color #FEF3C7)
+    - Record row shows a small orange triangle in table corners
+```
 
 ### 4.5 Finance Actions
 
@@ -244,51 +316,37 @@ If a counterparty rejects or returns the receipt, commercial should usually move
 
 Many internal states are intentionally simplified for customers.
 
-Customer sees "Under review" for:
+| Internal status | Customer sees |
+| --- | --- |
+| `pending`, `commercial_review`, `temp_commercial`, `returned_commercial`, `returned_finance` | Under review |
+| `approved` | Commercial registered |
+| `final_approved` | Final approved |
+| `rejected` | Rejected |
+| `incomplete` | Incomplete |
+| `void_confirmed` | Voided |
 
-- `pending`
-- `commercial_review`
-- `temp_commercial`
-- `returned_commercial`
-- `returned_finance`
-- `follow_up`
+Admin edits (`is_admin_edited=True`): customers see only "Details changed..." in history — no field-level details are exposed.
 
-Customer sees direct labels for:
+### 4.8 Dashboards vs History
 
-- `approved`
-- `final_approved`
-- `rejected`
-- `incomplete`
+Available dashboards:
 
-Decision:
+| Dashboard | URL | Access | Content |
+| --- | --- | --- | --- |
+| Main work queue | `submit/` | All staff | Records requiring action |
+| In Progress (commercial) | `commercial/temp/` | Commercial | Records with `temp_commercial` status |
+| Voided Documents | `finance/voided/` | Finance | Records with `returned_finance + is_void_return=True` |
+| Admin Review Queue | `admin/review-queue/` | Superuser only | Records with `needs_admin_review=True` |
+| Pending Final Approval | `finance/pending-final-approval/` | Finance manager | Records ready for final approval |
+| History | `payments/history/` | All staff | All authorized records, any status |
 
-- Internal workflow complexity should not be exposed to customers unless it helps them take action.
-- `incomplete` must be clear because it requires customer correction.
-
-### 4.8 Dashboard vs History
-
-Business rule:
+Business rules:
 
 - Dashboards show items that need action.
 - History shows all authorized records regardless of status.
-
-Dashboard should include:
-
-- new pending items
-- returned items
-- follow-up items
-- items waiting for the current department's action
-
-Dashboard should exclude:
-
-- rejected records
-- final approved records
-- records already completed by the current department unless another department return/follow-up requires action
-
-History should include:
-
-- all records visible to the user by role/ownership rules
-- all statuses, including rejected and completed records
+- `void_confirmed`, `final_approved`, and `rejected` records are excluded from operational dashboards.
+- Returned records must re-appear in the relevant department's dashboard.
+- History must show all records regardless of status.
 
 ## 5. Notifications
 
@@ -320,12 +378,15 @@ Reference colors:
 | Customer receipt upload | `#DDF6D2` |
 | Finance registration | `#DDF6D2` |
 | Commercial registration | `#B5F1CC` |
-| Temporary commercial registration | `#FEEAC9` |
+| Temporary commercial registration (when finance registered) | `#FEEAC9` |
 | Counterparty approval | `#B5F1CC` |
-| Counterparty return/follow-up | `#FEEAC9` |
+| Counterparty return | `#FEEAC9` |
 | Counterparty rejection or payment rejection | `#FECACA` |
 | Return to commercial | `#E9D5FF` |
-| Return to finance | `#DBEAFE` |
+| Void return to finance (finance gets) | `#DBEAFE` |
+| Void confirmed (commercial + customer get) | `#FECACA` |
+| Admin review request (superuser gets) | `#FEF3C7` |
+| Admin edit (commercial + finance get) | `#FEF3C7` |
 
 Recommended categories:
 
@@ -714,9 +775,12 @@ Finance/final approval:
 - `payments/<id>/finance-register/`
 - `payments/<id>/finance-action/`
 - `payments/<id>/final-approve/`
+- `payments/<id>/void/` — void return to finance (commercial action)
+- `payments/<id>/void-confirm/` — confirm void (finance action)
 - `finance/pending-final-approval/`
 - `finance/delegation/`
 - `finance/bulk-approve/`
+- `finance/voided/` — voided documents dashboard
 
 Commercial/status:
 
@@ -724,6 +788,13 @@ Commercial/status:
 - `payments/<id>/details-edit/`
 - `payments/<id>/edit/`
 - `payments/<id>/note/`
+- `payments/<id>/request-admin-review/` — send to admin review queue
+- `commercial/temp/` — "In Progress" commercial dashboard
+
+Admin:
+
+- `admin/review-queue/` — admin review queue (superuser only)
+- `admin/payments/<id>/edit/` — full edit form for superuser
 
 Reconciliation:
 
@@ -813,15 +884,23 @@ Keep these rules when modifying the system:
 
 - Finance flag is independent from commercial status.
 - Finance and commercial can act on the same payment record independently.
-- Return-to-finance and return-to-commercial should move the record back to operational dashboards.
+- **"Return to finance" is void-only**: irreversible except by superuser. Condition: `finance_status == finance_ok`. Allowed from `temp_commercial` and `approved`.
+- **`follow_up` status is removed**: do not re-add it. Use the admin review queue instead.
+- **Void flow**: commercial sets `returned_finance + is_void_return=True`; finance confirms in one step; finance registration is auto-reversed if needed; status becomes `void_confirmed`.
+- **`is_void_return` flag**: never reset when setting `returned_finance` — it distinguishes void return from regular return.
+- **`void_confirmed`** exits all operational dashboards permanently.
+- **`needs_admin_review`**: set to `False` after admin edits, not before.
+- **`is_admin_edited`**: drives the orange triangle CSS indicator in table rows.
+- **Admin edit logging**: log all field values before and after. Customers see only "Details changed..." — never field names or values.
+- Finance notification for `temp_commercial` and `incomplete`/`rejected` transitions: only send when `finance_status == finance_ok`.
+- Return-to-commercial should move the record back to the commercial operational dashboard.
 - Rejected records are locked out of operational flow.
 - Incomplete records pause staff operations and require customer correction.
 - History must show all authorized records with all statuses.
 - Notifications must have color, category, unread/read behavior, and URL navigation.
 - File download names must be consistent for image and PDF.
 - Mobile UI changes must not break desktop UI.
-- Desktop UI changes must not leak into mobile UI.
-- Model changes require migration and database migration execution.
+- Model changes require migration creation and execution.
 - Static/CSS/JS changes may require cache-busting and `collectstatic`.
 
 ## 22. Test Scenarios
@@ -831,16 +910,21 @@ Payment receipt:
 1. Customer uploads image receipt.
 2. Customer uploads PDF receipt.
 3. Customer enters tracking code that contains non-numeric characters.
-4. Commercial registers the payment.
-5. Commercial marks temporary registration.
+4. Commercial registers the payment (approved).
+5. Commercial marks temporary registration (temp_commercial) — record appears in "In Progress" dashboard.
 6. Commercial marks incomplete; customer edits and resubmits.
 7. Commercial rejects; record becomes non-operational.
 8. Finance registers payment.
 9. Finance returns to commercial.
-10. Commercial returns to finance.
-11. Counterparty approves.
-12. Counterparty returns or rejects.
-13. Each step updates history and notifications.
+10. Commercial (from temp_commercial) voids the payment — requires finance_ok.
+11. Commercial (from approved) voids the payment — requires finance_ok.
+12. Finance confirms void — finance registration auto-reversed; status = void_confirmed.
+13. Counterparty approves.
+14. Counterparty returns or rejects.
+15. Commercial requests admin review (from any of: temp_commercial, approved, incomplete, rejected).
+16. Superuser opens admin review queue, edits record with full before/after log.
+17. Confirm is_admin_edited=True; row shows orange triangle; commercial and finance notified.
+18. Each step updates history and notifications correctly.
 
 Notification:
 

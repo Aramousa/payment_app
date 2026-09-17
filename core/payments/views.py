@@ -861,9 +861,9 @@ def _commercial_can_revise(payment, logs=None):
     لاگ‌ها به ترتیب جدیدترین-اول هستند (ordering = ['-created_at', '-id']).
     اقدامات نادیده‌گرفته‌شده: VIEWED، CUSTOMER_NOTE.
     """
+    # رد شده در REVISABLE قرار ندارد: بعد از رد شدن، سند برای همه (از جمله بازرگانی) قفل است
     REVISABLE = {
         PaymentRecord.STATUS_APPROVED,
-        PaymentRecord.STATUS_REJECTED,
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
     }
     if payment.status not in REVISABLE:
@@ -934,6 +934,19 @@ def _can_finance_confirm_void(role, payment, is_system_admin=False):
     return (
         payment.status == PaymentRecord.STATUS_RETURNED_TO_FINANCE
         and payment.is_void_return
+    )
+
+
+def _can_finance_confirm_rejection(role, payment, is_system_admin=False):
+    """آیا مالی می‌تواند رد سند را تأیید کند؟
+    برگشت ثبت مالی قبلی (در صورت وجود) و تأیید رد در یک مرحله انجام می‌شود."""
+    if not is_system_admin:
+        dept = _department_role(role)
+        if dept != 'finance':
+            return False
+    return (
+        payment.status == PaymentRecord.STATUS_REJECTED
+        and payment.rejection_confirmed_at is None
     )
 
 
@@ -1057,14 +1070,20 @@ def _active_payment_records_for_user(user):
             PaymentRecord.STATUS_INCOMPLETE,
         ]).filter(pending_final_approval=False)
     if role == 'finance':
-        return records.filter(status__in=[
-            PaymentRecord.STATUS_PENDING,
-            PaymentRecord.STATUS_COMMERCIAL_REVIEW,
-            PaymentRecord.STATUS_TEMP_COMMERCIAL,
-            PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
-            PaymentRecord.STATUS_RETURNED_TO_FINANCE,
-            PaymentRecord.STATUS_APPROVED,
-        ], pending_final_approval=False).exclude(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
+        return records.filter(pending_final_approval=False).filter(
+            Q(status__in=[
+                PaymentRecord.STATUS_PENDING,
+                PaymentRecord.STATUS_COMMERCIAL_REVIEW,
+                PaymentRecord.STATUS_TEMP_COMMERCIAL,
+                PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+                PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+                PaymentRecord.STATUS_APPROVED,
+            ]) & ~Q(finance_status=PaymentRecord.FINANCE_STATUS_APPROVED)
+            # سند ناقص همان لحظه که بازرگانی وضعیت را تغییر می‌دهد در داشبورد مالی هم دیده شود
+            | Q(status=PaymentRecord.STATUS_INCOMPLETE)
+            # سند رد شده تا زمانی که مالی رد را تایید نکرده در داشبورد مالی باقی می‌ماند
+            | Q(status=PaymentRecord.STATUS_REJECTED, rejection_confirmed_at__isnull=True)
+        )
     if role == 'data_entry':
         return records.exclude(status__in=[
             PaymentRecord.STATUS_FINAL_APPROVED,
@@ -1911,10 +1930,8 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
     elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED}:
         recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
     elif to_status in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
-        roles = {'commercial'}
-        if finance_registered:
-            roles.add('finance')
-        recipients.extend(_staff_notification_users(roles=roles, exclude_user=actor))
+        # هر دو حالت اکنون بدون شرط در داشبورد مالی هم دیده می‌شوند، پس مالی همیشه مطلع شود
+        recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
 
     customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
     _notify_users(
@@ -1977,6 +1994,20 @@ def _notify_payment_void_confirmed(payment, actor):
             actor=actor,
             color='#FECACA',
         )
+
+
+def _notify_payment_rejection_confirmed(payment, actor):
+    """اطلاع‌رسانی تأیید رد سند توسط مالی — به بازرگانی/فروش."""
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
+    _notify_users(
+        list(_staff_notification_users(roles={'commercial', 'sales'}, exclude_user=actor)),
+        '✅ تایید رد سند توسط مالی',
+        f'رد سند #{payment.id} مشتری {customer_name} توسط واحد مالی تأیید شد.',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+        color='#FECACA',
+    )
 
 
 def _notify_payment_edited(payment, actor, title='ویرایش فیش واریزی'):
@@ -2145,6 +2176,10 @@ def _log_text(log):
         return f"↩ {role} ({actor}) ثبت مالی سند را برگشت زد."
     if log.action == PaymentActivityLog.ACTION_VOID_CONFIRM:
         return f"✅ {role} ({actor}) ابطال سند را تأیید کرد."
+    if log.action == PaymentActivityLog.ACTION_FINANCE_REJECTION_REVERSED:
+        return f"↩ {role} ({actor}) ثبت مالی سند را به دلیل رد شدن برگشت زد."
+    if log.action == PaymentActivityLog.ACTION_REJECTION_CONFIRMED:
+        return f"✅ {role} ({actor}) رد سند را تأیید کرد."
 
     if log.action == PaymentActivityLog.ACTION_ADMIN_REVIEW_REQ:
         return f"📨 {role} ({actor}) سند را به صف بررسی مدیر ارسال کرد."
@@ -2324,6 +2359,9 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         payment.can_finance_confirm_void = _can_finance_confirm_void(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
+        payment.can_finance_confirm_rejection = _can_finance_confirm_rejection(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
         payment.can_request_admin_review = _can_request_admin_review(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
@@ -2343,6 +2381,8 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
                 PaymentRecord.STATUS_INCOMPLETE,
             }:
                 finance_choices.append(('return_to_commercial', 'عودت به بازرگانی'))
+            if payment.can_finance_confirm_rejection:
+                finance_choices.append(('confirm_rejection', 'تایید رد سند'))
         payment.finance_choices = finance_choices
         payment.is_finance_actor = is_finance_actor
 
@@ -4373,6 +4413,35 @@ def finance_unified_action(request, payment_id):
         _notify_payment_status_changed(payment, request.user, old_status, payment.status)
         messages.warning(request, f'سند #{payment_id} به بازرگانی عودت داده شد.')
 
+    elif action_type == 'confirm_rejection':
+        payment = get_object_or_404(PaymentRecord, id=payment_id)
+        role = _user_role(request.user)
+        if not _can_finance_confirm_rejection(role, payment, request.user.is_superuser):
+            messages.error(request, 'تایید رد فقط توسط واحد مالی و روی اسناد رد شده تاییدنشده مجاز است.')
+            return redirect(redirect_target)
+
+        if payment.finance_status == PaymentRecord.FINANCE_STATUS_APPROVED:
+            payment.finance_status = None
+            payment.finance_registered_at = None
+            payment.finance_registered_by = None
+            payment.save(update_fields=['finance_status', 'finance_registered_at', 'finance_registered_by'])
+            _log_activity(
+                payment, request.user, PaymentActivityLog.ACTION_FINANCE_REJECTION_REVERSED,
+                from_status=PaymentRecord.STATUS_REJECTED, to_status=PaymentRecord.STATUS_REJECTED,
+                note='برگشت ثبت مالی به دلیل رد شدن سند',
+            )
+
+        payment.rejection_confirmed_at = timezone.now()
+        payment.rejection_confirmed_by = request.user
+        payment.save(update_fields=['rejection_confirmed_at', 'rejection_confirmed_by'])
+        _log_activity(
+            payment, request.user, PaymentActivityLog.ACTION_REJECTION_CONFIRMED,
+            from_status=PaymentRecord.STATUS_REJECTED, to_status=PaymentRecord.STATUS_REJECTED,
+            note=note,
+        )
+        _notify_payment_rejection_confirmed(payment, request.user)
+        messages.success(request, f'رد سند #{payment_id} توسط واحد مالی تأیید شد.')
+
     else:
         messages.error(request, 'عملیات نامعتبر است.')
 
@@ -4806,12 +4875,14 @@ def staff_update_status(request, payment_id):
     payment.last_staff_note = note
     payment.rejection_reason = form.cleaned_data['rejection_reason'] if target_status == PaymentRecord.STATUS_REJECTED else ''
 
-    # Finance can hard-lock records on terminal decisions.
+    # رد شده: صرف‌نظر از اینکه چه واحدی رد کرده، سند برای همه قفل می‌شود.
+    # سایر تصمیمات پایانی فقط توسط مالی قفل می‌شوند.
     if request.user.is_superuser:
         payment.is_locked = False
+    elif target_status == PaymentRecord.STATUS_REJECTED:
+        payment.is_locked = True
     elif department_role == 'finance' and target_status in {
         PaymentRecord.STATUS_FINAL_APPROVED,
-        PaymentRecord.STATUS_REJECTED,
         PaymentRecord.STATUS_INCOMPLETE,
     }:
         payment.is_locked = True
@@ -4890,10 +4961,34 @@ def staff_update_status(request, payment_id):
     return redirect(redirect_target)
 
 
+CUSTOMER_EDIT_DIFF_FIELDS = [
+    ('payer_full_name', 'نام واریزکننده'),
+    ('payer_account_number', 'شماره حساب واریزکننده'),
+    ('payer_bank_name', 'بانک واریزکننده'),
+    ('beneficiary_bank_name', 'بانک مقصد'),
+    ('beneficiary_account_number', 'شماره حساب مقصد'),
+    ('beneficiary_account_owner', 'صاحب حساب مقصد'),
+    ('amount', 'مبلغ'),
+    ('tracking_code', 'کد پیگیری'),
+    ('pay_date', 'تاریخ واریز'),
+    ('customer_notes', 'توضیحات مشتری'),
+]
+
+
+def _customer_edit_diff_display(field, value):
+    if field == 'pay_date':
+        return _format_jalali_date(value) or '—'
+    if field == 'amount':
+        return '{:,}'.format(value) if value is not None else '—'
+    return value or '—'
+
+
 @login_required
 def edit_payment(request, payment_id):
     payment = get_object_or_404(PaymentRecord, id=payment_id)
     return_url = _safe_next_url(request)
+    before_values = {field: getattr(payment, field) for field, _ in CUSTOMER_EDIT_DIFF_FIELDS}
+    before_counterparty_label = payment.counterparty_display_name
 
     if _is_staff_user(request.user):
         return HttpResponseForbidden('کاربران واحدها امکان ویرایش سند مشتری را ندارند.')
@@ -4968,12 +5063,32 @@ def edit_payment(request, payment_id):
             payment.pending_final_approval_since = None
             payment.created_at = timezone.now()
             payment.last_edited_at = timezone.now()
+
+            changed_lines = []
+            for field, label in CUSTOMER_EDIT_DIFF_FIELDS:
+                old_val = before_values[field]
+                new_val = getattr(payment, field)
+                if old_val != new_val:
+                    changed_lines.append(
+                        f'{label}: «{_customer_edit_diff_display(field, old_val)}» '
+                        f'→ «{_customer_edit_diff_display(field, new_val)}»'
+                    )
+            after_counterparty_label = payment.counterparty_display_name
+            if after_counterparty_label != before_counterparty_label:
+                changed_lines.append(
+                    f'طرف حساب: «{before_counterparty_label or "—"}» → «{after_counterparty_label or "—"}»'
+                )
+            had_new_receipt = bool(form.receipt_payload())
+            if had_new_receipt:
+                changed_lines.append('تصویر/فایل فیش جایگزین شد')
+            diff_note = ' | '.join(changed_lines) if changed_lines else 'بدون تغییر در فیلدها'
+
             payment.save()
             _save_receipts(payment, form)
             _log_activity(
                 payment, request.user, PaymentActivityLog.ACTION_EDITED,
                 from_status=from_status, to_status=payment.status,
-                note='رفع نقص توسط مشتری - ثبت مالی ابطال شد',
+                note=f'رفع نقص توسط مشتری - ثبت مالی ابطال شد. تغییرات: {diff_note}',
             )
             _notify_payment_edited(payment, request.user, title='ویرایش فیش توسط مشتری')
             messages.success(request, 'سند با موفقیت ویرایش شد و برای بررسی مجدد در صف قرار گرفت.')
@@ -5055,6 +5170,7 @@ def payment_timeline(request, payment_id):
     is_system_admin = request.user.is_superuser
     payment.can_void = _can_commercial_void(staff_role, payment, is_system_admin) if is_staff_user else False
     payment.can_finance_confirm_void = _can_finance_confirm_void(staff_role, payment, is_system_admin) if is_staff_user else False
+    payment.can_finance_confirm_rejection = _can_finance_confirm_rejection(staff_role, payment, is_system_admin) if is_staff_user else False
     payment.can_request_admin_review = _can_request_admin_review(staff_role, payment, is_system_admin) if is_staff_user else False
     return render(request, 'payments/timeline.html', {
         'payment': payment,
