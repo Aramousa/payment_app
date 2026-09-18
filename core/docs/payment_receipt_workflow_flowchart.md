@@ -2,7 +2,7 @@
 
 This document contains the full operational flow for customer payment receipts. It complements `docs/system_documentation_en.md`.
 
-Last updated: 2026-09-05
+Last updated: 2026-09-17
 
 ## Legend
 
@@ -25,8 +25,9 @@ Last updated: 2026-09-05
 | Returned to commercial | `returned_commercial` | visible to commercial dashboard |
 | Returned to finance (regular) | `returned_finance` + `is_void_return=False` | visible to finance dashboard |
 | Returned to finance (void) | `returned_finance` + `is_void_return=True` | visible only in Voided Documents dashboard |
-| Incomplete | `incomplete` | staff operations blocked; customer correction required |
-| Rejected | `rejected` | locked; hidden from operational dashboards |
+| Incomplete | `incomplete` | staff operations blocked; customer correction required; **visible (read-only) in finance dashboard the moment commercial marks it incomplete** |
+| Rejected (unconfirmed) | `rejected` + `rejection_confirmed_at=None` | **locked for everyone, including the staff member who rejected it**; visible (read-only) in finance dashboard so finance can confirm |
+| Rejected (confirmed) | `rejected` + `rejection_confirmed_at` set | removed from finance dashboard; history only |
 | Voided | `void_confirmed` | permanently removed from all operational dashboards |
 | Final approved | `final_approved` | completed; history only |
 | Admin review needed | `needs_admin_review=True` | visible in Admin Review Queue (superuser only) |
@@ -61,13 +62,13 @@ flowchart TD
     TCDASH --> TC1{Action from temp_commercial}
     TC1 --> TC1a[Register commercial → approved]
     TC1 --> TC1b[Void return to finance<br/>requires finance_ok]
-    TC1 --> TC1c[Incomplete / Reject<br/>notify finance if registered]
+    TC1 --> TC1c[Incomplete / Reject<br/>always notifies finance]
     TC1 --> TC1d[Request admin review]
 
     J1a --> AP1{Action from approved}
     AP1 --> AP1a[Temp commercial → temp_commercial<br/>notify finance if registered]
     AP1 --> AP1b[Void return to finance<br/>requires finance_ok]
-    AP1 --> AP1c[Incomplete / Reject]
+    AP1 --> AP1c[Incomplete / Reject<br/>always notifies finance]
     AP1 --> AP1d[Request admin review]
 
     TC1b --> VD[returned_finance + is_void_return=True]
@@ -94,15 +95,22 @@ flowchart TD
     J3b --> K
 
     J --> J4[Commercial marks incomplete]
-    J4 --> J4a[status = incomplete]
+    J4 --> J4a[status = incomplete<br/>visible read-only in finance dashboard]
     J4a --> J4b[Staff operations blocked]
-    J4b --> J4c[Customer edits/corrects receipt]
-    J4c --> C
+    J4b --> J4c[Log + notify commercial + finance + customer<br/>color #FEF3C7]
+    J4c --> J4d[Customer edits/corrects receipt<br/>field-by-field before/after diff logged in PaymentActivityLog]
+    J4d --> C
 
-    J --> J5[Commercial rejects]
-    J5 --> J5a[status = rejected]
-    J5a --> J5b[Record locked]
-    J5b --> J5c[Log + notify color #FECACA]
+    J --> J5[Commercial rejects<br/>rejection_reason required]
+    J5 --> J5a[status = rejected<br/>is_locked=True for everyone — no one can change status again]
+    J5a --> J5b[Log + notify commercial + finance + customer<br/>color #FECACA]
+    J5b --> RJDASH[Finance dashboard — read-only<br/>until finance confirms]
+    RJDASH --> RJ1[Finance confirms rejection]
+    RJ1 --> RJ2{finance_status == finance_ok?}
+    RJ2 -- Yes --> RJ3[Auto-reverse finance registration<br/>Log ACTION_FINANCE_REJECTION_REVERSED]
+    RJ2 -- No --> RJ4[Skip reversal]
+    RJ3 --> RJ5[rejection_confirmed_at/by set<br/>Log + notify commercial + sales #FECACA]
+    RJ4 --> RJ5
 
     CPQ -- No --> RQ{Finance registered?}
     CPQ -- Yes --> CP1[Show in counterparty dashboard]
@@ -137,7 +145,7 @@ flowchart TD
     FA -- No --> HX
 
     HX --> HIST[Visible in history for authorized users]
-    J5c --> HIST
+    RJ5 --> HIST
     FR2 --> HIST
     VOID --> HIST
 ```
@@ -156,8 +164,10 @@ flowchart TD
 | Can commercial request admin review? | From `temp_commercial`, `approved`, `incomplete`, `rejected` | `needs_admin_review=True`. |
 | Can superuser admin-edit? | `is_superuser=True` | Full edit form; full before/after log; `is_admin_edited=True`. |
 | Can finance return to commercial? | Finance user; record not locked/rejected | `status='returned_commercial'`. |
-| Can staff operate incomplete record? | `status='incomplete'` | No; only customer correction continues flow. |
-| Can staff operate rejected record? | `status='rejected'` | No; locked; history-only. |
+| Can staff operate incomplete record? | `status='incomplete'` | No; only customer correction continues flow. Finance dashboard still shows it (read-only). |
+| Is a customer's fix on an incomplete record logged with detail? | Customer submits the edit form | Every changed field is logged as `field: «before» → «after»` on the `ACTION_EDITED` log; status resets to `pending` (same starting point as a brand-new upload). |
+| Can staff operate rejected record? | `status='rejected'` | No, for anyone — including the staff member who rejected it; locked; history-only. |
+| Can finance confirm a rejection? | `status='rejected'` AND `rejection_confirmed_at` is None | Single-step: auto-reverses finance registration if `finance_status='finance_ok'`; sets `rejection_confirmed_at/by`. Record then leaves the finance dashboard. |
 | Can counterparty see record? | `payment.counterparty` matches linked counterparty user | Appears in counterparty dashboard. |
 | Should dashboard show record? | Current state requires action from current department | Show in dashboard. |
 | Should history show record? | User authorized by role/ownership | Show regardless of status. |
@@ -173,10 +183,12 @@ flowchart TD
 | Counterparty approval | commercial | `#B5F1CC` |
 | Counterparty return | commercial | `#FEEAC9` |
 | Counterparty rejection | commercial | `#FECACA` |
-| Payment rejection | commercial + customer | `#FECACA` |
+| Payment marked incomplete | commercial + finance + customer | `#FEF3C7` |
+| Payment rejection | commercial + finance + customer | `#FECACA` |
 | Return to commercial | commercial | `#E9D5FF` |
 | Void return to finance | finance | `#DBEAFE` |
 | Void confirmed | commercial + customer | `#FECACA` |
+| Rejection confirmed by finance | commercial + sales | `#FECACA` |
 | Admin review request | superuser | `#FEF3C7` |
 | Admin edit | commercial + finance | `#FEF3C7` |
 
@@ -206,10 +218,16 @@ flowchart TD
     F --> G{Record requires this department action?}
     G -- Yes --> H[Show]
     G -- No --> I[Hide from dashboard]
-    F --> J{status void_confirmed / rejected / final_approved?}
+    F --> J{status void_confirmed / final_approved?}
     J -- Yes --> I
     F --> K{status incomplete?}
-    K -- Yes --> L[Hide from staff dashboard<br/>customer correction required]
+    K -- Yes --> K1{department = finance?}
+    K1 -- Yes --> K2[Show read-only — awareness only, no action buttons]
+    K1 -- No --> L[Hide from dashboard<br/>customer correction required]
+    F --> S{status rejected?}
+    S -- Yes --> S1{department = finance AND rejection_confirmed_at is None?}
+    S1 -- Yes --> S2[Show — confirm-rejection action available]
+    S1 -- No --> I
     F --> M{needs_admin_review=True?}
     M -- Yes --> N[Show in Admin Review Queue for superuser]
     F --> O{status = returned_finance + is_void_return?}

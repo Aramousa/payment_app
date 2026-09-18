@@ -1,6 +1,6 @@
 ﻿# Customer Management System Documentation
 
-Last updated: 2026-09-05  
+Last updated: 2026-09-17  
 Code reference: `payments/models.py`, `payments/views.py`, `payments/forms.py`, `payments/urls.py`  
 Related workflow chart: `docs/payment_receipt_workflow_flowchart.md`
 
@@ -156,8 +156,8 @@ Status: Under review
 | `temp_commercial` | Temporary commercial registration | Commercial has entered a temporary/non-final state. Record appears in the "In Progress" commercial dashboard. |
 | `approved` | Commercial registered | Commercial registration is done. |
 | `final_approved` | Final approved | Final approval is complete. |
-| `rejected` | Rejected | Record is locked and removed from operational flow. |
-| `incomplete` | Incomplete | Company staff cannot operate; customer must correct the record based on staff note. |
+| `rejected` | Rejected | Record is locked for everyone — including the staff member who rejected it — and removed from operational flow. Stays visible (read-only) in the finance dashboard until finance confirms the rejection (`rejection_confirmed_at`). |
+| `incomplete` | Incomplete | Company staff cannot operate; customer must correct the record based on staff note. Visible (read-only) in the finance dashboard the moment commercial marks it incomplete. |
 | `returned_commercial` | Returned to commercial | Finance returned the record to commercial. |
 | `returned_finance` | Returned to finance | Commercial returned the record to finance. If `is_void_return=True`, this is a void request. |
 | `void_confirmed` | Voided | Void is confirmed by finance. Record exits all operational dashboards. |
@@ -181,6 +181,13 @@ Two additional boolean fields on `PaymentRecord` manage superuser editing:
 | --- | --- | --- |
 | `is_void_return` | BooleanField | This `returned_finance` is a void request, not a regular return. |
 | `void_reason` | TextField | Void reason entered by commercial. |
+
+### 4.2.3 Rejection Confirmation Fields
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `rejection_confirmed_at` | DateTimeField | When finance confirmed the rejection. While `None`, the record stays in the finance dashboard. |
+| `rejection_confirmed_by` | ForeignKey | The finance user who confirmed the rejection. |
 
 ### 4.3 Finance Flag
 
@@ -210,9 +217,11 @@ Commercial staff can act on a receipt while finance can also act independently.
 | --- | --- | --- |
 | Temporary commercial registration | `temp_commercial` | `#FEEAC9` |
 | Commercial registration | `approved` | `#B5F1CC` |
-| Mark incomplete | `incomplete` | — |
+| Mark incomplete | `incomplete` | `#FEF3C7` |
 | Reject | `rejected` | `#FECACA` |
 | Request admin review | `needs_admin_review=True` | `#FEF3C7` |
+
+> From this point on, "incomplete" and "reject" always notify commercial + finance + customer unconditionally, and both are also visible (read-only) in the finance dashboard — no prior finance registration is required.
 
 #### From "Temporary commercial registration" (`temp_commercial`)
 
@@ -222,8 +231,8 @@ Record is visible in the "In Progress" commercial dashboard. Finance can also se
 | --- | --- | --- |
 | Commercial registration | — | `approved` |
 | Void return to finance | `finance_status == finance_ok` | `returned_finance + is_void_return=True` |
-| Mark incomplete | — | `incomplete`; finance notified if registered |
-| Reject | — | `rejected`; finance notified if registered |
+| Mark incomplete | — | `incomplete`; always notifies commercial + finance + customer; shown read-only in finance dashboard |
+| Reject | — | `rejected`; locked for everyone; always notifies commercial + finance + customer; shown in finance dashboard until confirmed |
 | Request admin review | — | `needs_admin_review=True` |
 
 #### From "Commercial registered" (`approved`)
@@ -232,8 +241,8 @@ Record is visible in the "In Progress" commercial dashboard. Finance can also se
 | --- | --- | --- |
 | Temporary commercial registration | — | `temp_commercial`; finance notified if registered |
 | Void return to finance | `finance_status == finance_ok` | `returned_finance + is_void_return=True` |
-| Mark incomplete | — | `incomplete` |
-| Reject | — | `rejected` |
+| Mark incomplete | — | `incomplete`; always notifies commercial + finance + customer; shown read-only in finance dashboard |
+| Reject | — | `rejected`; locked for everyone; always notifies commercial + finance + customer; shown in finance dashboard until confirmed |
 | Request admin review | — | `needs_admin_review=True` |
 
 > **Rule for "Return to Finance"**: This action is exclusively for voiding a payment. It is irreversible except by a superuser. Condition: `finance_status == finance_ok`.
@@ -273,6 +282,45 @@ Superuser — Admin Review Queue dashboard
     - is_admin_edited=True, needs_admin_review=False
     - Notify commercial + finance (color #FEF3C7)
     - Record row shows a small orange triangle in table corners
+```
+
+### 4.4.3 Rejection & Finance Confirmation Workflow
+
+```
+Commercial (or any department) rejects the record
+  → rejection_reason is required (free-text note also required when reason = "other")
+    - status = rejected
+    - is_locked = True for everyone — no role (except via the separate admin review queue) can
+      change the status again, not even the staff member who rejected it
+    - Notify commercial + finance + customer unconditionally (color #FECACA)
+    - Record is immediately visible in the finance dashboard, read-only (no action buttons)
+Finance — main dashboard (rejected row)
+  → Confirm rejection (single step, via the same finance action form — "Confirm rejection" option)
+    - If finance_status == finance_ok: finance registration is reversed automatically
+      and logged as ACTION_FINANCE_REJECTION_REVERSED
+    - rejection_confirmed_at / rejection_confirmed_by are set
+    - ACTION_REJECTION_CONFIRMED is logged; commercial + sales are notified (color #FECACA)
+    - Record leaves the finance active queue; still fully visible in history/timeline
+```
+
+### 4.4.4 Incomplete & Customer Edit Workflow
+
+```
+Commercial marks the record incomplete (a note is required)
+  → status = incomplete
+    - Staff operations are blocked; only the customer can correct the record
+    - Notify commercial + finance + customer unconditionally (color #FEF3C7)
+    - Record is immediately visible in the finance dashboard, read-only (no action buttons)
+Customer submits the edit form
+  → Before applying changes, the current value of every editable field (payer name/account,
+    beneficiary bank/account/owner, amount, tracking code, date, notes, counterparty, receipt file)
+    is captured
+    - After saving, every changed field is logged as `field: «before» → «after»` on the
+      ACTION_EDITED log entry
+    - status = pending (the same starting point as a brand-new upload — commercial's dashboard
+      auto-flips it to commercial_review once viewed)
+    - Any prior finance registration is cleared so finance re-checks the record
+    - Prior history/logs are never deleted; the full timeline remains visible
 ```
 
 ### 4.5 Finance Actions
@@ -344,7 +392,8 @@ Business rules:
 
 - Dashboards show items that need action.
 - History shows all authorized records regardless of status.
-- `void_confirmed`, `final_approved`, and `rejected` records are excluded from operational dashboards.
+- `void_confirmed` and `final_approved` records are excluded from operational dashboards.
+- `incomplete` records and unconfirmed `rejected` records (`rejection_confirmed_at=None`) are excluded from the commercial dashboard, but remain visible read-only (no action buttons) in the finance dashboard — rejected until finance confirms, incomplete until the customer corrects it.
 - Returned records must re-appear in the relevant department's dashboard.
 - History must show all records regardless of status.
 
@@ -381,7 +430,10 @@ Reference colors:
 | Temporary commercial registration (when finance registered) | `#FEEAC9` |
 | Counterparty approval | `#B5F1CC` |
 | Counterparty return | `#FEEAC9` |
-| Counterparty rejection or payment rejection | `#FECACA` |
+| Counterparty rejection | `#FECACA` |
+| Marked incomplete (commercial + finance + customer, unconditional) | `#FEF3C7` |
+| Payment rejection (commercial + finance + customer, unconditional) | `#FECACA` |
+| Rejection confirmed by finance (commercial + sales get) | `#FECACA` |
 | Return to commercial | `#E9D5FF` |
 | Void return to finance (finance gets) | `#DBEAFE` |
 | Void confirmed (commercial + customer get) | `#FECACA` |
@@ -892,10 +944,12 @@ Keep these rules when modifying the system:
 - **`needs_admin_review`**: set to `False` after admin edits, not before.
 - **`is_admin_edited`**: drives the orange triangle CSS indicator in table rows.
 - **Admin edit logging**: log all field values before and after. Customers see only "Details changed..." — never field names or values.
-- Finance notification for `temp_commercial` and `incomplete`/`rejected` transitions: only send when `finance_status == finance_ok`.
+- Finance notification for `temp_commercial` transitions: only send when `finance_status == finance_ok`.
+- Finance notification for `incomplete` and `rejected` transitions: always sent, unconditionally — both are now always visible in the finance dashboard too.
 - Return-to-commercial should move the record back to the commercial operational dashboard.
-- Rejected records are locked out of operational flow.
-- Incomplete records pause staff operations and require customer correction.
+- Rejected records are locked out of operational flow for everyone, including the staff member who rejected them. They stay visible (read-only) in the finance dashboard until finance confirms the rejection (`rejection_confirmed_at`), which auto-reverses any prior finance registration.
+- Incomplete records pause staff operations and require customer correction; they're visible (read-only) in the finance dashboard the moment they're marked incomplete.
+- A customer's fix on an incomplete record resets status to `pending` (same starting point as a new upload) and logs every changed field as `field: «before» → «after»` on the edit's activity log; prior history is never deleted.
 - History must show all authorized records with all statuses.
 - Notifications must have color, category, unread/read behavior, and URL navigation.
 - File download names must be consistent for image and PDF.
@@ -912,19 +966,21 @@ Payment receipt:
 3. Customer enters tracking code that contains non-numeric characters.
 4. Commercial registers the payment (approved).
 5. Commercial marks temporary registration (temp_commercial) — record appears in "In Progress" dashboard.
-6. Commercial marks incomplete; customer edits and resubmits.
-7. Commercial rejects; record becomes non-operational.
-8. Finance registers payment.
-9. Finance returns to commercial.
-10. Commercial (from temp_commercial) voids the payment — requires finance_ok.
-11. Commercial (from approved) voids the payment — requires finance_ok.
-12. Finance confirms void — finance registration auto-reversed; status = void_confirmed.
-13. Counterparty approves.
-14. Counterparty returns or rejects.
-15. Commercial requests admin review (from any of: temp_commercial, approved, incomplete, rejected).
-16. Superuser opens admin review queue, edits record with full before/after log.
-17. Confirm is_admin_edited=True; row shows orange triangle; commercial and finance notified.
-18. Each step updates history and notifications correctly.
+6. Commercial marks incomplete — record is immediately visible (read-only) in the finance dashboard and notifies commercial + finance + customer.
+7. Customer edits and resubmits the incomplete record — every changed field is logged as "before → after"; status resets to `pending`.
+8. Commercial rejects — a rejection reason is required, the record locks for everyone, and it's immediately visible in the finance dashboard.
+9. Finance confirms the rejection — any prior finance registration is auto-reversed; `rejection_confirmed_at/by` are set; record leaves the finance active queue.
+10. Finance registers payment.
+11. Finance returns to commercial.
+12. Commercial (from temp_commercial) voids the payment — requires finance_ok.
+13. Commercial (from approved) voids the payment — requires finance_ok.
+14. Finance confirms void — finance registration auto-reversed; status = void_confirmed.
+15. Counterparty approves.
+16. Counterparty returns or rejects.
+17. Commercial requests admin review (from any of: temp_commercial, approved, incomplete, rejected).
+18. Superuser opens admin review queue, edits record with full before/after log.
+19. Confirm is_admin_edited=True; row shows orange triangle; commercial and finance notified.
+20. Each step updates history and notifications correctly.
 
 Notification:
 
