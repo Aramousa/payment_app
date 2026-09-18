@@ -212,10 +212,20 @@
                     <!-- حساب‌های بانکی -->
                     <h3 style="font-size:14px;margin:0 0 10px;color:#1a2f4e;">🏦 حساب‌های بانکی</h3>
                     {{ bank_formset.management_form }}
+                    {% if bank_formset.non_form_errors %}
+                    <div class="field-error" style="margin-bottom:10px;">
+                        {% for e in bank_formset.non_form_errors %}<div>{{ e }}</div>{% endfor %}
+                    </div>
+                    {% endif %}
                     <div id="bank-accounts-container">
                         {% for bf in bank_formset %}
                         <div class="bank-row bank-entry">
                             {% for hidden in bf.hidden_fields %}{{ hidden }}{% endfor %}
+                            {% if bf.non_field_errors %}
+                            <div class="field-error" style="margin-bottom:8px;">
+                                {% for e in bf.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+                            </div>
+                            {% endif %}
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                                 <strong style="font-size:13px;color:#1a2f4e;">حساب #{{ forloop.counter }}</strong>
                                 <div style="display:flex;gap:8px;align-items:center;">
@@ -233,29 +243,35 @@
                                 <div>
                                     <label>{{ bf.bank_name.label }}{% if bf.bank_name.field.required %}<span style="color:#c00;">*</span>{% endif %}</label>
                                     {{ bf.bank_name }}
+                                    {% for e in bf.bank_name.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                                 </div>
                                 <div>
                                     <label>{{ bf.city.label }}</label>
                                     {{ bf.city }}
+                                    {% for e in bf.city.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                                 </div>
                                 <div>
                                     <label>{{ bf.branch.label }}</label>
                                     {{ bf.branch }}
+                                    {% for e in bf.branch.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                                 </div>
                             </div>
                             <div class="bank-row-grid-2">
                                 <div>
                                     <label>{{ bf.account_number.label }}{% if bf.account_number.field.required %}<span style="color:#c00;">*</span>{% endif %}</label>
                                     {{ bf.account_number }}
+                                    {% for e in bf.account_number.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                                 </div>
                                 <div>
                                     <label>{{ bf.account_owner.label }}</label>
                                     {{ bf.account_owner }}
+                                    {% for e in bf.account_owner.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                                 </div>
                             </div>
                             <div style="margin-top:8px;">
                                 <label>{{ bf.iban.label }}</label>
                                 {{ bf.iban }}
+                                {% for e in bf.iban.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                             </div>
                         </div>
                         {% endfor %}

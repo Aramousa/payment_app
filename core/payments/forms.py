@@ -664,6 +664,10 @@ class PaymentRecordForm(forms.ModelForm):
             raise ValidationError('مبلغ باید یک عدد صحیح مثبت و به ریال باشد.')
         return amount
 
+    def clean_tracking_code(self):
+        # ارقام فارسی/عربی به لاتین تبدیل شود تا تشخیص تکراری بودن فیش (بر اساس رشته) درست کار کند
+        return _normalize_numeric_text(self.cleaned_data.get('tracking_code') or '').strip()
+
     def clean_pay_date(self):
         pay_date = self.cleaned_data.get('pay_date')
         today = jdatetime.date.fromgregorian(date=timezone.localdate(timezone=DISPLAY_TZ))

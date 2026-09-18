@@ -2637,18 +2637,20 @@ def _apply_record_sort(records, request):
 
     return records, current_sort, current_dir, base_query
 
-def _check_duplicate_payment(form, user):
+def _check_duplicate_payment(form, user, exclude_id=None):
     """
     بررسی تکراری بودن فیش با فیلدهایی که مشتری پر کرده است.
 
     قوانین:
-    ۱. اگر کد پیگیری وارد شده → به تنهایی کافی است (یکتاست)
+    ۱. اگر کد پیگیری وارد شده → همراه با بانک واریزکننده یکتاست
+       (کد پیگیری به بانک وابسته است؛ بانک‌های مختلف ممکن است کد یکسان صادر کنند)
     ۲. اگر کد پیگیری نبود → از ترکیب فیلدهای موجود استفاده می‌شود
     ۳. حداقل ۲ فیلد معنادار باید پر باشد تا بررسی انجام شود
     ۴. فیش‌های «رد شده» نادیده گرفته می‌شوند
     """
     amount           = form.cleaned_data.get('amount')
     tracking_code    = (form.cleaned_data.get('tracking_code') or '').strip()
+    payer_bank       = (form.cleaned_data.get('payer_bank_name') or '').strip()
     payer_account    = (form.cleaned_data.get('payer_account_number') or '').replace(' ', '').strip()
     beneficiary_acct = (form.cleaned_data.get('beneficiary_account_number') or '').replace(' ', '').strip()
     pay_date         = form.cleaned_data.get('pay_date')
@@ -2658,12 +2660,16 @@ def _check_duplicate_payment(form, user):
     ).exclude(
         status=PaymentRecord.STATUS_REJECTED,
     )
+    if exclude_id:
+        base_qs = base_qs.exclude(id=exclude_id)
 
     duplicate = None
 
-    # ── مسیر ۱: کد پیگیری وارد شده — به تنهایی یکتاست ─────────
+    # ── مسیر ۱: کد پیگیری وارد شده — همراه با بانک واریزکننده یکتاست ─────────
     if tracking_code:
         qs = base_qs.filter(tracking_code=tracking_code)
+        if payer_bank:
+            qs = qs.filter(payer_bank_name__iexact=payer_bank)
         if amount:
             qs = qs.filter(amount=amount)
         duplicate = qs.first()
@@ -4833,6 +4839,9 @@ def admin_edit_payment(request, payment_id):
                     new_val = jdatetime.datetime.strptime(raw, '%Y/%m/%d').date() if raw else None
                 except (ValueError, TypeError):
                     continue
+            elif field == 'tracking_code':
+                # ارقام فارسی/عربی به لاتین تبدیل شود — سازگار با تشخیص فیش تکراری
+                new_val = raw.translate(str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')).strip()
             else:
                 model_field = PaymentRecord._meta.get_field(field)
                 if model_field.get_internal_type() == 'BooleanField':
@@ -5131,6 +5140,9 @@ def edit_payment(request, payment_id):
             allowed_counterparty_accounts=counterparty_accounts_qs,
         )
         if form.is_valid():
+            _check_duplicate_payment(form, request.user, exclude_id=payment.id)
+
+        if form.is_valid() and not form.errors:
             payment = form.save(commit=False)
             selected_counterparty_account = form.cleaned_data.get('counterparty_bank_account')
             payment.user = request.user
@@ -5385,8 +5397,11 @@ def counterparty_manage_edit(request, cp_id=None):
                 _log_system_activity(request.user, None, 'counterparty_action', f'{action}: {cp.name}')
                 messages.success(request, f'طرف حساب «{cp.name}» با موفقیت ذخیره شد.')
                 return redirect('counterparty_manage_list')
+            else:
+                messages.error(request, 'ذخیره حساب‌های بانکی انجام نشد. لطفا خطاهای مشخص‌شده را بررسی کنید.')
         else:
             bank_formset = CounterpartyBankAccountFormSet(request.POST, instance=cp_instance or Counterparty())
+            messages.error(request, 'ذخیره طرف حساب انجام نشد. لطفا خطاهای مشخص‌شده را بررسی کنید.')
     else:
         form = CounterpartyManagementForm(instance=cp_instance)
         bank_formset = CounterpartyBankAccountFormSet(instance=cp_instance or Counterparty())
@@ -8150,25 +8165,40 @@ def import_customer_accounting_codes(request):
             return redirect('import_customer_accounting_codes')
         updated = 0
         skipped = 0
-        with transaction.atomic():
-            for idx, row in enumerate(preview):
-                if idx not in selected:
-                    skipped += 1
-                    continue
-                profile_id = row.get('profile_id')
-                code = (row.get('code') or '').strip()
-                if not profile_id or not code:
-                    skipped += 1
-                    continue
-                profile = UserProfile.objects.select_for_update().get(id=profile_id, role='customer')
-                if profile.accounting_code != code:
-                    profile.accounting_code = code
-                    profile.save(update_fields=['accounting_code'])
-                    updated += 1
-                else:
-                    skipped += 1
+        not_found = 0
+        try:
+            with transaction.atomic():
+                for idx, row in enumerate(preview):
+                    if idx not in selected:
+                        skipped += 1
+                        continue
+                    profile_id = row.get('profile_id')
+                    code = (row.get('code') or '').strip()
+                    if not profile_id or not code:
+                        skipped += 1
+                        continue
+                    try:
+                        profile = UserProfile.objects.select_for_update().get(id=profile_id, role='customer')
+                    except UserProfile.DoesNotExist:
+                        not_found += 1
+                        continue
+                    if profile.accounting_code != code:
+                        profile.accounting_code = code
+                        profile.save(update_fields=['accounting_code'])
+                        updated += 1
+                    else:
+                        skipped += 1
+        except Exception:
+            logger.exception('Customer accounting code import apply failed')
+            messages.error(request, 'خطا در ذخیره کدهای تفضیلی رخ داد؛ هیچ تغییری اعمال نشد. دوباره تلاش کنید.')
+            return redirect('import_customer_accounting_codes')
         request.session.pop(_CUSTOMER_ACCOUNTING_IMPORT_SESSION_KEY, None)
-        messages.success(request, f'{updated} کد تفضیلی ثبت/به‌روزرسانی شد. {skipped} ردیف بدون تغییر ماند.')
+        summary_text = f'{updated} کد تفضیلی ثبت/به‌روزرسانی شد. {skipped} ردیف بدون تغییر ماند.'
+        if not_found:
+            summary_text += f' {not_found} ردیف مربوط به مشتری‌ای بود که دیگر یافت نشد و نادیده گرفته شد.'
+            messages.warning(request, summary_text)
+        else:
+            messages.success(request, summary_text)
         return redirect('customers_list')
 
     return render(request, 'payments/import_customer_accounting_codes.html', {
@@ -8475,16 +8505,13 @@ def _agency_create_user(application):
         last_name=application.last_name,
         email=application.email or '',
     )
-    try:
-        from .models import UserProfile
-        UserProfile.objects.create(
-            user=user,
-            role='sales',
-            phone=application.phone,
-            mobile=application.phone,
-        )
-    except Exception:
-        pass
+    # سیگنال post_save روی User یک UserProfile خالی (role='customer') از قبل ساخته —
+    # باید همان را به‌روزرسانی کنیم، نه create که با IntegrityError مواجه می‌شد و بی‌صدا نادیده گرفته می‌شد
+    from .models import UserProfile
+    UserProfile.objects.update_or_create(
+        user=user,
+        defaults={'role': 'sales', 'phone': application.phone, 'mobile': application.phone},
+    )
     return user, password
 
 
@@ -8980,7 +9007,9 @@ def warranty_new(request):
             tracking_code=_warranty_tracking_code(),
             due_date=_warranty_due_date(),
         )
-        _save_warranty_files(request, claim, description='تصویر اولیه')
+        saved_files = _save_warranty_files(request, claim, description='تصویر اولیه')
+        if request.FILES.getlist('photos') and not saved_files:
+            messages.warning(request, 'توجه: هیچ‌کدام از فایل‌های ضمیمه بارگذاری نشدند (حجم بیش از ۱۵ مگابایت یا فرمت غیرمجاز). می‌توانید بعداً از صفحه پیگیری فایل اضافه کنید.')
         _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_SUBMITTED, visible_to_customer=True)
         _warranty_notify_staff(
             claim, '🛡️ درخواست گارانتی جدید',
@@ -9048,13 +9077,15 @@ def warranty_claim_detail(request, claim_id):
                 claim.customer_reply = reply
                 claim.status = WarrantyClaim.STATUS_REVIEWING
                 claim.save(update_fields=['customer_reply', 'status', 'updated_at'])
-                _save_warranty_files(request, claim, description='فایل تکمیلی مشتری')
+                saved_files = _save_warranty_files(request, claim, description='فایل تکمیلی مشتری')
                 _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_CUSTOMER_REPLY, note=reply)
                 _warranty_notify_staff(
                     claim, '💬 پاسخ مشتری',
                     f'مشتری پاسخ اطلاعات تکمیلی برای گارانتی #{claim.id} را ارسال کرد.',
                 )
                 messages.success(request, 'پاسخ شما ثبت شد.')
+                if request.FILES.getlist('photos') and not saved_files:
+                    messages.warning(request, 'توجه: هیچ‌کدام از فایل‌های ضمیمه بارگذاری نشدند (حجم بیش از ۱۵ مگابایت یا فرمت غیرمجاز).')
 
         elif action == 'rate' and claim.status in {
             WarrantyClaim.STATUS_RESOLVED, WarrantyClaim.STATUS_CLOSED
