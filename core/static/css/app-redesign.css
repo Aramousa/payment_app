@@ -29,6 +29,8 @@
     --a-radius: 8px;
     --a-header-h: 66px;
     --a-sidebar-w: 232px;
+    --a-sidebar-w-collapsed: 64px;
+    --a-sidebar-transition: .2s ease;
 }
 
 html,
@@ -279,6 +281,7 @@ iframe {
     position: fixed !important;
     right: 0 !important;
     top: var(--a-header-h) !important;
+    transition: width var(--a-sidebar-transition), transform var(--a-sidebar-transition) !important;
     width: var(--a-sidebar-w) !important;
     z-index: 850 !important;
 }
@@ -317,9 +320,17 @@ iframe {
     min-height: 42px !important;
     padding: 8px 10px !important;
     text-align: right !important;
-    white-space: normal !important;
+    white-space: nowrap !important;
     width: 100% !important;
     -webkit-text-fill-color: rgba(226, 232, 240, .9) !important;
+}
+
+.app-shell-nav .app-nav-text {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }
 
 .app-shell-nav .sb-group-header {
@@ -419,6 +430,120 @@ iframe {
     border-color: rgba(255, 255, 255, .15) !important;
     color: #fff !important;
     -webkit-text-fill-color: #fff !important;
+}
+
+/* Sidebar mode switch (fixed / collapsed / auto-hide) — دسکتاپ */
+.app-nav-mode-switch {
+    display: flex !important;
+    gap: 4px !important;
+    padding: 8px 10px 2px !important;
+}
+
+.app-nav-mode-btn {
+    align-items: center !important;
+    background: rgba(255, 255, 255, .06) !important;
+    border: 1px solid rgba(255, 255, 255, .12) !important;
+    border-radius: var(--a-radius) !important;
+    color: rgba(226, 232, 240, .75) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    flex: 1 1 0 !important;
+    font-size: 14px !important;
+    height: 32px !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    -webkit-text-fill-color: rgba(226, 232, 240, .75) !important;
+}
+
+.app-nav-mode-btn:hover {
+    background: rgba(255, 255, 255, .14) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+}
+
+.app-nav-mode-btn.active {
+    background: var(--a-accent) !important;
+    border-color: var(--a-accent) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+}
+
+/* حالت جمع‌شده (rail آیکون‌محور) — فقط دسکتاپ */
+@media (min-width: 761px) {
+    body.sb-mode-collapsed:has(.app-shell-nav) {
+        margin-right: var(--a-sidebar-w-collapsed) !important;
+    }
+
+    body.sb-mode-collapsed .app-shell-nav {
+        overflow: visible !important;
+        width: var(--a-sidebar-w-collapsed) !important;
+    }
+
+    body.sb-mode-collapsed .app-shell-nav .app-nav-links {
+        overflow-x: visible !important;
+        overflow-y: auto !important;
+    }
+
+    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-direct,
+    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-section > .sb-group-header {
+        justify-content: center !important;
+        padding: 8px !important;
+    }
+
+    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-direct .app-nav-text,
+    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-section > .sb-group-header .app-nav-text {
+        display: none !important;
+    }
+
+    body.sb-mode-collapsed .app-shell-nav .app-nav-mode-switch .app-nav-mode-label {
+        display: none !important;
+    }
+
+    /* زیرمنوهای گروه در حالت جمع‌شده به‌صورت flyout کنار آیکون باز می‌شوند */
+    body.sb-mode-collapsed .app-shell-nav .app-nav-section {
+        position: relative !important;
+    }
+
+    body.sb-mode-collapsed .app-shell-nav .app-nav-group-panel {
+        background: #172033 !important;
+        box-shadow: var(--a-shadow) !important;
+        display: none !important;
+        margin: 0 !important;
+        min-width: 190px !important;
+        position: absolute !important;
+        right: calc(100% + 6px) !important;
+        top: 0 !important;
+        z-index: 1000 !important;
+    }
+
+    body.sb-mode-collapsed .app-shell-nav .app-nav-section:hover .app-nav-group-panel,
+    body.sb-mode-collapsed .app-shell-nav .app-nav-section[open] .app-nav-group-panel {
+        display: grid !important;
+    }
+
+    /* حالت پنهان خودکار — سایدبار overlay، بدون اشغال فضای صفحه */
+    body.sb-mode-autohide:has(.app-shell-nav) {
+        margin-right: 0 !important;
+    }
+
+    body.sb-mode-autohide .app-shell-nav {
+        transform: translateX(105%) !important;
+        width: var(--a-sidebar-w) !important;
+    }
+
+    body.sb-mode-autohide .app-shell-nav.open,
+    body.sb-mode-autohide .app-shell-nav:hover,
+    body.sb-mode-autohide .app-shell-nav:focus-within {
+        transform: translateX(0) !important;
+    }
+
+    body.sb-mode-autohide .app-nav-toggle {
+        display: inline-flex !important;
+        position: fixed !important;
+        right: 12px !important;
+        top: calc(var(--a-header-h) + 10px) !important;
+        visibility: visible !important;
+    }
 }
 
 .app-sidebar-logout {
@@ -1029,6 +1154,11 @@ tbody tr:hover td {
 
     .app-shell-nav .app-nav-links {
         padding: 12px !important;
+    }
+
+    /* سوییچ حالت سایدبار (فیکس/جمع‌شده/خودکار) مخصوص دسکتاپ است؛ روی موبایل رفتار drawer فعلی حفظ می‌شود */
+    .app-nav-mode-switch {
+        display: none !important;
     }
 
     .app-shell-nav .app-nav-direct,

@@ -94,25 +94,30 @@
 
 <nav class="app-shell-nav" id="app-sidebar" aria-label="منوی اصلی">
     <div class="app-nav-panel">
+        <div class="app-nav-mode-switch" id="sb-mode-switch" role="group" aria-label="حالت نمایش منو">
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="expanded" title="فیکس (همیشه باز)" aria-label="فیکس کردن منو">📌</button>
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="collapsed" title="جمع‌شده (فقط آیکون)" aria-label="جمع کردن منو">⇤</button>
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="autohide" title="پنهان خودکار (نمایش با نگه‌داشتن ماوس)" aria-label="پنهان‌سازی خودکار منو">👁</button>
+        </div>
         <div class="app-nav-links">
             {% for group in app_nav_groups %}
                 {% if group.key != 'account' %}
                     {% if group.key == 'main' or group.key == 'customers' %}
                         {% for item in group.items %}
-                            <a class="app-nav-link app-nav-direct app-nav-{{ group.key }}" href="{{ item.url }}">
+                            <a class="app-nav-link app-nav-direct app-nav-{{ group.key }}" href="{{ item.url }}" title="{{ item.label }}">
                                 <span class="app-nav-icon">{{ item.icon }}</span>
                                 <span class="app-nav-text">{{ item.label }}</span>
                             </a>
                         {% endfor %}
                     {% else %}
                         <details class="app-nav-section app-nav-group" data-group="{{ group.key }}">
-                            <summary class="sb-group-header">
-                                <span>{{ group.icon }}</span>
-                                <span>{{ group.label }}</span>
+                            <summary class="sb-group-header" title="{{ group.label }}">
+                                <span class="app-nav-icon">{{ group.icon }}</span>
+                                <span class="app-nav-text">{{ group.label }}</span>
                             </summary>
                             <div class="app-nav-group-panel">
                                 {% for item in group.items %}
-                                    <a class="app-nav-link app-nav-{{ group.key }}" href="{{ item.url }}">
+                                    <a class="app-nav-link app-nav-{{ group.key }}" href="{{ item.url }}" title="{{ item.label }}">
                                         <span class="app-nav-icon">{{ item.icon }}</span>
                                         <span class="app-nav-text">{{ item.label }}</span>
                                     </a>
@@ -247,6 +252,89 @@
         if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         document.body.classList.toggle('app-nav-open', open);
     }
+
+    // ─── حالت سایدبار: فیکس / جمع‌شده / پنهان خودکار (فقط دسکتاپ) ───────────
+    (function () {
+        var SB_MODES = ['expanded', 'collapsed', 'autohide'];
+        var SB_MODE_KEY = 'sbMode:' + (window._appUserId || '{{ request.user.id }}');
+        var modeSwitch = document.getElementById('sb-mode-switch');
+
+        function getStoredMode() {
+            try {
+                var m = localStorage.getItem(SB_MODE_KEY);
+                return SB_MODES.indexOf(m) !== -1 ? m : 'expanded';
+            } catch (e) {
+                return 'expanded';
+            }
+        }
+
+        function applyMode(mode) {
+            if (SB_MODES.indexOf(mode) === -1) mode = 'expanded';
+            document.body.classList.remove('sb-mode-expanded', 'sb-mode-collapsed', 'sb-mode-autohide');
+            document.body.classList.add('sb-mode-' + mode);
+            if (modeSwitch) {
+                modeSwitch.querySelectorAll('.app-nav-mode-btn').forEach(function (btn) {
+                    btn.classList.toggle('active', btn.dataset.sbMode === mode);
+                });
+            }
+            // با تغییر حالت، هر flyout/باز بودن قبلی سایدبار موبایل و آکاردئون‌های گروه هم بسته شود
+            setOpen(false);
+            document.querySelectorAll('.app-shell-nav .app-nav-group[open]').forEach(function (g) {
+                g.removeAttribute('open');
+            });
+        }
+
+        function setMode(mode) {
+            try { localStorage.setItem(SB_MODE_KEY, mode); } catch (e) {}
+            applyMode(mode);
+        }
+
+        applyMode(getStoredMode());
+
+        if (modeSwitch) {
+            modeSwitch.addEventListener('click', function (event) {
+                var btn = event.target.closest('[data-sb-mode]');
+                if (!btn) return;
+                event.stopPropagation();
+                setMode(btn.dataset.sbMode);
+            });
+        }
+
+        // در حالت «پنهان خودکار»، کلیک بیرون از سایدبار (وقتی با کلیک دکمه toggle باز شده) آن را می‌بندد
+        document.addEventListener('click', function () {
+            if (document.body.classList.contains('sb-mode-autohide') && sidebar.classList.contains('open')) {
+                setOpen(false);
+            }
+        });
+    })();
+
+    // ─── عرض سایدبار متناسب با طولانی‌ترین برچسب منو (بدون شکستن به دو خط) ───
+    (function () {
+        function computeSidebarWidth() {
+            var textNodes = sidebar.querySelectorAll('.app-nav-text');
+            if (!textNodes.length) return;
+            var sample = textNodes[0];
+            var style = window.getComputedStyle(sample);
+            var canvas = computeSidebarWidth._canvas || (computeSidebarWidth._canvas = document.createElement('canvas'));
+            var ctx = canvas.getContext('2d');
+            ctx.font = style.fontWeight + ' ' + style.fontSize + ' ' + style.fontFamily;
+            var maxTextWidth = 0;
+            textNodes.forEach(function (el) {
+                var w = ctx.measureText((el.textContent || '').trim()).width;
+                if (w > maxTextWidth) maxTextWidth = w;
+            });
+            // آیکون + گپ + پدینگ لینک + پدینگ داخلی پنل + حاشیه اطمینان
+            var extra = 28 + 8 + 20 + 20 + 14;
+            var total = Math.ceil(maxTextWidth + extra);
+            var MIN_W = 200, MAX_W = 320;
+            total = Math.max(MIN_W, Math.min(MAX_W, total));
+            document.documentElement.style.setProperty('--a-sidebar-w', total + 'px');
+        }
+        computeSidebarWidth();
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(computeSidebarWidth).catch(function () {});
+        }
+    })();
 
     sidebar.addEventListener('click', function(event) {
         event.stopPropagation();
