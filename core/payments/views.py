@@ -1967,8 +1967,9 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
     elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED}:
         recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
     elif to_status in {PaymentRecord.STATUS_REJECTED, PaymentRecord.STATUS_INCOMPLETE}:
-        # هر دو حالت اکنون بدون شرط در داشبورد مالی هم دیده می‌شوند، پس مالی همیشه مطلع شود
-        recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
+        # هر دو حالت اکنون بدون شرط در داشبورد مالی هم دیده می‌شوند، پس مالی همیشه مطلع شود؛
+        # فروش هم مثل عودت به بازرگانی/مالی باید از این رویدادهای مهم مطلع شود
+        recipients.extend(_staff_notification_users(roles={'commercial', 'finance', 'sales'}, exclude_user=actor))
 
     customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
     _notify_users(
@@ -2061,11 +2062,11 @@ def _notify_payment_return_confirmed(payment, actor):
     )
 
 
-def _notify_payment_edited(payment, actor, title='ویرایش فیش واریزی'):
+def _notify_payment_edited(payment, actor, title='ویرایش فیش واریزی', roles=None):
     recipients = []
     if payment.user_id and (not actor or payment.user_id != actor.id):
         recipients.append(payment.user)
-    recipients.extend(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=actor))
+    recipients.extend(_staff_notification_users(roles=roles or {'commercial', 'finance'}, exclude_user=actor))
     customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
     _notify_users(
         recipients,
@@ -4857,9 +4858,11 @@ def admin_edit_payment(request, payment_id):
             change_summary = ' | '.join(changed)
             _log_activity(payment, request.user, PaymentActivityLog.ACTION_ADMIN_EDITED, note=change_summary)
 
-            # اطلاع‌رسانی به بازرگانی و مالی
+            # اطلاع‌رسانی به بازرگانی، مالی و فروش
             customer_name = f"{payment.first_name} {payment.last_name}".strip() or f'#{payment.id}'
-            notif_recipients = list(_staff_notification_users(roles={'commercial', 'finance'}, exclude_user=request.user))
+            notif_recipients = list(_staff_notification_users(
+                roles={'commercial', 'finance', 'sales'}, exclude_user=request.user,
+            ))
             _notify_users(
                 notif_recipients,
                 '🛠 ویرایش توسط مدیر',
@@ -4869,6 +4872,17 @@ def admin_edit_payment(request, payment_id):
                 actor=request.user,
                 color='#FEF3C7',
             )
+            # مشتری هم مطلع شود — بدون جزئیات، فقط «اطلاعات فیش تغییر کرد...»
+            if payment.user_id:
+                _notify_users(
+                    [payment.user],
+                    'بروزرسانی فیش',
+                    f'اطلاعات فیش #{payment.id} شما بروزرسانی شد.',
+                    reverse('payment_timeline', args=[payment.id]),
+                    category=UserNotification.CATEGORY_PAYMENT,
+                    actor=request.user,
+                    color='#FEF3C7',
+                )
             messages.success(request, f'سند با موفقیت ویرایش شد. ({len(changed)} فیلد تغییر کرد)')
         else:
             messages.info(request, 'تغییری ذخیره نشد.')
@@ -5172,7 +5186,10 @@ def edit_payment(request, payment_id):
                 from_status=from_status, to_status=payment.status,
                 note=f'رفع نقص توسط مشتری - ثبت مالی ابطال شد. تغییرات: {diff_note}',
             )
-            _notify_payment_edited(payment, request.user, title='ویرایش فیش توسط مشتری')
+            _notify_payment_edited(
+                payment, request.user, title='ویرایش فیش توسط مشتری',
+                roles={'commercial', 'finance', 'sales'},
+            )
             messages.success(request, 'سند با موفقیت ویرایش شد و برای بررسی مجدد در صف قرار گرفت.')
             return redirect(return_url or 'submit')
     else:

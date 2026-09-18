@@ -768,7 +768,7 @@
                     {% for payment in customer_home_summary.payments %}
                         <div class="dashboard-row">
                             <div class="dashboard-row-title">
-                                <span>{{ payment.tracking_code|default:'بدون کد پیگیری' }}</span>
+                                <span>شماره سریال: #{{ payment.id }}</span>
                                 <span>{{ payment.amount|thousand_sep }} ریال</span>
                             </div>
                             <div class="dashboard-row-meta">تاریخ: {{ payment.pay_date|jalali_date|default:'-' }} | پیگیری: {{ payment.tracking_code|default:'-' }} | {% if payment.last_edited_at %}ویرایش: {{ payment.last_edited_at|jalali_datetime }}{% else %}ثبت: {{ payment.created_at|jalali_datetime }}{% endif %}</div>
