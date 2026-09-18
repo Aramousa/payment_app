@@ -95,13 +95,13 @@
 <nav class="app-shell-nav" id="app-sidebar" aria-label="منوی اصلی">
     <div class="app-nav-panel">
         <div class="app-nav-mode-switch" id="sb-mode-switch" role="group" aria-label="حالت نمایش منو">
-            <button type="button" class="app-nav-mode-btn" data-sb-mode="expanded" title="فیکس (همیشه باز)" aria-label="فیکس کردن منو">
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="expanded" data-nav-hint="پین کردن منو" aria-label="پین کردن منو" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5c0 3.7 5 10.3 5 10.3S17 10.7 17 7a5 5 0 0 0-5-5Z"/><circle cx="12" cy="7" r="1.7"/></svg>
             </button>
-            <button type="button" class="app-nav-mode-btn" data-sb-mode="collapsed" title="جمع‌شده (فقط آیکون)" aria-label="جمع کردن منو">
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="collapsed" data-nav-hint="نمایش فقط آیکون‌ها" aria-label="نمایش فقط آیکون‌ها" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9.5" y1="4" x2="9.5" y2="20"/></svg>
             </button>
-            <button type="button" class="app-nav-mode-btn" data-sb-mode="autohide" title="پنهان خودکار (نمایش با نگه‌داشتن ماوس)" aria-label="پنهان‌سازی خودکار منو">
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="autohide" data-nav-hint="پنهان خودکار؛ نمایش با حرکت موس" aria-label="پنهان‌سازی خودکار منو" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
             <span class="app-nav-mode-indicator" aria-hidden="true"></span>
@@ -111,18 +111,18 @@
                 {% if group.key != 'account' %}
                     {% if group.key == 'main' or group.key == 'customers' %}
                         {% for item in group.items %}
-                            <a class="app-nav-link app-nav-direct app-nav-{{ group.key }}" href="{{ item.url }}" title="{{ item.label }}">
+                            <a class="app-nav-link app-nav-direct app-nav-{{ group.key }}" href="{{ item.url }}" aria-label="{{ item.label }}" data-nav-hint="{{ item.label }}">
                                 <span class="app-nav-icon">{{ item.icon }}</span>
                                 <span class="app-nav-text">{{ item.label }}</span>
                             </a>
                         {% endfor %}
                     {% else %}
                         <details class="app-nav-section app-nav-group" data-group="{{ group.key }}">
-                            <summary class="sb-group-header" title="{{ group.label }}">
+                            <summary class="sb-group-header" aria-label="{{ group.label }}">
                                 <span class="app-nav-icon">{{ group.icon }}</span>
                                 <span class="app-nav-text">{{ group.label }}</span>
                             </summary>
-                            <div class="app-nav-group-panel">
+                            <div class="app-nav-group-panel" data-group-label="{{ group.label }}">
                                 {% for item in group.items %}
                                     <a class="app-nav-link app-nav-{{ group.key }}" href="{{ item.url }}" title="{{ item.label }}">
                                         <span class="app-nav-icon">{{ item.icon }}</span>
@@ -137,9 +137,9 @@
         </div>
         <form class="app-nav-logout app-sidebar-logout" method="post" action="{% url 'logout' %}">
             {% csrf_token %}
-            <button type="submit">
+            <button type="submit" aria-label="خروج" data-nav-hint="خروج">
                 <span aria-hidden="true">&#x23FB;</span>
-                <span>خروج</span>
+                <span class="app-nav-text">خروج</span>
             </button>
         </form>
     </div>
@@ -260,7 +260,46 @@
         document.body.classList.toggle('app-nav-open', open);
     }
 
-    // ─── حالت سایدبار: فیکس / جمع‌شده / پنهان خودکار (فقط دسکتاپ) ───────────
+    // Tooltip شناورِ حالت آیکونی؛ بیرون سایدبار ساخته می‌شود تا با overflow بریده نشود.
+    var navHint = document.createElement('div');
+    navHint.className = 'app-nav-hint';
+    navHint.setAttribute('role', 'tooltip');
+    document.body.appendChild(navHint);
+
+    function hideNavHint() {
+        navHint.classList.remove('show');
+    }
+
+    function showNavHint(target) {
+        if (!window.matchMedia('(min-width: 761px)').matches) return;
+        var isModeControl = target.classList.contains('app-nav-mode-btn');
+        if (!isModeControl && !document.body.classList.contains('sb-mode-collapsed')) return;
+        var label = target.dataset.navHint;
+        if (!label) return;
+        var rect = target.getBoundingClientRect();
+        navHint.textContent = label;
+        navHint.style.top = (rect.top + rect.height / 2) + 'px';
+        navHint.style.right = (window.innerWidth - rect.left + 10) + 'px';
+        navHint.classList.add('show');
+    }
+
+    sidebar.addEventListener('pointerover', function (event) {
+        var target = event.target.closest('[data-nav-hint]');
+        if (target && sidebar.contains(target)) showNavHint(target);
+    });
+    sidebar.addEventListener('pointerout', function (event) {
+        var target = event.target.closest('[data-nav-hint]');
+        if (target && (!event.relatedTarget || !target.contains(event.relatedTarget))) hideNavHint();
+    });
+    sidebar.addEventListener('focusin', function (event) {
+        var target = event.target.closest('[data-nav-hint]');
+        if (target) showNavHint(target);
+    });
+    sidebar.addEventListener('focusout', hideNavHint);
+    window.addEventListener('resize', hideNavHint);
+    window.addEventListener('scroll', hideNavHint, true);
+
+    // ─── حالت سایدبار: پین‌شده، جمع‌شده یا پنهان خودکار ───────
     (function () {
         var SB_MODES = ['expanded', 'collapsed', 'autohide'];
         var SB_MODE_KEY = 'sbMode:' + (window._appUserId || '{{ request.user.id }}');
@@ -289,9 +328,12 @@
             if (SB_MODES.indexOf(mode) === -1) mode = 'expanded';
             document.body.classList.remove('sb-mode-expanded', 'sb-mode-collapsed', 'sb-mode-autohide');
             document.body.classList.add('sb-mode-' + mode);
+            hideNavHint();
             if (modeSwitch) {
                 modeSwitch.querySelectorAll('.app-nav-mode-btn').forEach(function (btn) {
-                    btn.classList.toggle('active', btn.dataset.sbMode === mode);
+                    var isActive = btn.dataset.sbMode === mode;
+                    btn.classList.toggle('active', isActive);
+                    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
                 });
                 positionIndicator(mode);
             }
@@ -303,9 +345,17 @@
         }
 
         function setMode(mode) {
+            if (SB_MODES.indexOf(mode) === -1) return;
             try { localStorage.setItem(SB_MODE_KEY, mode); } catch (e) {}
             applyMode(mode);
         }
+
+        // تنظیم نمایش فقط متعلق به همین کاربر است و هنگام خروج پاک می‌شود.
+        document.querySelectorAll('form.app-nav-logout').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                try { localStorage.removeItem(SB_MODE_KEY); } catch (e) {}
+            });
+        });
 
         applyMode(getStoredMode());
         // موقعیت اولیه indicator را یک فریم بعد هم دوباره تنظیم کن (اطمینان از layout نهایی)
@@ -322,6 +372,11 @@
             window.addEventListener('resize', function () {
                 clearTimeout(modeResizeTimer);
                 modeResizeTimer = setTimeout(function () { positionIndicator(getStoredMode()); }, 150);
+            });
+            sidebar.addEventListener('transitionend', function (event) {
+                if (event.target === sidebar && event.propertyName === 'width') {
+                    positionIndicator(getStoredMode());
+                }
             });
         }
 
@@ -351,10 +406,10 @@
             // آیکون + گپ + پدینگ لینک + پدینگ داخلی پنل + حاشیه اطمینان
             var extra = 28 + 8 + 20 + 20 + 18;
             var total = Math.ceil(maxTextWidth + extra);
-            var MIN_W = 200;
-            // بدون سقف ثابت: هیچ لیبلی نباید با ... کوتاه شود. فقط یک سقف نسبی به
-            // عرض صفحه به‌عنوان آخرین خط دفاعی در برابر صفحه‌نمایش‌های بسیار باریک وجود دارد
-            var VIEWPORT_CAP = Math.round(window.innerWidth * 0.5);
+            var MIN_W = 248;
+            // عرض منو تا جای ممکن با بلندترین لیبل هماهنگ می‌شود. سقف فقط برای
+            // باقی‌ماندن حداقل فضای قابل استفاده برای محتوای اصلی است.
+            var VIEWPORT_CAP = Math.max(MIN_W, window.innerWidth - 120);
             total = Math.max(MIN_W, Math.min(total, VIEWPORT_CAP));
             document.documentElement.style.setProperty('--a-sidebar-w', total + 'px');
         }
@@ -394,8 +449,30 @@
         });
     });
     document.querySelectorAll('.app-nav-group').forEach(function(group) {
+        var groupSummary = group.querySelector('.sb-group-header');
+        var groupPanel = group.querySelector('.app-nav-group-panel');
+
+        function positionCollapsedFlyout() {
+            if (!groupSummary || !groupPanel ||
+                    !document.body.classList.contains('sb-mode-collapsed') ||
+                    !window.matchMedia('(min-width: 761px)').matches) return;
+            document.querySelectorAll('.app-nav-group[open]').forEach(function (other) {
+                if (other !== group) other.removeAttribute('open');
+            });
+            var rect = groupSummary.getBoundingClientRect();
+            groupPanel.style.setProperty('--sb-flyout-top', Math.max(8, rect.top) + 'px');
+            window.requestAnimationFrame(function () {
+                var panelHeight = groupPanel.offsetHeight;
+                var top = Math.max(8, Math.min(rect.top, window.innerHeight - panelHeight - 8));
+                groupPanel.style.setProperty('--sb-flyout-top', top + 'px');
+            });
+        }
+
+        group.addEventListener('pointerenter', positionCollapsedFlyout);
+        if (groupSummary) groupSummary.addEventListener('focus', positionCollapsedFlyout);
         group.addEventListener('toggle', function() {
             if (!group.open) return;
+            positionCollapsedFlyout();
             document.querySelectorAll('.app-nav-group[open]').forEach(function(other) {
                 if (other !== group) other.removeAttribute('open');
             });
