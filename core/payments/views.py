@@ -950,6 +950,41 @@ def _can_finance_confirm_rejection(role, payment, is_system_admin=False):
     )
 
 
+def _can_finance_confirm_return(role, payment, is_system_admin=False):
+    """آیا مالی می‌تواند عودت به مالی (غیر ابطال) را تأیید کند؟
+    این عودت فقط فلگ بازرگانی را «عودت به مالی» می‌کند و فلگ مالی را دست‌نخورده می‌گذارد —
+    مالی بعد از اعمال تغییر در سیستم مالی شرکت، با این تایید سند را از کارتابل خارج می‌کند."""
+    if not is_system_admin:
+        dept = _department_role(role)
+        if dept != 'finance':
+            return False
+    return (
+        payment.status == PaymentRecord.STATUS_RETURNED_TO_FINANCE
+        and not payment.is_void_return
+        and payment.return_confirmed_at is None
+    )
+
+
+def _can_finance_return_to_commercial(role, payment, is_system_admin=False):
+    """آیا مالی می‌تواند سند را برای بررسی مجدد به بازرگانی عودت دهد؟
+    فقط روی اسناد ثبت‌مالی‌شده و غیر پایانی/غیر ابطالی مجاز است."""
+    if not is_system_admin:
+        dept = _department_role(role)
+        if dept != 'finance':
+            return False
+    return (
+        payment.is_finance_registered
+        and not payment.pending_final_approval
+        and not payment.is_void_return
+        and payment.status not in {
+            PaymentRecord.STATUS_FINAL_APPROVED,
+            PaymentRecord.STATUS_REJECTED,
+            PaymentRecord.STATUS_INCOMPLETE,
+            PaymentRecord.STATUS_VOID_CONFIRMED,
+        }
+    )
+
+
 def _can_request_admin_review(role, payment, is_system_admin=False):
     """آیا بازرگانی می‌تواند سند را به صف بررسی مدیر بفرستد؟
     مجاز از: ثبت موقت، ثبت بازرگانی، ناقص، رد شده — فقط توسط بازرگانی."""
@@ -1083,6 +1118,8 @@ def _active_payment_records_for_user(user):
             | Q(status=PaymentRecord.STATUS_INCOMPLETE)
             # سند رد شده تا زمانی که مالی رد را تایید نکرده در داشبورد مالی باقی می‌ماند
             | Q(status=PaymentRecord.STATUS_REJECTED, rejection_confirmed_at__isnull=True)
+            # عودت به مالی (غیر ابطال) صرف‌نظر از فلگ مالی، تا زمانی که مالی تایید نکرده دیده شود
+            | Q(status=PaymentRecord.STATUS_RETURNED_TO_FINANCE, is_void_return=False, return_confirmed_at__isnull=True)
         )
     if role == 'data_entry':
         return records.exclude(status__in=[
@@ -1924,7 +1961,7 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
         if finance_registered:
             recipients.extend(_staff_notification_users(roles={'finance'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL:
-        recipients.extend(_staff_notification_users(roles={'commercial'}, exclude_user=actor))
+        recipients.extend(_staff_notification_users(roles={'commercial', 'sales'}, exclude_user=actor))
     elif to_status == PaymentRecord.STATUS_RETURNED_TO_FINANCE:
         recipients.extend(_staff_notification_users(roles={'finance', 'commercial', 'sales'}, exclude_user=actor))
     elif to_status in {PaymentRecord.STATUS_FINAL_APPROVED}:
@@ -2007,6 +2044,20 @@ def _notify_payment_rejection_confirmed(payment, actor):
         category=UserNotification.CATEGORY_PAYMENT,
         actor=actor,
         color='#FECACA',
+    )
+
+
+def _notify_payment_return_confirmed(payment, actor):
+    """اطلاع‌رسانی تأیید عودت به مالی (غیر ابطال) — به بازرگانی/فروش."""
+    customer_name = f"{payment.first_name} {payment.last_name}".strip() or (payment.user.username if payment.user else f'#{payment.id}')
+    _notify_users(
+        list(_staff_notification_users(roles={'commercial', 'sales'}, exclude_user=actor)),
+        '✅ تایید عودت به مالی',
+        f'عودت سند #{payment.id} مشتری {customer_name} توسط واحد مالی تأیید شد.',
+        reverse('payment_timeline', args=[payment.id]),
+        category=UserNotification.CATEGORY_PAYMENT,
+        actor=actor,
+        color='#DBEAFE',
     )
 
 
@@ -2180,6 +2231,8 @@ def _log_text(log):
         return f"↩ {role} ({actor}) ثبت مالی سند را به دلیل رد شدن برگشت زد."
     if log.action == PaymentActivityLog.ACTION_REJECTION_CONFIRMED:
         return f"✅ {role} ({actor}) رد سند را تأیید کرد."
+    if log.action == PaymentActivityLog.ACTION_RETURN_CONFIRMED:
+        return f"✅ {role} ({actor}) عودت به مالی را تأیید کرد."
 
     if log.action == PaymentActivityLog.ACTION_ADMIN_REVIEW_REQ:
         return f"📨 {role} ({actor}) سند را به صف بررسی مدیر ارسال کرد."
@@ -2362,6 +2415,12 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         payment.can_finance_confirm_rejection = _can_finance_confirm_rejection(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
+        payment.can_finance_confirm_return = _can_finance_confirm_return(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
+        payment.can_finance_return_to_commercial = _can_finance_return_to_commercial(
+            staff_role, payment, is_system_admin=is_system_admin,
+        ) if staff_role else False
         payment.can_request_admin_review = _can_request_admin_review(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
@@ -2374,15 +2433,12 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         if is_finance_actor:
             if payment.can_finance_register:
                 finance_choices.append(('finance_register', 'ثبت مالی'))
-            # عودت وقتی بازرگانی سند را به یکی از وضعیت‌های ثبت بازرگانی، ناقص یا رد تغییر داده باشد
-            if payment.is_finance_registered and not payment.pending_final_approval and payment.status not in {
-                PaymentRecord.STATUS_FINAL_APPROVED,
-                PaymentRecord.STATUS_REJECTED,
-                PaymentRecord.STATUS_INCOMPLETE,
-            }:
+            if payment.can_finance_return_to_commercial:
                 finance_choices.append(('return_to_commercial', 'عودت به بازرگانی'))
             if payment.can_finance_confirm_rejection:
                 finance_choices.append(('confirm_rejection', 'تایید رد سند'))
+            if payment.can_finance_confirm_return:
+                finance_choices.append(('confirm_return', 'تایید عودت'))
         payment.finance_choices = finance_choices
         payment.is_finance_actor = is_finance_actor
 
@@ -2653,8 +2709,9 @@ def _save_receipts(payment, form):
     if not payload:
         return
 
-    # فیش قبلی را حذف کن تا همیشه فقط یک فیش داشته باشیم
-    payment.receipts.all().delete()
+    # نسخه قبلی حذف نمی‌شود — فقط is_current=False می‌شود تا بازرگانی/مالی
+    # بتوانند تصویر قبل/بعد از ویرایش مشتری را مقایسه کنند
+    payment.receipts.filter(is_current=True).update(is_current=False, replaced_at=timezone.now())
 
     receipts = [
         PaymentReceipt(payment=payment, image=uploaded, file_hash=file_hash)
@@ -4389,9 +4446,8 @@ def finance_unified_action(request, payment_id):
     elif action_type == 'return_to_commercial':
         payment = get_object_or_404(PaymentRecord, id=payment_id)
         role = _user_role(request.user)
-        dept = _department_role(role)
-        if dept != 'finance' and not request.user.is_superuser:
-            messages.error(request, 'فقط واحد مالی می‌تواند سند را عودت دهد.')
+        if not _can_finance_return_to_commercial(role, payment, request.user.is_superuser):
+            messages.error(request, 'در وضعیت فعلی این سند، عودت به بازرگانی توسط مالی مجاز نیست.')
             return redirect(redirect_target)
         if not note:
             messages.error(request, 'برای عودت به بازرگانی، ثبت توضیح الزامی است.')
@@ -4441,6 +4497,24 @@ def finance_unified_action(request, payment_id):
         )
         _notify_payment_rejection_confirmed(payment, request.user)
         messages.success(request, f'رد سند #{payment_id} توسط واحد مالی تأیید شد.')
+
+    elif action_type == 'confirm_return':
+        payment = get_object_or_404(PaymentRecord, id=payment_id)
+        role = _user_role(request.user)
+        if not _can_finance_confirm_return(role, payment, request.user.is_superuser):
+            messages.error(request, 'تایید عودت فقط توسط واحد مالی و روی اسناد «عودت به مالی» (غیر ابطال) تاییدنشده مجاز است.')
+            return redirect(redirect_target)
+
+        payment.return_confirmed_at = timezone.now()
+        payment.return_confirmed_by = request.user
+        payment.save(update_fields=['return_confirmed_at', 'return_confirmed_by'])
+        _log_activity(
+            payment, request.user, PaymentActivityLog.ACTION_RETURN_CONFIRMED,
+            from_status=PaymentRecord.STATUS_RETURNED_TO_FINANCE, to_status=PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+            note=note,
+        )
+        _notify_payment_return_confirmed(payment, request.user)
+        messages.success(request, f'عودت سند #{payment_id} توسط واحد مالی تأیید شد.')
 
     else:
         messages.error(request, 'عملیات نامعتبر است.')
@@ -4653,7 +4727,7 @@ def temp_commercial_dashboard(request):
         .filter(status=PaymentRecord.STATUS_TEMP_COMMERCIAL)
         .select_related('user', 'user__profile', 'counterparty')
         .prefetch_related('receipts')
-        .order_by('-updated_at')
+        .order_by('-created_at')
     )
     page_obj = _paginate_queryset(request, records, per_page=25)
     records_enriched = _enrich_records(
@@ -4716,7 +4790,7 @@ def admin_review_queue(request):
         .filter(needs_admin_review=True)
         .select_related('user', 'user__profile', 'counterparty')
         .prefetch_related('receipts')
-        .order_by('-updated_at')
+        .order_by('-created_at')
     )
     page_obj = _paginate_queryset(request, records, per_page=25)
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
@@ -4737,8 +4811,10 @@ def admin_edit_payment(request, payment_id):
     payment = get_object_or_404(PaymentRecord, id=payment_id)
 
     ADMIN_EDITABLE_FIELDS = [
-        'first_name', 'last_name', 'phone', 'amount', 'bank_name',
-        'account_number', 'payment_date', 'description',
+        'first_name', 'last_name', 'phone', 'amount',
+        'payer_full_name', 'payer_account_number', 'payer_bank_name',
+        'beneficiary_bank_name', 'beneficiary_account_number', 'beneficiary_account_owner',
+        'tracking_code', 'pay_date', 'customer_notes',
         'status', 'finance_status', 'needs_admin_review',
         'is_void_return', 'pending_final_approval',
     ]
@@ -4751,16 +4827,22 @@ def admin_edit_payment(request, payment_id):
             if raw is None:
                 continue
             old_val = getattr(payment, field)
-            model_field = PaymentRecord._meta.get_field(field)
-            if model_field.get_internal_type() == 'BooleanField':
-                new_val = raw in ('1', 'true', 'True', 'on')
-            elif model_field.get_internal_type() in ('DecimalField', 'IntegerField'):
+            if field == 'pay_date':
                 try:
-                    new_val = type(old_val)(raw) if old_val is not None else model_field.to_python(raw)
+                    new_val = jdatetime.datetime.strptime(raw, '%Y/%m/%d').date() if raw else None
                 except (ValueError, TypeError):
                     continue
             else:
-                new_val = raw or None if model_field.null else raw
+                model_field = PaymentRecord._meta.get_field(field)
+                if model_field.get_internal_type() == 'BooleanField':
+                    new_val = raw in ('1', 'true', 'True', 'on')
+                elif model_field.get_internal_type() in ('DecimalField', 'IntegerField'):
+                    try:
+                        new_val = type(old_val)(raw) if old_val is not None else model_field.to_python(raw)
+                    except (ValueError, TypeError):
+                        continue
+                else:
+                    new_val = raw or None if model_field.null else raw
             if new_val != old_val:
                 setattr(payment, field, new_val)
                 changed.append(f'{field}: «{old_val}» → «{new_val}»')
@@ -4797,7 +4879,7 @@ def admin_edit_payment(request, payment_id):
     return render(request, 'payments/admin_edit_payment.html', {
         'payment': payment,
         'status_choices': PaymentRecord.STATUS_CHOICES,
-        'finance_status_choices': PaymentRecord.FINANCE_STATUS_CHOICES,
+        'finance_status_choices': [(PaymentRecord.FINANCE_STATUS_APPROVED, 'ثبت مالی')],
         'is_staff_user': True,
         'staff_user_role': role,
         'user_display_name': user_display_name,
@@ -5171,6 +5253,7 @@ def payment_timeline(request, payment_id):
     payment.can_void = _can_commercial_void(staff_role, payment, is_system_admin) if is_staff_user else False
     payment.can_finance_confirm_void = _can_finance_confirm_void(staff_role, payment, is_system_admin) if is_staff_user else False
     payment.can_finance_confirm_rejection = _can_finance_confirm_rejection(staff_role, payment, is_system_admin) if is_staff_user else False
+    payment.can_finance_confirm_return = _can_finance_confirm_return(staff_role, payment, is_system_admin) if is_staff_user else False
     payment.can_request_admin_review = _can_request_admin_review(staff_role, payment, is_system_admin) if is_staff_user else False
     return render(request, 'payments/timeline.html', {
         'payment': payment,

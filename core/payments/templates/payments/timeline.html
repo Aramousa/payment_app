@@ -194,7 +194,7 @@
         <div class="card">
             <h3 style="margin:0 0 12px;font-size:15px;">📎 سند بارگذاری‌شده</h3>
             <div class="receipt-doc-grid">
-                {% with receipts=payment.receipts.all %}
+                {% with receipts=payment.current_receipts %}
                     {% if receipts %}
                         {% for receipt in receipts %}
                             {% with file_name=receipt.image.name|lower %}
@@ -228,6 +228,25 @@
                     {% endif %}
                 {% endwith %}
             </div>
+            {% if is_staff_user and payment.superseded_receipts %}
+            <div class="receipt-doc-grid" style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;">
+                <div style="width:100%;font-size:11px;color:#94a3b8;margin-bottom:4px;">🕓 نسخه‌های قبلی سند (قبل از ویرایش مشتری)</div>
+                {% for receipt in payment.superseded_receipts %}
+                    {% with file_name=receipt.image.name|lower %}
+                        <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" class="receipt-doc-link receipt-preview-link" style="opacity:.6;" title="نسخه قبلی — جایگزین شد در {{ receipt.replaced_at|jalali_datetime }}">
+                            <span class="receipt-doc-media">
+                                {% if '.pdf' in file_name %}
+                                    <span class="receipt-doc-pdf">📄 PDF</span>
+                                {% else %}
+                                    <img src="{% url 'receipt_file' receipt.id %}" alt="نسخه قبلی سند" loading="lazy">
+                                {% endif %}
+                            </span>
+                            <span class="receipt-doc-caption">قبلی — {{ receipt.replaced_at|jalali_datetime }}</span>
+                        </a>
+                    {% endwith %}
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
         <!-- تاریخچه -->

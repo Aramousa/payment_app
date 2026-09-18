@@ -102,9 +102,9 @@
             </div>
         {% endif %}
 
-        {% if payment.receipts.all %}
+        {% if payment.current_receipts %}
             <p>فایل های فعلی:</p>
-            {% for receipt in payment.receipts.all %}
+            {% for receipt in payment.current_receipts %}
                 <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" class="receipt-preview-link">مشاهده {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
             {% endfor %}
             <hr>

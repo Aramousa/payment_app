@@ -564,7 +564,7 @@ class PaymentRecordForm(forms.ModelForm):
             if field_name in self.fields and not self.fields[field_name].disabled:
                 self.fields[field_name].required = True
 
-        has_existing_files = bool(self.instance and self.instance.pk and self.instance.receipts.exists())
+        has_existing_files = bool(self.instance and self.instance.pk and self.instance.receipts.filter(is_current=True).exists())
         self.fields['receipt_images'].required = not has_existing_files
 
         # اعمال تنظیمات اجباری بودن فیلدها از دیتابیس
@@ -692,7 +692,7 @@ class PaymentRecordForm(forms.ModelForm):
 
     def clean_receipt_images(self):
         files = self.files.getlist('receipt_images')
-        has_existing_files = bool(self.instance.pk and self.instance.receipts.exists())
+        has_existing_files = bool(self.instance.pk and self.instance.receipts.filter(is_current=True).exists())
         if not files and not has_existing_files:
             raise ValidationError('حداقل یک فایل فیش لازم است.')
         if len(files) > 1:
@@ -700,7 +700,9 @@ class PaymentRecordForm(forms.ModelForm):
 
         existing_hashes = set()
         if self.instance.pk:
-            existing_hashes = set(self.instance.receipts.values_list('file_hash', flat=True))
+            existing_hashes = set(
+                self.instance.receipts.filter(is_current=True).values_list('file_hash', flat=True)
+            )
 
         payload = []
         seen_hashes = set()

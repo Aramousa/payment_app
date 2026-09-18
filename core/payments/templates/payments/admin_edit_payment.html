@@ -133,27 +133,61 @@
             </div>
 
             <div class="form-section">
-                <h4>اطلاعات پرداخت</h4>
+                <h4>اطلاعات واریزکننده</h4>
                 <div class="field-row">
                     <div class="field-group">
-                        <label for="f_bank_name">نام بانک</label>
-                        <input type="text" id="f_bank_name" name="bank_name" value="{{ payment.bank_name }}">
+                        <label for="f_payer_full_name">نام واریزکننده</label>
+                        <input type="text" id="f_payer_full_name" name="payer_full_name" value="{{ payment.payer_full_name }}">
                     </div>
                     <div class="field-group">
-                        <label for="f_account_number">شماره حساب / شبا</label>
-                        <input type="text" id="f_account_number" name="account_number" value="{{ payment.account_number }}">
-                    </div>
-                </div>
-                <div class="field-row single">
-                    <div class="field-group">
-                        <label for="f_payment_date">تاریخ واریز</label>
-                        <input type="text" id="f_payment_date" name="payment_date" value="{{ payment.payment_date|default:'' }}">
+                        <label for="f_payer_bank_name">بانک واریزکننده</label>
+                        <input type="text" id="f_payer_bank_name" name="payer_bank_name" value="{{ payment.payer_bank_name }}">
                     </div>
                 </div>
                 <div class="field-row single">
                     <div class="field-group">
-                        <label for="f_description">توضیحات</label>
-                        <textarea id="f_description" name="description" rows="3">{{ payment.description }}</textarea>
+                        <label for="f_payer_account_number">شماره حساب واریزکننده</label>
+                        <input type="text" id="f_payer_account_number" name="payer_account_number" value="{{ payment.payer_account_number }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>اطلاعات مقصد</h4>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label for="f_beneficiary_bank_name">بانک مقصد</label>
+                        <input type="text" id="f_beneficiary_bank_name" name="beneficiary_bank_name" value="{{ payment.beneficiary_bank_name }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="f_beneficiary_account_number">شماره حساب مقصد</label>
+                        <input type="text" id="f_beneficiary_account_number" name="beneficiary_account_number" value="{{ payment.beneficiary_account_number }}">
+                    </div>
+                </div>
+                <div class="field-row single">
+                    <div class="field-group">
+                        <label for="f_beneficiary_account_owner">صاحب حساب مقصد</label>
+                        <input type="text" id="f_beneficiary_account_owner" name="beneficiary_account_owner" value="{{ payment.beneficiary_account_owner }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>سایر اطلاعات فیش</h4>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label for="f_tracking_code">کد پیگیری</label>
+                        <input type="text" id="f_tracking_code" name="tracking_code" value="{{ payment.tracking_code }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="f_pay_date">تاریخ واریز</label>
+                        <input type="text" id="f_pay_date" name="pay_date" value="{{ payment.pay_date|jalali_date }}" placeholder="1403/01/31" dir="ltr">
+                    </div>
+                </div>
+                <div class="field-row single">
+                    <div class="field-group">
+                        <label for="f_customer_notes">توضیحات مشتری</label>
+                        <textarea id="f_customer_notes" name="customer_notes" rows="3">{{ payment.customer_notes }}</textarea>
                     </div>
                 </div>
             </div>

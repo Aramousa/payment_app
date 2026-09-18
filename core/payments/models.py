@@ -458,6 +458,15 @@ class PaymentRecord(models.Model):
         verbose_name='تایید‌کننده رد (مالی)',
     )
 
+    # ─── تایید عودت به مالی (غیر ابطال) توسط مالی ─────────────────────────────
+    return_confirmed_at = models.DateTimeField('زمان تایید عودت توسط مالی', null=True, blank=True)
+    return_confirmed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='return_confirmed_payments',
+        verbose_name='تایید‌کننده عودت (مالی)',
+    )
+
     # ─── ویرایش مدیر سیستم ───────────────────────────────────────────────────
     needs_admin_review = models.BooleanField(
         'نیاز به بررسی مدیر', default=False, db_index=True,
@@ -637,6 +646,17 @@ class PaymentRecord(models.Model):
     @property
     def is_seen_by_customer(self):
         return bool(self.customer_seen_at)
+
+    @property
+    def current_receipts(self):
+        """فیش‌های فعلی — سازگار با prefetch_related('receipts') (بدون کوئری اضافه)."""
+        return [r for r in self.receipts.all() if r.is_current]
+
+    @property
+    def superseded_receipts(self):
+        """نسخه‌های قبلی فیش که مشتری هنگام ویرایش جایگزین کرده — جدیدترین ابتدا."""
+        items = [r for r in self.receipts.all() if not r.is_current]
+        return sorted(items, key=lambda r: r.replaced_at or r.created_at, reverse=True)
 
 
 class UserProfile(models.Model):
@@ -978,10 +998,17 @@ class PaymentReceipt(models.Model):
     image = models.FileField(upload_to=payment_receipt_upload_to)
     file_hash = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
+    # وقتی مشتری فیش را ویرایش و فایل را جایگزین می‌کند، نسخه قبلی حذف نمی‌شود —
+    # فقط is_current=False می‌شود تا بازرگانی/مالی بتوانند قبل/بعد را مقایسه کنند.
+    is_current = models.BooleanField('نسخه فعلی', default=True, db_index=True)
+    replaced_at = models.DateTimeField('زمان جایگزینی', null=True, blank=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['payment', 'file_hash'], name='uniq_payment_receipt_hash'),
+            models.UniqueConstraint(
+                fields=['payment', 'file_hash'], condition=models.Q(is_current=True),
+                name='uniq_payment_receipt_hash_current',
+            ),
         ]
 
 
@@ -1098,6 +1125,7 @@ class PaymentActivityLog(models.Model):
     ACTION_ADMIN_EDITED          = 'admin_edited'
     ACTION_FINANCE_REJECTION_REVERSED = 'finance_rej_rev'
     ACTION_REJECTION_CONFIRMED        = 'rejection_confirm'
+    ACTION_RETURN_CONFIRMED           = 'return_confirm'
 
     ACTION_CHOICES = [
         (ACTION_CREATED,              'ثبت سند'),
@@ -1117,6 +1145,7 @@ class PaymentActivityLog(models.Model):
         (ACTION_ADMIN_EDITED,         'ویرایش توسط مدیر سیستم'),
         (ACTION_FINANCE_REJECTION_REVERSED, 'برگشت ثبت مالی (رد سند)'),
         (ACTION_REJECTION_CONFIRMED,        'تایید رد توسط مالی'),
+        (ACTION_RETURN_CONFIRMED,           'تایید عودت به مالی'),
     ]
 
     payment = models.ForeignKey(PaymentRecord, on_delete=models.CASCADE, related_name='activity_logs')

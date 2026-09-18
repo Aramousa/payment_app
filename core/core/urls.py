@@ -39,12 +39,15 @@ handler404 = handler404_view
 handler500 = handler500_view
 
 urlpatterns = [
+    # payments.urls must be tried before Django's own admin.site.urls: it owns two
+    # admin/... routes (admin/review-queue/, admin/payments/<id>/edit/) that would
+    # otherwise be swallowed by the admin/ prefix below and 404 inside AdminSite.
+    path('', include('payments.urls')),
     path('admin/', admin.site.urls),
     path('accounts/login/', SafeLoginView.as_view(), name='login'),
     path('accounts/logout/', safe_logout, name='logout'),
     path('accounts/', include('django.contrib.auth.urls')),
     path('mfa/', include('mfa.urls')),
-    path('', include('payments.urls')),
     path('', redirect_to_submit),
 ]
 

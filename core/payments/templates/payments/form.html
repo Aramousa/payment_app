@@ -1304,7 +1304,7 @@
                         <div class="detail-card">
                             <strong>اسناد</strong>
                             <div class="receipt-thumb-grid">
-                                {% with receipts=payment.receipts.all %}
+                                {% with receipts=payment.current_receipts %}
                                     {% if receipts %}
                                         {% for receipt in receipts %}
                                             {% with file_name=receipt.image.name|lower %}
@@ -1358,6 +1358,27 @@
                                     {% endif %}
                                 {% endwith %}
                             </div>
+                            {% if is_staff_user and payment.superseded_receipts %}
+                            <div class="receipt-thumb-grid" style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;">
+                                <div style="width:100%;font-size:11px;color:#94a3b8;margin-bottom:4px;">🕓 نسخه‌های قبلی سند (قبل از ویرایش مشتری)</div>
+                                {% for receipt in payment.superseded_receipts %}
+                                    {% with file_name=receipt.image.name|lower %}
+                                        <div class="receipt-thumb-card" style="opacity:.6;">
+                                            <a href="{% url 'receipt_file' receipt.id %}" data-file-name="{{ receipt.image.name }}" data-receipt-id="{{ receipt.id }}" class="receipt-preview-link receipt-thumb-link" title="نسخه قبلی — جایگزین شد در {{ receipt.replaced_at|jalali_datetime }}">
+                                                <span class="receipt-thumb-media">
+                                                    {% if '.pdf' in file_name %}
+                                                        <span class="receipt-thumb-pdf">PDF</span>
+                                                    {% else %}
+                                                        <img src="{% url 'receipt_file' receipt.id %}" alt="نسخه قبلی سند" loading="lazy">
+                                                    {% endif %}
+                                                </span>
+                                                <span class="receipt-thumb-caption">قبلی — {{ receipt.replaced_at|jalali_datetime }}</span>
+                                            </a>
+                                        </div>
+                                    {% endwith %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
 
                         <div class="detail-card">
