@@ -1016,7 +1016,8 @@
             var tabsBar = bell.querySelector('.notification-tabs');
             var activeCategory = 'all';
             var CATEGORY_LABELS = {
-                payment: 'فیش', invoice: 'فاکتور', order: 'سفارش', warranty: 'گارانتی',
+                payment: 'فیش', payment_submit: 'ثبت فیش', payment_review: 'بررسی فیش', payment_finance: 'گردش مالی',
+                invoice: 'فاکتور', order: 'سفارش', warranty: 'گارانتی',
                 agency: 'نمایندگی', reconciliation: 'مغایرت‌گیری', system: 'سیستم'
             };
             var enableButton = bell.querySelector('.enable-browser-notifications') || document.getElementById('enableBrowserNotifications');

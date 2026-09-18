@@ -1770,6 +1770,9 @@ def _notification_payload(notification):
     # آیکون بر اساس دسته‌بندی
     icon_map = {
         UserNotification.CATEGORY_PAYMENT: '💳',
+        UserNotification.CATEGORY_PAYMENT_SUBMIT: '🧾',
+        UserNotification.CATEGORY_PAYMENT_REVIEW: '🔍',
+        UserNotification.CATEGORY_PAYMENT_FINANCE: '🏦',
         UserNotification.CATEGORY_INVOICE: '📄',
         UserNotification.CATEGORY_ORDER: '📦',
         UserNotification.CATEGORY_WARRANTY: '🛡️',
@@ -1903,7 +1906,7 @@ def _notify_payment_finance_registered(payment, actor):
         'ثبت مالی فیش',
         f'فیش #{payment.id} مشتری {customer_name} توسط مالی ثبت شد.',
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_FINANCE,
         actor=actor,
         color=_payment_notification_color(event='finance_registered'),
     )
@@ -1944,10 +1947,22 @@ def _notify_payment_created(payment, actor):
         title,
         message,
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_SUBMIT,
         actor=actor,
         color=_payment_notification_color(event='created'),
     )
+
+
+def _payment_status_change_category(to_status):
+    """زیردسته‌ی اعلان بر اساس نوع تغییر وضعیت: مرحله مالی یا بررسی تجاری."""
+    finance_side = {
+        PaymentRecord.STATUS_RETURNED_TO_COMMERCIAL,
+        PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+        PaymentRecord.STATUS_FINAL_APPROVED,
+    }
+    if to_status in finance_side:
+        return UserNotification.CATEGORY_PAYMENT_FINANCE
+    return UserNotification.CATEGORY_PAYMENT_REVIEW
 
 
 def _notify_payment_status_changed(payment, actor, from_status, to_status):
@@ -1981,7 +1996,7 @@ def _notify_payment_status_changed(payment, actor, from_status, to_status):
         'تغییر وضعیت فیش',
         f'وضعیت فیش #{payment.id} مشتری {customer_name} به «{status_text}» تغییر کرد.',
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=_payment_status_change_category(to_status),
         actor=actor,
         color=_payment_notification_color(to_status),
     )
@@ -1997,7 +2012,7 @@ def _notify_payment_void_initiated(payment, actor):
         f'سند #{payment.id} مشتری {customer_name} توسط بازرگانی برای ابطال عودت داده شد. '
         f'لطفاً ابتدا ثبت مالی را برگشت بزنید، سپس ابطال را تأیید کنید.',
         reverse('voided_payments_dashboard'),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_FINANCE,
         actor=actor,
         color='#DBEAFE',
     )
@@ -2007,7 +2022,7 @@ def _notify_payment_void_initiated(payment, actor):
             '🚫 درخواست ابطال فیش',
             f'درخواست ابطال برای فیش #{payment.id} شما ثبت شد.',
             reverse('payment_timeline', args=[payment.id]),
-            category=UserNotification.CATEGORY_PAYMENT,
+            category=UserNotification.CATEGORY_PAYMENT_FINANCE,
             actor=actor,
             color='#FECACA',
         )
@@ -2022,7 +2037,7 @@ def _notify_payment_void_confirmed(payment, actor):
         '🚫 ابطال نهایی سند',
         f'ابطال سند #{payment.id} مشتری {customer_name} توسط واحد مالی تأیید شد و سند باطل شد.',
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_FINANCE,
         actor=actor,
         color='#FECACA',
     )
@@ -2032,7 +2047,7 @@ def _notify_payment_void_confirmed(payment, actor):
             '🚫 ابطال فیش شما',
             f'فیش #{payment.id} شما باطل شد.',
             reverse('payment_timeline', args=[payment.id]),
-            category=UserNotification.CATEGORY_PAYMENT,
+            category=UserNotification.CATEGORY_PAYMENT_FINANCE,
             actor=actor,
             color='#FECACA',
         )
@@ -2046,7 +2061,7 @@ def _notify_payment_rejection_confirmed(payment, actor):
         '✅ تایید رد سند توسط مالی',
         f'رد سند #{payment.id} مشتری {customer_name} توسط واحد مالی تأیید شد.',
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_FINANCE,
         actor=actor,
         color='#FECACA',
     )
@@ -2060,7 +2075,7 @@ def _notify_payment_return_confirmed(payment, actor):
         '✅ تایید عودت به مالی',
         f'عودت سند #{payment.id} مشتری {customer_name} توسط واحد مالی تأیید شد.',
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_FINANCE,
         actor=actor,
         color='#DBEAFE',
     )
@@ -2077,7 +2092,7 @@ def _notify_payment_edited(payment, actor, title='ویرایش فیش واریز
         title,
         f'اطلاعات فیش #{payment.id} مشتری {customer_name} بروزرسانی شد.',
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_SUBMIT,
         actor=actor,
     )
 
@@ -2113,7 +2128,7 @@ def _notify_payment_customer_note(payment, actor, note_text):
         'یادداشت جدید مشتری روی فیش',
         f'{customer_name} یک توضیح جدید روی فیش واریزی ثبت کرد: «{note_text[:120]}»',
         reverse('payment_timeline', args=[payment.id]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_SUBMIT,
         actor=actor,
     )
 
@@ -3666,7 +3681,7 @@ def daily_payment_notices(request):
                         'گزارش فیش‌های واریزی',
                         target_notice.message,
                         reverse('submit'),
-                        category=UserNotification.CATEGORY_PAYMENT,
+                        category=UserNotification.CATEGORY_PAYMENT_FINANCE,
                         actor=request.user,
                     )
                     if is_confirmed_republish:
@@ -4337,7 +4352,7 @@ def finance_bulk_final_approve(request):
                 customer_name = f"{payment.first_name} {payment.last_name}".strip() or payment.user.username
                 _notify_users([payment.user], 'تأیید نهایی سند',
                               f'سند #{pid} مشتری {customer_name} تأیید نهایی شد.',
-                              reverse('submit'), category=UserNotification.CATEGORY_PAYMENT,
+                              reverse('submit'), category=UserNotification.CATEGORY_PAYMENT_FINANCE,
                               actor=request.user)
             approved += 1
         except (PaymentRecord.DoesNotExist, ValueError):
@@ -4423,7 +4438,7 @@ def delegate_final_approval(request, payment_id):
             [delegate_user],
             '📋 تفویض اختیار تأیید نهایی',
             f'اختیار تأیید نهایی سند #{payment_id} مشتری {customer_name} به شما تفویض شد.',
-            reverse('submit'), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+            reverse('submit'), category=UserNotification.CATEGORY_PAYMENT_FINANCE, actor=request.user,
         )
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
                       note=f'تفویض اختیار تأیید نهایی به {_display_name(delegate_user)}')
@@ -4464,7 +4479,7 @@ def finance_unified_action(request, payment_id):
                 list(_staff_notification_users({'finance_manager'})),
                 '✅ سند آماده تأیید نهایی',
                 f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد.',
-                reverse('pending_final_approval'), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+                reverse('pending_final_approval'), category=UserNotification.CATEGORY_PAYMENT_FINANCE, actor=request.user,
                 color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
             )
         messages.success(request, f'ثبت مالی سند #{payment_id} انجام شد.')
@@ -4581,7 +4596,7 @@ def finance_register_payment(request, payment_id):
             '✅ سند آماده تأیید نهایی',
             f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد و آماده تأیید نهایی است.',
             reverse('pending_final_approval'),
-            category=UserNotification.CATEGORY_PAYMENT,
+            category=UserNotification.CATEGORY_PAYMENT_FINANCE,
             actor=request.user,
             color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
         )
@@ -4619,7 +4634,7 @@ def finance_final_approve(request, payment_id):
         'تأیید نهایی سند',
         f'سند #{payment_id} مشتری {customer_name} توسط مدیر مالی تأیید نهایی شد.',
         reverse('submit'),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_FINANCE,
         actor=request.user,
     )
 
@@ -4797,7 +4812,7 @@ def request_admin_review(request, payment_id):
         '📨 درخواست بررسی مدیر',
         f'سند #{payment.id} مشتری {customer_name} توسط بازرگانی برای بررسی مدیر ارسال شد.',
         reverse('admin_review_queue'),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_PAYMENT_REVIEW,
         actor=request.user,
         color='#FEF3C7',
     )
@@ -4896,7 +4911,7 @@ def admin_edit_payment(request, payment_id):
                 '🛠 ویرایش توسط مدیر',
                 f'سند #{payment.id} مشتری {customer_name} توسط مدیر سیستم ویرایش شد.',
                 reverse('payment_timeline', args=[payment.id]),
-                category=UserNotification.CATEGORY_PAYMENT,
+                category=UserNotification.CATEGORY_PAYMENT_SUBMIT,
                 actor=request.user,
                 color='#FEF3C7',
             )
@@ -4907,7 +4922,7 @@ def admin_edit_payment(request, payment_id):
                     'بروزرسانی فیش',
                     f'اطلاعات فیش #{payment.id} شما بروزرسانی شد.',
                     reverse('payment_timeline', args=[payment.id]),
-                    category=UserNotification.CATEGORY_PAYMENT,
+                    category=UserNotification.CATEGORY_PAYMENT_SUBMIT,
                     actor=request.user,
                     color='#FEF3C7',
                 )
@@ -7399,7 +7414,7 @@ def counterparty_approve_payment(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '✅ تایید فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» تایید شد.' + (f' توضیح: {note}' if note else ''),
-        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=request.user,
         color=_payment_notification_color(event='counterparty_approved'),
     )
     messages.success(request, f'✅ فیش #{payment_id} با موفقیت تایید شد.')
@@ -7439,7 +7454,7 @@ def counterparty_return_payment_cp(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '⚠ عودت فیش از طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» عودت داده شد. دلیل: {note}',
-        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=request.user,
         color=_payment_notification_color(event='counterparty_returned'),
     )
     messages.warning(request, f'⚠ فیش #{payment_id} به بازرگانی عودت داده شد.')
@@ -7476,7 +7491,7 @@ def counterparty_reject_payment_cp(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '🚫 رد فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» رد/ابطال شد. دلیل: {note}',
-        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=request.user,
         color=_payment_notification_color(event='counterparty_rejected'),
     )
     messages.error(request, f'🚫 فیش #{payment_id} رد/ابطال شد.')

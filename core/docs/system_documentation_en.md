@@ -473,11 +473,14 @@ Reference colors:
 
 ### Categories and tabbed display
 
-`UserNotification.category` has seven values:
+`UserNotification.category` has the following values — the payment-receipt bucket is now split into three sub-categories:
 
 | Value | Label | Covers |
 | --- | --- | --- |
-| `payment` | Payment receipt | All payment-receipt workflow events (creation, status changes, final approval, return, void, admin edit, counterparty decisions) |
+| `payment_submit` | Payment: submit & edit | Customer submits a new receipt, customer edits a receipt, completing an incomplete receipt, new customer note, admin edit |
+| `payment_review` | Payment: review | Commercial-review status changes (temp approval, commercial approval, incomplete, rejected), admin-review request, counterparty decision (approve/return/reject) |
+| `payment_finance` | Payment: finance flow | Finance registration, return to commercial/finance, return confirmed, rejection confirmed by finance, void (request and confirmation), final approval, final-approval delegation, payment notice publication |
+| `payment` | Payment receipt (legacy) | Kept only for backward compatibility with pre-existing rows; no longer produced by current code |
 | `invoice` | Invoice & sales documents | Invoices, price lists, proformas (issuance and approval) |
 | `order` | Order | Order creation, status changes, sales-expert assignment, proforma issued for an order |
 | `warranty` | Warranty | All warranty-claim workflow events |
@@ -485,7 +488,9 @@ Reference colors:
 | `reconciliation` | Reconciliation | New message in a reconciliation thread |
 | `system` | System | Management actions not tied to one specific document — sales-customer assignment/transfer, final-approval delegation |
 
-> Previously everything except payment/invoice fell under one generic "system" bucket. This split was introduced specifically to enable tabbed filtering.
+> Previously everything except payment/invoice fell under one generic "system" bucket, and every payment-receipt event shared one single "payment" category. Both splits were introduced to enable more precise tabbed filtering.
+>
+> The `payment_submit` / `payment_review` / `payment_finance` split mirrors the commercial-stage vs. finance-stage split used throughout section 4.4: "submit" = the customer's or admin's action on the document itself, "review" = the commercial stage (including counterparty decisions), "finance flow" = anything the finance unit does, or that is a direct result of the commercial↔finance handoff.
 
 **Tabbed notification dropdown**: if a user's unread notifications span more than one category, a tab bar ("All" + the categories present) appears above the list; clicking a tab filters client-side (over the already-fetched batch — no extra server round-trip). If all of a user's unread notifications share one category, the tab bar is not shown at all.
 

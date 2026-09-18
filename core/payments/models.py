@@ -1191,6 +1191,9 @@ class SystemActivityLog(models.Model):
 
 class UserNotification(models.Model):
     CATEGORY_PAYMENT = 'payment'
+    CATEGORY_PAYMENT_SUBMIT = 'payment_submit'
+    CATEGORY_PAYMENT_REVIEW = 'payment_review'
+    CATEGORY_PAYMENT_FINANCE = 'payment_finance'
     CATEGORY_INVOICE = 'invoice'
     CATEGORY_ORDER = 'order'
     CATEGORY_WARRANTY = 'warranty'
@@ -1198,8 +1201,13 @@ class UserNotification(models.Model):
     CATEGORY_RECONCILIATION = 'reconciliation'
     CATEGORY_SYSTEM = 'system'
 
+    # دسته‌بندی «فیش واریزی» به سه زیرشاخه تقسیم شده تا در نوار تب اعلان‌ها
+    # قابل تفکیک باشد؛ CATEGORY_PAYMENT فقط برای سازگاری با رکوردهای قدیمی نگه داشته شده
     CATEGORY_CHOICES = [
-        (CATEGORY_PAYMENT, 'فیش واریزی'),
+        (CATEGORY_PAYMENT, 'فیش واریزی (قدیمی)'),
+        (CATEGORY_PAYMENT_SUBMIT, 'ثبت و ویرایش فیش'),
+        (CATEGORY_PAYMENT_REVIEW, 'بررسی فیش'),
+        (CATEGORY_PAYMENT_FINANCE, 'گردش مالی فیش'),
         (CATEGORY_INVOICE, 'فاکتور و اسناد فروش'),
         (CATEGORY_ORDER, 'سفارش'),
         (CATEGORY_WARRANTY, 'گارانتی'),
