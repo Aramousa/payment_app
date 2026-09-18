@@ -45,8 +45,6 @@
             </div>
         </div>
 
-        <button type="button" class="app-sb-reset-btn" id="sb-reset-btn" title="بازنشانی منوی کناری به حالت پیش‌فرض (در صورت بروز مشکل نمایش)">↺</button>
-
         <a class="message-envelope"
            href="{% url 'reconciliation_center' %}"
            title="پیام‌های مغایرت‌گیری"
@@ -99,9 +97,6 @@
         <div class="app-nav-mode-switch" id="sb-mode-switch" role="group" aria-label="حالت نمایش منو">
             <button type="button" class="app-nav-mode-btn" data-sb-mode="expanded" data-nav-hint="پین کردن منو" aria-label="پین کردن منو" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5c0 3.7 5 10.3 5 10.3S17 10.7 17 7a5 5 0 0 0-5-5Z"/><circle cx="12" cy="7" r="1.7"/></svg>
-            </button>
-            <button type="button" class="app-nav-mode-btn" data-sb-mode="collapsed" data-nav-hint="نمایش فقط آیکون‌ها" aria-label="نمایش فقط آیکون‌ها" aria-pressed="false">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9.5" y1="4" x2="9.5" y2="20"/></svg>
             </button>
             <button type="button" class="app-nav-mode-btn" data-sb-mode="autohide" data-nav-hint="پنهان خودکار؛ نمایش با حرکت موس" aria-label="پنهان‌سازی خودکار منو" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -274,8 +269,8 @@
 
     function showNavHint(target) {
         if (!window.matchMedia('(min-width: 761px)').matches) return;
-        var isModeControl = target.classList.contains('app-nav-mode-btn');
-        if (!isModeControl && !document.body.classList.contains('sb-mode-collapsed')) return;
+        // فقط برای دکمه‌های کنترلی حالت سایدبار (که همیشه آیکون‌محورند) نیاز به تولتیپ است
+        if (!target.classList.contains('app-nav-mode-btn')) return;
         var label = target.dataset.navHint;
         if (!label) return;
         var rect = target.getBoundingClientRect();
@@ -303,7 +298,7 @@
 
     // ─── حالت سایدبار: پین‌شده، جمع‌شده یا پنهان خودکار ───────
     (function () {
-        var SB_MODES = ['expanded', 'collapsed', 'autohide'];
+        var SB_MODES = ['expanded', 'autohide'];
         var SB_MODE_KEY = 'sbMode:' + (window._appUserId || '{{ request.user.id }}');
         var modeSwitch = document.getElementById('sb-mode-switch');
 
@@ -388,18 +383,6 @@
                 setOpen(false);
             }
         });
-
-        // دکمه‌ی بازیابی در هدر — عمداً مستقل از هر منطق دیگر سایدبار نوشته شده
-        // تا در صورت بروز هر مشکل نمایشی در حالت‌های جمع‌شده/پنهان، همیشه یک راه
-        // مطمئن برای بازگشت به حالت پیش‌فرض (فیکس/باز) وجود داشته باشد.
-        var resetBtn = document.getElementById('sb-reset-btn');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', function (event) {
-                event.stopPropagation();
-                try { localStorage.removeItem(SB_MODE_KEY); } catch (e) {}
-                applyMode('expanded');
-            });
-        }
     })();
 
     // ─── عرض سایدبار متناسب با طولانی‌ترین برچسب منو (بدون شکستن به دو خط) ───
@@ -463,30 +446,8 @@
         });
     });
     document.querySelectorAll('.app-nav-group').forEach(function(group) {
-        var groupSummary = group.querySelector('.sb-group-header');
-        var groupPanel = group.querySelector('.app-nav-group-panel');
-
-        function positionCollapsedFlyout() {
-            if (!groupSummary || !groupPanel ||
-                    !document.body.classList.contains('sb-mode-collapsed') ||
-                    !window.matchMedia('(min-width: 761px)').matches) return;
-            document.querySelectorAll('.app-nav-group[open]').forEach(function (other) {
-                if (other !== group) other.removeAttribute('open');
-            });
-            var rect = groupSummary.getBoundingClientRect();
-            groupPanel.style.setProperty('--sb-flyout-top', Math.max(8, rect.top) + 'px');
-            window.requestAnimationFrame(function () {
-                var panelHeight = groupPanel.offsetHeight;
-                var top = Math.max(8, Math.min(rect.top, window.innerHeight - panelHeight - 8));
-                groupPanel.style.setProperty('--sb-flyout-top', top + 'px');
-            });
-        }
-
-        group.addEventListener('pointerenter', positionCollapsedFlyout);
-        if (groupSummary) groupSummary.addEventListener('focus', positionCollapsedFlyout);
         group.addEventListener('toggle', function() {
             if (!group.open) return;
-            positionCollapsedFlyout();
             document.querySelectorAll('.app-nav-group[open]').forEach(function(other) {
                 if (other !== group) other.removeAttribute('open');
             });
