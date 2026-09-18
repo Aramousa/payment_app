@@ -299,8 +299,18 @@ iframe {
     flex-direction: column !important;
     gap: 5px !important;
     min-height: 0 !important;
+    overflow-x: hidden !important;
     overflow-y: auto !important;
     padding: 10px !important;
+    /* اسکرول در صورت نیاز کار می‌کند، اما هیچ نوار اسکرولی نمایش داده نمی‌شود */
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.app-shell-nav .app-nav-links::-webkit-scrollbar {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
 }
 
 .app-shell-nav .app-nav-direct,
@@ -432,79 +442,106 @@ iframe {
     -webkit-text-fill-color: #fff !important;
 }
 
-/* Sidebar mode switch (fixed / collapsed / auto-hide) — دسکتاپ */
+/* Sidebar mode switch (fixed / collapsed / auto-hide) — دسکتاپ، سوییچ شناور مدرن */
 .app-nav-mode-switch {
+    background: rgba(255, 255, 255, .05) !important;
+    border: 1px solid rgba(255, 255, 255, .08) !important;
+    border-radius: 12px !important;
     display: flex !important;
-    gap: 4px !important;
-    padding: 8px 10px 2px !important;
+    gap: 2px !important;
+    margin: 10px 10px 6px !important;
+    padding: 3px !important;
+    position: relative !important;
+}
+
+.app-nav-mode-indicator {
+    background: linear-gradient(135deg, var(--a-accent), var(--a-accent-hover)) !important;
+    border-radius: 9px !important;
+    bottom: 3px !important;
+    box-shadow: 0 3px 10px rgba(22, 135, 124, .45) !important;
+    left: 0 !important;
+    position: absolute !important;
+    top: 3px !important;
+    transition: transform .22s cubic-bezier(.4, 0, .2, 1), width .22s cubic-bezier(.4, 0, .2, 1) !important;
+    z-index: 0 !important;
 }
 
 .app-nav-mode-btn {
     align-items: center !important;
-    background: rgba(255, 255, 255, .06) !important;
-    border: 1px solid rgba(255, 255, 255, .12) !important;
-    border-radius: var(--a-radius) !important;
-    color: rgba(226, 232, 240, .75) !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 9px !important;
+    color: rgba(226, 232, 240, .5) !important;
     cursor: pointer !important;
     display: flex !important;
     flex: 1 1 0 !important;
-    font-size: 14px !important;
     height: 32px !important;
     justify-content: center !important;
     padding: 0 !important;
-    -webkit-text-fill-color: rgba(226, 232, 240, .75) !important;
+    position: relative !important;
+    transition: color .18s ease, transform .12s ease !important;
+    -webkit-text-fill-color: rgba(226, 232, 240, .5) !important;
+    z-index: 1 !important;
+}
+
+.app-nav-mode-btn svg {
+    display: block !important;
+    pointer-events: none !important;
 }
 
 .app-nav-mode-btn:hover {
-    background: rgba(255, 255, 255, .14) !important;
-    color: #fff !important;
-    -webkit-text-fill-color: #fff !important;
+    color: rgba(255, 255, 255, .92) !important;
+    -webkit-text-fill-color: rgba(255, 255, 255, .92) !important;
+}
+
+.app-nav-mode-btn:active {
+    transform: scale(.9) !important;
 }
 
 .app-nav-mode-btn.active {
-    background: var(--a-accent) !important;
-    border-color: var(--a-accent) !important;
     color: #fff !important;
     -webkit-text-fill-color: #fff !important;
 }
 
-/* حالت جمع‌شده (rail آیکون‌محور) — فقط دسکتاپ */
+/* حالت جمع‌شده (rail آیکون‌محور) — فقط دسکتاپ
+   نکته: تمام سلکتورهای این بخش عمداً با #app-sidebar / #sb-toggle (شناسه) نوشته
+   شده‌اند، نه با کلاس .app-shell-nav / .app-nav-toggle — چون در فایل قدیمی‌تر
+   app-ui.css ده‌ها قانون !important پراکنده روی همین کلاس‌ها از طراحی‌های قبلی
+   باقی مانده و specificity کلاس ممکن است همیشه برنده نشود. specificity شناسه
+   از هر ترکیب کلاسی در آن فایل بالاتر است، پس تضمین می‌کند این قوانین همیشه اعمال شوند. */
 @media (min-width: 761px) {
-    body.sb-mode-collapsed:has(.app-shell-nav) {
+    body.sb-mode-collapsed:has(#app-sidebar) {
         margin-right: var(--a-sidebar-w-collapsed) !important;
     }
 
-    body.sb-mode-collapsed .app-shell-nav {
+    body.sb-mode-collapsed #app-sidebar {
         overflow: visible !important;
+        transform: none !important;
         width: var(--a-sidebar-w-collapsed) !important;
     }
 
-    body.sb-mode-collapsed .app-shell-nav .app-nav-links {
+    body.sb-mode-collapsed #app-sidebar .app-nav-links {
         overflow-x: visible !important;
         overflow-y: auto !important;
     }
 
-    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-direct,
-    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-section > .sb-group-header {
+    body.sb-mode-collapsed #app-sidebar .app-nav-links > .app-nav-direct,
+    body.sb-mode-collapsed #app-sidebar .app-nav-links > .app-nav-section > .sb-group-header {
         justify-content: center !important;
         padding: 8px !important;
     }
 
-    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-direct .app-nav-text,
-    body.sb-mode-collapsed .app-shell-nav .app-nav-links > .app-nav-section > .sb-group-header .app-nav-text {
-        display: none !important;
-    }
-
-    body.sb-mode-collapsed .app-shell-nav .app-nav-mode-switch .app-nav-mode-label {
+    body.sb-mode-collapsed #app-sidebar .app-nav-links > .app-nav-direct .app-nav-text,
+    body.sb-mode-collapsed #app-sidebar .app-nav-links > .app-nav-section > .sb-group-header .app-nav-text {
         display: none !important;
     }
 
     /* زیرمنوهای گروه در حالت جمع‌شده به‌صورت flyout کنار آیکون باز می‌شوند */
-    body.sb-mode-collapsed .app-shell-nav .app-nav-section {
+    body.sb-mode-collapsed #app-sidebar .app-nav-section {
         position: relative !important;
     }
 
-    body.sb-mode-collapsed .app-shell-nav .app-nav-group-panel {
+    body.sb-mode-collapsed #app-sidebar .app-nav-group-panel {
         background: #172033 !important;
         box-shadow: var(--a-shadow) !important;
         display: none !important;
@@ -516,33 +553,52 @@ iframe {
         z-index: 1000 !important;
     }
 
-    body.sb-mode-collapsed .app-shell-nav .app-nav-section:hover .app-nav-group-panel,
-    body.sb-mode-collapsed .app-shell-nav .app-nav-section[open] .app-nav-group-panel {
+    body.sb-mode-collapsed #app-sidebar .app-nav-section:hover .app-nav-group-panel,
+    body.sb-mode-collapsed #app-sidebar .app-nav-section[open] .app-nav-group-panel {
         display: grid !important;
     }
 
-    /* حالت پنهان خودکار — سایدبار overlay، بدون اشغال فضای صفحه */
-    body.sb-mode-autohide:has(.app-shell-nav) {
+    /* حالت پنهان خودکار — سایدبار overlay، بدون اشغال فضای صفحه.
+       همیشه یک نوار ۱۶ پیکسلی از لبه سایدبار پیدا/قابل‌هاور می‌ماند (هرگز ۱۰۰٪ ناپدید نمی‌شود)
+       تا حتی اگر کاربر دکمه‌ی toggle را هم پیدا نکند، امکان بازیابی منو همیشه وجود داشته باشد. */
+    body.sb-mode-autohide:has(#app-sidebar) {
         margin-right: 0 !important;
     }
 
-    body.sb-mode-autohide .app-shell-nav {
-        transform: translateX(105%) !important;
+    body.sb-mode-autohide #app-sidebar {
+        transform: translateX(calc(100% - 16px)) !important;
         width: var(--a-sidebar-w) !important;
+        z-index: 899 !important;
     }
 
-    body.sb-mode-autohide .app-shell-nav.open,
-    body.sb-mode-autohide .app-shell-nav:hover,
-    body.sb-mode-autohide .app-shell-nav:focus-within {
+    body.sb-mode-autohide #app-sidebar::before {
+        background: var(--a-accent) !important;
+        border-radius: 4px !important;
+        content: '' !important;
+        height: 64px !important;
+        left: 6px !important;
+        opacity: .9 !important;
+        position: absolute !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        width: 4px !important;
+    }
+
+    body.sb-mode-autohide #app-sidebar.open,
+    body.sb-mode-autohide #app-sidebar:hover,
+    body.sb-mode-autohide #app-sidebar:focus-within {
         transform: translateX(0) !important;
     }
 
-    body.sb-mode-autohide .app-nav-toggle {
+    body.sb-mode-autohide #sb-toggle {
         display: inline-flex !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
         position: fixed !important;
         right: 12px !important;
         top: calc(var(--a-header-h) + 10px) !important;
         visibility: visible !important;
+        z-index: 9999 !important;
     }
 }
 

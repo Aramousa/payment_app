@@ -1199,6 +1199,69 @@ class SystemActivityLog(models.Model):
         return f"{self.get_action_display()} - {target}"
 
 
+class BackupAccessCode(models.Model):
+    """
+    رمز موقت دسترسی به منوی پشتیبان‌گیری/بازگردانی — فقط از پنل /admin/ (نه از
+    خود اپلیکیشن) قابل تولید است. یک لایه دفاعی اضافه روی عملیات مخرب restore:
+    داشتن نقش مدیر سیستم به‌تنهایی کافی نیست، باید کد معتبر را هم از پنل ادمین
+    گرفته و در منوی برنامه وارد کرد. هر کد فقط یک‌بار مصرف و کوتاه‌مدت است.
+    """
+    CODE_LENGTH = 8
+    DEFAULT_VALIDITY_MINUTES = 15
+
+    code = models.CharField('کد دسترسی', max_length=16, unique=True, blank=True)
+    generated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+        verbose_name='تولیدشده توسط',
+    )
+    generated_at = models.DateTimeField('زمان تولید', auto_now_add=True)
+    expires_at = models.DateTimeField('زمان انقضا', blank=True, null=True)
+    used_at = models.DateTimeField('زمان استفاده', blank=True, null=True)
+    used_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+        verbose_name='استفاده‌شده توسط',
+    )
+
+    class Meta:
+        ordering = ['-generated_at', '-id']
+        verbose_name = 'کد دسترسی پشتیبان‌گیری'
+        verbose_name_plural = 'کدهای دسترسی پشتیبان‌گیری'
+
+    def __str__(self):
+        return f'{self.code} ({self.generated_at:%Y-%m-%d %H:%M})' if self.code else f'#{self.pk}'
+
+    @staticmethod
+    def _generate_code():
+        import secrets
+        import string
+        alphabet = string.ascii_uppercase + string.digits
+        return ''.join(secrets.choice(alphabet) for _ in range(BackupAccessCode.CODE_LENGTH))
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            code = self._generate_code()
+            while BackupAccessCode.objects.filter(code=code).exists():
+                code = self._generate_code()
+            self.code = code
+        if not self.expires_at:
+            from django.utils import timezone as _tz
+            from datetime import timedelta
+            self.expires_at = _tz.now() + timedelta(minutes=self.DEFAULT_VALIDITY_MINUTES)
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        from django.utils import timezone as _tz
+        return self.used_at is None and self.expires_at is not None and _tz.now() < self.expires_at
+
+    def status_label(self):
+        if self.used_at:
+            return 'استفاده‌شده'
+        from django.utils import timezone as _tz
+        if self.expires_at and _tz.now() >= self.expires_at:
+            return 'منقضی'
+        return 'معتبر'
+
+
 class UserNotification(models.Model):
     CATEGORY_PAYMENT = 'payment'
     CATEGORY_PAYMENT_SUBMIT = 'payment_submit'

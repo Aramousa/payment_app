@@ -38,7 +38,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentNoticeForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import AgencyApplication, AgencyApplicationLog, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import AgencyApplication, AgencyApplicationLog, BackupAccessCode, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 import os
 
 
@@ -5498,12 +5498,43 @@ def system_logo_settings(request):
 
 
 RESTORE_CONFIRM_PHRASE = 'RESTORE'
+BACKUP_ACCESS_SESSION_KEY = 'backup_access_ok'
+
+
+def _backup_access_granted(request):
+    return bool(request.session.get(BACKUP_ACCESS_SESSION_KEY))
 
 
 @login_required
 def system_backup_page(request):
+    """
+    منوی پشتیبان‌گیری/بازگردانی یک لایه دفاعی اضافه دارد: صرف داشتن نقش مدیر سیستم
+    کافی نیست — باید یک کد موقت یک‌بارمصرف را هم که فقط از پنل /admin/ قابل تولید
+    است وارد کرد. این کد در نشست (session) فعلی ذخیره می‌شود تا نیازی به وارد کردن
+    مکرر آن در هر بازدید نباشد؛ با خروج از سامانه یا دکمه «قفل مجدد» باطل می‌شود.
+    """
     if not request.user.is_superuser:
         return HttpResponseForbidden('این بخش فقط برای مدیر سیستم است.')
+
+    if request.method == 'POST' and request.POST.get('form_name') == 'relock':
+        request.session.pop(BACKUP_ACCESS_SESSION_KEY, None)
+        messages.info(request, 'دسترسی به بخش پشتیبان‌گیری قفل شد.')
+        return redirect('system_backup_page')
+
+    if not _backup_access_granted(request):
+        if request.method == 'POST' and request.POST.get('form_name') == 'unlock':
+            entered = (request.POST.get('access_code') or '').strip().upper()
+            code_obj = BackupAccessCode.objects.filter(code=entered).first() if entered else None
+            if code_obj and code_obj.is_valid():
+                code_obj.used_at = timezone.now()
+                code_obj.used_by = request.user
+                code_obj.save(update_fields=['used_at', 'used_by'])
+                request.session[BACKUP_ACCESS_SESSION_KEY] = True
+                messages.success(request, 'دسترسی به بخش پشتیبان‌گیری باز شد.')
+                return redirect('system_backup_page')
+            messages.error(request, 'کد وارد شده نامعتبر، منقضی یا قبلاً استفاده شده است.')
+        return render(request, 'payments/system_backup_lock.html', {'is_staff_user': True})
+
     recent_logs = SystemActivityLog.objects.filter(
         action__in=[
             SystemActivityLog.ACTION_BACKUP_CREATED,
@@ -5526,6 +5557,8 @@ def system_backup_download(request):
     """تهیه نسخه پشتیبان کامل (پایگاه‌داده + media) و دانلود مستقیم آن — بدون باقی ماندن نسخه‌ای روی سرور."""
     if not request.user.is_superuser:
         return HttpResponseForbidden('این بخش فقط برای مدیر سیستم است.')
+    if not _backup_access_granted(request):
+        return HttpResponseForbidden('ابتدا باید کد دسترسی موقت را در صفحه پشتیبان‌گیری وارد کنید.')
 
     import tempfile
 
@@ -5596,6 +5629,8 @@ def system_backup_restore(request):
     """
     if not request.user.is_superuser:
         return HttpResponseForbidden('این بخش فقط برای مدیر سیستم است.')
+    if not _backup_access_granted(request):
+        return HttpResponseForbidden('ابتدا باید کد دسترسی موقت را در صفحه پشتیبان‌گیری وارد کنید.')
 
     import tempfile
 

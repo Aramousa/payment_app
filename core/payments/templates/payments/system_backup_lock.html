@@ -1,0 +1,51 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>ورود به بخش پشتیبان‌گیری</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v22">
+    <style>
+        body { font-family: Vazir, sans-serif; background: #f3f6fb; margin: 0; }
+        .lock-page { max-width: 460px; margin: 40px auto; padding: 20px; }
+        .lock-panel { background: #fff; border: 1px solid #dce5f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(15,23,42,.08); padding: 26px; text-align: center; }
+        .lock-icon { font-size: 40px; margin-bottom: 10px; }
+        .lock-title { font-size: 18px; margin: 0 0 8px; }
+        .lock-sub { color: #5b6b84; font-size: 13px; line-height: 1.9; margin: 0 0 18px; }
+        .lock-form { display: grid; gap: 12px; text-align: right; }
+        .lock-form label { font-weight: 900; font-size: 13px; }
+        .lock-form input { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; font-family: Vazir, sans-serif; text-align: center; letter-spacing: 3px; font-weight: 900; }
+        .lock-submit { border: 0; border-radius: 8px; cursor: pointer; background: #1e3a5f; color: #fff; font-family: Vazir, sans-serif; font-weight: 900; min-height: 42px; padding: 9px 18px; }
+        .lock-hint { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 8px; color: #24344d; font-size: 12px; line-height: 1.9; margin-top: 16px; padding: 10px 12px; text-align: right; }
+    </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v22">
+</head>
+<body>
+{% include 'payments/partials/app_navigation.html' %}
+<main class="lock-page">
+    <section class="lock-panel">
+        <div class="lock-icon">🔐</div>
+        <h1 class="lock-title">دسترسی به این بخش قفل است</h1>
+        <p class="lock-sub">
+            برای ورود به منوی پشتیبان‌گیری و بازگردانی، یک کد موقت لازم است که فقط از پنل مدیریت
+            (<code dir="ltr">/admin/</code>) قابل تولید است.
+        </p>
+        <form class="lock-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="form_name" value="unlock">
+            <div>
+                <label for="access_code">کد دسترسی موقت</label>
+                <input type="text" name="access_code" id="access_code" maxlength="16" autocomplete="off" required autofocus dir="ltr" placeholder="XXXXXXXX">
+            </div>
+            <button type="submit" class="lock-submit">ورود</button>
+        </form>
+        <div class="lock-hint">
+            برای دریافت کد: وارد <code dir="ltr">/admin/</code> شوید → بخش «کدهای دسترسی پشتیبان‌گیری» → «افزودن» را بزنید (نیازی به وارد کردن چیزی نیست) →
+            کد تولیدشده را اینجا وارد کنید. هر کد فقط یک‌بار و حداکثر تا ۱۵ دقیقه معتبر است.
+        </div>
+    </section>
+</main>
+</body>
+</html>

@@ -1079,7 +1079,17 @@ Daily notices:
 
 ## 23. System Backup & Restore
 
-Reachable from the main dashboard menu (superuser only) → "System Backup" (`/admin-tools/backup/`).
+Reachable from the sidebar menu ("System operations" group, superuser only) → "Backup & Restore" (`/admin-tools/backup/`).
+
+### Extra defense layer: temporary access code (`BackupAccessCode`)
+
+Holding the superuser role alone is not enough to enter this menu. A one-time temporary code is also required, and it can **only be generated from Django's raw admin panel (`/admin/`)**, not from the app itself:
+
+1. The superuser logs into `/admin/` → "Backup Access Codes" (`BackupAccessCode`) → clicks "Add"; the form is empty — just "Save" is needed to generate a random 8-character code (valid for up to 15 minutes, single use).
+2. In the app, `/admin-tools/backup/` shows only a simple code-entry form (`payments/system_backup_lock.html`) until a valid code is submitted — never the real backup content.
+3. Entering the correct code immediately marks it "used" (`used_at`/`used_by`), so it can never be reused, and unlocks access for the **current session** (`backup_access_ok` session flag).
+4. Logging out, or clicking "Lock this section again" on the page itself, revokes the session's access — a fresh code is then required.
+5. All three endpoints (page, download, restore) enforce this check independently — even a direct POST to the download/restore endpoints is rejected with 403 without a valid code having been consumed in that same session.
 
 ### Creating a backup (`system_backup_download`)
 

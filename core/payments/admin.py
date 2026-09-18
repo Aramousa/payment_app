@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import BackupAccessCode, Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 
 
 def format_jalali_datetime(value):
@@ -797,6 +797,59 @@ class SystemActivityLogAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+@admin.register(BackupAccessCode)
+class BackupAccessCodeAdmin(admin.ModelAdmin):
+    """
+    تولید کد موقت برای باز کردن منوی پشتیبان‌گیری/بازگردانی در خود برنامه.
+    فقط اینجا (پنل /admin/) قابل تولید است — برای «افزودن» چیزی لازم نیست
+    وارد شود، فقط دکمه «ذخیره» را بزنید تا یک کد تازه ساخته شود.
+    """
+    list_display = ('code', 'status_badge', 'generated_by', 'jalali_generated_at', 'jalali_expires_at', 'used_by', 'jalali_used_at')
+    list_filter = ('generated_at',)
+    search_fields = ('code', 'generated_by__username', 'used_by__username')
+    readonly_fields = ('code', 'generated_by', 'generated_at', 'expires_at', 'used_at', 'used_by')
+    fields = ()
+
+    def status_badge(self, obj):
+        from django.utils.html import format_html
+        label = obj.status_label()
+        colors = {'معتبر': '#16a34a', 'استفاده‌شده': '#64748b', 'منقضی': '#dc2626'}
+        return format_html('<strong style="color:{};">{}</strong>', colors.get(label, '#64748b'), label)
+    status_badge.short_description = 'وضعیت'
+
+    def jalali_generated_at(self, obj):
+        return format_jalali_datetime(obj.generated_at)
+    jalali_generated_at.short_description = 'زمان تولید'
+
+    def jalali_expires_at(self, obj):
+        return format_jalali_datetime(obj.expires_at)
+    jalali_expires_at.short_description = 'زمان انقضا'
+
+    def jalali_used_at(self, obj):
+        return format_jalali_datetime(obj.used_at) if obj.used_at else '-'
+    jalali_used_at.short_description = 'زمان استفاده'
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.generated_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
 
     def has_change_permission(self, request, obj=None):
         return False

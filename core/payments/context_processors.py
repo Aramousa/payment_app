@@ -323,6 +323,7 @@ def app_navigation(request):
                 _nav_item('مدیریت کاربران', 'users_manage', 'users', 'system', '👤'),
                 _nav_item('تنظیم لوگو', 'system_logo_settings', 'system_logo_settings', 'system', '🖼'),
                 _nav_item('تست خوانش فیش', 'receipt_reader_test', 'receipt_reader', 'system', '🔍'),
+                _nav_item('پشتیبان‌گیری و بازگردانی', 'system_backup_page', 'system_backup', 'system', '📦'),
             ])
         elif not user.is_superuser and is_staff_user:
             items.append(_nav_item('تایید مشخصات', 'users_manage', 'profile_changes', 'system', '✅'))

@@ -95,9 +95,16 @@
 <nav class="app-shell-nav" id="app-sidebar" aria-label="منوی اصلی">
     <div class="app-nav-panel">
         <div class="app-nav-mode-switch" id="sb-mode-switch" role="group" aria-label="حالت نمایش منو">
-            <button type="button" class="app-nav-mode-btn" data-sb-mode="expanded" title="فیکس (همیشه باز)" aria-label="فیکس کردن منو">📌</button>
-            <button type="button" class="app-nav-mode-btn" data-sb-mode="collapsed" title="جمع‌شده (فقط آیکون)" aria-label="جمع کردن منو">⇤</button>
-            <button type="button" class="app-nav-mode-btn" data-sb-mode="autohide" title="پنهان خودکار (نمایش با نگه‌داشتن ماوس)" aria-label="پنهان‌سازی خودکار منو">👁</button>
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="expanded" title="فیکس (همیشه باز)" aria-label="فیکس کردن منو">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5c0 3.7 5 10.3 5 10.3S17 10.7 17 7a5 5 0 0 0-5-5Z"/><circle cx="12" cy="7" r="1.7"/></svg>
+            </button>
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="collapsed" title="جمع‌شده (فقط آیکون)" aria-label="جمع کردن منو">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9.5" y1="4" x2="9.5" y2="20"/></svg>
+            </button>
+            <button type="button" class="app-nav-mode-btn" data-sb-mode="autohide" title="پنهان خودکار (نمایش با نگه‌داشتن ماوس)" aria-label="پنهان‌سازی خودکار منو">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <span class="app-nav-mode-indicator" aria-hidden="true"></span>
         </div>
         <div class="app-nav-links">
             {% for group in app_nav_groups %}
@@ -268,6 +275,16 @@
             }
         }
 
+        function positionIndicator(mode) {
+            if (!modeSwitch) return;
+            var indicator = modeSwitch.querySelector('.app-nav-mode-indicator');
+            var activeBtn = modeSwitch.querySelector('.app-nav-mode-btn[data-sb-mode="' + mode + '"]');
+            if (!indicator || !activeBtn) return;
+            // با offsetLeft/offsetWidth واقعی موقعیت می‌گیرد تا در چیدمان RTL هم درست باشد
+            indicator.style.width = activeBtn.offsetWidth + 'px';
+            indicator.style.transform = 'translateX(' + activeBtn.offsetLeft + 'px)';
+        }
+
         function applyMode(mode) {
             if (SB_MODES.indexOf(mode) === -1) mode = 'expanded';
             document.body.classList.remove('sb-mode-expanded', 'sb-mode-collapsed', 'sb-mode-autohide');
@@ -276,6 +293,7 @@
                 modeSwitch.querySelectorAll('.app-nav-mode-btn').forEach(function (btn) {
                     btn.classList.toggle('active', btn.dataset.sbMode === mode);
                 });
+                positionIndicator(mode);
             }
             // با تغییر حالت، هر flyout/باز بودن قبلی سایدبار موبایل و آکاردئون‌های گروه هم بسته شود
             setOpen(false);
@@ -290,6 +308,8 @@
         }
 
         applyMode(getStoredMode());
+        // موقعیت اولیه indicator را یک فریم بعد هم دوباره تنظیم کن (اطمینان از layout نهایی)
+        window.requestAnimationFrame(function () { positionIndicator(getStoredMode()); });
 
         if (modeSwitch) {
             modeSwitch.addEventListener('click', function (event) {
@@ -297,6 +317,11 @@
                 if (!btn) return;
                 event.stopPropagation();
                 setMode(btn.dataset.sbMode);
+            });
+            var modeResizeTimer = null;
+            window.addEventListener('resize', function () {
+                clearTimeout(modeResizeTimer);
+                modeResizeTimer = setTimeout(function () { positionIndicator(getStoredMode()); }, 150);
             });
         }
 
@@ -324,16 +349,24 @@
                 if (w > maxTextWidth) maxTextWidth = w;
             });
             // آیکون + گپ + پدینگ لینک + پدینگ داخلی پنل + حاشیه اطمینان
-            var extra = 28 + 8 + 20 + 20 + 14;
+            var extra = 28 + 8 + 20 + 20 + 18;
             var total = Math.ceil(maxTextWidth + extra);
-            var MIN_W = 200, MAX_W = 320;
-            total = Math.max(MIN_W, Math.min(MAX_W, total));
+            var MIN_W = 200;
+            // بدون سقف ثابت: هیچ لیبلی نباید با ... کوتاه شود. فقط یک سقف نسبی به
+            // عرض صفحه به‌عنوان آخرین خط دفاعی در برابر صفحه‌نمایش‌های بسیار باریک وجود دارد
+            var VIEWPORT_CAP = Math.round(window.innerWidth * 0.5);
+            total = Math.max(MIN_W, Math.min(total, VIEWPORT_CAP));
             document.documentElement.style.setProperty('--a-sidebar-w', total + 'px');
         }
         computeSidebarWidth();
         if (document.fonts && document.fonts.ready) {
             document.fonts.ready.then(computeSidebarWidth).catch(function () {});
         }
+        var resizeTimer = null;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(computeSidebarWidth, 150);
+        });
     })();
 
     sidebar.addEventListener('click', function(event) {
