@@ -12,6 +12,26 @@
     <link href="{% static 'mfa/css/bootstrap-toggle.min.css' %}" rel="stylesheet">
     <script src="{% static 'mfa/js/bootstrap-toggle.min.js' %}"></script>
     <script>
+    /* جایگزینی امن toggleKey کتابخانه mfa.js: نسخه اصلی با GET و بدون CSRF
+       فراخوانی می‌شود (آسیب‌پذیر CSRF). این تابع سراسری را بازنویسی می‌کند تا
+       با POST + توکن CSRF به core/urls.py:mfa_toggle_key_secure درخواست بزند. */
+    function toggleKey(id) {
+        const toggle_key = JSON.parse(document.getElementById('toggle_key').textContent);
+        const csrf_token = JSON.parse(document.getElementById('csrf_token').textContent);
+        $.ajax({
+            url: toggle_key,
+            method: "POST",
+            data: {"id": id, "csrfmiddlewaretoken": csrf_token},
+            success: function (data) {
+                if (data == "Error")
+                    $("#toggle_" + id).bootstrapToggle("toggle");
+            },
+            error: function () {
+                $("#toggle_" + id).bootstrapToggle("toggle");
+            }
+        });
+    }
+
     /* ترجمه پیام‌های حذف دستگاه/کلید */
     function deleteKey(id, name) {
         $("#modal-title").html("تأیید حذف");

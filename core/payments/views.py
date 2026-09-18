@@ -3,6 +3,7 @@ import logging
 import mimetypes
 import random
 import re
+import shutil
 import uuid
 from difflib import SequenceMatcher
 from openpyxl import Workbook
@@ -5496,6 +5497,186 @@ def system_logo_settings(request):
     })
 
 
+RESTORE_CONFIRM_PHRASE = 'RESTORE'
+
+
+@login_required
+def system_backup_page(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('این بخش فقط برای مدیر سیستم است.')
+    recent_logs = SystemActivityLog.objects.filter(
+        action__in=[
+            SystemActivityLog.ACTION_BACKUP_CREATED,
+            SystemActivityLog.ACTION_BACKUP_FAILED,
+            SystemActivityLog.ACTION_RESTORE_STARTED,
+            SystemActivityLog.ACTION_RESTORE_SUCCEEDED,
+            SystemActivityLog.ACTION_RESTORE_FAILED,
+        ],
+    ).select_related('actor').order_by('-created_at')[:20]
+    return render(request, 'payments/system_backup.html', {
+        'is_staff_user': True,
+        'recent_logs': recent_logs,
+        'restore_confirm_phrase': RESTORE_CONFIRM_PHRASE,
+    })
+
+
+@login_required
+@require_POST
+def system_backup_download(request):
+    """تهیه نسخه پشتیبان کامل (پایگاه‌داده + media) و دانلود مستقیم آن — بدون باقی ماندن نسخه‌ای روی سرور."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('این بخش فقط برای مدیر سیستم است.')
+
+    import tempfile
+
+    from . import backup as backup_lib
+
+    passphrase = request.POST.get('passphrase') or ''
+    passphrase_confirm = request.POST.get('passphrase_confirm') or ''
+    if len(passphrase) < 8:
+        messages.error(request, 'رمز عبور فایل پشتیبان باید حداقل ۸ کاراکتر باشد.')
+        return redirect('system_backup_page')
+    if passphrase != passphrase_confirm:
+        messages.error(request, 'رمز عبور و تکرار آن یکسان نیستند.')
+        return redirect('system_backup_page')
+
+    tmp_dir = tempfile.mkdtemp(prefix='visiun_backup_out_')
+    zip_path = os.path.join(tmp_dir, 'backup.zip')
+    enc_path = os.path.join(tmp_dir, 'backup.visiunbackup')
+    try:
+        backup_lib.create_backup_zip(zip_path)
+        backup_lib.encrypt_file(zip_path, enc_path, passphrase)
+    except backup_lib.BackupError as e:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        SystemActivityLog.objects.create(
+            actor=request.user, action=SystemActivityLog.ACTION_BACKUP_FAILED,
+            description=str(e)[:2000],
+        )
+        messages.error(request, f'تهیه نسخه پشتیبان ناموفق بود: {e}')
+        return redirect('system_backup_page')
+    except Exception:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        logger.exception('خطای غیرمنتظره در تهیه نسخه پشتیبان')
+        SystemActivityLog.objects.create(
+            actor=request.user, action=SystemActivityLog.ACTION_BACKUP_FAILED,
+            description='خطای غیرمنتظره — جزئیات در لاگ سرور.',
+        )
+        messages.error(request, 'خطای غیرمنتظره در تهیه نسخه پشتیبان رخ داد. لاگ سرور را بررسی کنید.')
+        return redirect('system_backup_page')
+    finally:
+        # نسخه رمزنگاری‌نشده هرگز نباید بیشتر از لازم روی دیسک بماند
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+
+    file_size = os.path.getsize(enc_path)
+    SystemActivityLog.objects.create(
+        actor=request.user, action=SystemActivityLog.ACTION_BACKUP_CREATED,
+        description=f'نسخه پشتیبان رمزنگاری‌شده تهیه و دانلود شد ({file_size:,} بایت).',
+    )
+
+    filename = f'visiun-backup-{timezone.now().strftime("%Y%m%d-%H%M%S")}.visiunbackup'
+    file_handle = open(enc_path, 'rb')
+    response = FileResponse(file_handle, as_attachment=True, filename=filename)
+    response['Content-Length'] = str(file_size)
+
+    def _cleanup_tmp_dir():
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    response._resource_closers.append(_cleanup_tmp_dir)
+    return response
+
+
+@login_required
+@require_POST
+def system_backup_restore(request):
+    """
+    بازگردانی نسخه پشتیبان روی سرور — پرخطرترین عملیات سامانه.
+    ترتیب ایمنی: رمزگشایی و اعتبارسنجی قبل از قفل → فعال‌سازی قفل نگهداری →
+    pg_restore با تراکنش یکپارچه (اتمیک) → جایگزینی media فقط در صورت موفقیت DB.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('این بخش فقط برای مدیر سیستم است.')
+
+    import tempfile
+
+    from . import backup as backup_lib
+
+    confirm_text = (request.POST.get('confirm_text') or '').strip()
+    passphrase = request.POST.get('passphrase') or ''
+    uploaded = request.FILES.get('backup_file')
+
+    if confirm_text != RESTORE_CONFIRM_PHRASE:
+        messages.error(request, f'برای تایید بازگردانی باید عبارت «{RESTORE_CONFIRM_PHRASE}» را دقیقاً تایپ کنید.')
+        return redirect('system_backup_page')
+    if not uploaded:
+        messages.error(request, 'فایل پشتیبان انتخاب نشده است.')
+        return redirect('system_backup_page')
+    if not passphrase:
+        messages.error(request, 'رمز عبور فایل پشتیبان را وارد کنید.')
+        return redirect('system_backup_page')
+
+    tmp_dir = tempfile.mkdtemp(prefix='visiun_restore_in_')
+    enc_path = os.path.join(tmp_dir, 'uploaded.visiunbackup')
+    zip_path = os.path.join(tmp_dir, 'decrypted.zip')
+    lock_path = settings.MAINTENANCE_LOCK_FILE
+    lock_activated = False
+
+    try:
+        with open(enc_path, 'wb') as out:
+            for chunk in uploaded.chunks():
+                out.write(chunk)
+
+        # رمزگشایی و اعتبارسنجی ساختار — قبل از قفل، تا رمز غلط/فایل خراب سیستم را قفل نکند
+        backup_lib.decrypt_file(enc_path, zip_path, passphrase)
+        manifest = backup_lib.validate_backup_zip(zip_path)
+
+        SystemActivityLog.objects.create(
+            actor=request.user, action=SystemActivityLog.ACTION_RESTORE_STARTED,
+            description=f'بازگردانی نسخه پشتیبان آغاز شد (تاریخ تهیه: {manifest.get("created_at")}).',
+        )
+
+        with open(lock_path, 'w') as lf:
+            lf.write(timezone.now().isoformat())
+        lock_activated = True
+
+        backup_lib.apply_restore(zip_path)
+
+        from django.db import connections
+        connections.close_all()
+
+    except backup_lib.BackupError as e:
+        SystemActivityLog.objects.create(
+            actor=request.user, action=SystemActivityLog.ACTION_RESTORE_FAILED,
+            description=str(e)[:2000],
+        )
+        messages.error(request, f'بازگردانی ناموفق بود: {e}')
+        return redirect('system_backup_page')
+    except Exception as e:
+        logger.exception('خطای غیرمنتظره در بازگردانی نسخه پشتیبان')
+        SystemActivityLog.objects.create(
+            actor=request.user, action=SystemActivityLog.ACTION_RESTORE_FAILED,
+            description=f'خطای غیرمنتظره: {e}'[:2000],
+        )
+        messages.error(request, 'خطای غیرمنتظره در بازگردانی رخ داد. لاگ سرور را بررسی کنید.')
+        return redirect('system_backup_page')
+    finally:
+        if lock_activated and os.path.exists(lock_path):
+            os.remove(lock_path)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    SystemActivityLog.objects.create(
+        actor=request.user, action=SystemActivityLog.ACTION_RESTORE_SUCCEEDED,
+        description=f'بازگردانی با موفقیت انجام شد (نسخه پشتیبان مربوط به {manifest.get("created_at")}).',
+    )
+    auth_logout(request)
+    messages.success(
+        request,
+        'بازگردانی نسخه پشتیبان با موفقیت انجام شد. به‌دلیل جایگزینی کامل داده‌ها، '
+        'تمام کاربران (از جمله شما) باید مجدداً وارد سامانه شوند.',
+    )
+    return redirect('login')
+
+
 @login_required
 def reconciliation_center(request):
     if not _can_access_reconciliation(request.user):
@@ -8320,6 +8501,32 @@ def reset_user_password(request, user_id):
         'temp_password': temp_password,
         'message': message,
     })
+
+
+@login_required
+@require_POST
+def mfa_toggle_key_secure(request):
+    """
+    جایگزین امن `toggleKey` کتابخانه django-mfa2.
+    نسخه اصلی کتابخانه (mfa/views.py) این عملیات را با GET و بدون بررسی CSRF انجام می‌دهد —
+    یعنی یک لینک/تصویر جعلی در هر صفحه‌ای می‌تواند MFA کاربر واردشده را بی‌اطلاع او غیرفعال کند.
+    این view در core/urls.py با همان نام URL ('toggle_key') و مسیر جایگزین شده تا فقط POST
+    (که میان‌افزار CSRF پیش‌فرض جنگو آن را محافظت می‌کند) پذیرفته شود.
+    """
+    from mfa.models import User_Keys
+
+    key_id = request.POST.get('id')
+    if not key_id:
+        return HttpResponse('Error')
+    q = User_Keys.objects.filter(username=request.user.username, id=key_id)
+    if q.count() != 1:
+        return HttpResponse('Error')
+    key = q[0]
+    if key.key_type in settings.MFA_HIDE_DISABLE:
+        return HttpResponse('Error')
+    key.enabled = not key.enabled
+    key.save()
+    return HttpResponse('OK')
 
 
 # ─── SMS OTP MFA ─────────────────────────────────────────────────────────────

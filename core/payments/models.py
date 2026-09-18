@@ -1165,12 +1165,22 @@ class SystemActivityLog(models.Model):
     ACTION_USER_UPDATED = 'user_updated'
     ACTION_PASSWORD_RESET = 'password_reset'
     ACTION_PROFILE_UPDATED = 'profile_updated'
+    ACTION_BACKUP_CREATED = 'backup_created'
+    ACTION_BACKUP_FAILED = 'backup_failed'
+    ACTION_RESTORE_STARTED = 'restore_started'
+    ACTION_RESTORE_SUCCEEDED = 'restore_succeeded'
+    ACTION_RESTORE_FAILED = 'restore_failed'
 
     ACTION_CHOICES = [
         (ACTION_USER_CREATED, 'ایجاد کاربر'),
         (ACTION_USER_UPDATED, 'ویرایش کاربر'),
         (ACTION_PASSWORD_RESET, 'ریست رمز عبور'),
         (ACTION_PROFILE_UPDATED, 'ویرایش مشخصات کاربر'),
+        (ACTION_BACKUP_CREATED, 'تهیه نسخه پشتیبان'),
+        (ACTION_BACKUP_FAILED, 'خطا در تهیه نسخه پشتیبان'),
+        (ACTION_RESTORE_STARTED, 'شروع بازگردانی نسخه پشتیبان'),
+        (ACTION_RESTORE_SUCCEEDED, 'بازگردانی موفق نسخه پشتیبان'),
+        (ACTION_RESTORE_FAILED, 'خطا در بازگردانی نسخه پشتیبان'),
     ]
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='performed_system_logs')

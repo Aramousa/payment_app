@@ -91,6 +91,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # همیشه باید اولین میان‌افزار باشد — در زمان بازگردانی نسخه پشتیبان،
+    # بدون هیچ تماس با پایگاه‌داده باید بتواند درخواست‌ها را مسدود کند
+    'payments.middleware.MaintenanceModeMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'csp.middleware.CSPMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -217,6 +220,14 @@ STATICFILES_DIRS = [
 ]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# فایل قفل نگهداری — در زمان بازگردانی نسخه پشتیبان توسط payments/backup.py ساخته می‌شود
+# و MaintenanceModeMiddleware با بررسی وجود همین فایل، تمام درخواست‌ها را مسدود می‌کند
+MAINTENANCE_LOCK_FILE = str(BASE_DIR / '.maintenance_lock')
+
+# مسیر دستی pg_dump/pg_restore — فقط وقتی لازم است که این ابزارها در PATH سرور نباشند
+PG_DUMP_PATH = os.getenv('VISIUNAPP_PG_DUMP_PATH', '')
+PG_RESTORE_PATH = os.getenv('VISIUNAPP_PG_RESTORE_PATH', '')
 
 # حداکثر حجم فایل در حافظه قبل از نوشتن روی دیسک (2MB)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024

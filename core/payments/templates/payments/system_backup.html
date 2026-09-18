@@ -1,0 +1,165 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>پشتیبان‌گیری سامانه</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v21">
+    <style>
+        body { font-family: Vazir, sans-serif; background: #f3f6fb; margin: 0; }
+        .backup-page { max-width: 860px; margin: 0 auto; padding: 20px; display: grid; gap: 18px; }
+        .settings-panel { background: #fff; border: 1px solid #dce5f0; border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,.08); padding: 20px; }
+        .settings-title { border: 0; font-size: 20px; margin: 0 0 6px; padding: 0; text-align: right; }
+        .settings-sub { color: #5b6b84; font-size: 13px; margin: 0 0 16px; line-height: 1.8; }
+        .rules { background: #eef5ff; border: 1px solid #d8e6f7; border-radius: 8px; color: #24344d; font-size: 13px; line-height: 1.9; margin-bottom: 16px; padding: 12px 14px; }
+        .rules.danger { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
+        .rules ul { margin: 6px 0 0; padding-inline-start: 20px; }
+        .settings-form { display: grid; gap: 14px; }
+        .settings-form label { display: block; font-weight: 900; margin-bottom: 5px; font-size: 13px; }
+        .settings-form input[type="password"], .settings-form input[type="text"], .settings-form input[type="file"] {
+            width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 10px; font-family: Vazir, sans-serif;
+        }
+        .settings-actions { display: flex; gap: 10px; justify-content: flex-start; margin-top: 4px; }
+        .settings-actions button { border: 0; border-radius: 8px; cursor: pointer; font-family: Vazir, sans-serif; font-weight: 900; min-height: 42px; padding: 9px 18px; }
+        .btn-primary { background: #1e3a5f; color: #fff; }
+        .btn-danger { background: #b42318; color: #fff; }
+        .btn-danger:disabled { background: #d9c5c3; cursor: not-allowed; }
+        .backup-panel-danger { border-color: #fecaca; }
+        .log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .log-table th, .log-table td { border-bottom: 1px solid #eef1f6; padding: 8px 6px; text-align: right; vertical-align: top; }
+        .log-badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 800; }
+        .log-ok { background: #dcfce7; color: #166534; }
+        .log-bad { background: #fee2e2; color: #991b1b; }
+        .log-info { background: #e0e7ff; color: #3730a3; }
+        .spinner-note { display: none; font-size: 13px; color: #b45309; margin-top: 6px; }
+    </style>
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v21">
+</head>
+<body>
+{% include 'payments/partials/app_navigation.html' %}
+<main class="backup-page">
+
+    <section class="settings-panel">
+        <h1 class="settings-title">📦 تهیه نسخه پشتیبان</h1>
+        <p class="settings-sub">پایگاه‌داده کامل و تمام فایل‌های بارگذاری‌شده (فیش، فاکتور، گارانتی و...) در یک فایل واحد و رمزنگاری‌شده تهیه و مستقیماً روی همین کامپیوتر دانلود می‌شود. هیچ نسخه‌ای روی سرور باقی نمی‌ماند.</p>
+        <div class="rules">
+            <strong>رمز عبور فایل پشتیبان</strong> را خودتان انتخاب می‌کنید و در جایی امن نگه دارید — این سامانه آن را ذخیره نمی‌کند و در صورت فراموشی، امکان بازیابی فایل وجود ندارد.
+        </div>
+        <form class="settings-form" method="post" action="{% url 'system_backup_download' %}" id="backup-form">
+            {% csrf_token %}
+            <div>
+                <label for="passphrase">رمز عبور فایل پشتیبان (حداقل ۸ کاراکتر)</label>
+                <input type="password" name="passphrase" id="passphrase" minlength="8" required autocomplete="new-password">
+            </div>
+            <div>
+                <label for="passphrase_confirm">تکرار رمز عبور</label>
+                <input type="password" name="passphrase_confirm" id="passphrase_confirm" minlength="8" required autocomplete="new-password">
+            </div>
+            <div class="settings-actions">
+                <button type="submit" class="btn-primary" id="backup-submit-btn">دانلود نسخه پشتیبان</button>
+            </div>
+            <p class="spinner-note" id="backup-spinner-note">⏳ در حال تهیه نسخه پشتیبان... بسته به حجم داده‌ها ممکن است چند دقیقه طول بکشد. این صفحه را نبندید.</p>
+        </form>
+    </section>
+
+    <section class="settings-panel backup-panel-danger">
+        <h1 class="settings-title">♻️ بازگردانی نسخه پشتیبان</h1>
+        <div class="rules danger">
+            <strong>هشدار جدی:</strong> این عملیات تمام داده‌های فعلی پایگاه‌داده و فایل‌های سامانه را با محتوای فایل پشتیبان جایگزین می‌کند.
+            <ul>
+                <li>در حین بازگردانی، سامانه برای همه کاربران موقتاً غیرفعال می‌شود.</li>
+                <li>پس از پایان، همه کاربران (از جمله شما) باید دوباره وارد سامانه شوند.</li>
+                <li>بازگردانی پایگاه‌داده به‌صورت اتمیک انجام می‌شود؛ یعنی اگر در میانه راه خطایی رخ دهد، هیچ تغییری روی داده‌های فعلی اعمال نخواهد شد.</li>
+                <li>پیشنهاد می‌شود پیش از بازگردانی، یک نسخه پشتیبان تازه از وضعیت فعلی هم تهیه کنید.</li>
+            </ul>
+        </div>
+        <form class="settings-form" method="post" action="{% url 'system_backup_restore' %}" enctype="multipart/form-data" id="restore-form">
+            {% csrf_token %}
+            <div>
+                <label for="backup_file">فایل پشتیبان (visiunbackup.)</label>
+                <input type="file" name="backup_file" id="backup_file" accept=".visiunbackup" required>
+            </div>
+            <div>
+                <label for="restore_passphrase">رمز عبور فایل پشتیبان</label>
+                <input type="password" name="passphrase" id="restore_passphrase" required>
+            </div>
+            <div>
+                <label for="confirm_text">برای تایید نهایی، عبارت زیر را دقیقاً تایپ کنید:</label>
+                <div class="rules" style="margin-bottom:8px;text-align:center;font-weight:900;letter-spacing:2px;">{{ restore_confirm_phrase }}</div>
+                <input type="text" name="confirm_text" id="confirm_text" required autocomplete="off" dir="ltr">
+            </div>
+            <div class="settings-actions">
+                <button type="submit" class="btn-danger" id="restore-submit-btn" disabled>بازگردانی و جایگزینی کامل داده‌ها</button>
+            </div>
+            <p class="spinner-note" id="restore-spinner-note">⏳ در حال بازگردانی نسخه پشتیبان... این صفحه را نبندید.</p>
+        </form>
+    </section>
+
+    <section class="settings-panel">
+        <h1 class="settings-title">📜 آخرین رخدادهای پشتیبان‌گیری</h1>
+        {% if recent_logs %}
+        <div style="overflow-x:auto;">
+        <table class="log-table">
+            <thead><tr><th>زمان</th><th>عملیات</th><th>کاربر</th><th>توضیح</th></tr></thead>
+            <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                    <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        {% if log.action == 'restore_failed' or log.action == 'backup_failed' %}
+                            <span class="log-badge log-bad">{{ log.get_action_display }}</span>
+                        {% elif log.action == 'restore_succeeded' or log.action == 'backup_created' %}
+                            <span class="log-badge log-ok">{{ log.get_action_display }}</span>
+                        {% else %}
+                            <span class="log-badge log-info">{{ log.get_action_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ log.actor.get_full_name|default:log.actor.username|default:'-' }}</td>
+                    <td>{{ log.description|truncatechars:160 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="settings-sub">هنوز هیچ رخدادی ثبت نشده است.</p>
+        {% endif %}
+    </section>
+
+</main>
+<script>
+    (function () {
+        var backupForm = document.getElementById('backup-form');
+        if (backupForm) {
+            backupForm.addEventListener('submit', function () {
+                document.getElementById('backup-submit-btn').disabled = true;
+                document.getElementById('backup-spinner-note').style.display = 'block';
+            });
+        }
+
+        var confirmInput = document.getElementById('confirm_text');
+        var restoreBtn = document.getElementById('restore-submit-btn');
+        if (confirmInput && restoreBtn) {
+            confirmInput.addEventListener('input', function () {
+                restoreBtn.disabled = confirmInput.value.trim() !== '{{ restore_confirm_phrase }}';
+            });
+        }
+
+        var restoreForm = document.getElementById('restore-form');
+        if (restoreForm) {
+            restoreForm.addEventListener('submit', function (event) {
+                var ok = window.confirm('آیا کاملاً مطمئن هستید؟ این عملیات تمام داده‌های فعلی را با فایل پشتیبان جایگزین می‌کند و غیرقابل بازگشت است.');
+                if (!ok) {
+                    event.preventDefault();
+                    return;
+                }
+                restoreBtn.disabled = true;
+                document.getElementById('restore-spinner-note').style.display = 'block';
+            });
+        }
+    })();
+</script>
+</body>
+</html>

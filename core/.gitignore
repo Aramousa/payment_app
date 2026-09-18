@@ -20,6 +20,9 @@ media/*
 # Logs
 *.log
 
+# قفل نگهداری هنگام بازگردانی نسخه پشتیبان — فقط در زمان اجرا ساخته می‌شود
+.maintenance_lock
+
 # OS files
 .DS_Store
 Thumbs.db

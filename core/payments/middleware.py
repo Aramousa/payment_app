@@ -1,11 +1,42 @@
+import os
 import time
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
+
+
+class MaintenanceModeMiddleware:
+    """
+    در زمان بازگردانی نسخه پشتیبان فعال می‌شود — باید همیشه اولین میان‌افزار باشد
+    (قبل از SessionMiddleware) و هرگز به پایگاه‌داده وصل نشود، چون ممکن است
+    پایگاه‌داده در همان لحظه در حال بازنویسی توسط pg_restore باشد.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        lock_path = getattr(settings, 'MAINTENANCE_LOCK_FILE', None)
+        if lock_path and os.path.exists(lock_path):
+            return HttpResponse(
+                '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">'
+                '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+                '<title>در حال بازگردانی نسخه پشتیبان</title></head>'
+                '<body style="font-family:Tahoma,sans-serif;text-align:center;padding:80px 20px;'
+                'background:#0d1b2e;color:#fff;">'
+                '<h2>🛠 سامانه موقتاً در دسترس نیست</h2>'
+                '<p>در حال بازگردانی نسخه پشتیبان است. این فرآیند معمولاً چند دقیقه طول می‌کشد.</p>'
+                '<p>لطفاً صفحه را نبندید و کمی بعد دوباره تلاش کنید.</p>'
+                '</body></html>',
+                status=503,
+                content_type='text/html; charset=utf-8',
+            )
+        return self.get_response(request)
 
 _SESSION_EXEMPT_PREFIXES = ('/accounts/', '/admin/', '/static/', '/media/', '/sms-verify/')
 _SMS_OTP_VERIFY_URL = '/sms-verify/'

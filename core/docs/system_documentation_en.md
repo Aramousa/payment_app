@@ -1077,3 +1077,35 @@ Daily notices:
 5. Customer sees splash once.
 6. Notice histories are visible in tables.
 
+## 23. System Backup & Restore
+
+Reachable from the main dashboard menu (superuser only) → "System Backup" (`/admin-tools/backup/`).
+
+### Creating a backup (`system_backup_download`)
+
+1. The full database is dumped with `pg_dump -Fc` (compressed custom format, compatible with `pg_restore`).
+2. Every file under `MEDIA_ROOT` (receipts, invoices, price lists, proformas, reconciliation attachments, warranty files, avatars, branding) is packaged together with the DB dump into one zip archive.
+3. A `manifest.json` is added, recording the creation timestamp, database name, a SHA-256 checksum of the dump, and the media file count/total size.
+4. The whole zip is encrypted with a passphrase the superuser enters at that moment (`Fernet`/AES, key derived via PBKDF2-HMAC-SHA256 with 390,000 iterations) and downloaded directly with a `.visiunbackup` extension.
+5. The unencrypted zip and any intermediate temp files are **never left on the server** — they're deleted immediately after encryption/download.
+6. The passphrase is never stored by the system; if forgotten, the backup file cannot be recovered.
+
+### Restoring a backup (`system_backup_restore`)
+
+Execution order, chosen to minimize risk:
+
+1. The uploaded file is decrypted and the zip structure (`manifest.json`, `database.dump`) is validated **before the maintenance lock is activated** — so a wrong passphrase or a corrupt file never locks the system for nothing.
+2. The maintenance lock is activated: a sentinel file (`MAINTENANCE_LOCK_FILE`, default `.maintenance_lock` at the project root) is created. `MaintenanceModeMiddleware` — always the very first middleware, ahead of `SessionMiddleware` — sees this file and returns a 503 to every request without ever touching the database.
+3. `database.dump`'s checksum is verified against the value recorded in the manifest.
+4. `pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction` runs — **atomic**: either the whole restore succeeds, or any error rolls the transaction back and leaves current data completely untouched.
+5. Only after step 4 succeeds is the current `media` directory renamed aside (never deleted — so it can be recovered manually if needed) and the zip's files extracted into a fresh `media` directory.
+6. Django's DB connections are closed (`connections.close_all()`) and the maintenance lock is released.
+7. The current admin's session is also cleared; since the sessions table was replaced by the backup's content, every user must log in again.
+8. A fixed confirmation phrase (`RESTORE`) must be typed exactly into the form — enforced both client-side (keeps the button disabled) and server-side.
+
+### Deployment prerequisites (important)
+
+- The `pg_dump` and `pg_restore` command-line tools (the `postgresql-client` package, matching the server's PostgreSQL version) must be on the server's PATH; otherwise set `VISIUNAPP_PG_DUMP_PATH` / `VISIUNAPP_PG_RESTORE_PATH` to their full executable paths.
+- The front-facing web server's request body size limit (e.g. Nginx's `client_max_body_size`) must be raised enough to allow uploading a large backup file during restore — Django itself does not cap upload size.
+- Every backup/restore event (success and failure) is logged to `SystemActivityLog` with the actor, timestamp, and a description, and is shown on the same page.
+

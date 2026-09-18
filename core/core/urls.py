@@ -20,7 +20,7 @@ from django.urls import path
 from django.shortcuts import redirect, render
 from django.conf import settings
 from django.conf.urls.static import static
-from payments.views import SafeLoginView, safe_logout
+from payments.views import SafeLoginView, safe_logout, mfa_toggle_key_secure
 
 
 def redirect_to_submit(request):
@@ -47,6 +47,12 @@ urlpatterns = [
     path('accounts/login/', SafeLoginView.as_view(), name='login'),
     path('accounts/logout/', safe_logout, name='logout'),
     path('accounts/', include('django.contrib.auth.urls')),
+    # جایگزین امن toggleKey کتابخانه django-mfa2: آن view با GET و بدون CSRF کار می‌کند
+    # (آسیب‌پذیر CSRF — می‌تواند MFA کاربر را بدون اطلاع او غیرفعال کند). چون این مسیر
+    # قبل از include('mfa.urls') می‌آید و مسیرش دقیقاً یکسان است، درخواست‌های واقعی به
+    # اینجا می‌رسند؛ نام URL هم عمداً همان 'toggle_key' نگه داشته شده تا قالب‌های
+    # django-mfa2 (که {% url 'toggle_key' %} را صدا می‌زنند) بدون تغییر کار کنند.
+    path('mfa/toggleKey', mfa_toggle_key_secure, name='toggle_key'),
     path('mfa/', include('mfa.urls')),
     path('', redirect_to_submit),
 ]
