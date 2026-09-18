@@ -5581,7 +5581,7 @@ def reconciliation_center(request):
                     '💬 پیام جدید مغایرت‌گیری',
                     f'{sender_name} در گفتگوی «{thread.title}» پیام جدید ارسال کرد.',
                     f"{reverse('reconciliation_center')}?thread={thread.id}",
-                    category=UserNotification.CATEGORY_SYSTEM,
+                    category=UserNotification.CATEGORY_RECONCILIATION,
                     actor=request.user,
                 )
                 return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
@@ -7037,12 +7037,12 @@ def order_detail(request, order_id):
                     )
                 if old_status != updated.status:
                     CustomerOrderLog.objects.create(order=updated, actor=request.user, action=CustomerOrderLog.ACTION_STATUS_CHANGED, from_status=old_status, to_status=updated.status, note=updated.staff_note)
-                    _notify_users([updated.customer], 'تغییر وضعیت سفارش', f'وضعیت سفارش {updated.order_number} به «{updated.get_status_display()}» تغییر کرد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_SYSTEM, actor=request.user)
+                    _notify_users([updated.customer], 'تغییر وضعیت سفارش', f'وضعیت سفارش {updated.order_number} به «{updated.get_status_display()}» تغییر کرد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_ORDER, actor=request.user)
                 if old_sales_id != updated.sales_expert_id:
                     assignee = updated.sales_expert.get_full_name() or updated.sales_expert.username if updated.sales_expert else '-'
                     CustomerOrderLog.objects.create(order=updated, actor=request.user, action=CustomerOrderLog.ACTION_ASSIGNED, note=f'تخصیص به {assignee}')
                     if updated.sales_expert_id:
-                        _notify_users([updated.sales_expert], 'تخصیص سفارش', f'سفارش {updated.order_number} به شما تخصیص داده شد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_SYSTEM, actor=request.user)
+                        _notify_users([updated.sales_expert], 'تخصیص سفارش', f'سفارش {updated.order_number} به شما تخصیص داده شد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_ORDER, actor=request.user)
                 messages.success(request, 'سفارش بروزرسانی شد.')
                 return redirect('order_detail', order_id=updated.id)
         elif action == 'issue_proforma':
@@ -7070,7 +7070,7 @@ def order_detail(request, order_id):
                     order.sales_expert = request.user
                 order.save(update_fields=['status', 'sales_expert', 'updated_at'])
                 CustomerOrderLog.objects.create(order=order, actor=request.user, action=CustomerOrderLog.ACTION_PROFORMA_CREATED, from_status=previous_status, to_status=order.status, note=f'{len(created)} پیش فاکتور صادر شد.')
-                _notify_users([order.customer], 'پیش فاکتور سفارش صادر شد', f'{len(created)} پیش فاکتور برای سفارش {order.order_number} صادر شد.', reverse('order_detail', args=[order.id]), category=UserNotification.CATEGORY_SYSTEM, actor=request.user)
+                _notify_users([order.customer], 'پیش فاکتور سفارش صادر شد', f'{len(created)} پیش فاکتور برای سفارش {order.order_number} صادر شد.', reverse('order_detail', args=[order.id]), category=UserNotification.CATEGORY_ORDER, actor=request.user)
                 messages.success(request, 'پیش فاکتور سفارش صادر و به مشتری اطلاع رسانی شد.')
                 return redirect('order_detail', order_id=order.id)
 
@@ -8671,7 +8671,7 @@ def agency_register_apply(request):
                 '🤝 درخواست نمایندگی جدید',
                 f'درخواست نمایندگی از {app.full_name} — {app.city} ثبت شد.',
                 reverse('agency_application_detail', args=[app.pk]),
-                category=UserNotification.CATEGORY_SYSTEM,
+                category=UserNotification.CATEGORY_AGENCY,
             )
 
             # پیامک تأیید به متقاضی
@@ -8885,7 +8885,7 @@ def agency_application_action(request, app_id):
             '✅ تأیید نمایندگی',
             f'درخواست {app.full_name} تأیید و کاربر {user.username} ایجاد شد.',
             reverse('agency_application_detail', args=[app.pk]),
-            category=UserNotification.CATEGORY_SYSTEM,
+            category=UserNotification.CATEGORY_AGENCY,
             actor=request.user,
         )
         messages.success(request, f'درخواست تأیید شد. کاربر {user.username} ایجاد شد و اطلاعات ورود برای متقاضی پیامک شد.')
@@ -8948,7 +8948,7 @@ def _warranty_notify_staff(claim, title, body):
         list(staff.distinct()),
         title, body,
         reverse('warranty_staff_detail', args=[claim.pk]),
-        category=UserNotification.CATEGORY_PAYMENT,
+        category=UserNotification.CATEGORY_WARRANTY,
     )
 
 

@@ -428,7 +428,8 @@ def unread_notifications(request):
             'message': n.message,
             'url': reverse('notification_open', args=[n.id]),
             'color': n.color,
+            'category': n.category,
         }
-        for n in notifications[:5]
+        for n in notifications[:10]
     ]
     return {'unread_notifications': {'total': notifications.count(), 'items': items}}

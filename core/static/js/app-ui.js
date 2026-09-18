@@ -1013,6 +1013,12 @@
             var trigger = bell.querySelector('.notification-trigger');
             var badge = bell.querySelector('.notification-badge');
             var list = bell.querySelector('.notification-list') || document.getElementById('notificationList');
+            var tabsBar = bell.querySelector('.notification-tabs');
+            var activeCategory = 'all';
+            var CATEGORY_LABELS = {
+                payment: 'فیش', invoice: 'فاکتور', order: 'سفارش', warranty: 'گارانتی',
+                agency: 'نمایندگی', reconciliation: 'مغایرت‌گیری', system: 'سیستم'
+            };
             var enableButton = bell.querySelector('.enable-browser-notifications') || document.getElementById('enableBrowserNotifications');
             var readButton = bell.querySelector('.mark-notifications-read') || document.getElementById('markNotificationsRead');
             var feedUrl = bell.dataset.feedUrl || window.notificationFeedUrl;
@@ -1064,8 +1070,49 @@
                 badge.classList.toggle('zero', count === 0);
             }
 
+            function applyCategoryFilter() {
+                if (!list) return;
+                list.querySelectorAll('.notification-item').forEach(function (el) {
+                    el.hidden = activeCategory !== 'all' && el.dataset.notifCategory !== activeCategory;
+                });
+            }
+
+            function renderTabs(items) {
+                if (!tabsBar) return;
+                var seen = [];
+                items.forEach(function (item) {
+                    if (item.category && seen.indexOf(item.category) === -1) seen.push(item.category);
+                });
+                if (seen.length < 2) {
+                    tabsBar.innerHTML = '';
+                    activeCategory = 'all';
+                    return;
+                }
+                if (activeCategory !== 'all' && seen.indexOf(activeCategory) === -1) activeCategory = 'all';
+                var tabs = ['all'].concat(seen);
+                tabsBar.innerHTML = tabs.map(function (cat) {
+                    var label = cat === 'all' ? 'همه' : (CATEGORY_LABELS[cat] || cat);
+                    var activeClass = cat === activeCategory ? ' active' : '';
+                    return '<button type="button" class="notification-tab' + activeClass + '" data-notif-tab="' + cat + '">' + escapeHtml(label) + '</button>';
+                }).join('');
+            }
+
+            if (tabsBar) {
+                tabsBar.addEventListener('click', function (event) {
+                    var btn = event.target.closest('[data-notif-tab]');
+                    if (!btn) return;
+                    event.stopPropagation();
+                    activeCategory = btn.dataset.notifTab;
+                    tabsBar.querySelectorAll('.notification-tab').forEach(function (t) {
+                        t.classList.toggle('active', t.dataset.notifTab === activeCategory);
+                    });
+                    applyCategoryFilter();
+                });
+            }
+
             function renderItems(items) {
                 if (!list) return;
+                renderTabs(items);
                 if (!items.length) {
                     list.innerHTML = '<div class="notification-empty">📭 پیام جدیدی وجود ندارد.</div>';
                     return;
@@ -1074,7 +1121,7 @@
                     var icon = item.icon || '🔔';
                     var time = item.time_label ? '<span class="notif-time">' + escapeHtml(item.time_label) + '</span>' : '';
                     var colorStyle = item.color ? ' style="--notif-color: ' + escapeHtml(item.color) + ';"' : '';
-                    return '<a class="notification-item" href="' + escapeHtml(item.url) + '" data-notif-id="' + item.id + '"' + colorStyle + '>' +
+                    return '<a class="notification-item" href="' + escapeHtml(item.url) + '" data-notif-id="' + item.id + '" data-notif-category="' + escapeHtml(item.category || '') + '"' + colorStyle + '>' +
                         '<span class="notif-icon">' + icon + '</span>' +
                         '<span class="notif-body">' +
                             '<strong class="notif-title">' + escapeHtml(item.title) + '</strong>' +
@@ -1083,6 +1130,7 @@
                         '</span>' +
                         '</a>';
                 }).join('');
+                applyCategoryFilter();
             }
 
             function markNotificationRead(link, options) {

@@ -32,9 +32,10 @@
                     <button type="button" class="mark-notifications-read secondary">خوانده شد</button>
                     <button type="button" class="notification-sound-toggle secondary">🔔 صدا روشن</button>
                 </div>
+                <div class="notification-tabs"></div>
                 <div class="notification-list">
                     {% for item in unread_notifications.items %}
-                        <a class="notification-item" href="{{ item.url }}" data-notif-id="{{ item.id }}"{% if item.color %} style="--notif-color: {{ item.color }};"{% endif %}>
+                        <a class="notification-item" href="{{ item.url }}" data-notif-id="{{ item.id }}" data-notif-category="{{ item.category }}"{% if item.color %} style="--notif-color: {{ item.color }};"{% endif %}>
                             <strong>{{ item.title }}:</strong> {{ item.message }}
                         </a>
                     {% empty %}

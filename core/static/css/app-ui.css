@@ -1083,10 +1083,50 @@ h3 {
     background: var(--app-secondary-dark);
 }
 
+.notification-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--app-border);
+}
+
+.notification-tabs:empty {
+    display: none;
+    padding: 0;
+    border-bottom: none;
+}
+
+.notification-tab {
+    background: #f1f5f9;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: #475569;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+
+.notification-tab:hover {
+    background: #e2e8f0;
+}
+
+.notification-tab.active {
+    background: var(--app-primary);
+    border-color: var(--app-primary);
+    color: #fff;
+}
+
 .notification-item,
 .notification-empty {
     display: block;
     padding: 10px 12px;
+}
+
+.notification-item[hidden] {
+    display: none;
 }
 
 .notification-item {

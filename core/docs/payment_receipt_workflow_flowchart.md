@@ -2,7 +2,7 @@
 
 This document contains the full operational flow for customer payment receipts. It complements `docs/system_documentation_en.md`.
 
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ## Legend
 
@@ -23,7 +23,8 @@ Last updated: 2026-09-17
 | Finance pending | `finance_status=None` | visible to finance dashboard when finance action is needed |
 | Finance registered | `finance_status='finance_ok'` | removed from finance dashboard unless returned |
 | Returned to commercial | `returned_commercial` | visible to commercial dashboard |
-| Returned to finance (regular) | `returned_finance` + `is_void_return=False` | visible to finance dashboard |
+| Returned to finance (regular, unconfirmed) | `returned_finance` + `is_void_return=False` + `return_confirmed_at=None` | visible to finance dashboard regardless of `finance_status` — the fix that closed a bug where it could vanish entirely if finance had already registered |
+| Returned to finance (regular, confirmed) | `returned_finance` + `is_void_return=False` + `return_confirmed_at` set | leaves the finance active queue; history only |
 | Returned to finance (void) | `returned_finance` + `is_void_return=True` | visible only in Voided Documents dashboard |
 | Incomplete | `incomplete` | staff operations blocked; customer correction required; **visible (read-only) in finance dashboard the moment commercial marks it incomplete** |
 | Rejected (unconfirmed) | `rejected` + `rejection_confirmed_at=None` | **locked for everyone, including the staff member who rejected it**; visible (read-only) in finance dashboard so finance can confirm |
@@ -90,9 +91,13 @@ flowchart TD
     ADTRI --> J
 
     J --> J3[Commercial returns to finance]
-    J3 --> J3a[status = returned_finance<br/>is_void_return=False]
+    J3 --> J3a[status = returned_finance<br/>is_void_return=False<br/>finance_status left untouched]
     J3a --> J3b[Log + notify color #DBEAFE]
     J3b --> K
+    J3b --> RCDASH[Finance dashboard — visible regardless of finance_status<br/>until finance confirms]
+    RCDASH --> RC1[Finance confirms return<br/>note optional]
+    RC1 --> RC2[return_confirmed_at/by set<br/>finance_status NOT changed<br/>Log + notify commercial + sales #DBEAFE]
+    RC2 --> HIST
 
     J --> J4[Commercial marks incomplete]
     J4 --> J4a[status = incomplete<br/>visible read-only in finance dashboard]
@@ -168,6 +173,7 @@ flowchart TD
 | Is a customer's fix on an incomplete record logged with detail? | Customer submits the edit form | Every changed field is logged as `field: «before» → «after»` on the `ACTION_EDITED` log; status resets to `pending` (same starting point as a brand-new upload). |
 | Can staff operate rejected record? | `status='rejected'` | No, for anyone — including the staff member who rejected it; locked; history-only. |
 | Can finance confirm a rejection? | `status='rejected'` AND `rejection_confirmed_at` is None | Single-step: auto-reverses finance registration if `finance_status='finance_ok'`; sets `rejection_confirmed_at/by`. Record then leaves the finance dashboard. |
+| Can finance confirm a regular return? | `status='returned_finance'` AND `is_void_return=False` AND `return_confirmed_at` is None | Sets `return_confirmed_at/by`; `finance_status` is deliberately left untouched (finance updates their own external accounting system separately). Record then leaves the finance active queue. |
 | Can counterparty see record? | `payment.counterparty` matches linked counterparty user | Appears in counterparty dashboard. |
 | Should dashboard show record? | Current state requires action from current department | Show in dashboard. |
 | Should history show record? | User authorized by role/ownership | Show regardless of status. |
@@ -185,12 +191,23 @@ flowchart TD
 | Counterparty rejection | commercial | `#FECACA` |
 | Payment marked incomplete | commercial + finance + customer | `#FEF3C7` |
 | Payment rejection | commercial + finance + customer | `#FECACA` |
-| Return to commercial | commercial | `#E9D5FF` |
+| Return to commercial | commercial + sales | `#E9D5FF` |
+| Return to finance (regular) | commercial + finance + sales | `#DBEAFE` |
 | Void return to finance | finance | `#DBEAFE` |
 | Void confirmed | commercial + customer | `#FECACA` |
 | Rejection confirmed by finance | commercial + sales | `#FECACA` |
+| Return confirmed by finance | commercial + sales | `#DBEAFE` |
 | Admin review request | superuser | `#FEF3C7` |
 | Admin edit | commercial + finance | `#FEF3C7` |
+
+## Receipt File Versioning
+
+When a customer replaces the receipt image/PDF (correcting an `incomplete` record), the previous file is **not deleted**:
+
+- `PaymentReceipt.is_current` (default `True`) marks the active file(s); the previous one(s) are flipped to `is_current=False` with `replaced_at` set, instead of being removed.
+- The unique-hash constraint (`payment` + `file_hash`) is scoped to `is_current=True` only, so a customer can legitimately re-upload a file matching a now-superseded version without being blocked.
+- Customer-facing pages (`edit_payment`, `customer_detail` for staff, the main upload form) only ever show `payment.current_receipts`.
+- Staff-facing pages (main dashboard, payment timeline) additionally show a **"Previous versions"** section (`payment.superseded_receipts`) so commercial/finance can compare the image before vs. after the customer's edit — this is gated behind `is_staff_user` in the shared templates, and shown unconditionally in the staff-only customer-detail page.
 
 ## Customer Display Rules
 
@@ -228,6 +245,10 @@ flowchart TD
     S -- Yes --> S1{department = finance AND rejection_confirmed_at is None?}
     S1 -- Yes --> S2[Show — confirm-rejection action available]
     S1 -- No --> I
+    F --> T{status returned_finance AND is_void_return=False?}
+    T -- Yes --> T1{department = finance AND return_confirmed_at is None?}
+    T1 -- Yes --> T2[Show regardless of finance_status — confirm-return action available]
+    T1 -- No --> I
     F --> M{needs_admin_review=True?}
     M -- Yes --> N[Show in Admin Review Queue for superuser]
     F --> O{status = returned_finance + is_void_return?}
