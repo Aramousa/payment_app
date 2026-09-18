@@ -11,6 +11,16 @@ from .models import FinalApprovalDelegate, LoginAdvertisement, ReconciliationThr
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry', 'warranty', 'warranty_manager'}
 DISPLAY_TIME_ZONE = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
+# نسخه‌ی cache-busting فایل‌های استاتیک — یک‌بار در لحظه‌ی بالا آمدن هر پردازه
+# (worker) محاسبه می‌شود، پس با هر deploy/restart سرور خودکار تغییر می‌کند.
+# قبلاً این عدد به‌صورت دستی در ~۱۳۰ قالب مختلف (?v=ui-redesign-vNN) جابه‌جا
+# می‌شد که چندین‌بار باعث شد بعضی صفحات نسخه‌ی قدیمی/کش‌شده‌ی CSS/JS را نشان دهند.
+_ASSET_VERSION = str(int(timezone.now().timestamp()))
+
+
+def asset_version(request):
+    return {'asset_v': _ASSET_VERSION}
+
 
 def _role_for_nav(user):
     if not user.is_authenticated:

@@ -16,7 +16,7 @@
     <link rel="apple-touch-icon" href="{% static 'logo/logo-top.png' %}">
 
     <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v=ui-redesign-v29">
+    <link rel="stylesheet" href="{% static 'css/app-ui.css' %}?v={{ asset_v }}">
     <!-- Bootstrap + jQuery — فایل‌های محلی، بدون نیاز به اینترنت -->
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.rtl.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/css/bootstrap-icons.min.css' %}">
@@ -31,7 +31,7 @@
         .table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #eef2f8; }
     </style>
     {% block head %}{% endblock %}
-    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v=ui-redesign-v29">
+    <link rel="stylesheet" href="{% static 'css/app-redesign.css' %}?v={{ asset_v }}">
 </head>
 <body>
     {% include "payments/partials/app_navigation.html" %}
@@ -46,7 +46,7 @@
     </div>
     {% endif %}
     {% block content %}{% endblock %}
-    <script src="{% static 'js/app-ui.js' %}?v=ui-redesign-v29"></script>
+    <script src="{% static 'js/app-ui.js' %}?v={{ asset_v }}"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register("{% url 'pwa_service_worker' %}").catch(function () {});

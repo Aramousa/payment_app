@@ -812,11 +812,29 @@ class BackupAccessCodeAdmin(admin.ModelAdmin):
     فقط اینجا (پنل /admin/) قابل تولید است — برای «افزودن» چیزی لازم نیست
     وارد شود، فقط دکمه «ذخیره» را بزنید تا یک کد تازه ساخته شود.
     """
-    list_display = ('code', 'status_badge', 'generated_by', 'jalali_generated_at', 'jalali_expires_at', 'used_by', 'jalali_used_at')
+    list_display = ('code_copy', 'status_badge', 'generated_by', 'jalali_generated_at', 'jalali_expires_at', 'used_by', 'jalali_used_at')
     list_filter = ('generated_at',)
     search_fields = ('code', 'generated_by__username', 'used_by__username')
-    readonly_fields = ('code', 'generated_by', 'generated_at', 'expires_at', 'used_at', 'used_by')
+    readonly_fields = ('code_copy', 'generated_by', 'generated_at', 'expires_at', 'used_at', 'used_by')
     fields = ()
+
+    def code_copy(self, obj):
+        from django.utils.html import format_html
+        if not obj.code:
+            return '-'
+        js = (
+            "navigator.clipboard.writeText('%s');"
+            "this.textContent='✓ کپی شد';"
+            "this.style.background='#dcfce7';"
+        ) % obj.code
+        return format_html(
+            '<code style="cursor:pointer;padding:3px 10px;background:#eef2f7;'
+            'border-radius:5px;font-weight:800;letter-spacing:1px;" '
+            'onclick="{}" title="برای کپی در حافظه کلیپبورد کلیک کنید">{}</code>',
+            js, obj.code,
+        )
+    code_copy.short_description = 'کد (برای کپی کلیک کنید)'
+    code_copy.admin_order_field = 'code'
 
     def status_badge(self, obj):
         from django.utils.html import format_html

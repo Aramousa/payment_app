@@ -136,6 +136,7 @@ iframe {
 
 .notification-trigger,
 .message-envelope,
+.app-sb-reset-btn,
 .app-user-menu summary {
     align-items: center !important;
     background: var(--a-soft) !important;
@@ -143,6 +144,7 @@ iframe {
     border-radius: var(--a-radius) !important;
     box-shadow: none !important;
     color: var(--a-primary) !important;
+    cursor: pointer !important;
     display: inline-flex !important;
     font-size: 12px !important;
     font-weight: 900 !important;
@@ -154,10 +156,20 @@ iframe {
 
 .notification-trigger:hover,
 .message-envelope:hover,
+.app-sb-reset-btn:hover,
 .app-user-menu summary:hover {
     background: var(--a-accent-soft) !important;
     border-color: #c5e8e3 !important;
     color: var(--a-accent-hover) !important;
+}
+
+/* دکمه‌ی بازیابی همیشه‌کارِ منوی کناری — مستقل از CSS سایدبار، همیشه در هدر
+   قابل‌دسترس است تا در صورت بروز هر خطای نمایشی در سایدبار، بازیابی تضمین شود */
+.app-sb-reset-btn {
+    font-size: 16px !important;
+    line-height: 1 !important;
+    min-width: 40px !important;
+    padding: 0 !important;
 }
 
 .notification-bell {
@@ -569,12 +581,14 @@ iframe {
         display: none !important;
     }
 
+    /* نکته: ریل جمع‌شده فقط ۶۴ پیکسل عرض دارد؛ ۳ دکمه در یک ردیف (حتی با کمینه‌ی
+       ۴۴px هر کدام = ۱۳۲px) هرگز در آن جا نمی‌شود و از کادر بیرون می‌زند — به همین
+       دلیل در این حالت به‌صورت عمودی روی‌هم چیده می‌شوند، نه کنار هم. */
     body.sb-mode-collapsed #app-sidebar .app-nav-mode-switch {
         align-self: stretch !important;
-        align-items: center !important;
         box-sizing: border-box !important;
-        display: grid !important;
-        grid-template-columns: repeat(3, minmax(44px, 1fr)) !important;
+        display: flex !important;
+        flex-direction: column !important;
         gap: 4px !important;
         margin: 10px 8px 8px !important;
         max-width: none !important;
@@ -591,10 +605,10 @@ iframe {
     }
 
     body.sb-mode-collapsed #app-sidebar .app-nav-mode-btn {
-        flex: 1 1 0 !important;
-        height: 44px !important;
-        min-height: 44px !important;
-        min-width: 44px !important;
+        flex: 0 0 auto !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        min-width: 0 !important;
         pointer-events: auto !important;
         width: 100% !important;
     }
@@ -605,8 +619,8 @@ iframe {
     }
 
     body.sb-mode-collapsed #app-sidebar .app-nav-mode-btn svg {
-        height: 22px !important;
-        width: 22px !important;
+        height: 17px !important;
+        width: 17px !important;
     }
 
     body.sb-mode-collapsed #app-sidebar .app-nav-icon {

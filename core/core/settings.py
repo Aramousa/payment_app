@@ -129,6 +129,7 @@ TEMPLATES = [
                 'payments.context_processors.login_ads',
                 'payments.context_processors.unread_notifications',
                 'payments.context_processors.app_navigation',
+                'payments.context_processors.asset_version',
             ],
         },
     },

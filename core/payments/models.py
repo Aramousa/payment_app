@@ -1207,7 +1207,7 @@ class BackupAccessCode(models.Model):
     گرفته و در منوی برنامه وارد کرد. هر کد فقط یک‌بار مصرف و کوتاه‌مدت است.
     """
     CODE_LENGTH = 8
-    DEFAULT_VALIDITY_MINUTES = 15
+    DEFAULT_VALIDITY_MINUTES = 10
 
     code = models.CharField('کد دسترسی', max_length=16, unique=True, blank=True)
     generated_by = models.ForeignKey(

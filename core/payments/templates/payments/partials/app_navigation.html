@@ -45,6 +45,8 @@
             </div>
         </div>
 
+        <button type="button" class="app-sb-reset-btn" id="sb-reset-btn" title="بازنشانی منوی کناری به حالت پیش‌فرض (در صورت بروز مشکل نمایش)">↺</button>
+
         <a class="message-envelope"
            href="{% url 'reconciliation_center' %}"
            title="پیام‌های مغایرت‌گیری"
@@ -386,6 +388,18 @@
                 setOpen(false);
             }
         });
+
+        // دکمه‌ی بازیابی در هدر — عمداً مستقل از هر منطق دیگر سایدبار نوشته شده
+        // تا در صورت بروز هر مشکل نمایشی در حالت‌های جمع‌شده/پنهان، همیشه یک راه
+        // مطمئن برای بازگشت به حالت پیش‌فرض (فیکس/باز) وجود داشته باشد.
+        var resetBtn = document.getElementById('sb-reset-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function (event) {
+                event.stopPropagation();
+                try { localStorage.removeItem(SB_MODE_KEY); } catch (e) {}
+                applyMode('expanded');
+            });
+        }
     })();
 
     // ─── عرض سایدبار متناسب با طولانی‌ترین برچسب منو (بدون شکستن به دو خط) ───
