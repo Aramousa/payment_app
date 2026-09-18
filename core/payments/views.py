@@ -1771,6 +1771,10 @@ def _notification_payload(notification):
     icon_map = {
         UserNotification.CATEGORY_PAYMENT: '💳',
         UserNotification.CATEGORY_INVOICE: '📄',
+        UserNotification.CATEGORY_ORDER: '📦',
+        UserNotification.CATEGORY_WARRANTY: '🛡️',
+        UserNotification.CATEGORY_AGENCY: '🤝',
+        UserNotification.CATEGORY_RECONCILIATION: '💬',
         UserNotification.CATEGORY_SYSTEM:  '🔔',
     }
     icon = icon_map.get(notification.category, '🔔')
@@ -4145,9 +4149,24 @@ def _user_card_payload(user):
     }
 
 
+def _can_view_user_card(actor, target_user):
+    if actor.id == target_user.id:
+        return True
+    if actor.is_superuser:
+        return True
+    if not _is_staff_user(actor):
+        return False
+    target_role = getattr(getattr(target_user, 'profile', None), 'role', None)
+    if target_role == 'customer':
+        return _can_staff_access_customer(actor, target_user.id)
+    return True
+
+
 @login_required
 def user_business_card(request, user_id):
     target_user = get_object_or_404(User.objects.select_related('profile'), id=user_id, is_active=True)
+    if not _can_view_user_card(request.user, target_user):
+        return HttpResponseForbidden('دسترسی ممنوع.')
     return JsonResponse(_user_card_payload(target_user))
 
 
@@ -4318,7 +4337,7 @@ def finance_bulk_final_approve(request):
                 customer_name = f"{payment.first_name} {payment.last_name}".strip() or payment.user.username
                 _notify_users([payment.user], 'تأیید نهایی سند',
                               f'سند #{pid} مشتری {customer_name} تأیید نهایی شد.',
-                              reverse('submit'), category=UserNotification.CATEGORY_SYSTEM,
+                              reverse('submit'), category=UserNotification.CATEGORY_PAYMENT,
                               actor=request.user)
             approved += 1
         except (PaymentRecord.DoesNotExist, ValueError):
@@ -4404,7 +4423,7 @@ def delegate_final_approval(request, payment_id):
             [delegate_user],
             '📋 تفویض اختیار تأیید نهایی',
             f'اختیار تأیید نهایی سند #{payment_id} مشتری {customer_name} به شما تفویض شد.',
-            reverse('submit'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+            reverse('submit'), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
         )
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
                       note=f'تفویض اختیار تأیید نهایی به {_display_name(delegate_user)}')
@@ -4445,7 +4464,7 @@ def finance_unified_action(request, payment_id):
                 list(_staff_notification_users({'finance_manager'})),
                 '✅ سند آماده تأیید نهایی',
                 f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد.',
-                reverse('pending_final_approval'), category=UserNotification.CATEGORY_SYSTEM, actor=request.user,
+                reverse('pending_final_approval'), category=UserNotification.CATEGORY_PAYMENT, actor=request.user,
                 color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
             )
         messages.success(request, f'ثبت مالی سند #{payment_id} انجام شد.')
@@ -4562,7 +4581,7 @@ def finance_register_payment(request, payment_id):
             '✅ سند آماده تأیید نهایی',
             f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد و آماده تأیید نهایی است.',
             reverse('pending_final_approval'),
-            category=UserNotification.CATEGORY_SYSTEM,
+            category=UserNotification.CATEGORY_PAYMENT,
             actor=request.user,
             color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
         )
@@ -4600,7 +4619,7 @@ def finance_final_approve(request, payment_id):
         'تأیید نهایی سند',
         f'سند #{payment_id} مشتری {customer_name} توسط مدیر مالی تأیید نهایی شد.',
         reverse('submit'),
-        category=UserNotification.CATEGORY_SYSTEM,
+        category=UserNotification.CATEGORY_PAYMENT,
         actor=request.user,
     )
 
@@ -5549,10 +5568,22 @@ def reconciliation_center(request):
                 # باطل کردن cache شمارش پیام‌های نخوانده برای سایر اعضای thread
                 from django.core.cache import cache as _cache
                 from .context_processors import recon_unread_cache_key
-                for _p in thread.staff_participants.exclude(id=request.user.id):
+                notify_recipients = list(thread.staff_participants.exclude(id=request.user.id))
+                for _p in notify_recipients:
                     _cache.delete(recon_unread_cache_key(_p.id))
                 if thread.customer_id and thread.customer_id != request.user.id:
                     _cache.delete(recon_unread_cache_key(thread.customer_id))
+                    if not message.is_internal:
+                        notify_recipients.append(thread.customer)
+                sender_name = request.user.get_full_name().strip() or request.user.username
+                _notify_users(
+                    notify_recipients,
+                    '💬 پیام جدید مغایرت‌گیری',
+                    f'{sender_name} در گفتگوی «{thread.title}» پیام جدید ارسال کرد.',
+                    f"{reverse('reconciliation_center')}?thread={thread.id}",
+                    category=UserNotification.CATEGORY_SYSTEM,
+                    actor=request.user,
+                )
                 return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
             active_thread = thread
         elif action in {'close_thread', 'open_thread'}:
@@ -6359,7 +6390,7 @@ def price_lists_dashboard(request):
                     'لیست قیمت جدید',
                     f'{len(form.cleaned_data["files"])} فایل لیست قیمت جدید برای شما ثبت شد.',
                     reverse('price_list_file', args=[first_file.id]),
-                    category=UserNotification.CATEGORY_SYSTEM,
+                    category=UserNotification.CATEGORY_INVOICE,
                     actor=request.user,
                 )
             messages.success(
@@ -6441,7 +6472,7 @@ def proformas_dashboard(request):
                     'پیش فاکتور جدید',
                     f'{len(form.cleaned_data["files"])} پیش فاکتور جدید برای شما صادر شد.',
                     reverse('proforma_detail', args=[first_proforma.id]),
-                    category=UserNotification.CATEGORY_SYSTEM,
+                    category=UserNotification.CATEGORY_INVOICE,
                     actor=request.user,
                 )
             messages.success(
@@ -6533,7 +6564,7 @@ def proforma_detail(request, proforma_id):
             'تایید پیش فاکتور',
             f'پیش فاکتور «{proforma.title or proforma.id}» توسط مشتری تایید شد.',
             reverse('proforma_detail', args=[proforma.id]),
-            category=UserNotification.CATEGORY_SYSTEM,
+            category=UserNotification.CATEGORY_INVOICE,
             actor=request.user,
         )
         messages.success(request, 'پیش فاکتور با موفقیت تایید شد.')
@@ -6675,6 +6706,8 @@ def invoice_delete(request, invoice_id):
     if not _can_delete_customer_documents(request.user) or not _can_view_invoices(request.user):
         return HttpResponseForbidden('شما دسترسی حذف فاکتور را ندارید.')
     invoice = get_object_or_404(InvoiceRecord, id=invoice_id)
+    if not _can_staff_access_customer(request.user, invoice.customer_id):
+        return HttpResponseForbidden('امکان حذف فاکتور این مشتری برای شما وجود ندارد.')
     _delete_file_field(invoice.attachment)
     invoice.delete()
     messages.success(request, 'فاکتور حذف شد.')
@@ -6750,7 +6783,7 @@ def orders_dashboard(request):
                     'سفارش جدید مشتری',
                     f'سفارش {order.order_number} توسط {request.user.get_full_name() or request.user.username} ثبت شد.',
                     reverse('order_detail', args=[order.id]),
-                    category=UserNotification.CATEGORY_SYSTEM,
+                    category=UserNotification.CATEGORY_ORDER,
                     actor=request.user,
                 )
                 messages.success(request, 'سفارش شما با موفقیت ثبت شد.')
@@ -7013,6 +7046,9 @@ def order_detail(request, order_id):
                 messages.success(request, 'سفارش بروزرسانی شد.')
                 return redirect('order_detail', order_id=updated.id)
         elif action == 'issue_proforma':
+            if order.status in {CustomerOrder.STATUS_COMPLETED, CustomerOrder.STATUS_CANCELLED}:
+                messages.error(request, 'امکان صدور پیش فاکتور برای سفارش خاتمه‌یافته یا لغوشده وجود ندارد.')
+                return redirect('order_detail', order_id=order.id)
             proforma_form = OrderProformaUploadForm(request.POST, request.FILES)
             if proforma_form.is_valid():
                 created = []
@@ -8402,7 +8438,9 @@ def receipt_reader_test(request):
         import tempfile as _tmp, os as _os
         from .receipt_extraction import extract_receipt_file
 
-        suffix = _os.path.splitext(uploaded.name or '')[1].lower() or '.tmp'
+        suffix = _os.path.splitext(uploaded.name or '')[1].lower()
+        if suffix not in {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf'}:
+            suffix = '.tmp'
         tmp_path = None
         try:
             with _tmp.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -8802,6 +8840,9 @@ def agency_application_action(request, app_id):
             messages.success(request, 'یادداشت ثبت شد.')
 
     elif action == 'reject':
+        if app.status == AgencyApplication.STATUS_APPROVED:
+            messages.error(request, 'این درخواست قبلاً تأیید شده و کاربر ایجاد شده است؛ برای لغو دسترسی، از مدیریت کاربران اقدام کنید.')
+            return redirect(reverse('agency_application_detail', args=[app_id]))
         reason = note or (request.POST.get('rejection_reason') or '').strip()
         app.status = AgencyApplication.STATUS_REJECTED
         app.rejection_reason = reason
@@ -9104,11 +9145,14 @@ def warranty_claim_detail(request, claim_id):
                 messages.success(request, 'امتیاز شما ثبت شد.')
 
         elif action == 'add_file':
-            saved = _save_warranty_files(request, claim, description='فایل تکمیلی')
-            if saved:
-                messages.success(request, f'{saved} فایل بارگذاری شد.')
+            if claim.status == WarrantyClaim.STATUS_CLOSED:
+                messages.error(request, 'این درخواست بسته شده و امکان افزودن فایل جدید وجود ندارد.')
             else:
-                messages.error(request, 'فایلی بارگذاری نشد.')
+                saved = _save_warranty_files(request, claim, description='فایل تکمیلی')
+                if saved:
+                    messages.success(request, f'{saved} فایل بارگذاری شد.')
+                else:
+                    messages.error(request, 'فایلی بارگذاری نشد.')
 
         return redirect('warranty_claim_detail', claim_id=claim.pk)
 
@@ -9244,6 +9288,15 @@ def warranty_staff_action(request, claim_id):
     note   = request.POST.get('note', '').strip()
     now    = timezone.now()
 
+    # این اقدامات فقط روی درخواست‌هایی که هنوز به سرانجام نرسیده‌اند معنا دارند —
+    # بدون این محافظ می‌شد یک درخواست بسته‌شده را دوباره «رفع» یا «رد» کرد
+    TERMINAL_WARRANTY_STATUSES = {
+        WarrantyClaim.STATUS_RESOLVED, WarrantyClaim.STATUS_REJECTED, WarrantyClaim.STATUS_CLOSED,
+    }
+    if action in {'info_needed', 'approve', 'in_progress', 'resolve', 'reject'} and claim.status in TERMINAL_WARRANTY_STATUSES:
+        messages.error(request, 'این درخواست به سرانجام رسیده و دیگر قابل تغییر وضعیت نیست.')
+        return redirect('warranty_staff_detail', claim_id=claim.pk)
+
     if action == 'start_review':
         if claim.status == WarrantyClaim.STATUS_SUBMITTED:
             claim.status = WarrantyClaim.STATUS_REVIEWING
@@ -9315,6 +9368,9 @@ def warranty_staff_action(request, claim_id):
             messages.success(request, 'درخواست رد شد.')
 
     elif action == 'close':
+        if claim.status not in {WarrantyClaim.STATUS_RESOLVED, WarrantyClaim.STATUS_REJECTED}:
+            messages.error(request, 'فقط درخواست‌های رفع‌شده یا ردشده قابل بستن هستند.')
+            return redirect('warranty_staff_detail', claim_id=claim.pk)
         claim.status = WarrantyClaim.STATUS_CLOSED
         claim.save(update_fields=['status', 'updated_at'])
         _warranty_log(claim, request.user, WarrantyClaimLog.ACTION_CLOSED,

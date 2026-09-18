@@ -23,7 +23,7 @@ from PIL import Image, ImageOps
 
 DISPLAY_TZ = ZoneInfo(getattr(settings, 'APP_DISPLAY_TIME_ZONE', 'Asia/Tehran'))
 
-from .models import Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, SystemSettings, UploadSettings, UserProfile
+from .models import AgencyApplication, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderItem, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceRecord, PaymentRecord, PriceList, ProformaInvoice, ReconciliationMessage, ReconciliationThread, SystemSettings, UploadSettings, UserProfile, WarrantyClaim
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry'}
 MANAGER_ROLES = {'finance_manager', 'commercial_manager', 'sales_manager'}
@@ -1898,9 +1898,12 @@ class UserAccessManagementForm(forms.Form):
 
     def save(self):
         profile = self.target.profile
+        old_role = profile.role
+        new_role = old_role
         if 'role' in self.cleaned_data:
-            profile.role = self.cleaned_data['role']
-            self.target.is_staff = self.target.is_superuser or profile.role in STAFF_ROLES or profile.role in {'warranty', 'warranty_manager'}
+            new_role = self.cleaned_data['role']
+            profile.role = new_role
+            self.target.is_staff = self.target.is_superuser or new_role in STAFF_ROLES or new_role in {'warranty', 'warranty_manager'}
         profile.can_view_invoices = self.cleaned_data.get('can_view_invoices', False)
         profile.can_upload_invoices = self.cleaned_data.get('can_upload_invoices', False)
         profile.can_edit_payment_details = self.cleaned_data.get('can_edit_payment_details', False)
@@ -1909,7 +1912,27 @@ class UserAccessManagementForm(forms.Form):
         self.target.is_active = self.cleaned_data.get('is_active', True)
         self.target.save()
         profile.save()
+
+        if new_role != old_role:
+            self._clear_stale_role_assignments(old_role, new_role)
+
         return self.target
+
+    def _clear_stale_role_assignments(self, old_role, new_role):
+        """
+        وقتی نقش کاربر تغییر می‌کند، ارجاعاتی که او را به‌عنوان کارشناس/مسئول فعلی
+        نگه داشته‌اند (فروش، گارانتی) باید پاک شوند — در غیر این صورت مشتری یا سند
+        به کاربری ارجاع داده می‌شود که دیگر آن نقش را ندارد.
+        """
+        user = self.target
+        if old_role in {'sales', 'sales_manager'} and new_role not in {'sales', 'sales_manager'}:
+            CustomerSalesAssignment.objects.filter(sales_user=user).delete()
+            DailyPaymentAssignment.objects.filter(sales_user=user).update(sales_user=None)
+            CustomerOrder.objects.filter(sales_expert=user).update(sales_expert=None)
+        if old_role in {'warranty', 'warranty_manager'} and new_role not in {'warranty', 'warranty_manager'}:
+            WarrantyClaim.objects.filter(assigned_to=user).update(assigned_to=None)
+        if old_role != 'customer' and new_role == 'customer':
+            AgencyApplication.objects.filter(assigned_to=user).update(assigned_to=None)
 
 
 def _reconciliation_staff_queryset(customer_visible_only=False):

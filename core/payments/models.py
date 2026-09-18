@@ -1192,11 +1192,19 @@ class SystemActivityLog(models.Model):
 class UserNotification(models.Model):
     CATEGORY_PAYMENT = 'payment'
     CATEGORY_INVOICE = 'invoice'
+    CATEGORY_ORDER = 'order'
+    CATEGORY_WARRANTY = 'warranty'
+    CATEGORY_AGENCY = 'agency'
+    CATEGORY_RECONCILIATION = 'reconciliation'
     CATEGORY_SYSTEM = 'system'
 
     CATEGORY_CHOICES = [
         (CATEGORY_PAYMENT, 'فیش واریزی'),
-        (CATEGORY_INVOICE, 'فاکتور'),
+        (CATEGORY_INVOICE, 'فاکتور و اسناد فروش'),
+        (CATEGORY_ORDER, 'سفارش'),
+        (CATEGORY_WARRANTY, 'گارانتی'),
+        (CATEGORY_AGENCY, 'نمایندگی'),
+        (CATEGORY_RECONCILIATION, 'مغایرت‌گیری'),
         (CATEGORY_SYSTEM, 'سیستم'),
     ]
 
