@@ -772,7 +772,7 @@ def _suggest_five_digit_password():
     return ''.join(selected)
 
 
-def _staff_status_choices_for_role(role):
+def _staff_status_choices_for_role(role, current_status=None):
     """
     وضعیت‌های مجاز برای فلگ بازرگانی — بر اساس نقش.
     فلگ مالی مستقل است و از طریق finance_unified_action مدیریت می‌شود.
@@ -786,6 +786,15 @@ def _staff_status_choices_for_role(role):
         (PaymentRecord.STATUS_INCOMPLETE,         'ناقص'),
         (PaymentRecord.STATUS_REJECTED,           'رد شده'),
     ]
+
+    # «عودت به مالی» فقط از وضعیت «ثبت بازرگانی» یا «ثبت موقت بازرگانی» قابل دسترسی است؛
+    # از سایر وضعیت‌های فعال بازرگانی (بررسی، عودت‌شده از مالی و...) اصلاً نباید انتخاب‌پذیر باشد.
+    RETURN_TO_FINANCE_ALLOWED_FROM = {PaymentRecord.STATUS_APPROVED, PaymentRecord.STATUS_TEMP_COMMERCIAL}
+    if current_status not in RETURN_TO_FINANCE_ALLOWED_FROM:
+        COMMERCIAL_CHOICES = [
+            choice for choice in COMMERCIAL_CHOICES
+            if choice[0] != PaymentRecord.STATUS_RETURNED_TO_FINANCE
+        ]
 
     dept = _department_role(role)
 
@@ -1040,17 +1049,23 @@ def _can_see_pending_final_approval(user):
     return FinalApprovalDelegate.objects.filter(delegated_user=user, is_active=True).exists()
 
 
-def _can_final_approve(role, payment, is_system_admin=False, user=None):
+def _can_final_approve(role, payment, is_system_admin=False, user=None, is_delegated=None):
     """
     آیا تأیید نهایی مجاز است؟
     - مدیر مالی: همیشه (اگر هر دو فلگ آماده باشند)
     - کاربر تفویض‌شده (از FinalApprovalDelegate): اگر delegation فعال باشد
     - ادمین: همیشه
+
+    is_delegated: اگر فراخوان (مثل _enrich_records روی فهرست رکوردها) از قبل
+    این مقدار را یک‌بار برای کل درخواست محاسبه کرده، آن را بده تا به‌ازای هر
+    رکورد یک کوئری جداگانه به FinalApprovalDelegate زده نشود.
     """
     if not payment.ready_for_final_approval:
         return False
     if is_system_admin or role == 'finance_manager':
         return True
+    if is_delegated is not None:
+        return is_delegated
     # بررسی تفویض جهانی
     if user:
         from .models import FinalApprovalDelegate
@@ -1207,6 +1222,13 @@ def _build_query_string(request, remove_keys=None):
     return query_params.urlencode()
 
 
+# سقف تعداد رکورد در حالت «همه» (per_page=all) — برای جلوگیری از تولید یک صفحه‌ی
+# نامحدود که با رشد داده‌ها می‌تواند سرور را کند یا کاربر را در حالت loading نگه دارد.
+# اگر رکوردها از این سقف بیشتر باشند، «همه» به‌جای یک صفحه‌ی غول‌آسا، صفحه‌بندی
+# عادی با اندازه‌ی همین سقف می‌شود (چیزی گم نمی‌شود، فقط چند صفحه‌ای می‌شود).
+PER_PAGE_ALL_CAP = 1000
+
+
 def _get_page_size(request, page_param='page', default=10):
     page_size_key = 'per_page' if page_param == 'page' else page_param.replace('_page', '_per_page')
     page_size_value = (request.GET.get(page_size_key) or '').strip().lower()
@@ -1222,7 +1244,8 @@ def _get_page_size(request, page_param='page', default=10):
 def _paginate_queryset(request, queryset, per_page=10, page_param='page'):
     page_size, _ = _get_page_size(request, page_param=page_param, default=per_page)
     if page_size == 'all':
-        paginator = Paginator(queryset, max(len(queryset), 1))
+        total = len(queryset)
+        paginator = Paginator(queryset, min(max(total, 1), PER_PAGE_ALL_CAP))
     else:
         paginator = Paginator(queryset, page_size)
     page_number = request.GET.get(page_param) or 1
@@ -2346,6 +2369,15 @@ def _customer_visible_logs(logs):
 
 
 def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_payment_details=False, acting_user=None):
+    # تفویض تأیید نهایی یک‌بار برای کل درخواست محاسبه می‌شود (نه به‌ازای هر رکورد)
+    # چون نتیجه‌اش برای این کاربر ثابت است و ربطی به رکورد ندارد
+    _is_delegated_approver = None
+    if staff_role and acting_user and not is_system_admin and staff_role != 'finance_manager':
+        from .models import FinalApprovalDelegate
+        _is_delegated_approver = FinalApprovalDelegate.objects.filter(
+            delegated_user=acting_user, is_active=True,
+        ).exists()
+
     status_order = [
         PaymentRecord.STATUS_COMMERCIAL_REVIEW,
         PaymentRecord.STATUS_TEMP_COMMERCIAL,
@@ -2358,8 +2390,18 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
     ]
     records = list(records)
     for payment in records:
+        # لاگ‌ها را یک‌بار واکشی می‌کنیم و در چند جا استفاده می‌کنیم — از کش prefetch
+        # (که در _records_for_user با Prefetch(select_related=...) ساخته شده) استفاده
+        # می‌شود تا برای هر رکورد یک کوئری جداگانه به پایگاه‌داده زده نشود؛ روی
+        # per_page=all با هزاران رکورد، فراخوانی مستقیم .select_related() روی
+        # manager کش prefetch را دور می‌زند و باعث کوئری اضافه به ازای هر رکورد می‌شود.
+        _cached_logs = getattr(payment, '_prefetched_objects_cache', {}).get('activity_logs')
+        if _cached_logs is None:
+            _cached_logs = payment.activity_logs.select_related('actor', 'actor__profile').all()
+        _fetched_logs = list(_cached_logs)
+
         reached = set()
-        for log in payment.activity_logs.all():
+        for log in _fetched_logs:
             if log.to_status in STATUS_FLAG_META:
                 reached.add(log.to_status)
         if payment.status in STATUS_FLAG_META:
@@ -2375,10 +2417,6 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
             for code in status_order
             if code in reached
         ]
-        # لاگ‌ها را یک‌بار واکشی می‌کنیم و در چند جا استفاده می‌کنیم
-        _fetched_logs = list(
-            payment.activity_logs.select_related('actor', 'actor__profile').all()
-        )
 
         if staff_role:
             raw_lines = [
@@ -2398,12 +2436,16 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         payment.staff_can_act = _can_staff_act_on_payment(
             staff_role, payment, is_system_admin=is_system_admin,
         ) if staff_role else False
-        payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role) if staff_role else []
+        payment.staff_allowed_choices = _staff_status_choices_for_role(staff_role, payment.status) if staff_role else []
         _dept = _department_role(staff_role) if staff_role else ''
         if payment.status == PaymentRecord.STATUS_APPROVED and _dept in {'commercial', 'sales'}:
             payment.staff_allowed_choices = [
                 choice for choice in payment.staff_allowed_choices
-                if choice[0] in {PaymentRecord.STATUS_APPROVED, PaymentRecord.STATUS_TEMP_COMMERCIAL}
+                if choice[0] in {
+                    PaymentRecord.STATUS_APPROVED,
+                    PaymentRecord.STATUS_TEMP_COMMERCIAL,
+                    PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+                }
             ]
         payment.can_edit_details = bool(can_edit_payment_details)
         payment.can_customer_edit = _can_customer_edit_payment(payment)
@@ -2425,6 +2467,7 @@ def _enrich_records(records, staff_role='', is_system_admin=False, can_edit_paym
         )
         payment.can_final_approve = _can_final_approve(
             staff_role, payment, is_system_admin=is_system_admin, user=acting_user,
+            is_delegated=_is_delegated_approver,
         ) if staff_role else False
         payment.can_delegate = _can_delegate_final_approval(staff_role, is_system_admin)
         payment.can_void = _can_commercial_void(
@@ -3695,11 +3738,70 @@ def daily_payment_notices(request):
     else:
         form = DailyPaymentNoticeForm(instance=notice, initial=initial)
 
-    recent_notices = (
+    # ─── فیلتر/جستجوی سوابق اعلامیه‌های صادرشده — نام‌های GET عمداً متفاوت از
+    # customer/date هستند تا با پارامترهای فرم ثبت/ویرایش در همین صفحه تداخل نکنند ───
+    recent_notices_qs = (
         DailyPaymentNotice.objects
-        .select_related('customer', 'published_by', 'created_by')
-        .order_by('-updated_at', '-id')[:20]
+        .select_related('customer', 'customer__profile', 'published_by', 'created_by')
+        .order_by('-updated_at', '-id')
     )
+    notice_customer_q = (request.GET.get('notice_customer') or '').strip()
+    notice_date_from = (request.GET.get('notice_date_from') or '').strip()
+    notice_date_to = (request.GET.get('notice_date_to') or '').strip()
+    notice_status_filter = (request.GET.get('notice_status') or '').strip()
+    notice_seen_filter = (request.GET.get('notice_seen') or '').strip()
+
+    if notice_customer_q:
+        recent_notices_qs = recent_notices_qs.filter(
+            Q(customer__first_name__icontains=notice_customer_q) |
+            Q(customer__last_name__icontains=notice_customer_q) |
+            Q(customer__username__icontains=notice_customer_q) |
+            Q(customer__profile__organization__icontains=notice_customer_q)
+        )
+    parsed_notice_date_from = _parse_jalali_date(notice_date_from)
+    if parsed_notice_date_from:
+        recent_notices_qs = recent_notices_qs.filter(notice_date__gte=parsed_notice_date_from)
+    parsed_notice_date_to = _parse_jalali_date(notice_date_to)
+    if parsed_notice_date_to:
+        recent_notices_qs = recent_notices_qs.filter(notice_date__lte=parsed_notice_date_to)
+    if notice_status_filter == 'published':
+        recent_notices_qs = recent_notices_qs.filter(is_published=True)
+    elif notice_status_filter == 'draft':
+        recent_notices_qs = recent_notices_qs.filter(is_published=False)
+    if notice_seen_filter == 'seen':
+        recent_notices_qs = recent_notices_qs.filter(customer_seen_at__isnull=False)
+    elif notice_seen_filter == 'unseen':
+        recent_notices_qs = recent_notices_qs.filter(customer_seen_at__isnull=True)
+
+    recent_notices_page_obj = _paginate_queryset(request, recent_notices_qs, per_page=20, page_param='notice_page')
+    recent_notices_page_base_query = _build_query_string(request, remove_keys=['notice_page'])
+    recent_notices_filters = {
+        'customer': notice_customer_q,
+        'date_from': notice_date_from,
+        'date_to': notice_date_to,
+        'status': notice_status_filter,
+        'seen': notice_seen_filter,
+    }
+
+    # داده‌ی هر ردیف صفحه‌ی فعلی برای نمایش در popup هنگام کلیک روی ردیف
+    notice_popup_data = {
+        str(item.id): {
+            'customer': item.customer.get_full_name() or item.customer.username,
+            'date': _format_jalali_date(item.notice_date),
+            'count': item.payment_count,
+            'amount': item.total_amount,
+            'status': 'منتشر شده' if item.is_published else 'پیش‌نویس',
+            'seen': (
+                f'مشاهده شده — {_format_jalali_datetime(item.customer_seen_at)}'
+                if item.customer_seen_at else 'مشاهده نشده'
+            ),
+            'publisher': (item.published_by.get_full_name() or item.published_by.username) if item.published_by else '-',
+            'updated_at': _format_jalali_datetime(item.updated_at),
+            'message': item.message,
+        }
+        for item in recent_notices_page_obj
+    }
+
     return render(request, 'payments/daily_payment_notices.html', {
         'form': form,
         'selected_customer': selected_customer,
@@ -3709,7 +3811,11 @@ def daily_payment_notices(request):
         'duplicate_notice': duplicate_notice,
         'duplicate_notice_action': duplicate_notice_action,
         'preview_stats': preview_stats,
-        'recent_notices': recent_notices,
+        'recent_notices': recent_notices_page_obj,
+        'recent_notices_page_obj': recent_notices_page_obj,
+        'recent_notices_page_base_query': recent_notices_page_base_query,
+        'recent_notices_filters': recent_notices_filters,
+        'notice_popup_data': notice_popup_data,
         'user_display_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
     })
 
@@ -3748,21 +3854,54 @@ def customer_daily_payments(request):
         ]
 
     page_obj = _paginate_queryset(request, assignments, per_page=10, page_param='page')
-    customer_notices = (
-        DailyPaymentNotice.objects
-        .filter(customer=request.user, is_published=True)
-        .select_related('published_by')
-        .order_by('-notice_date', '-published_at', '-id')[:30]
-    )
     page_base_query = _build_query_string(request, remove_keys=['page'])
     filters = {
         'start_date': (request.GET.get('start_date') or '').strip(),
         'end_date': (request.GET.get('end_date') or '').strip(),
         'status': status_filter,
     }
+
+    # ─── سوابق اعلامیه‌های گزارش فیش — هر مشتری فقط اعلامیه‌های منتشرشده‌ی خودش
+    # را می‌بیند (filter(customer=request.user))؛ با جستجو/فیلتر و صفحه‌بندی مستقل ───
+    customer_notices_qs = (
+        DailyPaymentNotice.objects
+        .filter(customer=request.user, is_published=True)
+        .select_related('published_by')
+        .order_by('-notice_date', '-published_at', '-id')
+    )
+    notice_start_date = (request.GET.get('notice_start_date') or '').strip()
+    notice_end_date = (request.GET.get('notice_end_date') or '').strip()
+    notice_seen = (request.GET.get('notice_seen') or '').strip()
+    notice_q = (request.GET.get('notice_q') or '').strip()
+
+    parsed_notice_start = _parse_jalali_date(notice_start_date)
+    if parsed_notice_start:
+        customer_notices_qs = customer_notices_qs.filter(notice_date__gte=parsed_notice_start)
+    parsed_notice_end = _parse_jalali_date(notice_end_date)
+    if parsed_notice_end:
+        customer_notices_qs = customer_notices_qs.filter(notice_date__lte=parsed_notice_end)
+    if notice_seen == 'seen':
+        customer_notices_qs = customer_notices_qs.filter(customer_seen_at__isnull=False)
+    elif notice_seen == 'unseen':
+        customer_notices_qs = customer_notices_qs.filter(customer_seen_at__isnull=True)
+    if notice_q:
+        customer_notices_qs = customer_notices_qs.filter(message__icontains=notice_q)
+
+    notice_page_obj = _paginate_queryset(request, customer_notices_qs, per_page=10, page_param='notice_page')
+    notice_page_base_query = _build_query_string(request, remove_keys=['notice_page'])
+    notice_filters = {
+        'start_date': notice_start_date,
+        'end_date': notice_end_date,
+        'seen': notice_seen,
+        'q': notice_q,
+    }
+
     return render(request, 'payments/customer_daily_payments.html', {
         'assignments': page_obj,
-        'customer_notices': customer_notices,
+        'customer_notices': notice_page_obj,
+        'notice_page_obj': notice_page_obj,
+        'notice_page_base_query': notice_page_base_query,
+        'notice_filters': notice_filters,
         'page_obj': page_obj,
         'page_base_query': page_base_query,
         'filters': filters,
@@ -3926,7 +4065,7 @@ def create_payment(request):
         'is_system_admin': is_system_admin,
         'user_display_name': user_display_name,
         'source_profiles': _source_profiles_for_user(request.user) if not is_staff_user else [],
-        'destination_profiles': [],
+        'destination_profiles': _destination_profiles_for_user(request.user) if not is_staff_user else [],
         'counterparty_accounts': _counterparty_account_rows(counterparty_accounts),
         'current_sort': current_sort,
         'current_sort_dir': current_sort_dir,
@@ -4975,7 +5114,7 @@ def staff_update_status(request, payment_id):
         return redirect(redirect_target)
 
     target_status = form.cleaned_data['status']
-    allowed_statuses = {value for value, _ in _staff_status_choices_for_role(staff_role)}
+    allowed_statuses = {value for value, _ in _staff_status_choices_for_role(staff_role, payment.status)}
     if not request.user.is_superuser and target_status not in allowed_statuses:
         messages.error(request, 'این تغییر وضعیت برای نقش شما مجاز نیست.')
         return redirect(redirect_target)
@@ -4986,9 +5125,13 @@ def staff_update_status(request, payment_id):
     if (
         from_status == PaymentRecord.STATUS_APPROVED
         and department_role in {'commercial', 'sales'}
-        and target_status not in {PaymentRecord.STATUS_APPROVED, PaymentRecord.STATUS_TEMP_COMMERCIAL}
+        and target_status not in {
+            PaymentRecord.STATUS_APPROVED,
+            PaymentRecord.STATUS_TEMP_COMMERCIAL,
+            PaymentRecord.STATUS_RETURNED_TO_FINANCE,
+        }
     ):
-        messages.error(request, 'از وضعیت ثبت بازرگانی فقط امکان برگشت به ثبت موقت بازرگانی وجود دارد.')
+        messages.error(request, 'از وضعیت ثبت بازرگانی فقط امکان برگشت به ثبت موقت بازرگانی یا عودت به مالی وجود دارد.')
         return redirect(redirect_target)
     if target_status == PaymentRecord.STATUS_INCOMPLETE and not note:
         messages.error(request, 'برای وضعیت «ناقص»، ثبت توضیح الزامی است.')
@@ -5250,7 +5393,7 @@ def edit_payment(request, payment_id):
         'form': form,
         'payment': payment,
         'source_profiles': _source_profiles_for_user(request.user),
-        'destination_profiles': [],
+        'destination_profiles': _destination_profiles_for_user(request.user),
         'counterparty_accounts': _counterparty_account_rows(counterparty_accounts),
         'customer_info': initial_data,
         'customer_debt': _customer_debt_summary(request.user),

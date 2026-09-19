@@ -130,7 +130,7 @@ _GROUP_META = {
     'customers': {'label': 'مشتریان',                    'icon': '👥',  'order': 2},
     'business':  {'label': 'بازرگانی',                   'icon': '🏦',  'order': 3},
     'sales':     {'label': 'فروش',                       'icon': '📦',  'order': 4},
-    'warranty':  {'label': 'گارانتی و خدمات پس از فروش', 'icon': '🛡️', 'order': 5},
+    'warranty':  {'label': 'خدمات پس از فروش', 'icon': '🛡️', 'order': 5},
     'finance':   {'label': 'مالی',                       'icon': '💰',  'order': 6},
     'system':    {'label': 'عملیات سیستمی',               'icon': '⚙️', 'order': 7},
     'account':   {'label': 'حساب من',                    'icon': '👤',  'order': 8},

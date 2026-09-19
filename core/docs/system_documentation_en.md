@@ -332,7 +332,7 @@ Customer submits the edit form
 
 ### 4.4.5 Regular Return & Finance Confirmation Workflow
 
-A regular return ("Return to finance" from commercial's dropdown, distinct from the void path) is available from any active commercial state, regardless of whether finance has already registered.
+A regular return ("Return to finance" from commercial's dropdown, distinct from the void path) is available **only** from the `temp_commercial` or `approved` states — it never appears in the dropdown, and the server rejects it too, from any other active commercial state (under review, returned from finance, pending admin review). This restriction applies regardless of whether finance has already registered.
 
 ```
 Commercial returns the record to finance
@@ -988,7 +988,7 @@ Keep these rules when modifying the system:
 
 - Finance flag is independent from commercial status.
 - Finance and commercial can act on the same payment record independently.
-- **"Return to finance" has two independent paths**: **regular** (from any active commercial state, unconditional on finance registration — requires finance to confirm via `return_confirmed_at`, finance_status stays untouched) and **void** (`is_void_return=True`, only from `temp_commercial`/`approved`, condition `finance_status == finance_ok`, irreversible except by superuser).
+- **"Return to finance" has two independent paths, both reachable only from `temp_commercial`/`approved`**: **regular** (unconditional on finance registration — requires finance to confirm via `return_confirmed_at`, finance_status stays untouched) and **void** (`is_void_return=True`, condition `finance_status == finance_ok`, irreversible except by superuser).
 - **`follow_up` status is removed**: do not re-add it. Use the admin review queue instead.
 - **Void flow**: commercial sets `returned_finance + is_void_return=True`; finance confirms in one step; finance registration is auto-reversed if needed; status becomes `void_confirmed`.
 - **`is_void_return` flag**: never reset when setting `returned_finance` — it distinguishes void return from regular return.

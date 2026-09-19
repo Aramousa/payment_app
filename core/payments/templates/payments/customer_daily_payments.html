@@ -64,6 +64,11 @@
                     <option value="complete" {% if filters.status == 'complete' %}selected{% endif %}>تکمیل شده</option>
                 </select>
             </div>
+            {# فیلترهای بخش اعلامیه‌ها حفظ شوند تا با اعمال این فیلتر پاک نشوند #}
+            {% if notice_filters.start_date %}<input type="hidden" name="notice_start_date" value="{{ notice_filters.start_date }}">{% endif %}
+            {% if notice_filters.end_date %}<input type="hidden" name="notice_end_date" value="{{ notice_filters.end_date }}">{% endif %}
+            {% if notice_filters.seen %}<input type="hidden" name="notice_seen" value="{{ notice_filters.seen }}">{% endif %}
+            {% if notice_filters.q %}<input type="hidden" name="notice_q" value="{{ notice_filters.q }}">{% endif %}
             <button type="submit" class="button-link">اعمال فیلتر</button>
             <a href="{% url 'customer_daily_payments' %}" class="button-link alt">حذف فیلتر</a>
         </form>
@@ -71,6 +76,35 @@
 
     <div class="panel">
         <h3>سوابق اعلامیه‌های گزارش فیش</h3>
+        <form method="get" class="filters">
+            <div>
+                <label for="notice-start-date">از تاریخ گزارش</label>
+                <input id="notice-start-date" class="jalali-date" type="text" name="notice_start_date" value="{{ notice_filters.start_date }}" inputmode="numeric" dir="ltr">
+            </div>
+            <div>
+                <label for="notice-end-date">تا تاریخ گزارش</label>
+                <input id="notice-end-date" class="jalali-date" type="text" name="notice_end_date" value="{{ notice_filters.end_date }}" inputmode="numeric" dir="ltr">
+            </div>
+            <div>
+                <label for="notice-seen">وضعیت مشاهده</label>
+                <select id="notice-seen" name="notice_seen">
+                    <option value="">همه</option>
+                    <option value="seen" {% if notice_filters.seen == 'seen' %}selected{% endif %}>مشاهده شده</option>
+                    <option value="unseen" {% if notice_filters.seen == 'unseen' %}selected{% endif %}>مشاهده نشده</option>
+                </select>
+            </div>
+            <div>
+                <label for="notice-q">جستجو در متن اعلامیه</label>
+                <input id="notice-q" type="text" name="notice_q" value="{{ notice_filters.q }}">
+            </div>
+            {# فیلترهای بخش برنامه‌های واریز حفظ شوند تا با اعمال این فیلتر پاک نشوند #}
+            {% if filters.start_date %}<input type="hidden" name="start_date" value="{{ filters.start_date }}">{% endif %}
+            {% if filters.end_date %}<input type="hidden" name="end_date" value="{{ filters.end_date }}">{% endif %}
+            {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+            {% if page_obj.number > 1 %}<input type="hidden" name="page" value="{{ page_obj.number }}">{% endif %}
+            <button type="submit" class="button-link">اعمال فیلتر</button>
+            <a href="{% url 'customer_daily_payments' %}" class="button-link alt">حذف فیلتر</a>
+        </form>
         <div class="table-wrap">
         <table>
             <thead>
@@ -87,7 +121,7 @@
             <tbody>
                 {% for notice in customer_notices %}
                 <tr>
-                    <td>{{ forloop.counter }}</td>
+                    <td>{{ notice_page_obj.start_index|add:forloop.counter0 }}</td>
                     <td>{{ notice.notice_date|jalali_date }}</td>
                     <td>{{ notice.payment_count|thousand_sep }}</td>
                     <td class="money">{{ notice.total_amount|thousand_sep }} ریال</td>
@@ -96,11 +130,12 @@
                     <td>{% if notice.customer_seen_at %}<span class="badge seen">مشاهده شده</span><br>{{ notice.customer_seen_at|jalali_datetime }}{% else %}<span class="badge unseen">مشاهده نشده</span>{% endif %}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7">هنوز اعلامیه‌ای برای شما منتشر نشده است.</td></tr>
+                <tr><td colspan="7">اعلامیه‌ای با این مشخصات یافت نشد.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         </div>
+        {% include "payments/partials/pagination.html" with page_obj=notice_page_obj page_param="notice_page" page_base_query=notice_page_base_query link_class="button-link" %}
     </div>
 
     <div class="panel">
@@ -143,7 +178,7 @@
                 {% endfor %}
             </tbody>
         </table>
-        {% include "payments/partials/pagination.html" %}
+        {% include "payments/partials/pagination.html" with page_obj=page_obj page_param="page" page_base_query=page_base_query link_class="button-link" %}
     </div>
 
     <script>

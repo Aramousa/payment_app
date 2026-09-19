@@ -165,6 +165,19 @@
                 </select>
             </p>
             <p class="full-row">
+                <label for="destination_profile_picker">استفاده از اطلاعات مقصد قبلی</label>
+                <select id="destination_profile_picker">
+                    <option value="">انتخاب کنید</option>
+                    {% for profile in destination_profiles %}
+                        <option value="{{ forloop.counter0 }}">
+                            {{ profile.beneficiary_bank_name }} | {{ profile.beneficiary_account_number }} | {{ profile.beneficiary_account_owner }}
+                        </option>
+                    {% empty %}
+                        <option value="" disabled>اطلاعات مقصد قبلی موجود نیست</option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p class="full-row">
                 <label for="{{ form.customer_notes.id_for_label }}">توضیح (اختیاری)</label>
                 {{ form.customer_notes }}
                 {% if form.customer_notes.help_text %}<span class="helptext">{{ form.customer_notes.help_text }}</span>{% endif %}
@@ -174,6 +187,7 @@
             <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'submit' %}{% endif %}" class="back-link">بازگشت</a>
         </form>
         {{ source_profiles|json_script:"source-profiles-data" }}
+        {{ destination_profiles|json_script:"destination-profiles-data" }}
         {{ counterparty_accounts|json_script:"counterparty-accounts-data" }}
     </div>
     <div id="previewOverlay" class="preview-overlay" tabindex="-1">
@@ -218,6 +232,29 @@
                 Object.keys(fieldMap).forEach(function (name) {
                     const input = document.querySelector('[name="' + name + '"]');
                     if (input) input.value = fieldMap[name];
+                });
+            });
+        }
+
+        const destinationPicker = document.getElementById('destination_profile_picker');
+        const destinationDataEl = document.getElementById('destination-profiles-data');
+        if (destinationPicker && destinationDataEl) {
+            const destProfiles = JSON.parse(destinationDataEl.textContent || '[]');
+            destinationPicker.addEventListener('change', function () {
+                const idx = parseInt(destinationPicker.value, 10);
+                if (Number.isNaN(idx) || !destProfiles[idx]) return;
+                const selected = destProfiles[idx];
+                const fieldMap = {
+                    beneficiary_bank_name: selected.beneficiary_bank_name || '',
+                    beneficiary_account_number: selected.beneficiary_account_number || '',
+                    beneficiary_account_owner: selected.beneficiary_account_owner || ''
+                };
+                Object.keys(fieldMap).forEach(function (name) {
+                    const input = document.querySelector('[name="' + name + '"]');
+                    if (input) {
+                        input.readOnly = false;
+                        input.value = fieldMap[name];
+                    }
                 });
             });
         }
