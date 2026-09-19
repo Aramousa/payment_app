@@ -3366,37 +3366,28 @@ def _payment_notice_default_message(customer, notice_date, payment_count, total_
 
 
 def _published_payment_notice_for_customer(user):
+    """
+    آخرین اطلاعیه‌ی منتشرشده برای مشتری که هنوز آن را کنار نگذاشته (dismiss نکرده).
+    طبق قانون کسب‌وکار: هر اطلاعیه تا صدور اطلاعیه‌ی بعدی، در هر بازدید دوباره
+    نمایش داده می‌شود — مگر اینکه مشتری صریحاً اعلام کند دیگر نمی‌خواهد آن را ببیند
+    (customer_dismissed_at). با صدور اطلاعیه‌ی جدید، این چرخه از نو شروع می‌شود.
+    """
     if not user or not user.is_authenticated or _is_staff_user(user):
         return None
-    return (
+    notice = (
         DailyPaymentNotice.objects
         .select_related('customer', 'published_by')
-        .filter(customer=user, is_published=True)
+        .filter(customer=user, is_published=True, customer_dismissed_at__isnull=True)
         .order_by('-notice_date', '-published_at', '-id')
         .first()
     )
-
-
-def _payment_notice_splash_token(notice):
-    if not notice:
-        return ''
-    version = notice.published_at or notice.updated_at or notice.created_at
-    if version:
-        return f'{notice.id}:{int(version.timestamp())}'
-    return str(notice.id)
-
-
-def _should_show_payment_notice_splash(request, notice):
-    if not notice or notice.customer_seen_at:
-        return False
-    session_key = 'daily_payment_notice_splash_seen_ids'
-    seen_ids = request.session.get(session_key, [])
-    notice_token = _payment_notice_splash_token(notice)
-    if notice_token in {str(item) for item in seen_ids}:
-        return False
-    request.session[session_key] = [*seen_ids, notice_token]
-    request.session.modified = True
-    return True
+    if notice and notice.customer_seen_at is None:
+        # همین که اطلاعیه به داشبورد مشتری می‌رسد، خودکار «مشاهده‌شده» ثبت می‌شود —
+        # قبلاً این فقط با کلیک روی دکمه «متوجه شدم» ثبت می‌شد که در عمل خیلی وقت‌ها
+        # اتفاق نمی‌افتاد و باعث می‌شد وضعیت مشاهده برای کارکنان همیشه نادرست بماند
+        notice.customer_seen_at = timezone.now()
+        notice.save(update_fields=['customer_seen_at', 'updated_at'])
+    return notice
 
 
 def _managed_users(query='', role='', status=''):
@@ -3842,16 +3833,22 @@ def daily_payment_notices(request):
 @login_required
 @require_POST
 def daily_payment_notice_seen(request, notice_id):
+    """
+    کلیک مشتری روی «دیگر نمایش نده» — این اطلاعیه‌ی خاص را کنار می‌گذارد
+    (customer_dismissed_at) تا دیگر نمایش داده نشود. مستقل از این، «مشاهده‌شده»
+    خودکار و بدون نیاز به کلیک، همین که اطلاعیه به داشبورد مشتری می‌رسد ثبت
+    می‌شود (نگاه کنید به _published_payment_notice_for_customer).
+    """
     notice = get_object_or_404(DailyPaymentNotice, id=notice_id, customer=request.user, is_published=True)
-    session_key = 'daily_payment_notice_splash_seen_ids'
-    seen_ids = request.session.get(session_key, [])
-    notice_token = _payment_notice_splash_token(notice)
-    if notice_token not in {str(item) for item in seen_ids}:
-        request.session[session_key] = [*seen_ids, notice_token]
-        request.session.modified = True
+    update_fields = []
     if notice.customer_seen_at is None:
         notice.customer_seen_at = timezone.now()
-        notice.save(update_fields=['customer_seen_at', 'updated_at'])
+        update_fields.append('customer_seen_at')
+    if notice.customer_dismissed_at is None:
+        notice.customer_dismissed_at = timezone.now()
+        update_fields.append('customer_dismissed_at')
+    if update_fields:
+        notice.save(update_fields=[*update_fields, 'updated_at'])
     return JsonResponse({'ok': True})
 
 
@@ -4062,10 +4059,8 @@ def create_payment(request):
     page_base_query = _build_query_string(request, remove_keys=['page'])
     user_display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
     customer_payment_notice = _published_payment_notice_for_customer(request.user) if not is_staff_user else None
-    show_customer_payment_notice_splash = _should_show_payment_notice_splash(
-        request,
-        customer_payment_notice,
-    ) if customer_payment_notice else False
+    # اطلاعیه‌ی کنار گذاشته‌نشده باید در هر بازدید دوباره نمایش داده شود — نه فقط یک‌بار در هر نشست
+    show_customer_payment_notice_splash = bool(customer_payment_notice)
 
     return render(request, 'payments/form.html', {
         'form': form,

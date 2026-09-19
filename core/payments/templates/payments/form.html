@@ -700,9 +700,7 @@
                     </div>
                 </div>
                 <div class="customer-payment-alert-actions">
-                    {% if not customer_payment_notice.customer_seen_at %}
-                    <button type="button" class="notice-ack-btn">متوجه شدم</button>
-                    {% endif %}
+                    <button type="button" class="notice-ack-btn">دیگر نمایش نده</button>
                     <a class="button-link" href="{% url 'payment_create' %}">مشاهده فیش‌ها</a>
                 </div>
             </div>
@@ -727,7 +725,7 @@
                     </div>
                 </div>
                 <div class="notice-splash-actions">
-                    <button type="button" class="notice-ack-btn">متوجه شدم</button>
+                    <button type="button" class="notice-ack-btn">دیگر نمایش نده</button>
                 </div>
             </div>
         </div>
@@ -2399,30 +2397,29 @@
             return '';
         }
 
-        function markNoticeSeen(container) {
-            if (!container || container.dataset.sent === '1') return;
-            var url = container.getAttribute('data-seen-url');
-            if (!url) return;
-            container.dataset.sent = '1';
+        var noticeDismissSent = false;
+
+        function dismissNotice() {
+            var splash = document.getElementById('noticeSplash');
+            var alertBox = document.getElementById('customer-payment-alert');
+            var url = (splash || alertBox) ? (splash || alertBox).getAttribute('data-seen-url') : null;
+            // فقط دکمه‌ها مخفی نمی‌شوند؛ کل کارت/پاپ‌آپ باید ناپدید شود چون مشتری
+            // گفته دیگر نمی‌خواهد این اطلاعیه را ببیند
+            if (splash) splash.remove();
+            if (alertBox) alertBox.remove();
+            if (!url || noticeDismissSent) return;
+            noticeDismissSent = true;
             fetch(url, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'X-CSRFToken': getCookie('csrftoken') }
             }).catch(function () {
-                container.dataset.sent = '0';
+                noticeDismissSent = false;
             });
         }
 
         document.querySelectorAll('.notice-ack-btn').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var splash = document.getElementById('noticeSplash');
-                var alertBox = document.getElementById('customer-payment-alert');
-                markNoticeSeen(splash || alertBox);
-                if (splash) splash.classList.remove('open');
-                document.querySelectorAll('.notice-ack-btn').forEach(function (btn) {
-                    btn.style.display = 'none';
-                });
-            });
+            button.addEventListener('click', dismissNotice);
         });
     })();
     </script>
