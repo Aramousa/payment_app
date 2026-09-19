@@ -92,7 +92,9 @@
                     <span class="app-nav-user-name">{{ app_nav_user_display }}</span>
                     <span class="app-nav-user-role">{{ app_nav_role_label }}</span>
                 </span>
-                <span class="app-user-menu-caret" title="منوی کاربر">⌄</span>
+                <span class="app-user-menu-caret" title="منوی کاربر">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
             </summary>
             <div class="app-user-menu-panel">
                 {% for group in app_nav_groups %}
@@ -120,7 +122,7 @@
     <div class="app-nav-panel">
         <div class="app-nav-mode-switch" id="sb-mode-switch" role="group" aria-label="حالت نمایش منو">
             <button type="button" class="app-nav-mode-btn" data-sb-mode="expanded" data-nav-hint="پین کردن منو" aria-label="پین کردن منو" aria-pressed="false">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5c0 3.7 5 10.3 5 10.3S17 10.7 17 7a5 5 0 0 0-5-5Z"/><circle cx="12" cy="7" r="1.7"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><polygon points="10.95,12.72 12.36,11.80 17.42,19.59 17.14,19.77" fill="currentColor"/><polygon points="14.24,6.24 14.59,7.32 14.50,8.53 13.98,9.75 13.08,10.86 11.88,11.76 10.51,12.35 9.09,12.57 7.77,12.41 6.68,11.89 5.92,11.04 5.57,9.96 5.66,8.75 6.18,7.53 7.08,6.42 8.28,5.52 9.65,4.93 11.07,4.71 12.39,4.87 13.48,5.39" fill="currentColor"/><polygon points="9.73,6.61 9.82,7.07 9.62,7.58 9.19,8.06 8.60,8.40 7.96,8.54 7.42,8.45 7.07,8.15 6.98,7.69 7.18,7.18 7.61,6.70 8.20,6.36 8.84,6.22 9.38,6.31" fill="#fff" opacity=".55"/></svg>
             </button>
             <button type="button" class="app-nav-mode-btn" data-sb-mode="autohide" data-nav-hint="پنهان خودکار؛ نمایش با حرکت موس" aria-label="پنهان‌سازی خودکار منو" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
