@@ -49,11 +49,27 @@ def _can_view_invoices_nav(user):
         # مشتریان همگی دسترسی یکسان به مشاهده فاکتورهای خودشان دارند.
         if user.profile.role == 'customer':
             return True
-        if user.profile.role in {'sales', 'sales_manager', 'commercial_manager', 'finance_manager'}:
+        # کارکنان بازرگانی به فاکتورها دسترسی ندارند
+        if user.profile.role in {'commercial', 'commercial_manager'}:
+            return False
+        if user.profile.role in {'sales', 'sales_manager', 'finance', 'finance_manager'}:
             return True
         return bool(user.profile.can_view_invoices or user.profile.can_upload_invoices)
     except UserProfile.DoesNotExist:
         return False
+
+
+def _can_view_price_lists_nav(user):
+    if user.is_superuser:
+        return True
+    if not user.is_authenticated:
+        return False
+    try:
+        role = user.profile.role
+    except UserProfile.DoesNotExist:
+        return False
+    # کارکنان بازرگانی به لیست‌قیمت دسترسی ندارند؛ سایر نقش‌ها طبق روال قبلی دارند.
+    return role not in {'commercial', 'commercial_manager'}
 
 
 ACCESS_DEPARTMENT_MANAGER_ROLES = {'commercial_manager', 'finance_manager', 'sales_manager', 'warranty_manager'}
@@ -288,8 +304,9 @@ def app_navigation(request):
         if user.is_superuser or role in COMMERCIAL_ROLES:
             items.append(_nav_item('اطلاعیه فیش روزانه', 'daily_payment_notices', 'daily_payment_notices', 'business', '📣'))
 
-        if user.is_superuser or role in COMMERCIAL_ROLES:
+        if user.is_superuser or _can_view_price_lists_nav(user):
             items.append(_nav_item('لیست قیمت', 'price_lists', 'price_lists', 'sales', '💲'))
+        if user.is_superuser or role in COMMERCIAL_ROLES:
             items.append(_nav_item('سفارش‌ها', 'orders', 'orders', 'sales', '🛒'))
             items.append(_nav_item('پیشنهاد فروش', 'proformas', 'proformas', 'sales', '📝'))
         if user.is_superuser or _can_view_invoices_nav(user):

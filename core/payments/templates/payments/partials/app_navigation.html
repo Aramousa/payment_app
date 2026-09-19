@@ -1,4 +1,16 @@
 ﻿{% load static %}
+{% if request.is_impersonating %}
+<div class="impersonation-banner">
+    <span>
+        🔓 شما با نام <strong>{{ request.impersonation_session.staff_user.get_full_name|default:request.impersonation_session.staff_user.username }}</strong>
+        وارد پنل مشتری <strong>{{ request.impersonation_session.customer_user.get_full_name|default:request.impersonation_session.customer_user.username }}</strong> شده‌اید.
+    </span>
+    <form method="post" action="{% url 'exit_impersonation' %}">
+        {% csrf_token %}
+        <button type="submit" class="impersonation-exit-btn">پایان و بازگشت به حساب خودم</button>
+    </form>
+</div>
+{% endif %}
 {% if request.user.is_authenticated and app_nav_items %}
 {% now "U" as app_nav_cache_buster %}
 

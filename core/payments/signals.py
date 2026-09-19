@@ -63,6 +63,12 @@ def record_logout(sender, request, user, **kwargs):
         UserSession.objects.filter(user=user).delete()
     except Exception:
         pass
+    try:
+        from .impersonation import end_impersonation
+        from .models import CustomerImpersonationSession
+        end_impersonation(request, reason=CustomerImpersonationSession.END_REASON_LOGOUT)
+    except Exception:
+        pass
 
 
 def _create_login_record(request, user, session_key):

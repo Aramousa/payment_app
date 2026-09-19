@@ -102,6 +102,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'axes.middleware.AxesMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # باید بعد از AuthenticationMiddleware (که request.user را می‌سازد) و قبل از
+    # سه میان‌افزار زیر باشد — آن‌ها نباید روی هویت جایگزین‌شده‌ی مشتری اعمال شوند
+    'payments.impersonation.ImpersonationMiddleware',
     'payments.middleware.SingleSessionMiddleware',
     'payments.middleware.SMSOTPMiddleware',
     'payments.middleware.EnforceCustomerPasswordChangeMiddleware',

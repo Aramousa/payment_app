@@ -1,0 +1,169 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>انتخاب نقش ورود — سامانه ارتباط با مشتری</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Vazir, sans-serif;
+            direction: rtl;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0d1b2e 0%, #1a2f4e 50%, #1e3a5f 100%);
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 18px;
+            padding: 36px 32px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 24px 60px rgba(0,0,0,.35);
+        }
+        .icon { font-size: 40px; text-align: center; margin-bottom: 10px; }
+        h1 { font-size: 18px; color: #1e293b; text-align: center; margin-bottom: 6px; }
+        .subtitle { font-size: 13px; color: #64748b; text-align: center; margin-bottom: 26px; line-height: 1.8; }
+        .msg-box {
+            border-radius: 8px; padding: 10px 14px; font-size: 13px;
+            margin-bottom: 16px; text-align: right;
+        }
+        .msg-error { background: #fff5f5; border: 1px solid #fca5a5; color: #7f1d1d; }
+        .msg-success { background: #f0fdf4; border: 1px solid #86efac; color: #14532d; }
+        .option-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 16px;
+        }
+        .option-box h2 { font-size: 14px; color: #18375f; margin-bottom: 4px; }
+        .option-box p.hint { font-size: 12px; color: #94a3b8; margin-bottom: 14px; line-height: 1.8; }
+        .role-badge {
+            display: inline-block; background: #eef4fb; color: #1e3a5f;
+            font-weight: 800; font-size: 13px; border-radius: 999px; padding: 5px 14px;
+            margin-bottom: 12px;
+        }
+        select, input[type="search"] {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: Vazir, sans-serif;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-family: Vazir, sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .15s;
+        }
+        .btn:hover { opacity: .88; }
+        .btn-primary { background: linear-gradient(135deg, #1e3a5f, #0d1b2e); color: #fff; }
+        .btn-outline { background: #fff; color: #1e3a5f; border: 2px solid #1e3a5f; }
+        .notice-box {
+            background: #fffaf0; border: 1px solid #fcd34d; color: #78350f;
+            border-radius: 8px; padding: 10px 14px; font-size: 12px; line-height: 1.8;
+            margin-bottom: 14px;
+        }
+        .logout-link { display: block; margin-top: 18px; font-size: 12px; color: #94a3b8; text-align: center; }
+        .logout-link a { color: #ef4444; text-decoration: none; }
+        .no-customers { font-size: 12px; color: #94a3b8; text-align: center; padding: 8px 0; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">🔐</div>
+    <h1>خوش آمدید، {{ user_display_name }}</h1>
+    <p class="subtitle">نحوه‌ی ورود به سامانه را انتخاب کنید.</p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="msg-box {% if message.tags == 'error' %}msg-error{% else %}msg-success{% endif %}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="option-box">
+        <div class="role-badge">نقش شما: {{ role_label }}</div>
+        <h2>ادامه با نقش خودم</h2>
+        <p class="hint">ورود عادی به سامانه با دسترسی‌های کارمندی شما.</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="own">
+            <button type="submit" class="btn btn-primary">ادامه با نقش خودم</button>
+        </form>
+    </div>
+
+    <div class="option-box">
+        <h2>ورود به‌عنوان مشتری</h2>
+        <p class="hint">برای راهنمایی تلفنی هم‌زمان با مشاهده‌ی پنل مشتری. تمام تغییرات با نام واقعی شما در سوابق ثبت می‌شود و به مشتری اطلاع‌رسانی می‌شود.</p>
+        <div class="notice-box">
+            ⚠️ در این حالت، اعلامیه‌ها و اعلان‌های مشتری به‌عنوان «مشاهده‌شده» ثبت نخواهند شد.
+        </div>
+        {% if customers %}
+        <form method="post" id="customer-role-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="customer">
+            <input type="search" id="role-customer-search" placeholder="جستجوی نام مشتری" autocomplete="off">
+            <select name="customer_id" id="role-customer-select" required>
+                <option value="">— انتخاب مشتری —</option>
+                {% for c in customers %}
+                <option value="{{ c.id }}">{{ c.get_full_name|default:c.username }}{% if c.profile.organization %} ({{ c.profile.organization }}){% endif %}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-outline">ورود به‌عنوان این مشتری</button>
+        </form>
+        {% else %}
+        <p class="no-customers">مشتری فعالی برای انتخاب یافت نشد.</p>
+        {% endif %}
+    </div>
+
+    <div class="logout-link">
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <a href="#" onclick="this.closest('form').submit()">خروج از حساب کاربری</a>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    var search = document.getElementById('role-customer-search');
+    var select = document.getElementById('role-customer-select');
+    if (!search || !select) return;
+    var original = Array.from(select.options).map(function (o) {
+        return { value: o.value, text: o.text };
+    });
+    function normalize(v) {
+        return (v || '')
+            .replace(/[ي]/g, 'ی')
+            .replace(/[ك]/g, 'ک')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+    search.addEventListener('input', function () {
+        var query = normalize(search.value);
+        var current = select.value;
+        select.innerHTML = '';
+        original.forEach(function (opt) {
+            if (!opt.value || !query || normalize(opt.text).includes(query)) {
+                var item = new Option(opt.text, opt.value, false, opt.value === current);
+                select.add(item);
+            }
+        });
+    });
+})();
+</script>
+</body>
+</html>

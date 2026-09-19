@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import BackupAccessCode, Counterparty, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import BackupAccessCode, Counterparty, CustomerImpersonationSession, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 
 
 def format_jalali_datetime(value):
@@ -477,6 +477,50 @@ class LoginRecordAdmin(admin.ModelAdmin):
 
     jalali_login_at.short_description = 'زمان ورود'
     jalali_logout_at.short_description = 'زمان خروج'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+@admin.register(CustomerImpersonationSession)
+class CustomerImpersonationSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        'jalali_started_at', 'staff_user', 'customer_user', 'ip_address',
+        'jalali_ended_at', 'end_reason',
+    )
+    list_filter = ('end_reason', 'started_at')
+    search_fields = (
+        'staff_user__username', 'staff_user__first_name', 'staff_user__last_name',
+        'customer_user__username', 'customer_user__first_name', 'customer_user__last_name',
+        'ip_address',
+    )
+    readonly_fields = (
+        'staff_user', 'customer_user', 'session_key', 'ip_address',
+        'jalali_started_at', 'jalali_ended_at', 'end_reason',
+    )
+    date_hierarchy = 'started_at'
+    ordering = ('-started_at',)
+
+    def jalali_started_at(self, obj):
+        return format_jalali_datetime(obj.started_at)
+
+    def jalali_ended_at(self, obj):
+        return format_jalali_datetime(obj.ended_at) if obj.ended_at else '-'
+
+    jalali_started_at.short_description = 'زمان شروع'
+    jalali_ended_at.short_description = 'زمان پایان'
 
     def has_add_permission(self, request):
         return False

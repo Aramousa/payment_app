@@ -38,7 +38,8 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentNoticeForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import AgencyApplication, AgencyApplicationLog, BackupAccessCode, Counterparty, CounterpartyBankAccount, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import AgencyApplication, AgencyApplicationLog, BackupAccessCode, Counterparty, CounterpartyBankAccount, CustomerImpersonationSession, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .impersonation import ROLE_CONFIRMED_SESSION_KEY, end_impersonation, get_active_impersonation, start_impersonation
 import os
 
 
@@ -126,7 +127,10 @@ def _can_upload_invoices(user):
         return True
     try:
         role = user.profile.role
-        if role in {'commercial_manager', 'finance_manager'}:
+        # کارکنان بازرگانی به فاکتورها دسترسی ندارند (مسدود در پشت‌صحنه)
+        if role in {'commercial', 'commercial_manager'}:
+            return False
+        if role in {'finance', 'finance_manager', 'sales', 'sales_manager'}:
             return True
         return user.profile.can_upload_invoices
     except UserProfile.DoesNotExist:
@@ -141,7 +145,10 @@ def _can_view_invoices(user):
         # مشتریان همگی دسترسی یکسان به مشاهده فاکتورهای خودشان دارند.
         if role == 'customer':
             return True
-        if role in {'sales', 'sales_manager', 'commercial_manager', 'finance_manager'}:
+        # کارکنان بازرگانی به فاکتورها دسترسی ندارند (مسدود در پشت‌صحنه)
+        if role in {'commercial', 'commercial_manager'}:
+            return False
+        if role in {'sales', 'sales_manager', 'finance', 'finance_manager'}:
             return True
         return user.profile.can_view_invoices
     except UserProfile.DoesNotExist:
@@ -153,7 +160,21 @@ def _can_upload_price_lists(user):
         return False
     if user.is_superuser:
         return True
-    return _user_role(user) in {'commercial', 'commercial_manager', 'sales', 'sales_manager', 'finance', 'finance_manager'}
+    # کارکنان بازرگانی به لیست‌قیمت دسترسی ندارند (مسدود در پشت‌صحنه)
+    if _user_role(user) in {'commercial', 'commercial_manager'}:
+        return False
+    return _user_role(user) in {'sales', 'sales_manager', 'finance', 'finance_manager'}
+
+
+def _can_view_price_lists(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    role = _user_role(user)
+    # کارکنان بازرگانی به لیست‌قیمت دسترسی ندارند (مسدود در پشت‌صحنه)؛
+    # سایر نقش‌ها (ازجمله فروش و مالی) طبق روال قبلی دسترسی دارند.
+    return role not in {'commercial', 'commercial_manager'}
 
 
 def _can_issue_proformas(user):
@@ -329,7 +350,7 @@ def _apply_reconciliation_filters(threads, request):
 
 
 def _can_view_price_list_history(user):
-    return _is_staff_user(user)
+    return _is_staff_user(user) and _can_view_price_lists(user)
 
 
 def _can_delete_customer_documents(user):
@@ -711,6 +732,8 @@ class SafeLoginView(LoginView):
         user = self.request.user
         if _is_counterparty_user(user):
             return reverse('counterparty_dashboard')
+        if _is_staff_user(user) and not self.request.session.get(ROLE_CONFIRMED_SESSION_KEY):
+            return reverse('role_select')
         return super().get_success_url()
 
     def form_valid(self, form):
@@ -752,6 +775,63 @@ class SafeLoginView(LoginView):
                 f'حساب کاربری به دلیل تلاش‌های ناموفق مکرر به مدت {minutes} دقیقه قفل شده است.',
             )
         return super().form_invalid(form)
+
+
+@login_required
+def role_select(request):
+    """
+    پس از ورود موفق کارکنان (و پس از تأیید پیامکی MFA در صورت فعال بودن)، این
+    صفحه یک‌بار در ابتدای هر نشست نمایش داده می‌شود: کارمند یا با نقش واقعی خودش
+    ادامه می‌دهد، یا برای پشتیبانی تلفنی هم‌زمان، با دسترسی دقیق یک مشتری مشخص
+    وارد سامانه می‌شود (جانمایی/impersonation). هیچ محدودیتی بر اساس نقش کارمند
+    برای ورود به‌عنوان مشتری وجود ندارد.
+    """
+    if getattr(request, 'is_impersonating', False):
+        return redirect('submit')
+    if not _is_staff_user(request.user):
+        return redirect('submit')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'own':
+            request.session[ROLE_CONFIRMED_SESSION_KEY] = True
+            return redirect('submit')
+        if action == 'customer':
+            customer_id = (request.POST.get('customer_id') or '').strip()
+            customer = User.objects.filter(
+                id=customer_id, is_active=True, profile__role='customer', profile__suspended=False,
+            ).first() if customer_id.isdigit() else None
+            if not customer:
+                messages.error(request, 'مشتری انتخاب‌شده معتبر نیست.')
+                return redirect('role_select')
+            start_impersonation(request, staff_user=request.user, customer_user=customer)
+            customer_name = customer.get_full_name().strip() or customer.username
+            messages.success(request, f'با دسترسی مشتری «{customer_name}» وارد سامانه شدید.')
+            return redirect('submit')
+        messages.error(request, 'گزینه‌ی نامعتبر است.')
+        return redirect('role_select')
+
+    role = _user_role(request.user)
+    customers = (
+        User.objects.filter(is_active=True, profile__role='customer', profile__suspended=False)
+        .select_related('profile')
+        .order_by('first_name', 'last_name', 'username')
+    )
+    return render(request, 'payments/role_select.html', {
+        'role_label': _staff_role_label(_department_role(role)) or 'کارمند',
+        'customers': customers,
+        'user_display_name': request.user.get_full_name().strip() or request.user.username,
+    })
+
+
+@login_required
+@require_POST
+def exit_impersonation(request):
+    if not getattr(request, 'is_impersonating', False):
+        return redirect('submit')
+    end_impersonation(request, reason=CustomerImpersonationSession.END_REASON_MANUAL)
+    messages.success(request, 'به حساب کاربری خودتان بازگشتید.')
+    return redirect('submit')
 
 
 def _suggest_five_digit_password():
@@ -1759,14 +1839,32 @@ def _customer_daily_assignments_for_user(user, request=None):
     return _enrich_daily_assignments(list(assignments))
 
 
+def _real_actor(actor):
+    """
+    اگر actor در واقع «کاربر مشتری جایگزین‌شده» در request.user حین حالت جانمایی
+    باشد (نگاه کنید به payments/impersonation.py)، کارمند واقعی پشت آن را برمی‌گرداند؛
+    در غیر این صورت خود actor را بدون تغییر پس می‌دهد. این تابع تضمین می‌کند سوابق
+    و لاگ‌های سیستم همیشه به کارمند واقعی نسبت داده شوند، نه به هویت مشتری‌ای که
+    کارمند موقتاً با آن وارد شده است.
+    """
+    return getattr(actor, 'impersonator', None) or actor
+
+
 def _log_activity(payment, actor, action, from_status='', to_status='', note=''):
+    real_actor = _real_actor(actor)
+    final_note = note or ''
+    if real_actor is not actor and getattr(actor, 'is_authenticated', False):
+        final_note = (final_note + ' ' if final_note else '') + (
+            f'[ثبت توسط کارمند «{real_actor.get_full_name() or real_actor.username}» '
+            f'در حالت ورود به‌عنوان مشتری]'
+        )
     PaymentActivityLog.objects.create(
         payment=payment,
-        actor=actor if actor and actor.is_authenticated else None,
+        actor=real_actor if real_actor and real_actor.is_authenticated else None,
         action=action,
         from_status=from_status or '',
         to_status=to_status or '',
-        note=note or '',
+        note=final_note,
     )
 
 
@@ -1852,8 +1950,12 @@ def _notification_payload(notification):
     }
 
 
-def _mark_notifications_read_for_url(user, url):
+def _mark_notifications_read_for_url(request, url):
+    user = request.user
     if not user.is_authenticated or not url:
+        return 0
+    if getattr(request, 'is_impersonating', False):
+        # حین جانمایی، اعلان‌های مشتری نباید به‌عنوان «مشاهده‌شده» ثبت شوند
         return 0
 
     path = url.split('?', 1)[0]
@@ -1879,6 +1981,7 @@ def _mark_notifications_read_for_url(user, url):
 
 def _notify_users(users, title, message, url='', category=UserNotification.CATEGORY_SYSTEM, actor=None, sms_message=None, color=''):
     from .sms_service import notify_sms
+    real_actor = _real_actor(actor)
     seen_user_ids = set()
     notifications = []
     for user in users:
@@ -1887,7 +1990,7 @@ def _notify_users(users, title, message, url='', category=UserNotification.CATEG
         seen_user_ids.add(user.id)
         notifications.append(UserNotification(
             user=user,
-            actor=actor if actor and actor.is_authenticated else None,
+            actor=real_actor if real_actor and real_actor.is_authenticated else None,
             title=title,
             message=message,
             url=url,
@@ -3154,7 +3257,7 @@ def notifications_feed(request):
 @never_cache
 def notification_open(request, notification_id):
     notification = get_object_or_404(UserNotification, id=notification_id, user=request.user)
-    if not notification.is_read:
+    if not notification.is_read and not getattr(request, 'is_impersonating', False):
         notification.is_read = True
         notification.read_at = timezone.now()
         notification.save(update_fields=['is_read', 'read_at'])
@@ -3211,6 +3314,10 @@ def reconciliation_attachment_download(request, message_id):
 @require_POST
 @never_cache
 def notifications_mark_read(request):
+    unread_count = UserNotification.objects.filter(user=request.user, is_read=False).count()
+    if getattr(request, 'is_impersonating', False):
+        # حین جانمایی، اعلان‌های مشتری نباید به‌عنوان «مشاهده‌شده» ثبت شوند
+        return JsonResponse({'ok': True, 'updated': 0, 'unread_count': unread_count})
     queryset = UserNotification.objects.filter(user=request.user, is_read=False)
     notification_id = request.POST.get('id')
     if notification_id:
@@ -3381,10 +3488,11 @@ def _published_payment_notice_for_customer(user):
         .order_by('-notice_date', '-published_at', '-id')
         .first()
     )
-    if notice and notice.customer_seen_at is None:
+    if notice and notice.customer_seen_at is None and not getattr(user, 'impersonator', None):
         # همین که اطلاعیه به داشبورد مشتری می‌رسد، خودکار «مشاهده‌شده» ثبت می‌شود —
         # قبلاً این فقط با کلیک روی دکمه «متوجه شدم» ثبت می‌شد که در عمل خیلی وقت‌ها
         # اتفاق نمی‌افتاد و باعث می‌شد وضعیت مشاهده برای کارکنان همیشه نادرست بماند
+        # (حین جانمایی کارمند، این ثبت انجام نمی‌شود — مشتری واقعاً آن را ندیده است)
         notice.customer_seen_at = timezone.now()
         notice.save(update_fields=['customer_seen_at', 'updated_at'])
     return notice
@@ -3526,7 +3634,7 @@ def daily_payment_plan_detail(request, plan_id):
         return HttpResponseForbidden('این بخش فقط برای کاربران واحدهای شرکت قابل دسترسی است.')
 
     plan = get_object_or_404(DailyPaymentPlan.objects.select_related('created_by'), id=plan_id)
-    _mark_notifications_read_for_url(request.user, request.path)
+    _mark_notifications_read_for_url(request, request.path)
     can_manage = _can_manage_daily_payments(request.user)
     return_url = _safe_next_url(request, default=f"{reverse('daily_payment_plans')}?date={_format_jalali_date_latin(plan.deposit_date)}")
     return_label = _return_link_label(request, 'بازگشت به برنامه ها')
@@ -3736,7 +3844,7 @@ def daily_payment_notices(request):
                         target_notice.message,
                         reverse('submit'),
                         category=UserNotification.CATEGORY_PAYMENT_FINANCE,
-                        actor=request.user,
+                        actor=_real_actor(request.user),
                     )
                     if is_confirmed_republish:
                         messages.success(request, 'اعلامیه قبلی ویرایش و دوباره برای مشتری منتشر شد.')
@@ -3840,6 +3948,9 @@ def daily_payment_notice_seen(request, notice_id):
     می‌شود (نگاه کنید به _published_payment_notice_for_customer).
     """
     notice = get_object_or_404(DailyPaymentNotice, id=notice_id, customer=request.user, is_published=True)
+    if getattr(request, 'is_impersonating', False):
+        # حین جانمایی، کارمند نمی‌تواند به نیابت از مشتری اعلامیه را مشاهده‌شده/کناررفته ثبت کند
+        return JsonResponse({'ok': False, 'error': 'در حالت ورود به‌عنوان مشتری امکان این عملیات وجود ندارد.'}, status=403)
     update_fields = []
     if notice.customer_seen_at is None:
         notice.customer_seen_at = timezone.now()
@@ -4507,7 +4618,7 @@ def finance_bulk_final_approve(request):
                 _notify_users([payment.user], 'تأیید نهایی سند',
                               f'سند #{pid} مشتری {customer_name} تأیید نهایی شد.',
                               reverse('submit'), category=UserNotification.CATEGORY_PAYMENT_FINANCE,
-                              actor=request.user)
+                              actor=_real_actor(request.user))
             approved += 1
         except (PaymentRecord.DoesNotExist, ValueError):
             skipped += 1
@@ -4592,7 +4703,7 @@ def delegate_final_approval(request, payment_id):
             [delegate_user],
             '📋 تفویض اختیار تأیید نهایی',
             f'اختیار تأیید نهایی سند #{payment_id} مشتری {customer_name} به شما تفویض شد.',
-            reverse('submit'), category=UserNotification.CATEGORY_PAYMENT_FINANCE, actor=request.user,
+            reverse('submit'), category=UserNotification.CATEGORY_PAYMENT_FINANCE, actor=_real_actor(request.user),
         )
         _log_activity(payment, request.user, PaymentActivityLog.ACTION_STATUS_CHANGED,
                       note=f'تفویض اختیار تأیید نهایی به {_display_name(delegate_user)}')
@@ -4633,7 +4744,7 @@ def finance_unified_action(request, payment_id):
                 list(_staff_notification_users({'finance_manager'})),
                 '✅ سند آماده تأیید نهایی',
                 f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد.',
-                reverse('pending_final_approval'), category=UserNotification.CATEGORY_PAYMENT_FINANCE, actor=request.user,
+                reverse('pending_final_approval'), category=UserNotification.CATEGORY_PAYMENT_FINANCE, actor=_real_actor(request.user),
                 color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
             )
         messages.success(request, f'ثبت مالی سند #{payment_id} انجام شد.')
@@ -4751,7 +4862,7 @@ def finance_register_payment(request, payment_id):
             f'سند #{payment_id} مشتری {customer_name} هم ثبت بازرگانی و هم ثبت مالی دارد و آماده تأیید نهایی است.',
             reverse('pending_final_approval'),
             category=UserNotification.CATEGORY_PAYMENT_FINANCE,
-            actor=request.user,
+            actor=_real_actor(request.user),
             color=_payment_notification_color(PaymentRecord.STATUS_FINAL_APPROVED),
         )
 
@@ -4789,7 +4900,7 @@ def finance_final_approve(request, payment_id):
         f'سند #{payment_id} مشتری {customer_name} توسط مدیر مالی تأیید نهایی شد.',
         reverse('submit'),
         category=UserNotification.CATEGORY_PAYMENT_FINANCE,
-        actor=request.user,
+        actor=_real_actor(request.user),
     )
 
     messages.success(request, f'سند #{payment_id} با موفقیت تأیید نهایی شد.')
@@ -4967,7 +5078,7 @@ def request_admin_review(request, payment_id):
         f'سند #{payment.id} مشتری {customer_name} توسط بازرگانی برای بررسی مدیر ارسال شد.',
         reverse('admin_review_queue'),
         category=UserNotification.CATEGORY_PAYMENT_REVIEW,
-        actor=request.user,
+        actor=_real_actor(request.user),
         color='#FEF3C7',
     )
     messages.success(request, 'سند به صف بررسی مدیر ارسال شد.')
@@ -5066,7 +5177,7 @@ def admin_edit_payment(request, payment_id):
                 f'سند #{payment.id} مشتری {customer_name} توسط مدیر سیستم ویرایش شد.',
                 reverse('payment_timeline', args=[payment.id]),
                 category=UserNotification.CATEGORY_PAYMENT_SUBMIT,
-                actor=request.user,
+                actor=_real_actor(request.user),
                 color='#FEF3C7',
             )
             # مشتری هم مطلع شود — بدون جزئیات، فقط «اطلاعات فیش تغییر کرد...»
@@ -5077,7 +5188,7 @@ def admin_edit_payment(request, payment_id):
                     f'اطلاعات فیش #{payment.id} شما بروزرسانی شد.',
                     reverse('payment_timeline', args=[payment.id]),
                     category=UserNotification.CATEGORY_PAYMENT_SUBMIT,
-                    actor=request.user,
+                    actor=_real_actor(request.user),
                     color='#FEF3C7',
                 )
             messages.success(request, f'سند با موفقیت ویرایش شد. ({len(changed)} فیلد تغییر کرد)')
@@ -5425,8 +5536,8 @@ def payment_timeline(request, payment_id):
     if not is_staff_user and payment.user_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده تاریخچه اسناد خودتان وجود دارد.')
 
-    _mark_notifications_read_for_url(request.user, request.path)
-    if not is_staff_user and payment.customer_seen_at is None:
+    _mark_notifications_read_for_url(request, request.path)
+    if not is_staff_user and payment.customer_seen_at is None and not getattr(request, 'is_impersonating', False):
         payment.customer_seen_at = timezone.now()
         payment.save(update_fields=['customer_seen_at'])
     _log_activity(payment, request.user, PaymentActivityLog.ACTION_VIEWED, note='مشاهده تاریخچه')
@@ -5739,7 +5850,7 @@ def system_backup_download(request):
     except backup_lib.BackupError as e:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         SystemActivityLog.objects.create(
-            actor=request.user, action=SystemActivityLog.ACTION_BACKUP_FAILED,
+            actor=_real_actor(request.user), action=SystemActivityLog.ACTION_BACKUP_FAILED,
             description=str(e)[:2000],
         )
         messages.error(request, f'تهیه نسخه پشتیبان ناموفق بود: {e}')
@@ -5748,7 +5859,7 @@ def system_backup_download(request):
         shutil.rmtree(tmp_dir, ignore_errors=True)
         logger.exception('خطای غیرمنتظره در تهیه نسخه پشتیبان')
         SystemActivityLog.objects.create(
-            actor=request.user, action=SystemActivityLog.ACTION_BACKUP_FAILED,
+            actor=_real_actor(request.user), action=SystemActivityLog.ACTION_BACKUP_FAILED,
             description='خطای غیرمنتظره — جزئیات در لاگ سرور.',
         )
         messages.error(request, 'خطای غیرمنتظره در تهیه نسخه پشتیبان رخ داد. لاگ سرور را بررسی کنید.')
@@ -5760,7 +5871,7 @@ def system_backup_download(request):
 
     file_size = os.path.getsize(enc_path)
     SystemActivityLog.objects.create(
-        actor=request.user, action=SystemActivityLog.ACTION_BACKUP_CREATED,
+        actor=_real_actor(request.user), action=SystemActivityLog.ACTION_BACKUP_CREATED,
         description=f'نسخه پشتیبان رمزنگاری‌شده تهیه و دانلود شد ({file_size:,} بایت).',
     )
 
@@ -5823,7 +5934,7 @@ def system_backup_restore(request):
         manifest = backup_lib.validate_backup_zip(zip_path)
 
         SystemActivityLog.objects.create(
-            actor=request.user, action=SystemActivityLog.ACTION_RESTORE_STARTED,
+            actor=_real_actor(request.user), action=SystemActivityLog.ACTION_RESTORE_STARTED,
             description=f'بازگردانی نسخه پشتیبان آغاز شد (تاریخ تهیه: {manifest.get("created_at")}).',
         )
 
@@ -5838,7 +5949,7 @@ def system_backup_restore(request):
 
     except backup_lib.BackupError as e:
         SystemActivityLog.objects.create(
-            actor=request.user, action=SystemActivityLog.ACTION_RESTORE_FAILED,
+            actor=_real_actor(request.user), action=SystemActivityLog.ACTION_RESTORE_FAILED,
             description=str(e)[:2000],
         )
         messages.error(request, f'بازگردانی ناموفق بود: {e}')
@@ -5846,7 +5957,7 @@ def system_backup_restore(request):
     except Exception as e:
         logger.exception('خطای غیرمنتظره در بازگردانی نسخه پشتیبان')
         SystemActivityLog.objects.create(
-            actor=request.user, action=SystemActivityLog.ACTION_RESTORE_FAILED,
+            actor=_real_actor(request.user), action=SystemActivityLog.ACTION_RESTORE_FAILED,
             description=f'خطای غیرمنتظره: {e}'[:2000],
         )
         messages.error(request, 'خطای غیرمنتظره در بازگردانی رخ داد. لاگ سرور را بررسی کنید.')
@@ -5857,7 +5968,7 @@ def system_backup_restore(request):
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     SystemActivityLog.objects.create(
-        actor=request.user, action=SystemActivityLog.ACTION_RESTORE_SUCCEEDED,
+        actor=_real_actor(request.user), action=SystemActivityLog.ACTION_RESTORE_SUCCEEDED,
         description=f'بازگردانی با موفقیت انجام شد (نسخه پشتیبان مربوط به {manifest.get("created_at")}).',
     )
     auth_logout(request)
@@ -5970,7 +6081,7 @@ def reconciliation_center(request):
                     f'{sender_name} در گفتگوی «{thread.title}» پیام جدید ارسال کرد.',
                     f"{reverse('reconciliation_center')}?thread={thread.id}",
                     category=UserNotification.CATEGORY_RECONCILIATION,
-                    actor=request.user,
+                    actor=_real_actor(request.user),
                 )
                 return redirect(f"{reverse('reconciliation_center')}?thread={thread.id}")
             active_thread = thread
@@ -5996,7 +6107,7 @@ def reconciliation_center(request):
             if not new_body:
                 return JsonResponse({'error': 'متن پیام نمی‌تواند خالی باشد'}, status=400)
             ReconciliationMessageLog.objects.create(
-                message=msg_obj, actor=request.user,
+                message=msg_obj, actor=_real_actor(request.user),
                 action=ReconciliationMessageLog.ACTION_EDIT, old_body=msg_obj.body,
             )
             msg_obj.body = new_body
@@ -6023,7 +6134,7 @@ def reconciliation_center(request):
             if msg_obj.is_deleted:
                 return JsonResponse({'error': 'پیام قبلاً حذف شده است'}, status=400)
             ReconciliationMessageLog.objects.create(
-                message=msg_obj, actor=request.user,
+                message=msg_obj, actor=_real_actor(request.user),
                 action=ReconciliationMessageLog.ACTION_DELETE, old_body=msg_obj.body,
             )
             msg_obj.is_deleted = True
@@ -6047,7 +6158,7 @@ def reconciliation_center(request):
             if not _can_access_reconciliation_thread(request.user, thr):
                 return JsonResponse({'error': 'دسترسی ندارید'}, status=403)
             ReconciliationMessageLog.objects.create(
-                message=msg_obj, actor=request.user,
+                message=msg_obj, actor=_real_actor(request.user),
                 action=ReconciliationMessageLog.ACTION_INFO, old_body='',
             )
             participant_ids = set()
@@ -6086,7 +6197,7 @@ def reconciliation_center(request):
             if new_is_internal and not _is_staff_user(request.user) and not request.user.is_superuser:
                 return JsonResponse({'error': 'مشتری نمی‌تواند پیام داخلی ارسال کند'}, status=403)
             ReconciliationMessageLog.objects.create(
-                message=msg_obj, actor=request.user,
+                message=msg_obj, actor=_real_actor(request.user),
                 action=ReconciliationMessageLog.ACTION_VISIBILITY,
                 old_body='داخلی' if msg_obj.is_internal else 'عمومی',
             )
@@ -6748,6 +6859,10 @@ def _invoice_extraction_payload(job):
 def price_lists_dashboard(request):
     is_staff_user = _is_staff_user(request.user)
     can_upload = _can_upload_price_lists(request.user)
+    can_view = _can_view_price_lists(request.user)
+
+    if is_staff_user and not can_view:
+        return HttpResponseForbidden('شما دسترسی مشاهده لیست قیمت را ندارید.')
 
     if request.method == 'POST':
         if not can_upload:
@@ -6779,7 +6894,7 @@ def price_lists_dashboard(request):
                     f'{len(form.cleaned_data["files"])} فایل لیست قیمت جدید برای شما ثبت شد.',
                     reverse('price_list_file', args=[first_file.id]),
                     category=UserNotification.CATEGORY_INVOICE,
-                    actor=request.user,
+                    actor=_real_actor(request.user),
                 )
             messages.success(
                 request,
@@ -6816,6 +6931,7 @@ def price_lists_dashboard(request):
         'page_base_query': page_base_query,
         'is_staff_user': is_staff_user,
         'can_upload_price_lists': can_upload,
+        'can_view_price_lists': can_view,
         'can_delete_documents': _can_delete_customer_documents(request.user),
         'filters': {
             'customer': customer_filter,
@@ -6861,7 +6977,7 @@ def proformas_dashboard(request):
                     f'{len(form.cleaned_data["files"])} پیش فاکتور جدید برای شما صادر شد.',
                     reverse('proforma_detail', args=[first_proforma.id]),
                     category=UserNotification.CATEGORY_INVOICE,
-                    actor=request.user,
+                    actor=_real_actor(request.user),
                 )
             messages.success(
                 request,
@@ -6905,10 +7021,10 @@ def proforma_detail(request, proforma_id):
     if not _can_access_proforma(request.user, proforma):
         return HttpResponseForbidden('فقط امکان مشاهده پیش فاکتورهای خودتان وجود دارد.')
 
-    _mark_notifications_read_for_url(request.user, request.path)
+    _mark_notifications_read_for_url(request, request.path)
     is_staff_user = _is_staff_user(request.user)
     if not is_staff_user:
-        if proforma.customer_seen_at is None:
+        if proforma.customer_seen_at is None and not getattr(request, 'is_impersonating', False):
             proforma.customer_seen_at = timezone.now()
             proforma.save(update_fields=['customer_seen_at'])
         _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_VIEWED)
@@ -6939,7 +7055,7 @@ def proforma_detail(request, proforma_id):
             # لاگ تایید در تاریخچه سفارش
             CustomerOrderLog.objects.create(
                 order=order_ref,
-                actor=request.user,
+                actor=_real_actor(request.user),
                 action=CustomerOrderLog.ACTION_PROFORMA_APPROVED,
                 note=f'پیش فاکتور «{proforma.title or "بدون عنوان"}» توسط مشتری تایید شد.',
             )
@@ -6953,7 +7069,7 @@ def proforma_detail(request, proforma_id):
             f'پیش فاکتور «{proforma.title or proforma.id}» توسط مشتری تایید شد.',
             reverse('proforma_detail', args=[proforma.id]),
             category=UserNotification.CATEGORY_INVOICE,
-            actor=request.user,
+            actor=_real_actor(request.user),
         )
         messages.success(request, 'پیش فاکتور با موفقیت تایید شد.')
         return redirect('proforma_detail', proforma_id=proforma.id)
@@ -7001,8 +7117,8 @@ def invoice_detail(request, invoice_id):
     if not is_staff_user and invoice.customer_id != request.user.id:
         return HttpResponseForbidden('فقط امکان مشاهده فاکتورهای خودتان وجود دارد.')
 
-    _mark_notifications_read_for_url(request.user, request.path)
-    if not is_staff_user and invoice.customer_seen_at is None:
+    _mark_notifications_read_for_url(request, request.path)
+    if not is_staff_user and invoice.customer_seen_at is None and not getattr(request, 'is_impersonating', False):
         invoice.customer_seen_at = timezone.now()
         invoice.save(update_fields=['customer_seen_at'])
         just_marked_seen = True
@@ -7045,7 +7161,7 @@ def invoice_file(request, invoice_id):
         return HttpResponseForbidden('امکان حذف فاکتور این مشتری برای شما وجود ندارد.')
     if not _can_access_invoice(request.user, invoice):
         return HttpResponseForbidden('فقط امکان مشاهده فایل فاکتورهای خودتان وجود دارد.')
-    _mark_notifications_read_for_url(request.user, request.path)
+    _mark_notifications_read_for_url(request, request.path)
     return _file_response(invoice.attachment, as_attachment=request.GET.get('download') == '1')
 
 
@@ -7060,8 +7176,8 @@ def price_list_file(request, price_list_id):
     latest = PriceList.objects.filter(customer=request.user).order_by('-created_at', '-id').first()
     if not latest or price_list.customer_id != request.user.id or latest.batch_id != price_list.batch_id:
         return HttpResponseForbidden('فقط امکان مشاهده آخرین لیست قیمت خودتان وجود دارد.')
-    _mark_notifications_read_for_url(request.user, request.path)
-    if price_list.customer_seen_at is None:
+    _mark_notifications_read_for_url(request, request.path)
+    if price_list.customer_seen_at is None and not getattr(request, 'is_impersonating', False):
         price_list.customer_seen_at = timezone.now()
         price_list.save(update_fields=['customer_seen_at'])
     return _file_response(price_list.file, as_attachment=request.GET.get('download') == '1')
@@ -7072,9 +7188,9 @@ def proforma_file(request, proforma_id):
     proforma = get_object_or_404(ProformaInvoice.objects.select_related('customer'), id=proforma_id)
     if not _can_access_proforma(request.user, proforma):
         return HttpResponseForbidden('فقط امکان مشاهده فایل پیش فاکتورهای خودتان وجود دارد.')
-    _mark_notifications_read_for_url(request.user, request.path)
+    _mark_notifications_read_for_url(request, request.path)
     if not _is_staff_user(request.user):
-        if proforma.customer_seen_at is None:
+        if proforma.customer_seen_at is None and not getattr(request, 'is_impersonating', False):
             proforma.customer_seen_at = timezone.now()
             proforma.save(update_fields=['customer_seen_at'])
         _log_proforma(proforma, request.user, ProformaInvoiceLog.ACTION_FILE_VIEWED)
@@ -7164,7 +7280,7 @@ def orders_dashboard(request):
                 order.save()
                 item_formset.instance = order
                 item_formset.save()
-                CustomerOrderLog.objects.create(order=order, actor=request.user, action=CustomerOrderLog.ACTION_CREATED, to_status=order.status, note=order.customer_note)
+                CustomerOrderLog.objects.create(order=order, actor=_real_actor(request.user), action=CustomerOrderLog.ACTION_CREATED, to_status=order.status, note=order.customer_note)
                 notify_users = [assigned_sales_expert] if assigned_sales_expert else list(_staff_notification_users({'sales', 'commercial'}))
                 _notify_users(
                     notify_users,
@@ -7172,7 +7288,7 @@ def orders_dashboard(request):
                     f'سفارش {order.order_number} توسط {request.user.get_full_name() or request.user.username} ثبت شد.',
                     reverse('order_detail', args=[order.id]),
                     category=UserNotification.CATEGORY_ORDER,
-                    actor=request.user,
+                    actor=_real_actor(request.user),
                 )
                 messages.success(request, 'سفارش شما با موفقیت ثبت شد.')
                 return redirect('orders')
@@ -7326,7 +7442,7 @@ def sales_assignments_dashboard(request):
                     if old_sales_id != sales_user.id:
                         CustomerOrderLog.objects.create(
                             order=order,
-                            actor=request.user,
+                            actor=_real_actor(request.user),
                             action=CustomerOrderLog.ACTION_ASSIGNED,
                             note=f'تفویض توسط مدیر فروش به {sales_user.get_full_name() or sales_user.username}',
                         )
@@ -7338,7 +7454,7 @@ def sales_assignments_dashboard(request):
                 f'{len(customers)} مشتری به شما تخصیص داده شد.',
                 reverse('sales_expert_dashboard'),
                 category=UserNotification.CATEGORY_SYSTEM,
-                actor=request.user,
+                actor=_real_actor(request.user),
             )
 
             # اطلاع‌رسانی به کارشناسان قدیمی که مشتریانشان منتقل شد
@@ -7355,7 +7471,7 @@ def sales_assignments_dashboard(request):
                     f'{entry["count"]} مشتری از لیست شما به {sales_user.get_full_name() or sales_user.username} منتقل شد.',
                     reverse('sales_expert_dashboard'),
                     category=UserNotification.CATEGORY_SYSTEM,
-                    actor=request.user,
+                    actor=_real_actor(request.user),
                 )
 
             messages.success(request, f'{len(customers)} مشتری به {sales_user.get_full_name() or sales_user.username} تخصیص داده شد.')
@@ -7403,7 +7519,7 @@ def order_detail(request, order_id):
     if not _orders_for_user(request.user).filter(id=order.id).exists():
         return HttpResponseForbidden('امکان مشاهده این سفارش برای شما وجود ندارد.')
 
-    _mark_notifications_read_for_url(request.user, request.path)
+    _mark_notifications_read_for_url(request, request.path)
     can_manage = _can_manage_orders(request.user)
     status_form = StaffOrderUpdateForm(instance=order) if can_manage else None
     proforma_form = OrderProformaUploadForm() if can_manage else None
@@ -7424,13 +7540,13 @@ def order_detail(request, order_id):
                         defaults={'sales_user': updated.sales_expert, 'assigned_by': request.user, 'note': 'تخصیص از صفحه سفارش'},
                     )
                 if old_status != updated.status:
-                    CustomerOrderLog.objects.create(order=updated, actor=request.user, action=CustomerOrderLog.ACTION_STATUS_CHANGED, from_status=old_status, to_status=updated.status, note=updated.staff_note)
-                    _notify_users([updated.customer], 'تغییر وضعیت سفارش', f'وضعیت سفارش {updated.order_number} به «{updated.get_status_display()}» تغییر کرد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_ORDER, actor=request.user)
+                    CustomerOrderLog.objects.create(order=updated, actor=_real_actor(request.user), action=CustomerOrderLog.ACTION_STATUS_CHANGED, from_status=old_status, to_status=updated.status, note=updated.staff_note)
+                    _notify_users([updated.customer], 'تغییر وضعیت سفارش', f'وضعیت سفارش {updated.order_number} به «{updated.get_status_display()}» تغییر کرد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_ORDER, actor=_real_actor(request.user))
                 if old_sales_id != updated.sales_expert_id:
                     assignee = updated.sales_expert.get_full_name() or updated.sales_expert.username if updated.sales_expert else '-'
-                    CustomerOrderLog.objects.create(order=updated, actor=request.user, action=CustomerOrderLog.ACTION_ASSIGNED, note=f'تخصیص به {assignee}')
+                    CustomerOrderLog.objects.create(order=updated, actor=_real_actor(request.user), action=CustomerOrderLog.ACTION_ASSIGNED, note=f'تخصیص به {assignee}')
                     if updated.sales_expert_id:
-                        _notify_users([updated.sales_expert], 'تخصیص سفارش', f'سفارش {updated.order_number} به شما تخصیص داده شد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_ORDER, actor=request.user)
+                        _notify_users([updated.sales_expert], 'تخصیص سفارش', f'سفارش {updated.order_number} به شما تخصیص داده شد.', reverse('order_detail', args=[updated.id]), category=UserNotification.CATEGORY_ORDER, actor=_real_actor(request.user))
                 messages.success(request, 'سفارش بروزرسانی شد.')
                 return redirect('order_detail', order_id=updated.id)
         elif action == 'issue_proforma':
@@ -7457,8 +7573,8 @@ def order_detail(request, order_id):
                 if not order.sales_expert_id:
                     order.sales_expert = request.user
                 order.save(update_fields=['status', 'sales_expert', 'updated_at'])
-                CustomerOrderLog.objects.create(order=order, actor=request.user, action=CustomerOrderLog.ACTION_PROFORMA_CREATED, from_status=previous_status, to_status=order.status, note=f'{len(created)} پیش فاکتور صادر شد.')
-                _notify_users([order.customer], 'پیش فاکتور سفارش صادر شد', f'{len(created)} پیش فاکتور برای سفارش {order.order_number} صادر شد.', reverse('order_detail', args=[order.id]), category=UserNotification.CATEGORY_ORDER, actor=request.user)
+                CustomerOrderLog.objects.create(order=order, actor=_real_actor(request.user), action=CustomerOrderLog.ACTION_PROFORMA_CREATED, from_status=previous_status, to_status=order.status, note=f'{len(created)} پیش فاکتور صادر شد.')
+                _notify_users([order.customer], 'پیش فاکتور سفارش صادر شد', f'{len(created)} پیش فاکتور برای سفارش {order.order_number} صادر شد.', reverse('order_detail', args=[order.id]), category=UserNotification.CATEGORY_ORDER, actor=_real_actor(request.user))
                 messages.success(request, 'پیش فاکتور سفارش صادر و به مشتری اطلاع رسانی شد.')
                 return redirect('order_detail', order_id=order.id)
 
@@ -7787,7 +7903,7 @@ def counterparty_approve_payment(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '✅ تایید فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» تایید شد.' + (f' توضیح: {note}' if note else ''),
-        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=_real_actor(request.user),
         color=_payment_notification_color(event='counterparty_approved'),
     )
     messages.success(request, f'✅ فیش #{payment_id} با موفقیت تایید شد.')
@@ -7827,7 +7943,7 @@ def counterparty_return_payment_cp(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '⚠ عودت فیش از طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» عودت داده شد. دلیل: {note}',
-        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=_real_actor(request.user),
         color=_payment_notification_color(event='counterparty_returned'),
     )
     messages.warning(request, f'⚠ فیش #{payment_id} به بازرگانی عودت داده شد.')
@@ -7864,7 +7980,7 @@ def counterparty_reject_payment_cp(request, payment_id):
         list(_staff_notification_users({'commercial', 'commercial_manager'})),
         '🚫 رد فیش توسط طرف حساب',
         f'فیش #{payment_id} توسط «{cp.name}» رد/ابطال شد. دلیل: {note}',
-        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=request.user,
+        reverse('payment_timeline', args=[payment.id]), category=UserNotification.CATEGORY_PAYMENT_REVIEW, actor=_real_actor(request.user),
         color=_payment_notification_color(event='counterparty_rejected'),
     )
     messages.error(request, f'🚫 فیش #{payment_id} رد/ابطال شد.')
@@ -9300,7 +9416,7 @@ def agency_application_action(request, app_id):
             f'درخواست {app.full_name} تأیید و کاربر {user.username} ایجاد شد.',
             reverse('agency_application_detail', args=[app.pk]),
             category=UserNotification.CATEGORY_AGENCY,
-            actor=request.user,
+            actor=_real_actor(request.user),
         )
         messages.success(request, f'درخواست تأیید شد. کاربر {user.username} ایجاد شد و اطلاعات ورود برای متقاضی پیامک شد.')
 

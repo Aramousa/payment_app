@@ -72,6 +72,13 @@ class SingleSessionMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if getattr(request, 'is_impersonating', False):
+            # حین جانمایی، request.user موقتاً کاربر مشتری است — نباید نشست
+            # واقعی مشتری (که در جای دیگری فعال است) با این درخواست قطع شود.
+            # اما همچنان باید زمان آخرین فعالیت نشست واقعی کارمند به‌روز بماند تا
+            # بلافاصله بعد از پایان جانمایی به‌خاطر بی‌فعالیت خارج نشود.
+            request.session['_last_activity'] = time.time()
+            return self.get_response(request)
         if request.user.is_authenticated and not self._is_exempt(request):
             # طرف حساب → فقط به مسیرهای مجاز دسترسی دارد
             cp_redirect = self._check_counterparty(request)
@@ -181,6 +188,8 @@ class SMSOTPMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if getattr(request, 'is_impersonating', False):
+            return self.get_response(request)
         if (
             request.user.is_authenticated
             and not any(request.path.startswith(p) for p in self._EXEMPT)
@@ -196,6 +205,9 @@ class EnforceCustomerPasswordChangeMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if getattr(request, 'is_impersonating', False):
+            # کارمند حین جانمایی نباید مجبور به تغییر رمز عبور مشتری شود
+            return self.get_response(request)
         if request.user.is_authenticated:
             def _normalize_prefix(url):
                 normalized = f"/{(url or '').lstrip('/')}"

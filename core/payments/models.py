@@ -1697,6 +1697,52 @@ class UserSession(models.Model):
         return f"{self.user.username} - {self.session_key[:8]}…"
 
 
+class CustomerImpersonationSession(models.Model):
+    """
+    سابقه‌ی «ورود کارمند به‌عنوان مشتری» — مستقل از لاگ فعالیت‌های تک‌تک اقدامات.
+    هر بار یک کارمند نقش مشتری را انتخاب می‌کند، یک ردیف اینجا ساخته می‌شود که
+    نقطه‌ی شروع و پایان دقیق را برای گزارش‌گیری/حسابرسی بعدی ثبت می‌کند.
+    """
+    END_REASON_MANUAL = 'manual'
+    END_REASON_LOGOUT = 'logout'
+    END_REASON_INACTIVITY = 'inactivity'
+    END_REASON_FORCED = 'forced'
+    END_REASON_CHOICES = [
+        (END_REASON_MANUAL, 'خروج دستی کارمند از حالت مشتری'),
+        (END_REASON_LOGOUT, 'خروج کامل از سامانه'),
+        (END_REASON_INACTIVITY, 'انقضای بی‌فعالیت'),
+        (END_REASON_FORCED, 'پایان اجباری (مثلاً ورود مجدد از دستگاه دیگر)'),
+    ]
+
+    staff_user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='impersonation_sessions_started', verbose_name='کارمند',
+    )
+    customer_user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='impersonation_sessions_received', verbose_name='مشتری',
+    )
+    session_key = models.CharField('کلید نشست', max_length=40, blank=True)
+    ip_address = models.GenericIPAddressField('آدرس IP', null=True, blank=True)
+    started_at = models.DateTimeField('زمان شروع', auto_now_add=True)
+    ended_at = models.DateTimeField('زمان پایان', null=True, blank=True)
+    end_reason = models.CharField('دلیل پایان', max_length=20, choices=END_REASON_CHOICES, blank=True)
+
+    class Meta:
+        ordering = ['-started_at', '-id']
+        verbose_name = 'جلسه ورود کارمند به‌عنوان مشتری'
+        verbose_name_plural = 'جلسات ورود کارمند به‌عنوان مشتری'
+
+    def __str__(self):
+        staff = self.staff_user.username if self.staff_user else '—'
+        customer = self.customer_user.username if self.customer_user else '—'
+        return f'{staff} → {customer} ({self.started_at:%Y-%m-%d %H:%M})'
+
+    @property
+    def is_active(self):
+        return self.ended_at is None
+
+
 class LoginRecord(models.Model):
     LOGOUT_MANUAL = 'manual'
     LOGOUT_INACTIVITY = 'inactivity'
