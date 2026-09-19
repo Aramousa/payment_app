@@ -680,6 +680,29 @@
             برای امروز شماره حساب و مبلغ معتبری برای شما ثبت نشده است.
         </div>
         {% endif %}
+        {% if active_daily_assignment %}
+        <div class="notice-splash open" id="depositPlanSplash" role="dialog" aria-modal="true">
+            <div class="notice-splash-box">
+                <div class="notice-splash-top">
+                    <h3>برنامه واریز امروز شما</h3>
+                </div>
+                <div class="notice-splash-content">
+                    <p>
+                        لطفا، امروز <strong>{{ active_daily_assignment.plan.deposit_date|jalali_date }}</strong>
+                        مبلغ <strong>{{ active_daily_assignment.expected_amount|thousand_sep }} ریال</strong>
+                        را به حساب <strong>{{ active_daily_assignment.plan.account_number }}</strong>
+                        {% if active_daily_assignment.plan.bank_name %}بانک <strong>{{ active_daily_assignment.plan.bank_name }}</strong>{% endif %}
+                        {% if active_daily_assignment.plan.account_owner %}به نام <strong>{{ active_daily_assignment.plan.account_owner }}</strong>{% endif %}
+                        واریز نمایید و فیش‌های مربوطه را بارگذاری نمایید.
+                    </p>
+                    <p style="font-size:12px;color:#7a5a12;margin-top:8px;">نکته: این شماره حساب صرفا برای امروز مورد تایید می‌باشد.</p>
+                </div>
+                <div class="notice-splash-actions">
+                    <button type="button" class="deposit-plan-ack-btn">متوجه شدم</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% if customer_payment_notice %}
         <form id="notice-dismiss-csrf-form" style="display:none;">{% csrf_token %}</form>
         <div class="customer-payment-alert" id="customer-payment-alert" data-notice-id="{{ customer_payment_notice.id }}" data-seen-url="{% url 'daily_payment_notice_seen' customer_payment_notice.id %}">
@@ -706,7 +729,7 @@
             </div>
         </div>
         {% if show_customer_payment_notice_splash %}
-        <div class="notice-splash open" id="noticeSplash" data-notice-id="{{ customer_payment_notice.id }}" data-seen-url="{% url 'daily_payment_notice_seen' customer_payment_notice.id %}" role="dialog" aria-modal="true">
+        <div class="notice-splash{% if not active_daily_assignment %} open{% endif %}" id="noticeSplash" data-notice-id="{{ customer_payment_notice.id }}" data-seen-url="{% url 'daily_payment_notice_seen' customer_payment_notice.id %}" role="dialog" aria-modal="true">
             <div class="notice-splash-box">
                 <div class="notice-splash-top">
                     <h3>گزارش فیش‌های امروز آماده است</h3>
@@ -2428,6 +2451,21 @@
         document.querySelectorAll('.notice-ack-btn').forEach(function (button) {
             button.addEventListener('click', dismissNotice);
         });
+
+        // اگر هم برنامه واریز و هم اعلامیه فیش‌های ثبت‌شده موجود باشد، ابتدا
+        // popup برنامه واریز نمایش داده می‌شود و پس از بستن آن، popup بعدی
+        // (اعلامیه فیش‌ها) باز می‌شود
+        var depositPlanSplash = document.getElementById('depositPlanSplash');
+        if (depositPlanSplash) {
+            var ackBtn = depositPlanSplash.querySelector('.deposit-plan-ack-btn');
+            if (ackBtn) {
+                ackBtn.addEventListener('click', function () {
+                    depositPlanSplash.remove();
+                    var noticeSplash = document.getElementById('noticeSplash');
+                    if (noticeSplash) noticeSplash.classList.add('open');
+                });
+            }
+        }
     })();
     </script>
     <script src="{% static 'js/app-ui.js' %}?v={{ asset_v }}"></script>
