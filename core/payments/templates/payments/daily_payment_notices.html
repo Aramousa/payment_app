@@ -59,6 +59,44 @@
         .notice-filters label { display: block; font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 5px; }
         .notice-filters input, .notice-filters select { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 9px; font-family: Vazir, sans-serif; }
         .notice-filters .actions { justify-content: flex-start; }
+
+        /* محافظت از ظاهر تقویم persian-datepicker در برابر قوانین عمومی و پهن
+           app-redesign.css/app-ui.css (که با !important روی تگ‌های عمومی مثل
+           table/input/button اعمال می‌شوند) و همچنین غیرفعال‌سازی حالت تمام‌صفحه
+           موبایل کتابخانه (pwt-mobile-view) که باعث می‌شد تقویم به‌جای یک جعبه‌ی
+           کوچک شناور، به‌صورت به‌هم‌ریخته روی کل صفحه پهن شود. */
+        .datepicker-container { z-index: 100000 !important; }
+        .datepicker-container .datepicker-plot-area {
+            background-color: #fff !important;
+            border: 1px solid #ccc !important;
+            box-shadow: 0 6px 18px rgba(0,0,0,.25) !important;
+            width: 240px !important;
+            min-width: 240px !important;
+            max-width: 240px !important;
+            height: auto !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: auto !important;
+            bottom: auto !important;
+        }
+        .datepicker-container .datepicker-day-view table.table-days {
+            width: 100% !important;
+            table-layout: fixed !important;
+            min-width: 0 !important;
+        }
+        .datepicker-container.pwt-mobile-view {
+            position: absolute !important;
+            width: 240px !important;
+            height: auto !important;
+            top: auto !important;
+            left: auto !important;
+            right: auto !important;
+            bottom: auto !important;
+            transition: none !important;
+        }
         tr.notice-row { cursor: pointer; }
         tr.notice-row:hover td { background: #f0f6ff; }
         .notice-popup-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
