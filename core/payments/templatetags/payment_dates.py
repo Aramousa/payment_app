@@ -49,7 +49,7 @@ def jalali_date(value, date_format='%Y/%m/%d'):
     jalali_value = _to_jalali(value)
     if not jalali_value:
         return ''
-    return jalali_value.strftime(date_format)
+    return _to_persian_num(jalali_value.strftime(date_format))
 
 
 @register.filter

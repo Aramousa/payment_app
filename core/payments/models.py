@@ -1077,6 +1077,7 @@ class DailyPaymentNotice(models.Model):
         verbose_name='منتشرکننده',
     )
     customer_seen_at = models.DateTimeField('زمان مشاهده مشتری', null=True, blank=True)
+    customer_dismissed_at = models.DateTimeField('زمان انصراف مشتری از نمایش', null=True, blank=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

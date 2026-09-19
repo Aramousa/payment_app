@@ -1201,18 +1201,37 @@ def _today_jalali_date():
     return jdatetime.date.fromgregorian(date=timezone.localdate(timezone=DISPLAY_TIME_ZONE))
 
 
-def _format_jalali_date(value):
+_FA_DIGITS = str.maketrans('0123456789', '۰۱۲۳۴۵۶۷۸۹')
+
+
+def _to_persian_num(text):
+    return str(text).translate(_FA_DIGITS)
+
+
+def _format_jalali_date_latin(value):
+    """نسخه‌ی اعداد لاتین — فقط برای خروجی اکسل و رشته‌های داخلی URL استفاده شود، نه نمایش به کاربر."""
     if not value:
         return ''
     return value.strftime('%Y/%m/%d')
 
 
-def _format_jalali_datetime(value, date_format='%Y/%m/%d %H:%M'):
+def _format_jalali_datetime_latin(value, date_format='%Y/%m/%d %H:%M'):
+    """نسخه‌ی اعداد لاتین — فقط برای خروجی اکسل و رشته‌های داخلی URL استفاده شود، نه نمایش به کاربر."""
     if not value:
         return ''
     if timezone.is_aware(value):
         value = timezone.localtime(value, DISPLAY_TIME_ZONE)
     return jdatetime.datetime.fromgregorian(datetime=value).strftime(date_format)
+
+
+def _format_jalali_date(value):
+    """برای نمایش به کاربر — اعداد فارسی. برای خروجی اکسل از _format_jalali_date_latin استفاده کنید."""
+    return _to_persian_num(_format_jalali_date_latin(value)) if value else ''
+
+
+def _format_jalali_datetime(value, date_format='%Y/%m/%d %H:%M'):
+    """برای نمایش به کاربر — اعداد فارسی. برای خروجی اکسل از _format_jalali_datetime_latin استفاده کنید."""
+    return _to_persian_num(_format_jalali_datetime_latin(value, date_format)) if value else ''
 
 
 def _build_query_string(request, remove_keys=None):
@@ -1336,14 +1355,14 @@ PAYMENT_EXPORT_FIELDS = [
     _field('beneficiary_account_number', 'شماره حساب مقصد', lambda p: p.beneficiary_account_number),
     _field('beneficiary_account_owner', 'صاحب حساب مقصد', lambda p: p.beneficiary_account_owner),
     _field('amount', 'مبلغ', lambda p: p.amount),
-    _field('pay_date', 'تاریخ واریز', lambda p: _format_jalali_date(p.pay_date)),
+    _field('pay_date', 'تاریخ واریز', lambda p: _format_jalali_date_latin(p.pay_date)),
     _field('tracking_code', 'کد پیگیری', lambda p: p.tracking_code or ''),
     _field('status', 'وضعیت', lambda p: p.get_status_display()),
     _field('counterparty', 'طرف حساب', lambda p: p.counterparty_display_name or ''),
     _field('last_staff_note', 'آخرین توضیح کارشناس', lambda p: p.last_staff_note),
     _field('customer_notes', 'توضیح مشتری', lambda p: p.customer_notes),
-    _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime(p.created_at)),
-    _field('updated_seen_at', 'زمان مشاهده مشتری', lambda p: _format_jalali_datetime(p.customer_seen_at)),
+    _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime_latin(p.created_at)),
+    _field('updated_seen_at', 'زمان مشاهده مشتری', lambda p: _format_jalali_datetime_latin(p.customer_seen_at)),
 ]
 
 INVOICE_EXPORT_FIELDS = [
@@ -1353,7 +1372,7 @@ INVOICE_EXPORT_FIELDS = [
     _field('customer_name', 'نام مشتری', lambda i: i.customer.get_full_name() or i.customer.username),
     _field('organization', 'مجموعه', lambda i: getattr(i.customer.profile, 'organization', '')),
     _field('invoice_number', 'شماره فاکتور', lambda i: i.invoice_number),
-    _field('invoice_date', 'تاریخ فاکتور', lambda i: _format_jalali_date(i.invoice_date)),
+    _field('invoice_date', 'تاریخ فاکتور', lambda i: _format_jalali_date_latin(i.invoice_date)),
     _field('amount', 'مبلغ', lambda i: i.amount),
     _field('reference_number', 'شماره حواله', lambda i: i.reference_number),
     _field('uploaded_by', 'بارگذاری کننده', lambda i: i.uploaded_by.get_full_name() if i.uploaded_by else ''),
@@ -1361,7 +1380,7 @@ INVOICE_EXPORT_FIELDS = [
     _field('customer_visible_note', 'توضیح قابل مشاهده مشتری', lambda i: i.customer_visible_note),
     _field('internal_note', 'توضیح داخلی', lambda i: i.internal_note),
     _field('customer_note', 'یادداشت مشتری', lambda i: i.customer_note),
-    _field('created_at', 'تاریخ ثبت', lambda i: _format_jalali_datetime(i.created_at)),
+    _field('created_at', 'تاریخ ثبت', lambda i: _format_jalali_datetime_latin(i.created_at)),
 ]
 
 CUSTOMER_EXPORT_FIELDS = [
@@ -1380,7 +1399,7 @@ CUSTOMER_EXPORT_FIELDS = [
     _field('total_amount', 'جمع واریزی ها', lambda c: c['total_amount']),
     _field('review_debt', 'بدهی ممیزی نشده', lambda c: c['review_debt']),
     _field('confirmed_debt', 'بدهی تایید شده', lambda c: c['confirmed_debt']),
-    _field('latest_payment_date', 'آخرین سند', lambda c: _format_jalali_datetime(c['latest_payment_date'])),
+    _field('latest_payment_date', 'آخرین سند', lambda c: _format_jalali_datetime_latin(c['latest_payment_date'])),
     _field('status', 'وضعیت', lambda c: 'معلق' if c['profile'].suspended else ('فعال' if c['user'].is_active else 'غیرفعال')),
 ]
 
@@ -1397,8 +1416,8 @@ USER_EXPORT_FIELDS = [
     _field('organization', 'مجموعه', lambda u: u.profile.organization),
     _field('city', 'شهر', lambda u: u.profile.city),
     _field('province', 'استان', lambda u: u.profile.province),
-    _field('active_from', 'تاریخ آغاز', lambda u: _format_jalali_date(u.profile.active_from)),
-    _field('valid_until', 'تاریخ اعتبار', lambda u: _format_jalali_date(u.profile.valid_until)),
+    _field('active_from', 'تاریخ آغاز', lambda u: _format_jalali_date_latin(u.profile.active_from)),
+    _field('valid_until', 'تاریخ اعتبار', lambda u: _format_jalali_date_latin(u.profile.valid_until)),
     _field('is_active', 'فعال', lambda u: 'بله' if u.is_active else 'خیر'),
     _field('suspended', 'معلق', lambda u: 'بله' if u.profile.suspended else 'خیر'),
     _field('can_edit_payment_details', 'دسترسی تکمیل اطلاعات فیش‌ها', lambda u: 'بله' if u.profile.can_edit_payment_details else 'خیر'),
@@ -1408,13 +1427,13 @@ COUNTERPARTY_EXPORT_FIELDS = [
     _field('id', 'ID', lambda c: c.id),
     _field('name', 'نام', lambda c: c.name),
     _field('description', 'توضیحات', lambda c: c.description),
-    _field('created_at', 'تاریخ ثبت', lambda c: _format_jalali_datetime(c.created_at)),
-    _field('updated_at', 'آخرین بروزرسانی', lambda c: _format_jalali_datetime(c.updated_at)),
+    _field('created_at', 'تاریخ ثبت', lambda c: _format_jalali_datetime_latin(c.created_at)),
+    _field('updated_at', 'آخرین بروزرسانی', lambda c: _format_jalali_datetime_latin(c.updated_at)),
 ]
 
 DAILY_PLAN_EXPORT_FIELDS = [
     _field('id', 'ID', lambda p: p.id),
-    _field('deposit_date', 'تاریخ', lambda p: _format_jalali_date(p.deposit_date)),
+    _field('deposit_date', 'تاریخ', lambda p: _format_jalali_date_latin(p.deposit_date)),
     _field('bank_name', 'بانک', lambda p: p.bank_name),
     _field('account_number', 'شماره حساب', lambda p: p.account_number),
     _field('account_owner', 'صاحب حساب', lambda p: p.account_owner),
@@ -1461,8 +1480,8 @@ ORDER_EXPORT_FIELDS = [
     _field('proforma_count', 'تعداد پیش فاکتور', lambda o: o.proformas.count()),
     _field('customer_note', 'توضیح مشتری', lambda o: o.customer_note),
     _field('staff_note', 'توضیح داخلی فروش', lambda o: o.staff_note),
-    _field('created_at', 'زمان ثبت', lambda o: _format_jalali_datetime(o.created_at)),
-    _field('updated_at', 'آخرین بروزرسانی', lambda o: _format_jalali_datetime(o.updated_at)),
+    _field('created_at', 'زمان ثبت', lambda o: _format_jalali_datetime_latin(o.created_at)),
+    _field('updated_at', 'آخرین بروزرسانی', lambda o: _format_jalali_datetime_latin(o.updated_at)),
 ]
 
 SALES_ASSIGNMENT_EXPORT_FIELDS = [
@@ -1474,7 +1493,7 @@ SALES_ASSIGNMENT_EXPORT_FIELDS = [
     _field('sales_user', 'کارشناس فروش', lambda r: r['sales_user'].get_full_name() or r['sales_user'].username if r['sales_user'] else ''),
     _field('assigned_by', 'تخصیص دهنده', lambda r: r['assigned_by'].get_full_name() or r['assigned_by'].username if r['assigned_by'] else ''),
     _field('open_orders', 'سفارش های باز', lambda r: r['open_orders']),
-    _field('updated_at', 'آخرین بروزرسانی', lambda r: _format_jalali_datetime(r['updated_at'])),
+    _field('updated_at', 'آخرین بروزرسانی', lambda r: _format_jalali_datetime_latin(r['updated_at'])),
     _field('note', 'توضیح', lambda r: r['note']),
 ]
 
@@ -1677,10 +1696,10 @@ def _daily_payment_period(request):
 
 
 def _daily_period_query(mode, date_value, start_date=None, end_date=None):
-    query = {'mode': mode, 'date': _format_jalali_date(date_value)}
+    query = {'mode': mode, 'date': _format_jalali_date_latin(date_value)}
     if mode == 'range':
-        query['start_date'] = _format_jalali_date(start_date or date_value)
-        query['end_date'] = _format_jalali_date(end_date or start_date or date_value)
+        query['start_date'] = _format_jalali_date_latin(start_date or date_value)
+        query['end_date'] = _format_jalali_date_latin(end_date or start_date or date_value)
     return urlencode(query)
 
 
@@ -1813,10 +1832,10 @@ def _notification_payload(notification):
         time_label = 'همین الان'
     elif delta.total_seconds() < 3600:
         mins = int(delta.total_seconds() / 60)
-        time_label = f'{mins} دقیقه پیش'
+        time_label = f'{_to_persian_num(mins)} دقیقه پیش'
     elif delta.total_seconds() < 86400:
         hours = int(delta.total_seconds() / 3600)
-        time_label = f'{hours} ساعت پیش'
+        time_label = f'{_to_persian_num(hours)} ساعت پیش'
     else:
         time_label = _format_jalali_datetime(notification.created_at)
 
@@ -2664,7 +2683,7 @@ def _apply_record_filters(records, request, is_staff_user):
 
 def _format_thousand_separator(value):
     try:
-        return '{:,}'.format(int(str(value).replace(',', '').strip()))
+        return _to_persian_num('{:,}'.format(int(str(value).replace(',', '').strip())))
     except (ValueError, TypeError):
         return value
 
@@ -3518,7 +3537,7 @@ def daily_payment_plan_detail(request, plan_id):
     plan = get_object_or_404(DailyPaymentPlan.objects.select_related('created_by'), id=plan_id)
     _mark_notifications_read_for_url(request.user, request.path)
     can_manage = _can_manage_daily_payments(request.user)
-    return_url = _safe_next_url(request, default=f"{reverse('daily_payment_plans')}?date={_format_jalali_date(plan.deposit_date)}")
+    return_url = _safe_next_url(request, default=f"{reverse('daily_payment_plans')}?date={_format_jalali_date_latin(plan.deposit_date)}")
     return_label = _return_link_label(request, 'بازگشت به برنامه ها')
     detail_url = f"{request.path}?{urlencode({'next': return_url})}"
 
@@ -3651,7 +3670,7 @@ def daily_payment_notices(request):
         action = request.POST.get('action') or 'save'
         if action == 'preview':
             customer_value = request.POST.get('customer') or ''
-            date_value = request.POST.get('notice_date') or _format_jalali_date(default_notice_date)
+            date_value = request.POST.get('notice_date') or _format_jalali_date_latin(default_notice_date)
             query = urlencode({'customer': customer_value, 'date': date_value})
             return redirect(f"{reverse('daily_payment_notices')}?{query}")
         if action == 'unpublish':
@@ -3660,7 +3679,7 @@ def daily_payment_notices(request):
             target_notice.is_published = False
             target_notice.save(update_fields=['is_published', 'updated_at'])
             messages.success(request, 'اطلاعیه از پرتال مشتری برداشته شد.')
-            return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date(target_notice.notice_date)}")
+            return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date_latin(target_notice.notice_date)}")
 
         form_instance = notice
         if not form_instance and selected_customer:
@@ -3734,7 +3753,7 @@ def daily_payment_notices(request):
                         messages.success(request, 'اعلامیه برای مشتری منتشر شد.')
                 else:
                     messages.success(request, 'پیش‌نویس اطلاعیه ذخیره شد.')
-                return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date(target_notice.notice_date)}")
+                return redirect(f"{reverse('daily_payment_notices')}?customer={target_notice.customer_id}&date={_format_jalali_date_latin(target_notice.notice_date)}")
     else:
         form = DailyPaymentNoticeForm(instance=notice, initial=initial)
 
@@ -7681,15 +7700,15 @@ def counterparty_dashboard(request):
             _field('customer', 'مشتری', lambda p: f"{p.first_name} {p.last_name}".strip() or (p.user.get_full_name() if p.user else '')),
             _field('organization', 'مجموعه', lambda p: p.organization),
             _field('amount', 'مبلغ (ریال)', lambda p: p.amount),
-            _field('pay_date', 'تاریخ واریز', lambda p: _format_jalali_date(p.pay_date)),
+            _field('pay_date', 'تاریخ واریز', lambda p: _format_jalali_date_latin(p.pay_date)),
             _field('tracking_code', 'کد پیگیری', lambda p: p.tracking_code or ''),
             _field('payer_full_name', 'نام واریز کننده', lambda p: p.payer_full_name),
             _field('payer_account_number', 'شماره حساب واریز کننده', lambda p: p.payer_account_number),
             _field('payer_bank_name', 'بانک واریز کننده', lambda p: p.payer_bank_name),
             _field('beneficiary_account_number', 'شماره حساب مقصد', lambda p: p.beneficiary_account_number),
             _field('status', 'وضعیت', lambda p: p.get_status_display()),
-            _field('cp_approved', 'تایید طرف حساب', lambda p: _format_jalali_datetime(p.counterparty_decided_at) if p.counterparty_decided_at and p.counterparty_status == PaymentRecord.CP_STATUS_APPROVED else 'تایید نشده'),
-            _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime(p.created_at)),
+            _field('cp_approved', 'تایید طرف حساب', lambda p: _format_jalali_datetime_latin(p.counterparty_decided_at) if p.counterparty_decided_at and p.counterparty_status == PaymentRecord.CP_STATUS_APPROVED else 'تایید نشده'),
+            _field('created_at', 'تاریخ ثبت', lambda p: _format_jalali_datetime_latin(p.created_at)),
         ]
         return _export_response(
             _timestamped_excel_filename('counterparty_payments.xlsx'),

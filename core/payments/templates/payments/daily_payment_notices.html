@@ -347,8 +347,13 @@
             if (!dataEl || !overlay) return;
             var popupData = JSON.parse(dataEl.textContent || '{}');
 
+            var faDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+            function toPersianDigits(text) {
+                return String(text).replace(/[0-9]/g, function (d) { return faDigits[d]; });
+            }
             function thousandSep(n) {
-                return (n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                var withCommas = (n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                return toPersianDigits(withCommas);
             }
 
             function openPopup(id) {
