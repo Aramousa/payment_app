@@ -720,6 +720,11 @@ class UserProfile(models.Model):
     )
     avatar_image = models.ImageField('عکس نمایه', upload_to=profile_avatar_upload_to, blank=True, null=True)
     avatar_preset = models.CharField('نمایه پیش‌فرض', max_length=20, choices=AVATAR_PRESET_CHOICES, default='neutral_1')
+    call_available = models.BooleanField(
+        'در دسترس برای تماس',
+        default=False,
+        help_text='اگر فعال باشد، مشتریان می‌توانند برای تماس تصویری با این کارمند (در واحد مربوطه) درخواست بدهند.',
+    )
 
     def __str__(self):
         return self.user.username
@@ -1741,6 +1746,67 @@ class CustomerImpersonationSession(models.Model):
     @property
     def is_active(self):
         return self.ended_at is None
+
+
+class CallRequest(models.Model):
+    """
+    درخواست تماس تصویری مشتری با یکی از واحدهای سازمان (فروش/بازرگانی/مالی).
+    خودِ رسانه‌ی تماس از طریق سرور Jitsi (meet.visiun.ir) و مستقیماً بین
+    مرورگرها ردوبدل می‌شود — این مدل فقط متادیتا (چه کسی، چه زمانی، کدام واحد،
+    کدام کارمند پاسخ داد، چقدر طول کشید) را برای سابقه/حسابرسی ثبت می‌کند.
+    """
+    DEPT_SALES = 'sales'
+    DEPT_COMMERCIAL = 'commercial'
+    DEPT_FINANCE = 'finance'
+    DEPARTMENT_CHOICES = [
+        (DEPT_SALES, 'فروش'),
+        (DEPT_COMMERCIAL, 'بازرگانی'),
+        (DEPT_FINANCE, 'مالی'),
+    ]
+    DEPARTMENT_ROLES = {
+        DEPT_SALES: {'sales', 'sales_manager'},
+        DEPT_COMMERCIAL: {'commercial', 'commercial_manager'},
+        DEPT_FINANCE: {'finance', 'finance_manager'},
+    }
+
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_ENDED = 'ended'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'در انتظار پاسخ'),
+        (STATUS_ACCEPTED, 'پذیرفته‌شده'),
+        (STATUS_EXPIRED, 'بی‌پاسخ (منقضی‌شده)'),
+        (STATUS_CANCELLED, 'لغوشده توسط مشتری'),
+        (STATUS_ENDED, 'پایان‌یافته'),
+    ]
+
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='call_requests', verbose_name='مشتری')
+    department = models.CharField('واحد', max_length=16, choices=DEPARTMENT_CHOICES)
+    room_name = models.CharField('نام اتاق', max_length=64, unique=True)
+    status = models.CharField('وضعیت', max_length=12, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    accepted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='accepted_calls', verbose_name='کارمند پاسخ‌دهنده',
+    )
+    created_at = models.DateTimeField('زمان درخواست', auto_now_add=True)
+    accepted_at = models.DateTimeField('زمان پاسخ', null=True, blank=True)
+    ended_at = models.DateTimeField('زمان پایان', null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'درخواست تماس'
+        verbose_name_plural = 'درخواست‌های تماس'
+
+    def __str__(self):
+        return f'{self.customer} — {self.get_department_display()} ({self.get_status_display()})'
+
+    @property
+    def duration_seconds(self):
+        if self.accepted_at and self.ended_at:
+            return int((self.ended_at - self.accepted_at).total_seconds())
+        return None
 
 
 class LoginRecord(models.Model):
