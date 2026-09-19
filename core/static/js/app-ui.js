@@ -1366,6 +1366,17 @@
         });
     }
 
+    // اگر فرم به‌دلیل خطای اعتبارسنجی دوباره بارگذاری شده، خلاصه‌ی خطاها ممکن است
+    // پایین‌تر از دید کاربر در صفحه‌های طولانی باشد — این تابع آن را به‌طور خودکار
+    // به دید می‌آورد تا کاربر گمان نکند ثبت با موفقیت انجام شده است
+    function scrollToFormErrors() {
+        var summary = document.querySelector('.form-error-summary');
+        if (!summary) return;
+        summary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        summary.classList.add('form-error-summary-pulse');
+        setTimeout(function () { summary.classList.remove('form-error-summary-pulse'); }, 1600);
+    }
+
     var CALL_DEPT_LABELS = { sales: 'فروش', commercial: 'بازرگانی', finance: 'مالی' };
 
     function enhanceCallSystem() {
@@ -1641,6 +1652,7 @@
         enhanceZoomableImages();
         enhanceSelectSubmitOnEnter();
         enhancePdfIframes();
+        scrollToFormErrors();
 
         // Run displayOnlyFileNameInFileInputs again after a short delay
         // to catch dynamically rendered elements

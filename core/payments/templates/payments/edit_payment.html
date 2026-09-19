@@ -116,7 +116,21 @@
             {% for hidden in form.hidden_fields %}
                 {{ hidden }}
             {% endfor %}
-            {{ form.non_field_errors }}
+            {% if form.errors %}
+            <div class="form-error-summary" id="formErrorSummary" role="alert">
+                <div class="form-error-summary-title">⚠ ذخیره تغییرات انجام نشد — لطفاً موارد زیر را بررسی و اصلاح کنید</div>
+                <ul>
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li><a href="#{{ field.id_for_label }}">{{ field.label }}</a>: {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
             <fieldset class="payment-fieldset">
                 <legend>حساب مبدا</legend>
                 {% for field in form.visible_fields %}

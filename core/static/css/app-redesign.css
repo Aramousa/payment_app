@@ -1785,3 +1785,63 @@ tbody tr:hover td {
     animation: call-spin 0.9s linear infinite;
 }
 @keyframes call-spin { to { transform: rotate(360deg); } }
+
+/* ── نمایش برجسته‌ی خطای فرم‌ها ─────────────────────────────────────────── */
+/* قبلاً خطاها فقط با رنگ قرمزِ متن (بدون پس‌زمینه/حاشیه) کنار یک فیلد خاص
+   نمایش داده می‌شدند — در فرم‌های طولانی به‌راحتی از دید کاربر جا می‌ماندند
+   و او فکر می‌کرد ثبت انجام شده است. این بخش خطاها را واضح و غیرقابل‌چشم‌پوشی می‌کند. */
+.form-error-summary {
+    background: #fef2f2 !important;
+    border: 2px solid #dc2626 !important;
+    border-radius: 10px !important;
+    padding: 14px 16px !important;
+    margin: 0 0 18px !important;
+    max-width: 980px;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+.form-error-summary-title {
+    color: #991b1b !important;
+    font-weight: 900 !important;
+    font-size: 15px !important;
+    margin-bottom: 8px !important;
+}
+.form-error-summary ul {
+    margin: 0 !important;
+    padding-right: 20px !important;
+}
+.form-error-summary li {
+    color: #7f1d1d !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 2 !important;
+}
+.form-error-summary li a {
+    color: #b91c1c !important;
+    text-decoration: underline !important;
+}
+
+.field-error,
+.errorlist {
+    background: #fef2f2 !important;
+    border: 1px solid #fca5a5 !important;
+    border-radius: 6px !important;
+    color: #991b1b !important;
+    display: block !important;
+    font-weight: 800 !important;
+    list-style: none !important;
+    margin: 4px 0 0 !important;
+    padding: 6px 10px !important;
+}
+.field-error::before,
+.errorlist li::before {
+    content: "⚠ ";
+}
+
+.form-error-summary-pulse {
+    animation: form-error-pulse 0.5s ease-in-out 2;
+}
+@keyframes form-error-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .45); }
+    50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+}
