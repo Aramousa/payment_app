@@ -135,6 +135,7 @@ iframe {
 
 .notification-trigger,
 .message-envelope,
+.call-availability-toggle,
 .app-user-menu summary {
     align-items: center !important;
     background: var(--a-soft) !important;
@@ -154,6 +155,7 @@ iframe {
 
 .notification-trigger:hover,
 .message-envelope:hover,
+.call-availability-toggle:hover,
 .app-user-menu summary:hover {
     background: var(--a-accent-soft) !important;
     border-color: #c5e8e3 !important;
@@ -1647,22 +1649,26 @@ tbody tr:hover td {
 }
 
 /* ── تماس درون‌برنامه‌ای (Jitsi) ──────────────────────────────────────────── */
-.call-availability-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: #eef4fb;
-    border: 1px solid #c7d2e8;
-    border-radius: 999px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 800;
-    color: #1e3a5f;
+/* اندازه/قالب پایه (پدینگ، ارتفاع، گردی گوشه و...) از قانون مشترک با «پیام‌ها»
+   در بالای همین فایل می‌آید تا این دو کادر دقیقاً هم‌اندازه باشند */
+.call-availability-toggle input {
+    accent-color: #148a5b;
+    width: 15px !important;
+    height: 15px !important;
+    min-height: 0 !important;
+    margin: 0 !important;
     cursor: pointer;
-    white-space: nowrap;
 }
-.call-availability-toggle input { accent-color: #148a5b; width: 15px; height: 15px; cursor: pointer; }
-.call-availability-toggle:has(input:checked) { background: #e3f6e8; border-color: #86efac; color: #14532d; }
+.call-availability-toggle {
+    background: #fdf0f0 !important;
+    border-color: #f0c4c4 !important;
+    color: #8a3a3a !important;
+}
+.call-availability-toggle:has(input:checked) {
+    background: #e3f6e8 !important;
+    border-color: #86efac !important;
+    color: #14532d !important;
+}
 
 .customer-call-btn {
     display: flex;

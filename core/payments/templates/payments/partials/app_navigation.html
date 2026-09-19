@@ -32,7 +32,7 @@
         {% if app_nav_call_department %}
         <label class="call-availability-toggle" title="در دسترس بودن برای تماس مشتریان">
             <input type="checkbox" id="callAvailabilityCheckbox" {% if app_nav_call_available %}checked{% endif %}>
-            <span>در دسترس هستم</span>
+            <span id="callAvailabilityLabel">{% if app_nav_call_available %}در دسترس هستم{% else %}در دسترس نیستم{% endif %}</span>
         </label>
         {% endif %}
         {% if app_nav_is_customer %}
