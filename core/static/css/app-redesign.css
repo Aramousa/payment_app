@@ -135,7 +135,6 @@ iframe {
 
 .notification-trigger,
 .message-envelope,
-.call-availability-toggle,
 .app-user-menu summary {
     align-items: center !important;
     background: var(--a-soft) !important;
@@ -155,7 +154,6 @@ iframe {
 
 .notification-trigger:hover,
 .message-envelope:hover,
-.call-availability-toggle:hover,
 .app-user-menu summary:hover {
     background: var(--a-accent-soft) !important;
     border-color: #c5e8e3 !important;
@@ -1161,6 +1159,25 @@ tbody tr:hover td {
         font-size: 16px !important;
     }
 
+    .app-top-actions {
+        max-width: 100% !important;
+    }
+
+    .customer-call-btn,
+    .call-availability-toggle {
+        height: 38px !important;
+        min-height: 38px !important;
+        min-width: 38px !important;
+        justify-content: center !important;
+        padding: 0 8px !important;
+        gap: 0 !important;
+    }
+
+    .customer-call-label,
+    #callAvailabilityLabel {
+        display: none !important;
+    }
+
     .notification-dropdown {
         left: 10px !important;
         max-width: calc(100vw - 20px) !important;
@@ -1649,32 +1666,13 @@ tbody tr:hover td {
 }
 
 /* ── تماس درون‌برنامه‌ای (Jitsi) ──────────────────────────────────────────── */
-/* اندازه/قالب پایه (پدینگ، ارتفاع، گردی گوشه و...) از قانون مشترک با «پیام‌ها»
-   در بالای همین فایل می‌آید تا این دو کادر دقیقاً هم‌اندازه باشند */
-.call-availability-toggle input {
-    accent-color: #148a5b;
-    width: 15px !important;
-    height: 15px !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    cursor: pointer;
-}
+/* کادر «در دسترس هستم/نیستم» دقیقاً هم‌شکل و هم‌اندازه‌ی دکمه‌ی «تماس با ما»
+   در پنل مشتریان است — فقط رنگ آن بر اساس وضعیت (سبز/قرمز) عوض می‌شود */
+.customer-call-btn,
 .call-availability-toggle {
-    background: #fdf0f0 !important;
-    border-color: #f0c4c4 !important;
-    color: #8a3a3a !important;
-}
-.call-availability-toggle:has(input:checked) {
-    background: #e3f6e8 !important;
-    border-color: #86efac !important;
-    color: #14532d !important;
-}
-
-.customer-call-btn {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: #148a5b;
     border: none;
     border-radius: 999px;
     padding: 8px 14px;
@@ -1685,7 +1683,22 @@ tbody tr:hover td {
     cursor: pointer;
     white-space: nowrap;
 }
+
+.customer-call-btn { background: #148a5b; }
 .customer-call-btn:hover { background: #0f6e49; }
+
+.call-availability-toggle { background: #b3433f; }
+.call-availability-toggle:hover { background: #9c3a37; }
+.call-availability-toggle:has(input:checked) { background: #148a5b; }
+.call-availability-toggle:has(input:checked):hover { background: #0f6e49; }
+.call-availability-toggle input {
+    accent-color: #fff;
+    width: 15px;
+    height: 15px;
+    min-height: 0 !important;
+    margin: 0;
+    cursor: pointer;
+}
 
 .call-modal-overlay {
     display: none;

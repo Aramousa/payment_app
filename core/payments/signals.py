@@ -45,7 +45,9 @@ def enforce_single_session(sender, request, user, **kwargs):
     except Exception:
         pass
 
-    # در ابتدای هر ورود، کارمند باید دوباره آگاهانه «در دسترس هستم» را تیک بزند
+    # در زمان لاگین مجدد، «در دسترس هستم» باید به حالت پیش‌فرض (غیرفعال) برگردد
+    # نه حالت قبل — این تغییر مستقل از رفرش صفحه است چون این سیگنال فقط با
+    # لاگین واقعی (نه رفرش صفحه در همان نشست) اجرا می‌شود
     try:
         UserProfile.objects.filter(user=user, call_available=True).update(call_available=False)
     except Exception:
@@ -67,10 +69,6 @@ def record_logout(sender, request, user, **kwargs):
         pass
     try:
         UserSession.objects.filter(user=user).delete()
-    except Exception:
-        pass
-    try:
-        UserProfile.objects.filter(user=user, call_available=True).update(call_available=False)
     except Exception:
         pass
     try:

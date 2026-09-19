@@ -1372,7 +1372,11 @@
         // ── کارمند: تیک «در دسترس هستم» + تماس‌های ورودی ─────────────────
         var availabilityCheckbox = document.getElementById('callAvailabilityCheckbox');
         if (availabilityCheckbox) {
+            var availabilityLabel = document.getElementById('callAvailabilityLabel');
             availabilityCheckbox.addEventListener('change', function () {
+                if (availabilityLabel) {
+                    availabilityLabel.textContent = availabilityCheckbox.checked ? 'در دسترس هستم' : 'در دسترس نیستم';
+                }
                 fetch('/calls/toggle-availability/', {
                     method: 'POST',
                     credentials: 'same-origin',
@@ -1576,6 +1580,9 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        // اول از همه اجرا می‌شود تا اگر تابع دیگری بعداً خطا داد، این قابلیت
+        // (تیک در دسترس بودن/تماس مشتری) هرگز غیرفعال نماند
+        try { enhanceCallSystem(); } catch (e) {}
         ensureRedesignStylesheet();
         localStorage.removeItem('paymentAppTheme');
         document.documentElement.removeAttribute('data-theme');
@@ -1595,8 +1602,7 @@
         enhanceZoomableImages();
         enhanceSelectSubmitOnEnter();
         enhancePdfIframes();
-        enhanceCallSystem();
-        
+
         // Run displayOnlyFileNameInFileInputs again after a short delay
         // to catch dynamically rendered elements
         setTimeout(function() {

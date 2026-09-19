@@ -4047,12 +4047,30 @@ def customer_daily_payments(request):
         'q': notice_q,
     }
 
+    # داده‌ی هر ردیف صفحه‌ی فعلی برای نمایش در popup هنگام کلیک روی ردیف
+    notice_popup_data = {
+        str(item.id): {
+            'date': _format_jalali_date(item.notice_date),
+            'count': item.payment_count,
+            'amount': item.total_amount,
+            'seen': (
+                f'مشاهده شده — {_format_jalali_datetime(item.customer_seen_at)}'
+                if item.customer_seen_at else 'مشاهده نشده'
+            ),
+            'publisher': (item.published_by.get_full_name() or item.published_by.username) if item.published_by else '-',
+            'updated_at': _format_jalali_datetime(item.updated_at),
+            'message': item.message,
+        }
+        for item in notice_page_obj
+    }
+
     return render(request, 'payments/customer_daily_payments.html', {
         'assignments': page_obj,
         'customer_notices': notice_page_obj,
         'notice_page_obj': notice_page_obj,
         'notice_page_base_query': notice_page_base_query,
         'notice_filters': notice_filters,
+        'notice_popup_data': notice_popup_data,
         'page_obj': page_obj,
         'page_base_query': page_base_query,
         'filters': filters,
