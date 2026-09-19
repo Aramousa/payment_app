@@ -38,7 +38,7 @@ from zoneinfo import ZoneInfo
 
 from .forms import CounterpartyBankAccountFormSet, CounterpartyForm, CounterpartyManagementForm, CustomPasswordChangeForm, CustomerOrderForm, CustomerOrderItemFormSet, CustomerProfileUpdateForm, DailyPaymentAssignmentForm, DailyPaymentNoticeForm, DailyPaymentPlanForm, InvoiceCustomerNoteForm, InvoiceUploadForm, OrderProformaUploadForm, PaymentRecordForm, PriceListUploadForm, ProformaInvoiceForm, ReconciliationMessageForm, ReconciliationThreadForm, SalesAssignmentBulkForm, StaffOrderUpdateForm, StaffPaymentDetailsForm, StaffStatusUpdateForm, SystemLogoSettingsForm, SystemMenuSettingsForm, UserAccessManagementForm, UserAccountManagementForm
 from .invoice_extraction import create_preview_extraction_job, flatten_fields, process_invoice_extraction_job
-from .models import AgencyApplication, AgencyApplicationLog, BackupAccessCode, Counterparty, CounterpartyBankAccount, CustomerImpersonationSession, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import AgencyApplication, AgencyApplicationLog, BackupAccessCode, CallRequest, Counterparty, CounterpartyBankAccount, CustomerImpersonationSession, CustomerOrder, CustomerOrderLog, CustomerSalesAssignment, DailyPaymentAssignment, DailyPaymentNotice, DailyPaymentPlan, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, PaymentActivityLog, PaymentRecord, PaymentReceipt, PriceList, ProductCatalog, ProfileChangeRequest, ProformaInvoice, ProformaInvoiceLog, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, ReconciliationThreadPin, SystemActivityLog, SystemSettings, UploadSettings, UserNotification, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 from .impersonation import ROLE_CONFIRMED_SESSION_KEY, end_impersonation, get_active_impersonation, start_impersonation
 import os
 
@@ -214,6 +214,30 @@ def _can_access_reconciliation(user):
         return True
     # کلیه کارکنان و مشتریان به بخش مغایرت‌گیری دسترسی دارند
     return _is_staff_user(user) or _user_role(user) == 'customer'
+
+
+CALL_RING_TIMEOUT_SECONDS = 90
+
+
+def _call_department_for_role(role):
+    """واحد مربوط به یک نقش کارمندی برای مسیریابی تماس مشتری (فروش/بازرگانی/مالی) — یا رشته خالی."""
+    for dept, roles in CallRequest.DEPARTMENT_ROLES.items():
+        if role in roles:
+            return dept
+    return ''
+
+
+def _can_use_call_availability(user):
+    """آیا این کاربر عضو یکی از سه واحد قابل‌تماس (فروش/بازرگانی/مالی) است."""
+    if not user or not user.is_authenticated:
+        return False
+    return bool(_call_department_for_role(_user_role(user)))
+
+
+def _expire_overdue_call_requests():
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(seconds=CALL_RING_TIMEOUT_SECONDS)
+    CallRequest.objects.filter(status=CallRequest.STATUS_PENDING, created_at__lt=cutoff).update(status=CallRequest.STATUS_EXPIRED)
 
 
 def _reconciliation_threads_for_user(user):
@@ -9955,21 +9979,198 @@ def warranty_staff_action(request, claim_id):
 
 
 
-# ─── Jitsi Meet ───────────────────────────────────────────────────────────────
+# ─── تماس تصویری مشتری با واحدهای سازمان (Jitsi Meet) ─────────────────────────
 
 @login_required
-def jitsi_call(request, room=None):
-    """صفحه تماس تصویری از طریق Jitsi Meet."""
-    if not _can_access_reconciliation(request.user):
-        return HttpResponseForbidden('دسترسی ندارید.')
+@require_POST
+def call_toggle_availability(request):
+    """کارمند با تیک‌زدن «در دسترس هستم» برای دریافت تماس مشتریان واحدش آماده می‌شود."""
+    if not _can_use_call_availability(request.user):
+        return HttpResponseForbidden('این قابلیت برای نقش شما در دسترس نیست.')
+    profile = request.user.profile
+    profile.call_available = request.POST.get('available') == '1'
+    profile.save(update_fields=['call_available'])
+    return JsonResponse({'ok': True, 'available': profile.call_available})
+
+
+@login_required
+def call_departments_status(request):
+    """برای مشتری: کدام واحدها الان حداقل یک کارمند در دسترس دارند."""
+    if _is_staff_user(request.user):
+        return JsonResponse({'departments': {}})
+    _expire_overdue_call_requests()
+    active = CallRequest.objects.filter(
+        customer=request.user, status__in=[CallRequest.STATUS_PENDING, CallRequest.STATUS_ACCEPTED],
+    ).first()
+    departments = {}
+    for dept, roles in CallRequest.DEPARTMENT_ROLES.items():
+        departments[dept] = UserProfile.objects.filter(
+            role__in=roles, call_available=True, user__is_active=True, suspended=False,
+        ).exists()
+    return JsonResponse({
+        'departments': departments,
+        'active_call': {'id': active.id, 'status': active.status} if active else None,
+    })
+
+
+@login_required
+@require_POST
+def call_request_create(request):
+    """مشتری درخواست تماس با یک واحد را ثبت می‌کند."""
+    if _is_staff_user(request.user):
+        return HttpResponseForbidden('این قابلیت فقط برای مشتریان است.')
+    department = request.POST.get('department', '')
+    if department not in CallRequest.DEPARTMENT_ROLES:
+        return JsonResponse({'ok': False, 'error': 'واحد نامعتبر است.'}, status=400)
+
+    _expire_overdue_call_requests()
+    active = CallRequest.objects.filter(
+        customer=request.user, status__in=[CallRequest.STATUS_PENDING, CallRequest.STATUS_ACCEPTED],
+    ).first()
+    if active:
+        return JsonResponse({
+            'ok': False, 'error': 'شما در حال حاضر یک تماس فعال یا در انتظار دارید.', 'call_id': active.id,
+        }, status=409)
+
+    roles = CallRequest.DEPARTMENT_ROLES[department]
+    staff_qs = User.objects.filter(
+        profile__role__in=roles, profile__call_available=True, is_active=True, profile__suspended=False,
+    ).select_related('profile')
+    staff_list = list(staff_qs)
+    if not staff_list:
+        return JsonResponse({'ok': False, 'error': 'در حال حاضر کارمندی در این واحد در دسترس نیست.'}, status=409)
+
+    call = CallRequest.objects.create(customer=request.user, department=department, room_name=uuid.uuid4().hex)
+    customer_name = request.user.get_full_name().strip() or request.user.username
+    _notify_users(
+        staff_list,
+        'تماس ورودی از مشتری',
+        f'درخواست تماس تصویری از «{customer_name}» — واحد {call.get_department_display()}',
+        category=UserNotification.CATEGORY_SYSTEM,
+        actor=request.user,
+    )
+    return JsonResponse({'ok': True, 'call_id': call.id, 'timeout_seconds': CALL_RING_TIMEOUT_SECONDS})
+
+
+@login_required
+def call_request_poll(request, call_id):
+    """مشتری وضعیت درخواست تماس خودش را برای رسیدن به پاسخ کارمند بررسی می‌کند."""
+    call = get_object_or_404(CallRequest, id=call_id, customer=request.user)
+    if call.status == CallRequest.STATUS_PENDING:
+        from datetime import timedelta
+        if timezone.now() - call.created_at > timedelta(seconds=CALL_RING_TIMEOUT_SECONDS):
+            call.status = CallRequest.STATUS_EXPIRED
+            call.save(update_fields=['status'])
+    return JsonResponse({
+        'status': call.status,
+        'room_url': reverse('call_room', args=[call.id]) if call.status == CallRequest.STATUS_ACCEPTED else None,
+        'accepted_by': (call.accepted_by.get_full_name() or call.accepted_by.username) if call.accepted_by else None,
+    })
+
+
+@login_required
+@require_POST
+def call_request_cancel(request, call_id):
+    """مشتری پیش از پاسخ کارمند، درخواست تماس را لغو می‌کند."""
+    updated = CallRequest.objects.filter(
+        id=call_id, customer=request.user, status=CallRequest.STATUS_PENDING,
+    ).update(status=CallRequest.STATUS_CANCELLED)
+    return JsonResponse({'ok': bool(updated)})
+
+
+@login_required
+def call_incoming_poll(request):
+    """کارمندِ در دسترس، تماس‌های در انتظارِ واحد خودش را بررسی می‌کند."""
+    dept = _call_department_for_role(_user_role(request.user))
+    profile = getattr(request.user, 'profile', None)
+    if not dept or not profile or not profile.call_available:
+        return JsonResponse({'calls': []})
+    _expire_overdue_call_requests()
+    calls = (
+        CallRequest.objects
+        .filter(department=dept, status=CallRequest.STATUS_PENDING)
+        .select_related('customer', 'customer__profile')
+        .order_by('created_at')
+    )
+    return JsonResponse({'calls': [
+        {
+            'id': c.id,
+            'customer_name': c.customer.get_full_name().strip() or c.customer.username,
+            'organization': getattr(c.customer.profile, 'organization', '') if hasattr(c.customer, 'profile') else '',
+        }
+        for c in calls
+    ]})
+
+
+@login_required
+@require_POST
+def call_request_accept(request, call_id):
+    """اولین کارمندی که پاسخ دهد، تماس را می‌گیرد — با قفل اتمیک برای جلوگیری از تداخل."""
+    dept = _call_department_for_role(_user_role(request.user))
+    profile = getattr(request.user, 'profile', None)
+    if not dept or not profile or not profile.call_available:
+        return JsonResponse({'ok': False, 'error': 'شما در دسترس نیستید.'}, status=403)
+
+    updated = CallRequest.objects.filter(
+        id=call_id, department=dept, status=CallRequest.STATUS_PENDING,
+    ).update(status=CallRequest.STATUS_ACCEPTED, accepted_by=request.user, accepted_at=timezone.now())
+    if not updated:
+        return JsonResponse({'ok': False, 'error': 'این تماس دیگر در دسترس نیست.'}, status=409)
+
+    # حین تماس فعال، کارمند به‌طور خودکار از حالت «در دسترس» خارج می‌شود
+    profile.call_available = False
+    profile.save(update_fields=['call_available'])
+    return JsonResponse({'ok': True, 'room_url': reverse('call_room', args=[call_id])})
+
+
+@login_required
+@require_POST
+def call_request_end(request, call_id):
+    """هر یک از دو طرف می‌تواند تماس فعال را پایان دهد."""
+    call = get_object_or_404(CallRequest, id=call_id)
+    if call.customer_id != request.user.id and call.accepted_by_id != request.user.id:
+        return HttpResponseForbidden('شما در این تماس شرکت نداشته‌اید.')
+    if call.status == CallRequest.STATUS_ACCEPTED:
+        call.status = CallRequest.STATUS_ENDED
+        call.ended_at = timezone.now()
+        call.save(update_fields=['status', 'ended_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def call_room(request, call_id):
+    """صفحه‌ی اتاق تماس Jitsi — فقط مشتری درخواست‌دهنده و کارمند پاسخ‌دهنده اجازه‌ی ورود دارند."""
+    call = get_object_or_404(CallRequest.objects.select_related('customer', 'accepted_by'), id=call_id)
+    is_customer = call.customer_id == request.user.id
+    dept = _call_department_for_role(_user_role(request.user)) if not is_customer else ''
+    is_dept_staff = bool(dept) and dept == call.department
+
+    if not is_customer and not is_dept_staff:
+        return HttpResponseForbidden('شما به این تماس دسترسی ندارید.')
+
+    # اگر کارمند مستقیماً (بدون گذر از دکمه پاسخ در پاپ‌آپ) وارد شود، همینجا تماس را claim می‌کند
+    if not is_customer and call.status == CallRequest.STATUS_PENDING:
+        profile = request.user.profile
+        if profile.call_available:
+            updated = CallRequest.objects.filter(id=call.id, status=CallRequest.STATUS_PENDING).update(
+                status=CallRequest.STATUS_ACCEPTED, accepted_by=request.user, accepted_at=timezone.now(),
+            )
+            if updated:
+                call.refresh_from_db()
+                profile.call_available = False
+                profile.save(update_fields=['call_available'])
+
+    if not is_customer and call.accepted_by_id != request.user.id:
+        return HttpResponseForbidden('این تماس توسط کارمند دیگری پاسخ داده شده یا هنوز پذیرفته نشده است.')
+    if is_customer and call.status not in (CallRequest.STATUS_ACCEPTED, CallRequest.STATUS_PENDING):
+        return HttpResponseForbidden('این تماس دیگر فعال نیست.')
+
     jitsi_url = SystemSettings.load().jitsi_server_url.strip().rstrip('/')
-    if not jitsi_url:
-        return render(request, 'payments/jitsi_call.html', {'jitsi_configured': False})
-    if room:
-        room = re.sub(r'[^a-zA-Z0-9\-_]', '-', room)[:80]
-    return render(request, 'payments/jitsi_call.html', {
-        'jitsi_configured': True,
+    return render(request, 'payments/call_room.html', {
+        'call': call,
+        'jitsi_configured': bool(jitsi_url),
         'jitsi_url': jitsi_url,
-        'room': room or '',
+        'room': call.room_name,
         'display_name': request.user.profile.display_name,
+        'is_customer': is_customer,
     })

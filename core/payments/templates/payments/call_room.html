@@ -1,0 +1,130 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اتاق تماس — ویزیون</title>
+    <link rel="stylesheet" href="{% static 'css/font-face.css' %}">
+    <style>
+        * { box-sizing: border-box; }
+        body { background: #0f172a; color: #f1f5f9; display: flex; flex-direction: column; font-family: Vazir, sans-serif; margin: 0; min-height: 100vh; }
+        .call-header { align-items: center; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 12px; justify-content: space-between; padding: 12px 20px; }
+        .call-header-left { align-items: center; display: flex; gap: 12px; }
+        .call-header-title { font-size: 15px; font-weight: 800; }
+        .call-header-sub { color: #94a3b8; font-size: 12px; }
+        .call-end-btn { background: #dc2626; border: none; border-radius: 8px; color: #fff; cursor: pointer; font-family: Vazir, sans-serif; font-size: 13px; font-weight: 800; padding: 9px 16px; }
+        .call-end-btn:hover { background: #b91c1c; }
+        .call-body { flex: 1; position: relative; }
+        #jitsi-frame { height: 100%; left: 0; position: absolute; top: 0; width: 100%; }
+        .not-configured { align-items: center; display: flex; flex: 1; flex-direction: column; gap: 16px; justify-content: center; padding: 40px; text-align: center; }
+        .not-configured h2 { font-size: 18px; margin: 0; }
+        .not-configured p { color: #94a3b8; font-size: 13px; line-height: 1.7; margin: 0; }
+        .call-ended-box { align-items: center; display: flex; flex: 1; flex-direction: column; gap: 14px; justify-content: center; padding: 40px; text-align: center; }
+        .call-ended-box h2 { font-size: 18px; margin: 0; }
+        .back-link { background: #2563eb; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 700; padding: 10px 20px; text-decoration: none; }
+    </style>
+</head>
+<body>
+<form id="call-csrf-form" style="display:none;">{% csrf_token %}</form>
+<div class="call-header">
+    <div class="call-header-left">
+        <span class="call-header-title">📹 اتاق تماس تصویری</span>
+        {% if is_customer %}
+        <span class="call-header-sub">واحد {{ call.get_department_display }}</span>
+        {% else %}
+        <span class="call-header-sub">مشتری: {{ call.customer.get_full_name|default:call.customer.username }}</span>
+        {% endif %}
+    </div>
+    <button type="button" class="call-end-btn" id="endCallBtn">پایان تماس</button>
+</div>
+
+{% if not jitsi_configured %}
+<div class="not-configured">
+    <h2>⚙️ سرور تماس پیکربندی نشده</h2>
+    <p>آدرس سرور Jitsi هنوز از پنل ادمین تنظیم نشده است.</p>
+</div>
+{% else %}
+<div class="call-body" id="callBody">
+    <div id="jitsi-frame"></div>
+</div>
+<div class="call-ended-box" id="callEndedBox" style="display:none;">
+    <h2>تماس پایان یافت</h2>
+    <a class="back-link" href="{% if is_customer %}{% url 'submit' %}{% else %}{% url 'submit' %}{% endif %}">بازگشت</a>
+</div>
+
+<script>
+(function () {
+    var JITSI_URL = '{{ jitsi_url|escapejs }}';
+    var DISPLAY_NAME = '{{ display_name|escapejs }}';
+    var ROOM = '{{ room|escapejs }}';
+    var CALL_ID = '{{ call.id }}';
+    var endUrl = '/calls/' + CALL_ID + '/end/';
+    var ended = false;
+    var jitsiApi = null;
+
+    function getCsrfToken() {
+        var el = document.querySelector('#call-csrf-form [name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
+    }
+
+    function notifyEnd() {
+        if (ended) return;
+        ended = true;
+        fetch(endUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': getCsrfToken() },
+        }).catch(function () {});
+    }
+
+    function showEnded() {
+        document.getElementById('callBody').style.display = 'none';
+        document.getElementById('callEndedBox').style.display = 'flex';
+    }
+
+    function startCall() {
+        var el = document.getElementById('jitsi-frame');
+        jitsiApi = new JitsiMeetExternalAPI(JITSI_URL, {
+            roomName: ROOM,
+            parentNode: el,
+            width: '100%',
+            height: '100%',
+            userInfo: { displayName: DISPLAY_NAME },
+            configOverwrite: {
+                disableDeepLinking: true,
+                prejoinPageEnabled: false,
+                disableProfile: true,
+            },
+            interfaceConfigOverwrite: {
+                SHOW_JITSI_WATERMARK: false,
+                SHOW_BRAND_WATERMARK: false,
+            },
+        });
+        jitsiApi.addEventListener('videoConferenceLeft', function () {
+            notifyEnd();
+            showEnded();
+        });
+        jitsiApi.addEventListener('readyToClose', function () {
+            notifyEnd();
+            showEnded();
+        });
+    }
+
+    var script = document.createElement('script');
+    script.src = 'https://' + JITSI_URL + '/external_api.js';
+    script.onload = startCall;
+    document.head.appendChild(script);
+
+    document.getElementById('endCallBtn').addEventListener('click', function () {
+        notifyEnd();
+        if (jitsiApi) { try { jitsiApi.executeCommand('hangup'); } catch (e) {} }
+        showEnded();
+    });
+
+    window.addEventListener('beforeunload', notifyEnd);
+})();
+</script>
+{% endif %}
+</body>
+</html>

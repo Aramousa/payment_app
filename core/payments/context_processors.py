@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import Q
 from zoneinfo import ZoneInfo
 
-from .models import FinalApprovalDelegate, LoginAdvertisement, ReconciliationThread, SystemSettings, UserNotification, UserProfile, WarrantyClaim
+from .models import CallRequest, FinalApprovalDelegate, LoginAdvertisement, ReconciliationThread, SystemSettings, UserNotification, UserProfile, WarrantyClaim
 
 
 STAFF_ROLES = {'staff', 'finance', 'finance_manager', 'commercial', 'commercial_manager', 'sales', 'sales_manager', 'data_entry', 'warranty', 'warranty_manager'}
@@ -70,6 +70,13 @@ def _can_view_price_lists_nav(user):
         return False
     # کارکنان بازرگانی به لیست‌قیمت دسترسی ندارند؛ سایر نقش‌ها طبق روال قبلی دارند.
     return role not in {'commercial', 'commercial_manager'}
+
+
+def _call_department_for_role_nav(role):
+    for dept, roles in CallRequest.DEPARTMENT_ROLES.items():
+        if role in roles:
+            return dept
+    return ''
 
 
 ACCESS_DEPARTMENT_MANAGER_ROLES = {'commercial_manager', 'finance_manager', 'sales_manager', 'warranty_manager'}
@@ -418,6 +425,8 @@ def app_navigation(request):
         'app_nav_avatar_class': profile.avatar_class if profile else 'avatar-neutral_1',
         'app_nav_reconciliation_unread': _reconciliation_unread_count_nav(user),
         'app_nav_logo_url': app_logo_url,
+        'app_nav_call_department': _call_department_for_role_nav(role),
+        'app_nav_call_available': bool(profile.call_available) if profile else False,
         **_business_card_context(user, profile, role_label, user.get_full_name().strip() or user.username),
     }
 
