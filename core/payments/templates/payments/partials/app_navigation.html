@@ -29,6 +29,18 @@
     <div class="app-top-spacer"></div>
 
     <div class="app-top-actions">
+        {% if app_nav_call_department %}
+        <label class="call-availability-toggle" title="در دسترس بودن برای تماس مشتریان">
+            <input type="checkbox" id="callAvailabilityCheckbox" {% if app_nav_call_available %}checked{% endif %}>
+            <span>در دسترس هستم</span>
+        </label>
+        {% endif %}
+        {% if app_nav_is_customer %}
+        <button type="button" class="customer-call-btn" id="customerCallBtn" title="تماس با شرکت">
+            <span aria-hidden="true">📞</span>
+            <span class="customer-call-label">تماس با ما</span>
+        </button>
+        {% endif %}
         <div class="notification-bell app-nav-notification"
              title="اعلان‌ها"
              data-feed-url="{% url 'notifications_feed' %}?v={{ unread_notifications.total }}-{{ app_nav_cache_buster }}"
@@ -597,4 +609,44 @@
 </script>
 <script>window._appUserId = '{{ request.user.id }}';</script>
 <script src="{% static 'js/app-table-prefs.js' %}"></script>
+
+{% if app_nav_call_department or app_nav_is_customer %}
+<form id="call-system-csrf-form" style="display:none;">{% csrf_token %}</form>
+{% endif %}
+
+{% if app_nav_call_department %}
+<div class="call-modal-overlay" id="callIncomingModal">
+    <div class="call-modal-box">
+        <h3>📞 تماس ورودی</h3>
+        <p id="callIncomingText"></p>
+        <div class="call-modal-actions">
+            <button type="button" class="call-answer-btn" id="callAnswerBtn">پاسخ</button>
+            <button type="button" class="call-modal-cancel" id="callIgnoreBtn">نادیده گرفتن</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if app_nav_is_customer %}
+<div class="call-modal-overlay" id="callDeptModal">
+    <div class="call-modal-box">
+        <h3>تماس با کدام واحد؟</h3>
+        <div class="call-dept-options">
+            <button type="button" class="call-dept-btn" data-dept="sales">فروش</button>
+            <button type="button" class="call-dept-btn" data-dept="commercial">بازرگانی</button>
+            <button type="button" class="call-dept-btn" data-dept="finance">مالی</button>
+        </div>
+        <div class="call-modal-error" id="callDeptError" hidden></div>
+        <button type="button" class="call-modal-cancel" id="callDeptCancelBtn">انصراف</button>
+    </div>
+</div>
+<div class="call-modal-overlay" id="callWaitingModal">
+    <div class="call-modal-box">
+        <div class="call-waiting-spinner"></div>
+        <h3 id="callWaitingText">در حال برقراری تماس...</h3>
+        <p id="callWaitingSub"></p>
+        <button type="button" class="call-modal-cancel" id="callWaitingCancelBtn" data-mode="cancel">لغو تماس</button>
+    </div>
+</div>
+{% endif %}
 {% endif %}

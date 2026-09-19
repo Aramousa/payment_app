@@ -1366,6 +1366,215 @@
         });
     }
 
+    var CALL_DEPT_LABELS = { sales: 'فروش', commercial: 'بازرگانی', finance: 'مالی' };
+
+    function enhanceCallSystem() {
+        // ── کارمند: تیک «در دسترس هستم» + تماس‌های ورودی ─────────────────
+        var availabilityCheckbox = document.getElementById('callAvailabilityCheckbox');
+        if (availabilityCheckbox) {
+            availabilityCheckbox.addEventListener('change', function () {
+                fetch('/calls/toggle-availability/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'available=' + (availabilityCheckbox.checked ? '1' : '0'),
+                }).catch(function () {});
+            });
+        }
+
+        var incomingModal = document.getElementById('callIncomingModal');
+        if (incomingModal) {
+            var incomingText = document.getElementById('callIncomingText');
+            var answerBtn = document.getElementById('callAnswerBtn');
+            var ignoreBtn = document.getElementById('callIgnoreBtn');
+            var shownCallId = null;
+            var ignoredIds = {};
+
+            function hideIncoming() {
+                incomingModal.classList.remove('open');
+                shownCallId = null;
+            }
+
+            function pollIncoming() {
+                fetch('/calls/incoming/', { credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        var calls = (data && data.calls) || [];
+                        if (shownCallId && !calls.some(function (c) { return c.id === shownCallId; })) {
+                            hideIncoming();
+                        }
+                        if (!shownCallId) {
+                            var next = calls.find(function (c) { return !ignoredIds[c.id]; });
+                            if (next) {
+                                shownCallId = next.id;
+                                incomingText.textContent = 'تماس از «' + next.customer_name + '»' +
+                                    (next.organization ? ' (' + next.organization + ')' : '');
+                                incomingModal.classList.add('open');
+                            }
+                        }
+                    }).catch(function () {});
+            }
+
+            if (answerBtn) {
+                answerBtn.addEventListener('click', function () {
+                    if (!shownCallId) return;
+                    var callId = shownCallId;
+                    fetch('/calls/' + callId + '/accept/', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': getCsrfToken() },
+                    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                        .then(function (result) {
+                            if (result.ok && result.data.room_url) {
+                                window.location.href = result.data.room_url;
+                            } else {
+                                hideIncoming();
+                                pollIncoming();
+                            }
+                        }).catch(function () { hideIncoming(); });
+                });
+            }
+            if (ignoreBtn) {
+                ignoreBtn.addEventListener('click', function () {
+                    if (shownCallId) ignoredIds[shownCallId] = true;
+                    hideIncoming();
+                });
+            }
+
+            pollIncoming();
+            setInterval(pollIncoming, 5000);
+        }
+
+        // ── مشتری: دکمه تماس با شرکت ──────────────────────────────────────
+        var callBtn = document.getElementById('customerCallBtn');
+        var deptModal = document.getElementById('callDeptModal');
+        var waitingModal = document.getElementById('callWaitingModal');
+        if (!callBtn || !deptModal || !waitingModal) return;
+
+        var deptError = document.getElementById('callDeptError');
+        var waitingText = document.getElementById('callWaitingText');
+        var waitingSub = document.getElementById('callWaitingSub');
+        var waitingCancelBtn = document.getElementById('callWaitingCancelBtn');
+        var deptCancelBtn = document.getElementById('callDeptCancelBtn');
+        var activeCallId = null;
+        var waitingPollTimer = null;
+
+        function stopWaitingPoll() {
+            if (waitingPollTimer) { clearInterval(waitingPollTimer); waitingPollTimer = null; }
+        }
+
+        function showWaiting(text) {
+            deptModal.classList.remove('open');
+            waitingText.textContent = text || 'در حال برقراری تماس...';
+            waitingSub.textContent = '';
+            waitingCancelBtn.textContent = 'لغو تماس';
+            waitingCancelBtn.dataset.mode = 'cancel';
+            waitingModal.classList.add('open');
+        }
+
+        function pollActiveCall() {
+            if (!activeCallId) return;
+            fetch('/calls/' + activeCallId + '/poll/', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.status === 'accepted' && data.room_url) {
+                        stopWaitingPoll();
+                        window.location.href = data.room_url;
+                    } else if (data.status === 'expired') {
+                        stopWaitingPoll();
+                        waitingText.textContent = 'متأسفانه در حال حاضر پاسخ‌گویی وجود ندارد.';
+                        waitingSub.textContent = 'لطفاً دوباره تلاش کنید.';
+                        waitingCancelBtn.textContent = 'بستن';
+                        waitingCancelBtn.dataset.mode = 'close';
+                        activeCallId = null;
+                    } else if (data.status === 'cancelled' || data.status === 'ended') {
+                        stopWaitingPoll();
+                        waitingModal.classList.remove('open');
+                        activeCallId = null;
+                    }
+                }).catch(function () {});
+        }
+
+        callBtn.addEventListener('click', function () {
+            deptError.hidden = true;
+            deptModal.classList.add('open');
+            fetch('/calls/departments-status/', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.active_call) {
+                        activeCallId = data.active_call.id;
+                        if (data.active_call.status === 'accepted') {
+                            showWaiting('در حال اتصال...');
+                            pollActiveCall();
+                        } else {
+                            showWaiting('در انتظار پاسخ کارمند...');
+                        }
+                        waitingPollTimer = setInterval(pollActiveCall, 2000);
+                        return;
+                    }
+                    var departments = data.departments || {};
+                    deptModal.querySelectorAll('.call-dept-btn').forEach(function (btn) {
+                        var dept = btn.dataset.dept;
+                        btn.disabled = !departments[dept];
+                        btn.classList.toggle('call-dept-unavailable', !departments[dept]);
+                    });
+                }).catch(function () {});
+        });
+
+        deptModal.querySelectorAll('.call-dept-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (btn.disabled) return;
+                var dept = btn.dataset.dept;
+                fetch('/calls/request/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'department=' + encodeURIComponent(dept),
+                }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                    .then(function (result) {
+                        if (result.ok && result.data.call_id) {
+                            activeCallId = result.data.call_id;
+                            showWaiting('در انتظار پاسخ کارمند ' + (CALL_DEPT_LABELS[dept] || '') + '...');
+                            waitingPollTimer = setInterval(pollActiveCall, 2000);
+                        } else {
+                            deptError.hidden = false;
+                            deptError.textContent = (result.data && result.data.error) || 'خطا در برقراری تماس.';
+                        }
+                    }).catch(function () {
+                        deptError.hidden = false;
+                        deptError.textContent = 'خطا در ارتباط با سرور.';
+                    });
+            });
+        });
+
+        if (deptCancelBtn) {
+            deptCancelBtn.addEventListener('click', function () {
+                deptModal.classList.remove('open');
+            });
+        }
+
+        if (waitingCancelBtn) {
+            waitingCancelBtn.addEventListener('click', function () {
+                stopWaitingPoll();
+                if (waitingCancelBtn.dataset.mode === 'cancel' && activeCallId) {
+                    fetch('/calls/' + activeCallId + '/cancel/', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': getCsrfToken() },
+                    }).catch(function () {});
+                }
+                activeCallId = null;
+                waitingModal.classList.remove('open');
+            });
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         ensureRedesignStylesheet();
         localStorage.removeItem('paymentAppTheme');
@@ -1386,6 +1595,7 @@
         enhanceZoomableImages();
         enhanceSelectSubmitOnEnter();
         enhancePdfIframes();
+        enhanceCallSystem();
         
         // Run displayOnlyFileNameInFileInputs again after a short delay
         // to catch dynamically rendered elements

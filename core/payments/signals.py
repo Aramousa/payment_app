@@ -45,6 +45,12 @@ def enforce_single_session(sender, request, user, **kwargs):
     except Exception:
         pass
 
+    # در ابتدای هر ورود، کارمند باید دوباره آگاهانه «در دسترس هستم» را تیک بزند
+    try:
+        UserProfile.objects.filter(user=user, call_available=True).update(call_available=False)
+    except Exception:
+        pass
+
 
 @receiver(user_logged_out)
 def record_logout(sender, request, user, **kwargs):
@@ -61,6 +67,10 @@ def record_logout(sender, request, user, **kwargs):
         pass
     try:
         UserSession.objects.filter(user=user).delete()
+    except Exception:
+        pass
+    try:
+        UserProfile.objects.filter(user=user, call_available=True).update(call_available=False)
     except Exception:
         pass
     try:

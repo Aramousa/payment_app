@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 import jdatetime
 from django.utils import timezone
 
-from .models import BackupAccessCode, Counterparty, CustomerImpersonationSession, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
+from .models import BackupAccessCode, CallRequest, Counterparty, CustomerImpersonationSession, CustomerOrder, CustomerOrderItem, CustomerOrderLog, CustomerSalesAssignment, FieldRequirementConfig, InvoiceExtractionJob, InvoiceRecord, LoginAdvertisement, LoginRecord, PaymentActivityLog, PaymentRecord, PaymentReceipt, ProductCatalog, ProfileChangeRequest, ReconciliationMessage, ReconciliationMessageLog, ReconciliationMessageReadReceipt, ReconciliationReadState, ReconciliationThread, SystemActivityLog, SystemSettings, UploadSettings, UserProfile, WarrantyClaim, WarrantyClaimFile, WarrantyClaimLog
 
 
 def format_jalali_datetime(value):
@@ -521,6 +521,59 @@ class CustomerImpersonationSessionAdmin(admin.ModelAdmin):
 
     jalali_started_at.short_description = 'زمان شروع'
     jalali_ended_at.short_description = 'زمان پایان'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+@admin.register(CallRequest)
+class CallRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        'jalali_created_at', 'customer', 'department', 'accepted_by', 'status', 'duration_display',
+    )
+    list_filter = ('department', 'status', 'created_at')
+    search_fields = (
+        'customer__username', 'customer__first_name', 'customer__last_name',
+        'accepted_by__username', 'accepted_by__first_name', 'accepted_by__last_name',
+    )
+    readonly_fields = (
+        'customer', 'department', 'room_name', 'status', 'accepted_by',
+        'jalali_created_at', 'jalali_accepted_at', 'jalali_ended_at', 'duration_display',
+    )
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+
+    def jalali_created_at(self, obj):
+        return format_jalali_datetime(obj.created_at)
+
+    def jalali_accepted_at(self, obj):
+        return format_jalali_datetime(obj.accepted_at) if obj.accepted_at else '-'
+
+    def jalali_ended_at(self, obj):
+        return format_jalali_datetime(obj.ended_at) if obj.ended_at else '-'
+
+    def duration_display(self, obj):
+        seconds = obj.duration_seconds
+        if seconds is None:
+            return '-'
+        return f'{seconds // 60} دقیقه و {seconds % 60} ثانیه'
+
+    jalali_created_at.short_description = 'زمان درخواست'
+    jalali_accepted_at.short_description = 'زمان پاسخ'
+    jalali_ended_at.short_description = 'زمان پایان'
+    duration_display.short_description = 'مدت تماس'
 
     def has_add_permission(self, request):
         return False
