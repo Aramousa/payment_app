@@ -98,7 +98,10 @@
             transition: none !important;
         }
         tr.notice-row { cursor: pointer; }
-        tr.notice-row:hover td { background: #f0f6ff; }
+        tr.notice-row.notice-row-seen td { background: #f2faf4; }
+        tr.notice-row.notice-row-unseen td { background: #fdfaf1; }
+        tr.notice-row.notice-row-seen:hover td { background: #e3f6e8; }
+        tr.notice-row.notice-row-unseen:hover td { background: #faf0d8; }
         .notice-popup-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
         .notice-popup-overlay.open { display: flex; }
         .notice-popup-box { background: #fff; border-radius: 10px; max-width: 520px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 20px; box-shadow: 0 20px 50px rgba(15,23,42,.3); }
@@ -224,7 +227,7 @@
                     </thead>
                     <tbody>
                     {% for item in recent_notices %}
-                        <tr class="notice-row" data-notice-id="{{ item.id }}" title="مشاهده جزئیات">
+                        <tr class="notice-row {% if item.customer_seen_at %}notice-row-seen{% else %}notice-row-unseen{% endif %}" data-notice-id="{{ item.id }}" title="مشاهده جزئیات">
                             <td>{{ item.customer.get_full_name|default:item.customer.username }}</td>
                             <td>{{ item.notice_date|jalali_date }}</td>
                             <td>{{ item.payment_count|thousand_sep }}</td>
