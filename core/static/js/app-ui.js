@@ -1396,10 +1396,48 @@
             var ignoreBtn = document.getElementById('callIgnoreBtn');
             var shownCallId = null;
             var ignoredIds = {};
+            var ringIntervalId = null;
+
+            function isCallSoundMuted() {
+                try { return localStorage.getItem('notifSoundMuted:' + (window._appUserId || '')) === '1'; } catch (e) { return false; }
+            }
+
+            function playRingBurst() {
+                if (isCallSoundMuted()) return;
+                try {
+                    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    function tone(freq, startTime, duration) {
+                        var osc = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.frequency.value = freq;
+                        osc.type = 'sine';
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime + startTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+                        osc.start(ctx.currentTime + startTime);
+                        osc.stop(ctx.currentTime + startTime + duration);
+                    }
+                    // دو بوق کوتاه شبیه زنگ تلفن
+                    tone(880, 0, 0.35);
+                    tone(880, 0.45, 0.35);
+                } catch (e) {}
+            }
+
+            function startRinging() {
+                if (ringIntervalId) return;
+                playRingBurst();
+                ringIntervalId = setInterval(playRingBurst, 2200);
+            }
+
+            function stopRinging() {
+                if (ringIntervalId) { clearInterval(ringIntervalId); ringIntervalId = null; }
+            }
 
             function hideIncoming() {
                 incomingModal.classList.remove('open');
                 shownCallId = null;
+                stopRinging();
             }
 
             function pollIncoming() {
@@ -1417,6 +1455,7 @@
                                 incomingText.textContent = 'تماس از «' + next.customer_name + '»' +
                                     (next.organization ? ' (' + next.organization + ')' : '');
                                 incomingModal.classList.add('open');
+                                startRinging();
                             }
                         }
                     }).catch(function () {});
